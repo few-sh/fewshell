@@ -261,6 +261,19 @@ class _ChatSessionState extends State<ChatSession> {
               ),
             ),
             ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('Snippets'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Snippets page coming soon!'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.key),
               title: const Text('Secrets'),
               onTap: () {
@@ -281,6 +294,19 @@ class _ChatSessionState extends State<ChatSession> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Customize instructions for the assistant.'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.monitor_heart),
+              title: const Text('Monitors (Premium)'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Monitoring page coming soon!'),
                     duration: Duration(seconds: 2),
                   ),
                 );
