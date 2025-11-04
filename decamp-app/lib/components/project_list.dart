@@ -93,14 +93,18 @@ class ProjectList extends StatelessWidget {
                       Icon(
                         Icons.folder_open,
                         size: 64,
-                        color: Colors.grey.shade400,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.3),
                       ),
                       const SizedBox(height: 16),
                       Text(
                         'No projects yet',
                         style: TextStyle(
                           fontSize: 18,
-                          color: Colors.grey.shade600,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.6),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -108,7 +112,9 @@ class ProjectList extends StatelessWidget {
                         'Create a new project to get started',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade500,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.5),
                         ),
                       ),
                     ],
@@ -155,7 +161,9 @@ class ProjectList extends StatelessWidget {
                                   project.description!,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.grey.shade700,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.7),
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -166,7 +174,9 @@ class ProjectList extends StatelessWidget {
                                 'Last session: $absoluteDateTime',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.grey.shade600,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.6),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -174,7 +184,9 @@ class ProjectList extends StatelessWidget {
                                 relativeTime,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.grey.shade500,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.5),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
@@ -189,15 +201,22 @@ class ProjectList extends StatelessWidget {
                             }
                           },
                           itemBuilder: (BuildContext context) => [
-                            const PopupMenuItem<String>(
+                            PopupMenuItem<String>(
                               value: 'delete',
                               child: Row(
                                 children: [
-                                  Icon(Icons.delete, color: Colors.red),
-                                  SizedBox(width: 8),
+                                  Icon(
+                                    Icons.delete,
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
                                     'Delete',
-                                    style: TextStyle(color: Colors.red),
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.error,
+                                    ),
                                   ),
                                 ],
                               ),

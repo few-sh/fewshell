@@ -208,7 +208,9 @@ class _ChatSessionState extends State<ChatSession> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade700,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.7),
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -236,7 +238,9 @@ class _ChatSessionState extends State<ChatSession> {
                               'Current project',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: Colors.grey.shade600,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.6),
                               ),
                             ),
                           ],
@@ -314,9 +318,9 @@ class _ChatSessionState extends State<ChatSession> {
         // Input field customization
         inputOptions: InputOptions.minimal(
           hintText: 'Ask me anything...',
-          textColor: Colors.black,
-          hintColor: Colors.grey,
-          backgroundColor: Colors.white,
+          textColor: Theme.of(context).colorScheme.onSurface,
+          hintColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+          backgroundColor: Theme.of(context).colorScheme.surface,
           borderRadius: 24.0,
           autofocus: true,
           sendOnEnter: true,
@@ -346,10 +350,12 @@ class _ChatSessionState extends State<ChatSession> {
           showTime: true,
           showUserName: true,
           bubbleStyle: BubbleStyle(
-            userBubbleColor: Colors.blue.withOpacity(0.1),
-            aiBubbleColor: Colors.grey.shade100,
-            userNameColor: Colors.blue.shade700,
-            aiNameColor: Colors.purple.shade700,
+            userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
+            aiBubbleColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
+            userNameColor: Theme.of(context).colorScheme.primary,
+            aiNameColor: Theme.of(context).colorScheme.secondary,
             bottomLeftRadius: 22,
             bottomRightRadius: 22,
             enableShadow: true,

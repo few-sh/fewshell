@@ -1,3 +1,11 @@
+## About the app
+
+Decamp is a mobile app to help on-call infrastructure management
+and troubleshooting for devops engineers.
+
+It allows AI-assisted shell sessions that help send commands to the cloud
+
+
 ## Instructions
 
 - This is a PRODUCTION app, not a prototype. Follow Flutter best practices, keep code clean and reusable.
