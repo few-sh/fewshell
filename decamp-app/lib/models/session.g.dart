@@ -6,10 +6,10 @@ part of 'session.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_Session _$SessionFromJson(
+_$SessionImpl _$$SessionImplFromJson(
   Map<String, dynamic> json,
-) => $checkedCreate('_Session', json, ($checkedConvert) {
-  final val = _Session(
+) => $checkedCreate(r'_$SessionImpl', json, ($checkedConvert) {
+  final val = _$SessionImpl(
     id: $checkedConvert('id', (v) => v as String),
     projectId: $checkedConvert('projectId', (v) => v as String),
     description: $checkedConvert('description', (v) => v as String),
@@ -20,11 +20,12 @@ _Session _$SessionFromJson(
   return val;
 });
 
-Map<String, dynamic> _$SessionToJson(_Session instance) => <String, dynamic>{
-  'id': instance.id,
-  'projectId': instance.projectId,
-  'description': instance.description,
-  'timestamp': instance.timestamp.toIso8601String(),
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt.toIso8601String(),
-};
+Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'projectId': instance.projectId,
+      'description': instance.description,
+      'timestamp': instance.timestamp.toIso8601String(),
+      'createdAt': instance.createdAt.toIso8601String(),
+      'updatedAt': instance.updatedAt.toIso8601String(),
+    };

@@ -6,10 +6,10 @@ part of 'secret.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_Secret _$SecretFromJson(
+_$SecretImpl _$$SecretImplFromJson(
   Map<String, dynamic> json,
-) => $checkedCreate('_Secret', json, ($checkedConvert) {
-  final val = _Secret(
+) => $checkedCreate(r'_$SecretImpl', json, ($checkedConvert) {
+  final val = _$SecretImpl(
     id: $checkedConvert('id', (v) => v as String),
     projectId: $checkedConvert('projectId', (v) => v as String?),
     key: $checkedConvert('key', (v) => v as String),
@@ -20,11 +20,12 @@ _Secret _$SecretFromJson(
   return val;
 });
 
-Map<String, dynamic> _$SecretToJson(_Secret instance) => <String, dynamic>{
-  'id': instance.id,
-  'projectId': instance.projectId,
-  'key': instance.key,
-  'description': instance.description,
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt.toIso8601String(),
-};
+Map<String, dynamic> _$$SecretImplToJson(_$SecretImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'projectId': instance.projectId,
+      'key': instance.key,
+      'description': instance.description,
+      'createdAt': instance.createdAt.toIso8601String(),
+      'updatedAt': instance.updatedAt.toIso8601String(),
+    };

@@ -7,6 +7,8 @@ part 'project.g.dart';
 /// Each project contains multiple sessions and has its own settings.
 @freezed
 class Project with _$Project {
+  const Project._();
+
   const factory Project({
     required String id,
     required String name,

@@ -6,10 +6,10 @@ part of 'snippet.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_Snippet _$SnippetFromJson(
+_$SnippetImpl _$$SnippetImplFromJson(
   Map<String, dynamic> json,
-) => $checkedCreate('_Snippet', json, ($checkedConvert) {
-  final val = _Snippet(
+) => $checkedCreate(r'_$SnippetImpl', json, ($checkedConvert) {
+  final val = _$SnippetImpl(
     id: $checkedConvert('id', (v) => v as String),
     projectId: $checkedConvert('projectId', (v) => v as String?),
     name: $checkedConvert('name', (v) => v as String),
@@ -26,13 +26,14 @@ _Snippet _$SnippetFromJson(
   return val;
 });
 
-Map<String, dynamic> _$SnippetToJson(_Snippet instance) => <String, dynamic>{
-  'id': instance.id,
-  'projectId': instance.projectId,
-  'name': instance.name,
-  'content': instance.content,
-  'description': instance.description,
-  'tags': instance.tags,
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt.toIso8601String(),
-};
+Map<String, dynamic> _$$SnippetImplToJson(_$SnippetImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'projectId': instance.projectId,
+      'name': instance.name,
+      'content': instance.content,
+      'description': instance.description,
+      'tags': instance.tags,
+      'createdAt': instance.createdAt.toIso8601String(),
+      'updatedAt': instance.updatedAt.toIso8601String(),
+    };

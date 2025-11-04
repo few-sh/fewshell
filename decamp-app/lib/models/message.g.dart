@@ -6,10 +6,10 @@ part of 'message.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_Message _$MessageFromJson(
+_$MessageImpl _$$MessageImplFromJson(
   Map<String, dynamic> json,
-) => $checkedCreate('_Message', json, ($checkedConvert) {
-  final val = _Message(
+) => $checkedCreate(r'_$MessageImpl', json, ($checkedConvert) {
+  final val = _$MessageImpl(
     id: $checkedConvert('id', (v) => v as String),
     sessionId: $checkedConvert('sessionId', (v) => v as String),
     userId: $checkedConvert('userId', (v) => v as String),
@@ -23,14 +23,15 @@ _Message _$MessageFromJson(
   return val;
 });
 
-Map<String, dynamic> _$MessageToJson(_Message instance) => <String, dynamic>{
-  'id': instance.id,
-  'sessionId': instance.sessionId,
-  'userId': instance.userId,
-  'userName': instance.userName,
-  'content': instance.content,
-  'timestamp': instance.timestamp.toIso8601String(),
-  'createdAt': instance.createdAt.toIso8601String(),
-  'imageUrl': instance.imageUrl,
-  'metadata': instance.metadata,
-};
+Map<String, dynamic> _$$MessageImplToJson(_$MessageImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'sessionId': instance.sessionId,
+      'userId': instance.userId,
+      'userName': instance.userName,
+      'content': instance.content,
+      'timestamp': instance.timestamp.toIso8601String(),
+      'createdAt': instance.createdAt.toIso8601String(),
+      'imageUrl': instance.imageUrl,
+      'metadata': instance.metadata,
+    };

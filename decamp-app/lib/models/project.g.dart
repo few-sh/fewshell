@@ -6,10 +6,10 @@ part of 'project.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-_Project _$ProjectFromJson(
+_$ProjectImpl _$$ProjectImplFromJson(
   Map<String, dynamic> json,
-) => $checkedCreate('_Project', json, ($checkedConvert) {
-  final val = _Project(
+) => $checkedCreate(r'_$ProjectImpl', json, ($checkedConvert) {
+  final val = _$ProjectImpl(
     id: $checkedConvert('id', (v) => v as String),
     name: $checkedConvert('name', (v) => v as String),
     description: $checkedConvert('description', (v) => v as String?),
@@ -23,11 +23,12 @@ _Project _$ProjectFromJson(
   return val;
 });
 
-Map<String, dynamic> _$ProjectToJson(_Project instance) => <String, dynamic>{
-  'id': instance.id,
-  'name': instance.name,
-  'description': instance.description,
-  'lastSessionDate': instance.lastSessionDate.toIso8601String(),
-  'createdAt': instance.createdAt.toIso8601String(),
-  'updatedAt': instance.updatedAt.toIso8601String(),
-};
+Map<String, dynamic> _$$ProjectImplToJson(_$ProjectImpl instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'name': instance.name,
+      'description': instance.description,
+      'lastSessionDate': instance.lastSessionDate.toIso8601String(),
+      'createdAt': instance.createdAt.toIso8601String(),
+      'updatedAt': instance.updatedAt.toIso8601String(),
+    };
