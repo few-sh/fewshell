@@ -392,14 +392,31 @@ class _ChatSessionState extends State<ChatSession> {
           ),
 
           // Input field customization
-          inputOptions: InputOptions.minimal(
-            hintText: 'Ask me anything...',
-            textColor: Theme.of(context).colorScheme.onSurface,
-            hintColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            borderRadius: 24.0,
+          inputOptions: InputOptions(
+            textStyle: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+            decoration: InputDecoration(
+              hintText: 'Ask me anything...',
+              hintStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surface,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(24.0),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 10.0,
+              ),
+            ),
+            useOuterContainer: false,
             autofocus: true,
             sendOnEnter: true,
+            textInputAction: TextInputAction.send,
+            maxLines: 1,
           ),
 
           // Welcome message configuration
