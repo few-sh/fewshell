@@ -263,7 +263,7 @@ class _ChatSessionState extends State<ChatSession> {
                         fontWeight: FontWeight.w500,
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.7),
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -291,9 +291,8 @@ class _ChatSessionState extends State<ChatSession> {
                                 'Current project',
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withOpacity(0.6),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.6),
                                 ),
                               ),
                             ],
@@ -399,7 +398,9 @@ class _ChatSessionState extends State<ChatSession> {
             decoration: InputDecoration(
               hintText: 'Ask me anything...',
               hintStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surface,

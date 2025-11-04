@@ -9,7 +9,6 @@ final neonDarkTheme = ThemeData(
     primary: Color(0xFF8A2EFF),
     secondary: Color(0xFF00E5FF),
     tertiary: Color(0xFFFF4DFF),
-    background: Color(0xFF0B0C2A),
     surface: Color(0xFF14143A),
   ),
   textTheme: const TextTheme(

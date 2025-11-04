@@ -95,7 +95,7 @@ class ProjectList extends StatelessWidget {
                         size: 64,
                         color: Theme.of(
                           context,
-                        ).colorScheme.onSurface.withOpacity(0.3),
+                        ).colorScheme.onSurface.withValues(alpha: 0.3),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -104,7 +104,7 @@ class ProjectList extends StatelessWidget {
                           fontSize: 18,
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.6),
+                          ).colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -114,7 +114,7 @@ class ProjectList extends StatelessWidget {
                           fontSize: 14,
                           color: Theme.of(
                             context,
-                          ).colorScheme.onSurface.withOpacity(0.5),
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -161,9 +161,10 @@ class ProjectList extends StatelessWidget {
                                   project.description!,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface.withOpacity(0.7),
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.7),
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -174,9 +175,8 @@ class ProjectList extends StatelessWidget {
                                 'Last session: $absoluteDateTime',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withOpacity(0.6),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.6),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -184,9 +184,8 @@ class ProjectList extends StatelessWidget {
                                 relativeTime,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurface.withOpacity(0.5),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.5),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),

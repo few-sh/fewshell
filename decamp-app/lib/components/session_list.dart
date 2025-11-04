@@ -29,14 +29,18 @@ class SessionList extends StatelessWidget {
             Icon(
               Icons.chat_bubble_outline,
               size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
             ),
             const SizedBox(height: 16),
             Text(
               'No chat sessions yet',
               style: TextStyle(
                 fontSize: 18,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
             const SizedBox(height: 8),
@@ -44,7 +48,9 @@ class SessionList extends StatelessWidget {
               'Start a new conversation to see it here',
               style: TextStyle(
                 fontSize: 14,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
               ),
             ),
           ],
@@ -95,7 +101,7 @@ class SessionList extends StatelessWidget {
                       fontSize: 13,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.6),
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -105,7 +111,7 @@ class SessionList extends StatelessWidget {
                       fontSize: 12,
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontStyle: FontStyle.italic,
                     ),
                   ),
