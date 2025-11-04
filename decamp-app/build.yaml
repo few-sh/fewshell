@@ -23,10 +23,8 @@ targets:
         options:
           # Store datetime as unix timestamps
           store_date_time_values_as_text: false
-          # Generate code for data classes
-          generate_data_class_to_companions: true
-          # Generate copyWith methods for data classes
-          generate_copy_with: true
+          # Use data class name for companions (instead of deprecated option)
+          use_data_class_name_for_companions: true
           
       # JSON Serializable configuration  
       json_serializable:

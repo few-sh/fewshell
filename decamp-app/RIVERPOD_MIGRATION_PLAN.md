@@ -120,44 +120,44 @@ lib/
 
 ---
 
-### Phase 2: Data Models ✓ TODO
+### Phase 2: Data Models ✅ COMPLETED
 **Goal**: Create immutable, type-safe models with Freezed
 
 #### Tasks:
-- [ ] Create `models/project.dart`
+- [x] Create `models/project.dart`
   - Convert existing `Project` class to Freezed model
   - Add `toJson`/`fromJson`
   - Add `createdAt`, `updatedAt` fields
 
-- [ ] Create `models/session.dart`
+- [x] Create `models/session.dart`
   - Convert existing `ChatSessionItem` to Freezed
   - Rename to `Session`
   - Add `projectId` foreign key
   - Add metadata fields (createdAt, updatedAt)
 
-- [ ] Create `models/message.dart`
+- [x] Create `models/message.dart`
   - Based on `ChatMessage` from chat UI library
   - Add `sessionId` foreign key
   - Add local persistence fields
 
-- [ ] Create `models/settings.dart`
-  - Global settings structure
-  - Project-specific overrides
-  - Merge logic
+- [x] Create `models/settings.dart`
+  - Global settings structure (AppSettings)
+  - Project-specific overrides (ProjectSettings)
+  - Support for global/project secrets
 
-- [ ] Create `models/snippet.dart` (future)
+- [x] Create `models/snippet.dart` (future)
   - Snippet model for code/command snippets
 
-- [ ] Create `models/secret.dart` (future)
+- [x] Create `models/secret.dart` (future)
   - Secret metadata (actual values in keychain)
 
-- [ ] Run code generation
-  - `flutter pub run build_runner build --delete-conflicting-outputs`
+- [x] Run code generation
+  - `dart run build_runner build --delete-conflicting-outputs`
 
 #### Success Criteria:
-- All models compile
-- toJson/fromJson work
-- Freezed methods available (copyWith, equality)
+- ✅ All models compile successfully
+- ✅ toJson/fromJson generated and working
+- ✅ Freezed methods available (copyWith, equality, toString)
 
 ---
 
