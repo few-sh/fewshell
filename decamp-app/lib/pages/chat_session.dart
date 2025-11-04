@@ -4,7 +4,9 @@ import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/project_list.dart';
 
 class ChatSession extends StatefulWidget {
-  const ChatSession({super.key});
+  final Function(ThemeMode)? onThemeChanged;
+
+  const ChatSession({super.key, this.onThemeChanged});
 
   @override
   State<ChatSession> createState() => _ChatSessionState();
@@ -176,6 +178,52 @@ class _ChatSessionState extends State<ChatSession> {
     );
   }
 
+  void _showThemeDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose Theme'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.brightness_auto),
+                title: const Text('System Default'),
+                onTap: () {
+                  if (widget.onThemeChanged != null) {
+                    widget.onThemeChanged!(ThemeMode.system);
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.light_mode),
+                title: const Text('Light'),
+                onTap: () {
+                  if (widget.onThemeChanged != null) {
+                    widget.onThemeChanged!(ThemeMode.light);
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.dark_mode),
+                title: const Text('Dark (Neon)'),
+                onTap: () {
+                  if (widget.onThemeChanged != null) {
+                    widget.onThemeChanged!(ThemeMode.dark);
+                  }
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -317,12 +365,7 @@ class _ChatSessionState extends State<ChatSession> {
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Settings page coming soon!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
+                _showThemeDialog();
               },
             ),
           ],
