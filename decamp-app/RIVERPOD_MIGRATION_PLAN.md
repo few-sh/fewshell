@@ -161,67 +161,71 @@ lib/
 
 ---
 
-### Phase 3: Database Layer (Drift) ✓ TODO
+### Phase 3: Database Layer (Drift) ✅ COMPLETED
 **Goal**: Setup SQLite database with Drift
 
 #### Tasks:
-- [ ] Create `database/tables/projects_table.dart`
+- [x] Create `database/tables/projects_table.dart`
   - Define table schema
   - Indexes for common queries
 
-- [ ] Create `database/tables/sessions_table.dart`
+- [x] Create `database/tables/sessions_table.dart`
   - Define table with projectId foreign key
   - Index on projectId + timestamp
 
-- [ ] Create `database/tables/messages_table.dart`
+- [x] Create `database/tables/messages_table.dart`
   - Define table with sessionId foreign key
   - Index on sessionId + createdAt
 
-- [ ] Create `database/tables/snippets_table.dart`
+- [x] Create `database/tables/snippets_table.dart`
   - Define table with projectId foreign key
 
-- [ ] Create `database/database.dart`
+- [x] Create `database/database.dart`
   - Main database class
   - Define all tables
   - Migration logic
   - Database version management
 
-- [ ] Create DAOs
+- [x] Create DAOs
   - `database/daos/project_dao.dart` - CRUD + watch streams
   - `database/daos/session_dao.dart` - CRUD + watch streams
   - `database/daos/message_dao.dart` - CRUD + watch streams
 
-- [ ] Run code generation for Drift
+- [x] Run code generation for Drift
   - Generate database code
 
-- [ ] Write database initialization logic
+- [x] Write database initialization logic
   - Handle first-time setup
   - Seed with sample data for development
 
 #### Success Criteria:
-- Database creates successfully
-- All DAOs compile
-- Watch streams return data
-- Can insert/query/update/delete
+- ✅ Database creates successfully
+- ✅ All DAOs compile
+- ✅ Watch streams return data
+- ✅ Can insert/query/update/delete
 
 ---
 
-### Phase 4: Services Layer ✓ TODO
+### Phase 4: Services Layer ✅ COMPLETED
 **Goal**: External service integrations
 
 #### Tasks:
-- [ ] Create `services/keychain_service.dart`
+- [x] Create `services/keychain_service.dart`
   - Wrapper for `flutter_secure_storage`
   - Methods: saveSecret, getSecret, deleteSecret, listSecrets
   - Handle iOS Keychain / Android Keystore
+  - Project-scoped secrets (project:{projectId}:{secretName})
+  - Global secrets (global:{secretName})
 
 - [ ] Create `services/sync_service.dart` (stub for future)
   - Interface for real-time sync
   - Placeholder methods
+  - **Note**: Deferred to Phase 11 (Future Enhancements)
 
 #### Success Criteria:
-- Can save/retrieve secrets securely
-- Services ready for provider integration
+- ✅ Can save/retrieve secrets securely
+- ✅ Services ready for provider integration
+- ✅ Support for both project-scoped and global secrets
 
 ---
 
