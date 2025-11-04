@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/session_list.dart';
+import 'package:hello_world/components/project_list.dart';
 
 class ChatSession extends StatefulWidget {
   const ChatSession({super.key});
@@ -23,9 +24,43 @@ class _ChatSessionState extends State<ChatSession> {
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
 
+  // Sample projects (replace with actual data later)
+  late List<Project> _projects;
+  late String _currentProjectId;
+
   @override
   void initState() {
     super.initState();
+
+    // Initialize sample projects
+    _projects = [
+      Project(
+        id: '1',
+        name: 'few-sh',
+        description: 'Production environment for Fewshot',
+        lastSessionDate: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
+      Project(
+        id: '2',
+        name: 'autographiq',
+        description: 'Sandbox environment for Gulliver',
+        lastSessionDate: DateTime.now().subtract(const Duration(days: 3)),
+      ),
+      Project(
+        id: '3',
+        name: 'RL environment',
+        description: null,
+        lastSessionDate: DateTime.now().subtract(const Duration(days: 7)),
+      ),
+      Project(
+        id: '4',
+        name: 'API services',
+        description: 'API services for iOS and Android apps',
+        lastSessionDate: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+    ];
+    _currentProjectId = '1'; // Decamp is the current project
+
     // Initialize sample sessions
     _chatSessions = [
       ChatSessionItem(
@@ -89,6 +124,58 @@ class _ChatSessionState extends State<ChatSession> {
     );
   }
 
+  void _showProjectSwitcher() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Switch Project'),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+          body: ProjectList(
+            projects: _projects,
+            onProjectTap: (project) {
+              setState(() {
+                _currentProjectId = project.id;
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Switched to project: ${project.name}'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              // TODO: Load project data and sessions
+            },
+            onProjectDelete: (project) {
+              setState(() {
+                _projects.removeWhere((p) => p.id == project.id);
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Deleted project: ${project.name}'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              // TODO: Delete project data from storage
+            },
+            onCreateProject: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Create project dialog coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              // TODO: Show create project dialog
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,9 +219,14 @@ class _ChatSessionState extends State<ChatSession> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'fewshot production',
-                              style: TextStyle(
+                            Text(
+                              _projects
+                                  .firstWhere(
+                                    (p) => p.id == _currentProjectId,
+                                    orElse: () => _projects.first,
+                                  )
+                                  .name,
+                              style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -156,13 +248,7 @@ class _ChatSessionState extends State<ChatSession> {
                         iconSize: 28,
                         onPressed: () {
                           Navigator.pop(context);
-                          // TODO: Implement project switcher
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Project switcher coming soon!'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          _showProjectSwitcher();
                         },
                       ),
                     ],

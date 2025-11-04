@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_gen_ai_chat_ui: ^2.4.2
   intl: ^0.19.0
+  timeago: ^3.7.0
 
 dev_dependencies:
   flutter_test:
