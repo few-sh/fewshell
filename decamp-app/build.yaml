@@ -1,0 +1,41 @@
+# Build configuration for code generation
+targets:
+  $default:
+    builders:
+      # Freezed configuration
+      freezed:
+        generate_for:
+          - lib/models/*.dart
+        options:
+          # Generate copyWith methods
+          copyWith: true
+          # Generate equality methods
+          equal: true
+          # Generate toString methods
+          to_string: true
+          # Generate fromJson/toJson
+          json: true
+          
+      # Drift configuration
+      drift_dev:
+        generate_for:
+          - lib/database/**/*.dart
+        options:
+          # Store datetime as unix timestamps
+          store_date_time_values_as_text: false
+          # Generate code for data classes
+          generate_data_class_to_companions: true
+          # Generate copyWith methods for data classes
+          generate_copy_with: true
+          
+      # JSON Serializable configuration  
+      json_serializable:
+        generate_for:
+          - lib/models/*.dart
+        options:
+          # Generate checked fromJson methods
+          checked: true
+          # Generate toJson methods
+          any_map: false
+          # Fail on null for non-nullable fields
+          disallow_unrecognized_keys: false

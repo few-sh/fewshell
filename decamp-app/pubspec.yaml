@@ -38,6 +38,22 @@ dependencies:
   intl: ^0.19.0
   timeago: ^3.7.0
   shared_preferences: ^2.3.3
+  
+  # State Management
+  flutter_riverpod: ^2.5.1
+  
+  # Database
+  drift: ^2.14.0
+  sqlite3_flutter_libs: ^0.5.0
+  path_provider: ^2.1.0
+  path: ^1.9.0
+  
+  # Secure Storage
+  flutter_secure_storage: ^9.2.2
+  
+  # Code Generation
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.9.0
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +65,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
+  # Code Generation
+  build_runner: ^2.4.6
+  drift_dev: ^2.14.0
+  freezed: ^2.4.5
+  json_serializable: ^6.7.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

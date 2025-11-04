@@ -24,6 +24,9 @@ Project settings:
 - Manage snippets (future functionality)
 - Github integration for snippets, md files, tools
 
+- All settings can have global or per-project scope, similar to VSCode User/Workspace settings.
+
+
 Session page:
 - Shows chat session and short terminal screen (a few lines)
 - Can expand the screen to split with the chat session
