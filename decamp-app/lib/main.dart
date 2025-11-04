@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hello_world/pages/chat_session.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const DecampApp());
@@ -14,15 +15,48 @@ class DecampApp extends StatefulWidget {
 
 class _DecampAppState extends State<DecampApp> {
   ThemeMode _themeMode = ThemeMode.system;
+  bool _isLoading = true;
 
-  void changeTheme(ThemeMode mode) {
+  @override
+  void initState() {
+    super.initState();
+    _loadThemePreference();
+  }
+
+  Future<void> _loadThemePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final themeModeString = prefs.getString('themeMode');
+
+    setState(() {
+      if (themeModeString != null) {
+        _themeMode = ThemeMode.values.firstWhere(
+          (mode) => mode.toString() == themeModeString,
+          orElse: () => ThemeMode.system,
+        );
+      }
+      _isLoading = false;
+    });
+  }
+
+  Future<void> changeTheme(ThemeMode mode) async {
     setState(() {
       _themeMode = mode;
     });
+
+    // Save to persistent storage
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('themeMode', mode.toString());
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show loading screen while loading theme preference
+    if (_isLoading) {
+      return const MaterialApp(
+        home: Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
     return MaterialApp(
       title: 'Decamp AI Chat',
       theme: ThemeData(

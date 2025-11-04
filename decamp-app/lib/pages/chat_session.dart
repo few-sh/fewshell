@@ -18,7 +18,7 @@ class _ChatSessionState extends State<ChatSession> {
 
   // Define users
   final _currentUser = ChatUser(id: 'user', firstName: 'You');
-  final _aiUser = ChatUser(id: 'ai', firstName: 'Shell Assistant');
+  final _aiUser = ChatUser(id: 'ai', firstName: 'Ops Agent');
 
   // Loading state
   bool _isLoading = false;
