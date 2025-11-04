@@ -43,7 +43,7 @@ dependencies:
   flutter_riverpod: ^2.5.1
   
   # Database
-  drift: ^2.14.0
+  drift: ^2.20.0
   sqlite3_flutter_libs: ^0.5.0
   path_provider: ^2.1.0
   path: ^1.9.0
@@ -68,7 +68,7 @@ dev_dependencies:
   
   # Code Generation
   build_runner: ^2.4.6
-  drift_dev: ^2.14.0
+  drift_dev: ^2.20.0
   freezed: ^2.4.5
   json_serializable: ^6.7.1
 
