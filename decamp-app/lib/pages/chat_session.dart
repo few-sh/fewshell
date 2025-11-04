@@ -31,6 +31,21 @@ class _ChatSessionState extends State<ChatSession> {
       appBar: AppBar(
         title: const Text('AI Chat'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Session History',
+            onPressed: () {
+              // TODO: Implement session history functionality
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Session history coming soon!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: AiChatWidget(
         // Required parameters
