@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
+import 'package:hello_world/components/session_list.dart';
 
 class ChatSession extends StatefulWidget {
   const ChatSession({super.key});
@@ -19,10 +20,73 @@ class _ChatSessionState extends State<ChatSession> {
   // Loading state
   bool _isLoading = false;
 
+  // Sample chat sessions (replace with actual data later)
+  late final List<ChatSessionItem> _chatSessions;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize sample sessions
+    _chatSessions = [
+      ChatSessionItem(
+        id: '1',
+        description: 'Troubleshooting site outage due to MySQL',
+        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
+      ),
+      ChatSessionItem(
+        id: '2',
+        description: 'Restart of redis server on production',
+        timestamp: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      ChatSessionItem(
+        id: '3',
+        description: 'Help investigating elevated errors on the app server',
+        timestamp: DateTime.now().subtract(const Duration(days: 3)),
+      ),
+      ChatSessionItem(
+        id: '4',
+        description: 'Out of memory errors in background jobs',
+        timestamp: DateTime.now().subtract(const Duration(days: 7)),
+      ),
+      ChatSessionItem(
+        id: '5',
+        description: 'RL Cluster not responding',
+        timestamp: DateTime.now().subtract(const Duration(days: 14)),
+      ),
+    ];
+  }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  void _showSessionHistory() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: const Text('Session History'),
+            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          ),
+          body: SessionList(
+            sessions: _chatSessions,
+            onSessionTap: (session) {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Opening session: ${session.description}'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              // TODO: Load the selected session
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -36,15 +100,7 @@ class _ChatSessionState extends State<ChatSession> {
           IconButton(
             icon: const Icon(Icons.history),
             tooltip: 'Session History',
-            onPressed: () {
-              // TODO: Implement session history functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Session history coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
+            onPressed: _showSessionHistory,
           ),
         ],
       ),
