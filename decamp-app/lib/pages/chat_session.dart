@@ -226,220 +226,228 @@ class _ChatSessionState extends State<ChatSession> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('fewshot production'),
-        centerTitle: false,
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.history),
-            tooltip: 'Session History',
-            onPressed: _showSessionHistory,
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.inversePrimary,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'PROJECT',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withOpacity(0.7),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _projects
-                                  .firstWhere(
-                                    (p) => p.id == _currentProjectId,
-                                    orElse: () => _projects.first,
-                                  )
-                                  .name,
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Current project',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.swap_horiz),
-                        tooltip: 'Switch Project',
-                        iconSize: 28,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _showProjectSwitcher();
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('Snippets'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Snippets page coming soon!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.key),
-              title: const Text('Secrets'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Secrets page coming soon!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.description),
-              title: const Text('Agent Instructions'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Customize instructions for the assistant.'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.monitor_heart),
-              title: const Text('Monitors (Premium)'),
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Monitoring page coming soon!'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
-              onTap: () {
-                Navigator.pop(context);
-                _showThemeDialog();
-              },
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('fewshot production'),
+          centerTitle: false,
+          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: 'Session History',
+              onPressed: _showSessionHistory,
             ),
           ],
         ),
-      ),
-      body: AiChatWidget(
-        // Required parameters
-        currentUser: _currentUser,
-        aiUser: _aiUser,
-        controller: _controller,
-        onSendMessage: _handleSendMessage,
-
-        // Loading configuration
-        loadingConfig: LoadingConfig(
-          isLoading: _isLoading,
-          showCenteredIndicator: true,
-        ),
-
-        // Input field customization
-        inputOptions: InputOptions.minimal(
-          hintText: 'Ask me anything...',
-          textColor: Theme.of(context).colorScheme.onSurface,
-          hintColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          borderRadius: 24.0,
-          autofocus: true,
-          sendOnEnter: true,
-        ),
-
-        // Welcome message configuration
-        welcomeMessageConfig: WelcomeMessageConfig(
-          title: 'Welcome to AI Chat',
-          questionsSectionTitle: 'Try asking me:',
-        ),
-
-        // Example questions for users
-        exampleQuestions: [
-          ExampleQuestion(question: "What can you help me with?"),
-          ExampleQuestion(question: "Tell me about your features"),
-          ExampleQuestion(question: "How does this chat work?"),
-        ],
-
-        // Enable animations and streaming
-        enableAnimation: true,
-        enableMarkdownStreaming: true,
-        streamingWordByWord: true,
-        streamingDuration: const Duration(milliseconds: 30),
-
-        // Message options
-        messageOptions: MessageOptions(
-          showTime: true,
-          showUserName: true,
-          bubbleStyle: BubbleStyle(
-            userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
-            aiBubbleColor: Theme.of(
-              context,
-            ).colorScheme.surfaceContainerHighest,
-            userNameColor: Theme.of(context).colorScheme.primary,
-            aiNameColor: Theme.of(context).colorScheme.secondary,
-            bottomLeftRadius: 22,
-            bottomRightRadius: 22,
-            enableShadow: true,
+        drawer: Drawer(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              DrawerHeader(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.inversePrimary,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'PROJECT',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.7),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _projects
+                                    .firstWhere(
+                                      (p) => p.id == _currentProjectId,
+                                      orElse: () => _projects.first,
+                                    )
+                                    .name,
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Current project',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.swap_horiz),
+                          tooltip: 'Switch Project',
+                          iconSize: 28,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showProjectSwitcher();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.code),
+                title: const Text('Snippets'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Snippets page coming soon!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.key),
+                title: const Text('Secrets'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Secrets page coming soon!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.description),
+                title: const Text('Agent Instructions'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Customize instructions for the assistant.',
+                      ),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.monitor_heart),
+                title: const Text('Monitors (Premium)'),
+                onTap: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Monitoring page coming soon!'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: const Text('Settings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showThemeDialog();
+                },
+              ),
+            ],
           ),
         ),
+        body: AiChatWidget(
+          // Required parameters
+          currentUser: _currentUser,
+          aiUser: _aiUser,
+          controller: _controller,
+          onSendMessage: _handleSendMessage,
 
-        // Scroll behavior
-        scrollBehaviorConfig: ScrollBehaviorConfig(
-          autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
-          scrollToFirstResponseMessage: true,
+          // Loading configuration
+          loadingConfig: LoadingConfig(
+            isLoading: _isLoading,
+            showCenteredIndicator: true,
+          ),
+
+          // Input field customization
+          inputOptions: InputOptions.minimal(
+            hintText: 'Ask me anything...',
+            textColor: Theme.of(context).colorScheme.onSurface,
+            hintColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            borderRadius: 24.0,
+            autofocus: true,
+            sendOnEnter: true,
+          ),
+
+          // Welcome message configuration
+          welcomeMessageConfig: WelcomeMessageConfig(
+            title: 'Welcome to AI Chat',
+            questionsSectionTitle: 'Try asking me:',
+          ),
+
+          // Example questions for users
+          exampleQuestions: [
+            ExampleQuestion(question: "What can you help me with?"),
+            ExampleQuestion(question: "Tell me about your features"),
+            ExampleQuestion(question: "How does this chat work?"),
+          ],
+
+          // Enable animations and streaming
+          enableAnimation: true,
+          enableMarkdownStreaming: true,
+          streamingWordByWord: true,
+          streamingDuration: const Duration(milliseconds: 30),
+
+          // Message options
+          messageOptions: MessageOptions(
+            showTime: true,
+            showUserName: true,
+            bubbleStyle: BubbleStyle(
+              userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
+              aiBubbleColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+              userNameColor: Theme.of(context).colorScheme.primary,
+              aiNameColor: Theme.of(context).colorScheme.secondary,
+              bottomLeftRadius: 22,
+              bottomRightRadius: 22,
+              enableShadow: true,
+            ),
+          ),
+
+          // Scroll behavior
+          scrollBehaviorConfig: ScrollBehaviorConfig(
+            autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
+            scrollToFirstResponseMessage: true,
+          ),
+
+          // Layout options
+          maxWidth: 800,
+          padding: const EdgeInsets.all(16),
         ),
-
-        // Layout options
-        maxWidth: 800,
-        padding: const EdgeInsets.all(16),
       ),
     );
   }
