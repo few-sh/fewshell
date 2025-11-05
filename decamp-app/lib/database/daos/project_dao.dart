@@ -50,8 +50,10 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
   }
 
   /// Update an existing project
-  Future<bool> updateProject(ProjectEntityCompanion project) {
-    return update(projects).replace(project);
+  Future<int> updateProject(ProjectEntityCompanion project) {
+    return (update(
+      projects,
+    )..where((p) => p.id.equals(project.id.value))).write(project);
   }
 
   /// Delete a project by ID
