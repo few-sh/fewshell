@@ -59,6 +59,9 @@ dependencies:
   # Code Generation
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
+  
+  # LLM Integration
+  llm_dart: ^0.10.0
 
 dev_dependencies:
   flutter_test:

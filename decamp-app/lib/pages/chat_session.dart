@@ -5,6 +5,7 @@ import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/main_drawer.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
+import 'package:hello_world/services/llm_service.dart';
 
 class ChatSession extends ConsumerStatefulWidget {
   const ChatSession({super.key});
@@ -243,15 +244,51 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     setState(() => _isLoading = true);
 
     try {
-      // Simulate API call delay
-      await Future.delayed(const Duration(seconds: 1));
+      // Get the LLM service
+      final llmService = ref.read(llmServiceProvider);
 
-      // Generate a response based on the user's message
-      final response = _generateResponse(message.text);
+      // Check if LLM is configured
+      final isConfigured = await llmService.isConfigured();
+      if (!isConfigured) {
+        _controller.addMessage(
+          ChatMessage(
+            text:
+                "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.",
+            user: _aiUser,
+            createdAt: DateTime.now(),
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
 
-      // Add AI response to chat
+      // Build conversation history for context (excluding the current user message)
+      final history = _controller.messages
+          .where((msg) => msg.text.isNotEmpty) // Skip empty messages
+          .map(
+            (msg) => {
+              'role': msg.user.id == 'user' ? 'user' : 'assistant',
+              'content': msg.text,
+            },
+          )
+          .toList();
+
+      // Collect the full response
+      final buffer = StringBuffer();
+      await for (final chunk in llmService.sendMessage(
+        message.text,
+        history: history,
+      )) {
+        buffer.write(chunk);
+      }
+
+      // Add the complete response
       _controller.addMessage(
-        ChatMessage(text: response, user: _aiUser, createdAt: DateTime.now()),
+        ChatMessage(
+          text: buffer.toString(),
+          user: _aiUser,
+          createdAt: DateTime.now(),
+        ),
       );
     } catch (e) {
       // Handle errors
@@ -264,41 +301,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       );
     } finally {
       setState(() => _isLoading = false);
-    }
-  }
-
-  /// Generate a simple response (replace with actual AI integration)
-  String _generateResponse(String userMessage) {
-    final lowerMessage = userMessage.toLowerCase();
-
-    if (lowerMessage.contains('hello') || lowerMessage.contains('hi')) {
-      return "Hello! 👋 How can I help you today?";
-    } else if (lowerMessage.contains('help')) {
-      return "I'm here to assist you! You can ask me questions, and I'll do my best to provide helpful answers. "
-          "Feel free to explore the example questions or type your own query.";
-    } else if (lowerMessage.contains('feature')) {
-      return "This chat includes:\n\n"
-          "• 🎨 Modern UI with dark/light themes\n"
-          "• 💫 Streaming text animations\n"
-          "• 📝 Markdown support\n"
-          "• 🔄 Real-time message handling\n"
-          "• 📱 Responsive design\n\n"
-          "Try asking me anything!";
-    } else if (lowerMessage.contains('how') && lowerMessage.contains('work')) {
-      return "This chat works by:\n\n"
-          "1. You type a message\n"
-          "2. It gets sent to the AI system\n"
-          "3. The AI processes your request\n"
-          "4. You receive a response with smooth animations\n\n"
-          "Currently, I'm using a simple demo backend. You can integrate this with real AI services like OpenAI, Claude, or Gemini!";
-    } else {
-      return "I received your message: \"$userMessage\"\n\n"
-          "This is a demo response. In a real application, this would be connected to an AI service like:\n\n"
-          "• OpenAI GPT\n"
-          "• Anthropic Claude\n"
-          "• Google Gemini\n"
-          "• Or any custom AI backend\n\n"
-          "Ask me about features or help!";
     }
   }
 }
