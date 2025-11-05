@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
+import '../providers/project_provider.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -98,6 +99,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildProjectSelector() {
     final theme = Theme.of(context);
+    final projectsAsync = ref.watch(projectsStreamProvider);
+    final currentProjectId = ref.watch(currentProjectIdProvider);
 
     return Card(
       child: Padding(
@@ -112,29 +115,88 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                border: OutlineInputBorder(
+            projectsAsync.when(
+              data: (projects) {
+                if (projects.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: theme.colorScheme.outline),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.6,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'No projects yet. Create a project from the main drawer.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface.withValues(
+                                alpha: 0.6,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return DropdownButtonFormField<String>(
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.folder),
+                  ),
+                  hint: const Text('Select a project'),
+                  value: currentProjectId,
+                  items: projects.map((project) {
+                    return DropdownMenuItem<String>(
+                      value: project.id,
+                      child: Text(project.name),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      ref.read(currentProjectIdProvider.notifier).state = value;
+                    }
+                  },
+                );
+              },
+              loading: () => const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+              error: (error, stack) => Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.error),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                prefixIcon: const Icon(Icons.folder),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: theme.colorScheme.error),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Error loading projects: $error',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              hint: const Text('Select a project'),
-              value: null, // TODO: Wire to currentProjectIdProvider
-              items: const [
-                // TODO: Wire to projectsStreamProvider
-                DropdownMenuItem(
-                  value: 'proj1',
-                  child: Text('Project 1 (Placeholder)'),
-                ),
-                DropdownMenuItem(
-                  value: 'proj2',
-                  child: Text('Project 2 (Placeholder)'),
-                ),
-              ],
-              onChanged: (value) {
-                // TODO: Update currentProjectIdProvider
-              },
             ),
           ],
         ),
