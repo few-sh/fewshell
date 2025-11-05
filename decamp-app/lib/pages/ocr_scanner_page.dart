@@ -1,8 +1,9 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:apple_vision_recognize_text/apple_vision_recognize_text.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/text_pattern_matcher.dart';
 
@@ -19,7 +20,8 @@ class OcrScannerPage extends StatefulWidget {
 
 class _OcrScannerPageState extends State<OcrScannerPage> {
   CameraController? _cameraController;
-  final TextRecognizer _textRecognizer = TextRecognizer();
+  final AppleVisionRecognizeTextController _textRecognizer =
+      AppleVisionRecognizeTextController();
   bool _isDetecting = false;
   List<MatchedTextBlock> _matchedBlocks = [];
   bool _isInitialized = false;
@@ -102,32 +104,50 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     _isDetecting = true;
 
     try {
-      final inputImage = _convertCameraImage(image);
-      if (inputImage == null) {
+      // Convert CameraImage to bytes (BGRA format for iOS)
+      final bytes = _convertCameraImageToBytes(image);
+      if (bytes == null) {
         _isDetecting = false;
         return;
       }
 
-      final recognizedText = await _textRecognizer.processImage(inputImage);
+      // Create RecognizeTextData for Apple Vision
+      final recognizeData = RecognizeTextData(
+        image: bytes,
+        imageSize: Size(image.width.toDouble(), image.height.toDouble()),
+        recognitionLevel: RecognitionLevel.accurate,
+        automaticallyDetectsLanguage: true,
+      );
+
+      // Process image with Apple Vision
+      final recognizedTexts = await _textRecognizer.processImage(recognizeData);
+
+      if (recognizedTexts == null) {
+        _isDetecting = false;
+        return;
+      }
 
       // Filter text blocks that match the pattern
       final matchedBlocks = <MatchedTextBlock>[];
-      for (final block in recognizedText.blocks) {
-        for (final line in block.lines) {
-          final text = line.text.trim();
+      for (final textBlock in recognizedTexts) {
+        // Check each text candidate in the block
+        for (final text in textBlock.listText) {
+          final trimmedText = text.trim();
           final matches = widget.scanType == ScanType.apiKey
-              ? TextPatternMatcher.isApiKey(text)
-              : TextPatternMatcher.isUrl(text);
+              ? TextPatternMatcher.isApiKey(trimmedText)
+              : TextPatternMatcher.isUrl(trimmedText);
 
           if (matches) {
             final extractedText =
-                TextPatternMatcher.extractMatch(text, widget.scanType) ?? text;
+                TextPatternMatcher.extractMatch(trimmedText, widget.scanType) ??
+                trimmedText;
             matchedBlocks.add(
               MatchedTextBlock(
                 text: extractedText,
-                boundingBox: line.boundingBox,
+                boundingBox: textBlock.boundingBox,
               ),
             );
+            break; // Only add one match per text block
           }
         }
       }
@@ -144,34 +164,16 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     }
   }
 
-  InputImage? _convertCameraImage(CameraImage image) {
-    final camera = _cameraController?.description;
-    if (camera == null) return null;
-
-    final sensorOrientation = camera.sensorOrientation;
-    InputImageRotation? rotation;
-
-    if (Theme.of(context).platform == TargetPlatform.iOS) {
-      rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
-    } else {
-      // Android
-      rotation = InputImageRotation.rotation0deg;
+  Uint8List? _convertCameraImageToBytes(CameraImage image) {
+    try {
+      // For iOS, CameraImage provides YUV420 format
+      // We need to convert it to a format Apple Vision can process
+      final plane = image.planes[0];
+      return plane.bytes;
+    } catch (e) {
+      debugPrint('Error converting camera image: $e');
+      return null;
     }
-
-    if (rotation == null) return null;
-
-    final format = InputImageFormatValue.fromRawValue(image.format.raw);
-    if (format == null) return null;
-
-    final plane = image.planes.first;
-    final inputImageData = InputImageMetadata(
-      size: Size(image.width.toDouble(), image.height.toDouble()),
-      rotation: rotation,
-      format: format,
-      bytesPerRow: plane.bytesPerRow,
-    );
-
-    return InputImage.fromBytes(bytes: plane.bytes, metadata: inputImageData);
   }
 
   void _selectText(String text) {
@@ -182,7 +184,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   void dispose() {
     _cameraController?.stopImageStream();
     _cameraController?.dispose();
-    _textRecognizer.close();
+    // Apple Vision controller doesn't need explicit disposal
     super.dispose();
   }
 

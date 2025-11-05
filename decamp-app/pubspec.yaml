@@ -52,7 +52,7 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   
   # OCR and Camera
-  google_mlkit_text_recognition: ^0.13.1
+  apple_vision_recognize_text: ^0.0.4
   camera: ^0.11.0+2
   permission_handler: ^11.3.1
   

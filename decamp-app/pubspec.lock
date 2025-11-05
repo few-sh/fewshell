@@ -17,6 +17,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.7.1"
+  apple_vision_commons:
+    dependency: transitive
+    description:
+      name: apple_vision_commons
+      sha256: "494e26c50f43a14fcd242ff9708e17afd72b83df7fac1795dbcbde828be8ed8b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.3"
+  apple_vision_recognize_text:
+    dependency: "direct main"
+    description:
+      name: apple_vision_recognize_text
+      sha256: b14e7cf8d9c41b0215100097587b4626fb855ababaabbafb6db7c34408eca5c3
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.4"
   args:
     dependency: transitive
     description:
@@ -456,22 +472,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.3.2"
-  google_mlkit_commons:
-    dependency: transitive
-    description:
-      name: google_mlkit_commons
-      sha256: "9990a65f407a3ef6bae646bf10143faa93fec126683771465bc6c0b43fb0e6e9"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.8.1"
-  google_mlkit_text_recognition:
-    dependency: "direct main"
-    description:
-      name: google_mlkit_text_recognition
-      sha256: "179349417066fa2c275d7a6ed6cbceeb7fa265d73aacdb2d732f1a2991face0a"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.13.1"
   gpt_markdown:
     dependency: transitive
     description:
