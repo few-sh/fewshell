@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/main_drawer.dart';
-import 'package:hello_world/providers/theme_provider.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
 
@@ -95,50 +94,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
   }
 
-  void _showThemeDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Choose Theme'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.brightness_auto),
-                title: const Text('System Default'),
-                onTap: () {
-                  ref
-                      .read(themeProvider.notifier)
-                      .setThemeMode(ThemeMode.system);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.light_mode),
-                title: const Text('Light'),
-                onTap: () {
-                  ref
-                      .read(themeProvider.notifier)
-                      .setThemeMode(ThemeMode.light);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.dark_mode),
-                title: const Text('Dark (Neon)'),
-                onTap: () {
-                  ref.read(themeProvider.notifier).setThemeMode(ThemeMode.dark);
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Watch the current project from the provider
@@ -189,7 +144,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             ),
           ],
         ),
-        drawer: MainDrawer(onThemeSettingsTap: _showThemeDialog),
+        drawer: const MainDrawer(),
         body: AiChatWidget(
           // Required parameters
           currentUser: _currentUser,

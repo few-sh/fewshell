@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
+import 'package:hello_world/pages/main_settings.dart';
 
 class MainDrawer extends ConsumerWidget {
-  final VoidCallback onThemeSettingsTap;
-
-  const MainDrawer({super.key, required this.onThemeSettingsTap});
+  const MainDrawer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -168,7 +167,12 @@ class MainDrawer extends ConsumerWidget {
             title: const Text('Settings'),
             onTap: () {
               Navigator.pop(context);
-              onThemeSettingsTap();
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MainSettingsPage(),
+                ),
+              );
             },
           ),
         ],
