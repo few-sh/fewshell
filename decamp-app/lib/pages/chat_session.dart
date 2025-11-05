@@ -252,7 +252,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                                 const SizedBox(height: 4),
                                 Text(
                                   hasProject
-                                      ? 'Current project'
+                                      ? (currentProject.description ?? '')
                                       : 'Tap to create a project',
                                   style: TextStyle(
                                     fontSize: 13,
@@ -261,6 +261,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                                         .onSurface
                                         .withValues(alpha: 0.6),
                                   ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
