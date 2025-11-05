@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/session_list.dart';
-import 'package:hello_world/components/project_list.dart';
 import 'package:hello_world/providers/theme_provider.dart';
+import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -27,42 +27,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
 
-  // Sample projects (replace with actual data later)
-  late List<Project> _projects;
-  late String _currentProjectId;
-
   @override
   void initState() {
     super.initState();
-
-    // Initialize sample projects
-    _projects = [
-      Project(
-        id: '1',
-        name: 'few-sh',
-        description: 'Production environment for Fewshot',
-        lastSessionDate: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      Project(
-        id: '2',
-        name: 'autographiq',
-        description: 'Sandbox environment for Gulliver',
-        lastSessionDate: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-      Project(
-        id: '3',
-        name: 'RL environment',
-        description: null,
-        lastSessionDate: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      Project(
-        id: '4',
-        name: 'API services',
-        description: 'API services for iOS and Android apps',
-        lastSessionDate: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-    ];
-    _currentProjectId = '1'; // Decamp is the current project
 
     // Initialize sample sessions
     _chatSessions = [
@@ -173,6 +140,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the current project from the provider
+    final currentProject = ref.watch(currentProjectProvider);
+    final currentProjectName = currentProject?.name ?? 'No Project';
+
     return GestureDetector(
       onTap: () {
         // Dismiss keyboard when tapping outside
@@ -180,7 +151,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('fewshot production'),
+          title: Text(currentProjectName),
           centerTitle: false,
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
           actions: [
@@ -222,12 +193,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _projects
-                                    .firstWhere(
-                                      (p) => p.id == _currentProjectId,
-                                      orElse: () => _projects.first,
-                                    )
-                                    .name,
+                                currentProjectName,
                                 style: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
