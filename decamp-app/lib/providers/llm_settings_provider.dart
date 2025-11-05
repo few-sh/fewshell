@@ -55,10 +55,8 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Add a new LLM configuration with API key
   Future<void> addLlmSettings({
     required String identifier,
-    required String displayName,
     required String baseUrl,
     required String apiKey,
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -66,9 +64,7 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     final now = DateTime.now();
     final newSettings = LlmApiSettings(
       identifier: identifier,
-      displayName: displayName,
       baseUrl: baseUrl,
-      modelName: modelName,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
       temperature: temperature,
@@ -98,10 +94,8 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Update an existing LLM configuration
   Future<void> updateLlmSettings({
     required String identifier,
-    required String displayName,
     required String baseUrl,
     String? apiKey,
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -116,9 +110,7 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
 
     final existing = state[index];
     final updatedSettings = existing.copyWith(
-      displayName: displayName,
       baseUrl: baseUrl,
-      modelName: modelName,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
       temperature: temperature,
@@ -207,10 +199,8 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Add a new LLM configuration with API key for this project
   Future<void> addLlmSettings({
     required String identifier,
-    required String displayName,
     required String baseUrl,
     required String apiKey,
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -218,9 +208,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     final now = DateTime.now();
     final newSettings = LlmApiSettings(
       identifier: identifier,
-      displayName: displayName,
       baseUrl: baseUrl,
-      modelName: modelName,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
       temperature: temperature,
@@ -252,10 +240,8 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Update an existing LLM configuration for this project
   Future<void> updateLlmSettings({
     required String identifier,
-    required String displayName,
     required String baseUrl,
     String? apiKey,
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -270,9 +256,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
 
     final existing = state[index];
     final updatedSettings = existing.copyWith(
-      displayName: displayName,
       baseUrl: baseUrl,
-      modelName: modelName,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
       temperature: temperature,

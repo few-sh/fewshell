@@ -12,14 +12,8 @@ class LlmApiSettings with _$LlmApiSettings {
     /// Unique identifier for this LLM configuration (e.g., "gpt-4-turbo", "claude-3-5-sonnet")
     required String identifier,
 
-    /// Display name for the model (e.g., "GPT-4 Turbo", "Claude 3.5 Sonnet")
-    required String displayName,
-
     /// Base URL for the API endpoint
     required String baseUrl,
-
-    /// Optional: Model name to use in API requests (if different from identifier)
-    String? modelName,
 
     /// Optional: Additional headers to include in requests (as JSON string)
     /// Format: {"Header-Name": "value", ...}

@@ -10,9 +10,7 @@ _$LlmApiSettingsImpl _$$LlmApiSettingsImplFromJson(Map<String, dynamic> json) =>
     $checkedCreate(r'_$LlmApiSettingsImpl', json, ($checkedConvert) {
       final val = _$LlmApiSettingsImpl(
         identifier: $checkedConvert('identifier', (v) => v as String),
-        displayName: $checkedConvert('displayName', (v) => v as String),
         baseUrl: $checkedConvert('baseUrl', (v) => v as String),
-        modelName: $checkedConvert('modelName', (v) => v as String?),
         customHeaders: $checkedConvert('customHeaders', (v) => v as String?),
         maxTokens: $checkedConvert('maxTokens', (v) => (v as num?)?.toInt()),
         temperature: $checkedConvert(
@@ -36,9 +34,7 @@ Map<String, dynamic> _$$LlmApiSettingsImplToJson(
   _$LlmApiSettingsImpl instance,
 ) => <String, dynamic>{
   'identifier': instance.identifier,
-  'displayName': instance.displayName,
   'baseUrl': instance.baseUrl,
-  'modelName': instance.modelName,
   'customHeaders': instance.customHeaders,
   'maxTokens': instance.maxTokens,
   'temperature': instance.temperature,

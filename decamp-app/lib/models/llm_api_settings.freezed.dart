@@ -24,14 +24,8 @@ mixin _$LlmApiSettings {
   /// Unique identifier for this LLM configuration (e.g., "gpt-4-turbo", "claude-3-5-sonnet")
   String get identifier => throw _privateConstructorUsedError;
 
-  /// Display name for the model (e.g., "GPT-4 Turbo", "Claude 3.5 Sonnet")
-  String get displayName => throw _privateConstructorUsedError;
-
   /// Base URL for the API endpoint
   String get baseUrl => throw _privateConstructorUsedError;
-
-  /// Optional: Model name to use in API requests (if different from identifier)
-  String? get modelName => throw _privateConstructorUsedError;
 
   /// Optional: Additional headers to include in requests (as JSON string)
   /// Format: {"Header-Name": "value", ...}
@@ -71,9 +65,7 @@ abstract class $LlmApiSettingsCopyWith<$Res> {
   @useResult
   $Res call({
     String identifier,
-    String displayName,
     String baseUrl,
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -99,9 +91,7 @@ class _$LlmApiSettingsCopyWithImpl<$Res, $Val extends LlmApiSettings>
   @override
   $Res call({
     Object? identifier = null,
-    Object? displayName = null,
     Object? baseUrl = null,
-    Object? modelName = freezed,
     Object? customHeaders = freezed,
     Object? maxTokens = freezed,
     Object? temperature = freezed,
@@ -115,18 +105,10 @@ class _$LlmApiSettingsCopyWithImpl<$Res, $Val extends LlmApiSettings>
                 ? _value.identifier
                 : identifier // ignore: cast_nullable_to_non_nullable
                       as String,
-            displayName: null == displayName
-                ? _value.displayName
-                : displayName // ignore: cast_nullable_to_non_nullable
-                      as String,
             baseUrl: null == baseUrl
                 ? _value.baseUrl
                 : baseUrl // ignore: cast_nullable_to_non_nullable
                       as String,
-            modelName: freezed == modelName
-                ? _value.modelName
-                : modelName // ignore: cast_nullable_to_non_nullable
-                      as String?,
             customHeaders: freezed == customHeaders
                 ? _value.customHeaders
                 : customHeaders // ignore: cast_nullable_to_non_nullable
@@ -168,9 +150,7 @@ abstract class _$$LlmApiSettingsImplCopyWith<$Res>
   @useResult
   $Res call({
     String identifier,
-    String displayName,
     String baseUrl,
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -195,9 +175,7 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? identifier = null,
-    Object? displayName = null,
     Object? baseUrl = null,
-    Object? modelName = freezed,
     Object? customHeaders = freezed,
     Object? maxTokens = freezed,
     Object? temperature = freezed,
@@ -211,18 +189,10 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
             ? _value.identifier
             : identifier // ignore: cast_nullable_to_non_nullable
                   as String,
-        displayName: null == displayName
-            ? _value.displayName
-            : displayName // ignore: cast_nullable_to_non_nullable
-                  as String,
         baseUrl: null == baseUrl
             ? _value.baseUrl
             : baseUrl // ignore: cast_nullable_to_non_nullable
                   as String,
-        modelName: freezed == modelName
-            ? _value.modelName
-            : modelName // ignore: cast_nullable_to_non_nullable
-                  as String?,
         customHeaders: freezed == customHeaders
             ? _value.customHeaders
             : customHeaders // ignore: cast_nullable_to_non_nullable
@@ -257,9 +227,7 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
 class _$LlmApiSettingsImpl implements _LlmApiSettings {
   const _$LlmApiSettingsImpl({
     required this.identifier,
-    required this.displayName,
     required this.baseUrl,
-    this.modelName,
     this.customHeaders,
     this.maxTokens,
     this.temperature,
@@ -275,17 +243,9 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
   @override
   final String identifier;
 
-  /// Display name for the model (e.g., "GPT-4 Turbo", "Claude 3.5 Sonnet")
-  @override
-  final String displayName;
-
   /// Base URL for the API endpoint
   @override
   final String baseUrl;
-
-  /// Optional: Model name to use in API requests (if different from identifier)
-  @override
-  final String? modelName;
 
   /// Optional: Additional headers to include in requests (as JSON string)
   /// Format: {"Header-Name": "value", ...}
@@ -315,7 +275,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
 
   @override
   String toString() {
-    return 'LlmApiSettings(identifier: $identifier, displayName: $displayName, baseUrl: $baseUrl, modelName: $modelName, customHeaders: $customHeaders, maxTokens: $maxTokens, temperature: $temperature, enabled: $enabled, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'LlmApiSettings(identifier: $identifier, baseUrl: $baseUrl, customHeaders: $customHeaders, maxTokens: $maxTokens, temperature: $temperature, enabled: $enabled, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -325,11 +285,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
             other is _$LlmApiSettingsImpl &&
             (identical(other.identifier, identifier) ||
                 other.identifier == identifier) &&
-            (identical(other.displayName, displayName) ||
-                other.displayName == displayName) &&
             (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
-            (identical(other.modelName, modelName) ||
-                other.modelName == modelName) &&
             (identical(other.customHeaders, customHeaders) ||
                 other.customHeaders == customHeaders) &&
             (identical(other.maxTokens, maxTokens) ||
@@ -348,9 +304,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
   int get hashCode => Object.hash(
     runtimeType,
     identifier,
-    displayName,
     baseUrl,
-    modelName,
     customHeaders,
     maxTokens,
     temperature,
@@ -379,9 +333,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
 abstract class _LlmApiSettings implements LlmApiSettings {
   const factory _LlmApiSettings({
     required final String identifier,
-    required final String displayName,
     required final String baseUrl,
-    final String? modelName,
     final String? customHeaders,
     final int? maxTokens,
     final double? temperature,
@@ -397,17 +349,9 @@ abstract class _LlmApiSettings implements LlmApiSettings {
   @override
   String get identifier;
 
-  /// Display name for the model (e.g., "GPT-4 Turbo", "Claude 3.5 Sonnet")
-  @override
-  String get displayName;
-
   /// Base URL for the API endpoint
   @override
   String get baseUrl;
-
-  /// Optional: Model name to use in API requests (if different from identifier)
-  @override
-  String? get modelName;
 
   /// Optional: Additional headers to include in requests (as JSON string)
   /// Format: {"Header-Name": "value", ...}

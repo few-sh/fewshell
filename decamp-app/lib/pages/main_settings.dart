@@ -334,7 +334,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               children: [
                 Expanded(
                   child: Text(
-                    settings.displayName,
+                    settings.identifier,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -530,10 +530,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         onSave:
             (
               identifier,
-              displayName,
               url,
               apiKey, {
-              modelName,
               customHeaders,
               maxTokens,
               temperature,
@@ -545,10 +543,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                       .read(globalLlmSettingsProvider.notifier)
                       .addLlmSettings(
                         identifier: identifier,
-                        displayName: displayName,
                         baseUrl: url,
                         apiKey: apiKey,
-                        modelName: modelName,
                         customHeaders: customHeaders,
                         maxTokens: maxTokens,
                         temperature: temperature,
@@ -560,10 +556,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                         .read(projectLlmSettingsProvider(projectId).notifier)
                         .addLlmSettings(
                           identifier: identifier,
-                          displayName: displayName,
                           baseUrl: url,
                           apiKey: apiKey,
-                          modelName: modelName,
                           customHeaders: customHeaders,
                           maxTokens: maxTokens,
                           temperature: temperature,
@@ -573,7 +567,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Added model: $displayName')),
+                    SnackBar(content: Text('Added model: $identifier')),
                   );
                 }
               } catch (e) {
@@ -618,18 +612,14 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         title: 'Edit AI Model',
         isGlobal: isGlobal,
         initialIdentifier: settings.identifier,
-        initialDisplayName: settings.displayName,
         initialUrl: settings.baseUrl,
         initialApiKey: apiKey ?? '',
-        initialModelName: settings.modelName,
         initialEnabled: settings.enabled,
         onSave:
             (
               identifier,
-              displayName,
               url,
               apiKey, {
-              modelName,
               customHeaders,
               maxTokens,
               temperature,
@@ -641,10 +631,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                       .read(globalLlmSettingsProvider.notifier)
                       .updateLlmSettings(
                         identifier: identifier,
-                        displayName: displayName,
                         baseUrl: url,
                         apiKey: apiKey.isNotEmpty ? apiKey : null,
-                        modelName: modelName,
                         customHeaders: customHeaders,
                         maxTokens: maxTokens,
                         temperature: temperature,
@@ -657,10 +645,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                         .read(projectLlmSettingsProvider(projectId).notifier)
                         .updateLlmSettings(
                           identifier: identifier,
-                          displayName: displayName,
                           baseUrl: url,
                           apiKey: apiKey.isNotEmpty ? apiKey : null,
-                          modelName: modelName,
                           customHeaders: customHeaders,
                           maxTokens: maxTokens,
                           temperature: temperature,
@@ -671,7 +657,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Updated model: $displayName')),
+                    SnackBar(content: Text('Updated model: $identifier')),
                   );
                 }
               } catch (e) {
@@ -698,7 +684,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       builder: (context) => AlertDialog(
         title: const Text('Delete AI Model'),
         content: Text(
-          'Are you sure you want to delete "${settings.displayName}"?',
+          'Are you sure you want to delete "${settings.identifier}"?',
         ),
         actions: [
           TextButton(
@@ -725,7 +711,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Deleted model: ${settings.displayName}'),
+                      content: Text('Deleted model: ${settings.identifier}'),
                     ),
                   );
                 }
@@ -757,17 +743,13 @@ class _AIModelDialog extends StatefulWidget {
   final String title;
   final bool isGlobal;
   final String? initialIdentifier;
-  final String? initialDisplayName;
   final String? initialUrl;
   final String? initialApiKey;
-  final String? initialModelName;
   final bool? initialEnabled;
   final Function(
     String identifier,
-    String displayName,
     String url,
     String apiKey, {
-    String? modelName,
     String? customHeaders,
     int? maxTokens,
     double? temperature,
@@ -780,10 +762,8 @@ class _AIModelDialog extends StatefulWidget {
     required this.isGlobal,
     required this.onSave,
     this.initialIdentifier,
-    this.initialDisplayName,
     this.initialUrl,
     this.initialApiKey,
-    this.initialModelName,
     this.initialEnabled,
   });
 
@@ -793,10 +773,8 @@ class _AIModelDialog extends StatefulWidget {
 
 class _AIModelDialogState extends State<_AIModelDialog> {
   late final TextEditingController _identifierController;
-  late final TextEditingController _displayNameController;
   late final TextEditingController _urlController;
   late final TextEditingController _apiKeyController;
-  late final TextEditingController _modelNameController;
   final _formKey = GlobalKey<FormState>();
   bool _obscureApiKey = true;
   bool _isTestingConnection = false;
@@ -808,22 +786,16 @@ class _AIModelDialogState extends State<_AIModelDialog> {
     _identifierController = TextEditingController(
       text: widget.initialIdentifier,
     );
-    _displayNameController = TextEditingController(
-      text: widget.initialDisplayName,
-    );
     _urlController = TextEditingController(text: widget.initialUrl);
     _apiKeyController = TextEditingController(text: widget.initialApiKey);
-    _modelNameController = TextEditingController(text: widget.initialModelName);
     _enabled = widget.initialEnabled ?? true;
   }
 
   @override
   void dispose() {
     _identifierController.dispose();
-    _displayNameController.dispose();
     _urlController.dispose();
     _apiKeyController.dispose();
-    _modelNameController.dispose();
     super.dispose();
   }
 
@@ -848,21 +820,6 @@ class _AIModelDialogState extends State<_AIModelDialog> {
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a model identifier';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _displayNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Display Name',
-                  hintText: 'e.g., GPT-4 Turbo, Claude 3.5 Sonnet',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a display name';
                   }
                   return null;
                 },
@@ -932,15 +889,6 @@ class _AIModelDialogState extends State<_AIModelDialog> {
                   }
                   return null;
                 },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _modelNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Model Name (Optional)',
-                  hintText: 'Override model name for API requests',
-                  prefixIcon: Icon(Icons.smart_toy),
-                ),
               ),
               if (widget.initialIdentifier != null) ...[
                 const SizedBox(height: 16),
@@ -1016,12 +964,8 @@ class _AIModelDialogState extends State<_AIModelDialog> {
     if (_formKey.currentState!.validate()) {
       widget.onSave(
         _identifierController.text,
-        _displayNameController.text,
         _urlController.text,
         _apiKeyController.text,
-        modelName: _modelNameController.text.isNotEmpty
-            ? _modelNameController.text
-            : null,
         enabled: widget.initialIdentifier != null ? _enabled : null,
       );
       Navigator.of(context).pop();
