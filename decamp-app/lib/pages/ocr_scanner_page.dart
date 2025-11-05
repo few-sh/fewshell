@@ -161,6 +161,9 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
             final extractedText =
                 TextPatternMatcher.extractMatch(trimmedText, widget.scanType) ??
                 trimmedText;
+            debugPrint(
+              'Found match: "$extractedText" at ${textBlock.boundingBox}',
+            );
             matchedBlocks.add(
               MatchedTextBlock(
                 text: extractedText,
@@ -388,6 +391,11 @@ class TextOverlayPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    debugPrint(
+      'TextOverlayPainter: painting ${matchedBlocks.length} blocks, '
+      'imageSize=$imageSize, screenSize=$size',
+    );
+
     final paint = Paint()
       ..color = color.withValues(alpha: 0.6)
       ..style = PaintingStyle.stroke
@@ -399,6 +407,7 @@ class TextOverlayPainter extends CustomPainter {
 
     for (final block in matchedBlocks) {
       final rect = _scaleRect(block.boundingBox, imageSize, size);
+      debugPrint('  Block boundingBox=${block.boundingBox}, scaled=$rect');
 
       // Draw filled background
       canvas.drawRRect(
@@ -415,14 +424,26 @@ class TextOverlayPainter extends CustomPainter {
   }
 
   Rect _scaleRect(Rect rect, Size imageSize, Size screenSize) {
+    // WORKAROUND: Apple Vision package appears to return incorrect width/height
+    // Use a fixed size box around the center point for now
     final scaleX = screenSize.width / imageSize.width;
     final scaleY = screenSize.height / imageSize.height;
 
-    return Rect.fromLTRB(
-      rect.left * scaleX,
-      rect.top * scaleY,
-      rect.right * scaleX,
-      rect.bottom * scaleY,
+    // Get center of the (malformed) rect
+    final centerX = (rect.left + rect.right) / 2;
+    final centerY = (rect.top + rect.bottom) / 2;
+
+    // Vision uses bottom-left origin, Flutter uses top-left
+    final flippedY = imageSize.height - centerY;
+
+    // Create a reasonable-sized box (100x40 pixels in image space)
+    const boxWidth = 100.0;
+    const boxHeight = 40.0;
+
+    return Rect.fromCenter(
+      center: Offset(centerX * scaleX, flippedY * scaleY),
+      width: boxWidth * scaleX,
+      height: boxHeight * scaleY,
     );
   }
 
