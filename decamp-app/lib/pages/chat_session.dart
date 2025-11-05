@@ -143,6 +143,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Watch the current project from the provider
     final currentProject = ref.watch(currentProjectProvider);
     final currentProjectName = currentProject?.name ?? 'No Project';
+    final hasProject = currentProject != null;
 
     return GestureDetector(
       onTap: () {
@@ -151,7 +152,32 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(currentProjectName),
+          title: GestureDetector(
+            onTap: hasProject
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProjectsPage(),
+                      ),
+                    );
+                  },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(currentProjectName),
+                if (!hasProject) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.add_circle_outline,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ],
+              ],
+            ),
+          ),
           centerTitle: false,
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
           actions: [
@@ -189,26 +215,55 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     Row(
                       children: [
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentProjectName,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
+                          child: GestureDetector(
+                            onTap: hasProject
+                                ? null
+                                : () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ProjectsPage(),
+                                      ),
+                                    );
+                                  },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      currentProjectName,
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (!hasProject) ...[
+                                      const SizedBox(width: 8),
+                                      const Icon(
+                                        Icons.add_circle_outline,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Current project',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.6),
+                                const SizedBox(height: 4),
+                                Text(
+                                  hasProject
+                                      ? 'Current project'
+                                      : 'Tap to create a project',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                         IconButton(
