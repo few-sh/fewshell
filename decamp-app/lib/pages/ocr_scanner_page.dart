@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -32,25 +33,22 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
 
   Future<void> _initializeCamera() async {
     try {
-      // Request camera permission
-      final status = await Permission.camera.request();
-      if (!status.isGranted) {
-        setState(() {
-          _errorMessage = 'Camera permission is required to scan text';
-        });
-        return;
-      }
+      debugPrint('Initializing camera...');
 
-      // Get available cameras
+      // Get available cameras first
       final cameras = await availableCameras();
+      debugPrint('Available cameras: ${cameras.length}');
+
       if (cameras.isEmpty) {
         setState(() {
-          _errorMessage = 'No camera found on this device';
+          _errorMessage =
+              'No camera found on this device.\n\n${defaultTargetPlatform == TargetPlatform.iOS ? 'Note: iOS Simulator does not support camera. Please test on a physical device.' : 'Please ensure your device has a working camera.'}';
         });
         return;
       }
 
       // Initialize camera controller
+      // On iOS, this will automatically trigger the permission dialog if needed
       _cameraController = CameraController(
         cameras.first,
         ResolutionPreset.high,
@@ -58,7 +56,29 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
         imageFormatGroup: ImageFormatGroup.nv21,
       );
 
-      await _cameraController!.initialize();
+      try {
+        await _cameraController!.initialize();
+        debugPrint('Camera initialized successfully');
+      } on CameraException catch (e) {
+        debugPrint('Camera exception: ${e.code} - ${e.description}');
+
+        // Check if it's a permission error
+        if (e.code == 'CameraAccessDenied' ||
+            e.description?.contains('denied') == true ||
+            e.description?.contains('authorized') == true) {
+          setState(() {
+            _errorMessage =
+                'Camera access was denied.\n\nTo use this feature, please:\n1. Go to Settings\n2. Find this app\n3. Enable Camera access';
+          });
+          return;
+        }
+
+        // Other camera errors
+        setState(() {
+          _errorMessage = 'Failed to access camera: ${e.description ?? e.code}';
+        });
+        return;
+      }
 
       if (!mounted) return;
 
@@ -69,6 +89,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       // Start image stream for continuous text detection
       _cameraController!.startImageStream(_processCameraImage);
     } catch (e) {
+      debugPrint('Unexpected error: $e');
       setState(() {
         _errorMessage = 'Failed to initialize camera: $e';
       });
@@ -187,13 +208,19 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   }
 
   Widget _buildErrorView(ThemeData theme) {
+    final isPermissionError = _errorMessage?.contains('permission') ?? false;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+            Icon(
+              isPermissionError ? Icons.lock_outline : Icons.error_outline,
+              size: 64,
+              color: theme.colorScheme.error,
+            ),
             const SizedBox(height: 16),
             Text(
               _errorMessage!,
@@ -201,7 +228,17 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            FilledButton(
+            if (isPermissionError) ...[
+              FilledButton.icon(
+                onPressed: () async {
+                  await openAppSettings();
+                },
+                icon: const Icon(Icons.settings),
+                label: const Text('Open Settings'),
+              ),
+              const SizedBox(height: 12),
+            ],
+            OutlinedButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Go Back'),
             ),
