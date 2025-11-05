@@ -11,6 +11,7 @@ It allows AI-assisted shell sessions that help send commands to the cloud
 - This is a PRODUCTION app, not a prototype. Follow Flutter best practices, keep code clean and reusable.
 - Keep the code well structured.
 - Always ask me clarification questions before beginning to write any code.
+- Follow the YAGNI principle. ASK me before adding any extra fields or any other functionality not explicitly requested. Do not make stuff up!
 
 ## Features:
 
