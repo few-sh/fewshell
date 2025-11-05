@@ -42,21 +42,6 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
     state = settings;
     await _prefs.setString(_globalSettingsKey, jsonEncode(settings.toJson()));
   }
-
-  /// Update dark mode
-  Future<void> setDarkMode(bool darkMode) async {
-    await updateSettings(state.copyWith(darkMode: darkMode));
-  }
-
-  /// Update default agents.md content
-  Future<void> setDefaultAgentsMd(String content) async {
-    await updateSettings(state.copyWith(defaultAgentsMd: content));
-  }
-
-  /// Update global secrets metadata
-  Future<void> setGlobalSecrets(Map<String, dynamic>? secrets) async {
-    await updateSettings(state.copyWith(globalSecrets: secrets));
-  }
 }
 
 /// Provider for project-specific settings (family provider)
@@ -99,103 +84,10 @@ class ProjectSettingsNotifier extends StateNotifier<ProjectSettings?> {
     await _prefs.setString(key, jsonEncode(settings.toJson()));
   }
 
-  /// Update agents.md content
-  Future<void> setAgentsMd(String? content) async {
-    final now = DateTime.now();
-    final updated = (state ?? ProjectSettings(projectId: _projectId)).copyWith(
-      agentsMd: content,
-      updatedAt: now,
-      createdAt: state?.createdAt ?? now,
-    );
-    await updateSettings(updated);
-  }
-
-  /// Update GitHub repository
-  Future<void> setGithubRepo(String? repo) async {
-    final now = DateTime.now();
-    final updated = (state ?? ProjectSettings(projectId: _projectId)).copyWith(
-      githubRepo: repo,
-      updatedAt: now,
-      createdAt: state?.createdAt ?? now,
-    );
-    await updateSettings(updated);
-  }
-
-  /// Update GitHub branch
-  Future<void> setGithubBranch(String? branch) async {
-    final now = DateTime.now();
-    final updated = (state ?? ProjectSettings(projectId: _projectId)).copyWith(
-      githubBranch: branch,
-      updatedAt: now,
-      createdAt: state?.createdAt ?? now,
-    );
-    await updateSettings(updated);
-  }
-
-  /// Update project secrets metadata
-  Future<void> setSecrets(Map<String, String>? secrets) async {
-    final now = DateTime.now();
-    final updated = (state ?? ProjectSettings(projectId: _projectId)).copyWith(
-      secrets: secrets,
-      updatedAt: now,
-      createdAt: state?.createdAt ?? now,
-    );
-    await updateSettings(updated);
-  }
-
-  /// Update GitHub sync enabled flag
-  Future<void> setGithubSyncEnabled(bool enabled) async {
-    final now = DateTime.now();
-    final updated = (state ?? ProjectSettings(projectId: _projectId)).copyWith(
-      enableGithubSync: enabled,
-      updatedAt: now,
-      createdAt: state?.createdAt ?? now,
-    );
-    await updateSettings(updated);
-  }
-
   /// Delete project settings
   Future<void> deleteSettings() async {
     final key = '$_projectSettingsPrefix$_projectId';
     await _prefs.remove(key);
     state = null;
   }
-}
-
-/// Provider for effective settings (merged global + project overrides)
-final effectiveSettingsProvider = Provider.family<EffectiveSettings, String>((
-  ref,
-  projectId,
-) {
-  final globalSettings = ref.watch(globalSettingsProvider);
-  final projectSettings = ref.watch(projectSettingsProvider(projectId));
-
-  return EffectiveSettings(global: globalSettings, project: projectSettings);
-});
-
-/// Class representing merged settings
-class EffectiveSettings {
-  final AppSettings global;
-  final ProjectSettings? project;
-
-  EffectiveSettings({required this.global, this.project});
-
-  /// Get agents.md content (project overrides global)
-  String get agentsMd => project?.agentsMd ?? global.defaultAgentsMd;
-
-  /// Get GitHub repo (project specific)
-  String? get githubRepo => project?.githubRepo;
-
-  /// Get GitHub branch (project specific)
-  String? get githubBranch => project?.githubBranch;
-
-  /// Get GitHub sync enabled flag
-  bool get githubSyncEnabled => project?.enableGithubSync ?? true;
-
-  /// Check if project has custom agents.md
-  bool get hasCustomAgentsMd => project?.agentsMd != null;
-
-  /// Check if GitHub is configured for project
-  bool get hasGithubConfigured =>
-      project?.githubRepo != null && project?.githubRepo?.isNotEmpty == true;
 }
