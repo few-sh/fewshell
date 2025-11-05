@@ -1,28 +1,37 @@
 /// Utility for matching text patterns like API keys and URLs
+///
+// TODO: Add more key types, e.g., AWS, Azure, etc.
+// ssh keys, sha1, sha256, etc.
+
 class TextPatternMatcher {
   /// Regex pattern for detecting API keys
   /// Matches common formats:
   /// - OpenAI style: sk-...
+  /// - Gemini style: AIza...
   /// - Generic: api_key_..., apikey:..., etc.
   /// - Long alphanumeric strings (32+ chars)
   static final RegExp apiKeyPattern = RegExp(
     r'(?:sk-[A-Za-z0-9]{20,})|'
+    r'(?:AIza[A-Za-z0-9_\-]{35})|'
     r'(?:api[_-]?key[_:\s]*[A-Za-z0-9]{20,})|'
     r'(?:[A-Za-z0-9]{32,})',
     caseSensitive: false,
   );
 
   /// Regex pattern for detecting URLs
-  /// Matches http:// and https:// URLs even when embedded in surrounding text
+  /// Stricter pattern - requires complete domain and filters out ellipsis
   static final RegExp urlPattern = RegExp(
-    // Allow one or two slashes after the protocol and tolerate stray
-    // backslashes/spaces that OCR sometimes inserts. We'll also
-    // normalize the input before matching.
-    // This pattern can match URLs anywhere in the text, not just at the start.
-    r'https?:/{1,2}[ \t\\/]*[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]?'
-    r'\.[a-zA-Z]{2,}(?:[\/\w\.\-~:/?#\[\]@!$&()*+,;=%]*)?',
+    r'https?://[a-zA-Z0-9][-a-zA-Z0-9]{0,61}[a-zA-Z0-9]?\.[a-zA-Z]{2,}(?:[/\w\.\-~:?#\[\]@!$&()*+,;=%]*)?',
     caseSensitive: false,
   );
+
+  /// Check if text contains ellipsis or other indicators of incomplete text
+  static bool hasEllipsisOrIncomplete(String text) {
+    return text.contains('...') ||
+        text.contains('…') || // Unicode ellipsis
+        text.contains('..') ||
+        text.endsWith('..');
+  }
 
   /// Try to repair common OCR mistakes in URLs before applying regex.
   ///
@@ -73,15 +82,15 @@ class TextPatternMatcher {
 
   /// Check if text matches URL pattern
   static bool isUrl(String text) {
+    // Reject URLs with ellipsis or incomplete indicators
+    if (hasEllipsisOrIncomplete(text)) return false;
+
     final cleaned = normalizeUrl(text);
     final match = urlPattern.firstMatch(cleaned);
     if (match == null) return false;
 
-    // For URLs, we're more lenient - just check if we found a valid URL
-    // somewhere in the text (it doesn't need to cover 70% since URLs
-    // can be embedded in surrounding text that OCR picked up)
-    final matchedText = match.group(0) ?? '';
     // URL must be at least 10 chars (e.g., "http://a.co")
+    final matchedText = match.group(0) ?? '';
     return matchedText.length >= 10;
   }
 

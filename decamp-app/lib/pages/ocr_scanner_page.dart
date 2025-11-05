@@ -180,6 +180,15 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
           _matchedBlocks = matchedBlocks;
           if (matchedBlocks.isNotEmpty) {
             _hasFoundMatch = true; // Stop continuous processing
+
+            // Auto-return the detected result
+            // If multiple matches, prefer the one closest to screen center
+            final selectedMatch = _selectCenterMostMatch(matchedBlocks);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.of(context).pop(selectedMatch.text);
+              }
+            });
           }
         });
       }
@@ -188,6 +197,45 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     } finally {
       _isDetecting = false;
     }
+  }
+
+  /// Selects the match closest to the center of the screen
+  MatchedTextBlock _selectCenterMostMatch(List<MatchedTextBlock> matches) {
+    if (matches.length == 1) {
+      return matches.first;
+    }
+
+    // Get camera preview center point (in camera coordinate space)
+    final previewSize = _cameraController!.value.previewSize!;
+    final centerX = previewSize.width / 2;
+    final centerY = previewSize.height / 2;
+
+    // Find the match with minimum distance to center
+    MatchedTextBlock closestMatch = matches.first;
+    double minDistance = double.infinity;
+
+    for (final match in matches) {
+      // Calculate the center of the bounding box
+      final boxCenterX = match.boundingBox.left + match.boundingBox.width / 2;
+      final boxCenterY = match.boundingBox.top + match.boundingBox.height / 2;
+
+      // Calculate Euclidean distance to screen center
+      final dx = boxCenterX - centerX;
+      final dy = boxCenterY - centerY;
+      final distance = dx * dx + dy * dy; // No need for sqrt, just comparing
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestMatch = match;
+      }
+    }
+
+    debugPrint(
+      'Selected center-most match: "${closestMatch.text}" '
+      'from ${matches.length} candidates',
+    );
+
+    return closestMatch;
   }
 
   Uint8List? _convertCameraImageToBytes(CameraImage image) {
@@ -200,10 +248,6 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       debugPrint('Error converting camera image: $e');
       return null;
     }
-  }
-
-  void _selectText(String text) {
-    Navigator.of(context).pop(text);
   }
 
   @override
@@ -296,9 +340,6 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
           ),
         ),
 
-        // Tap detector for selecting text
-        ..._matchedBlocks.map((block) => _buildTextTapArea(block, theme)),
-
         // Instructions at the bottom
         Positioned(
           left: 0,
@@ -337,7 +378,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                 Text(
                   _matchedBlocks.isEmpty
                       ? 'Matching text will be highlighted'
-                      : 'Tap highlighted text to select',
+                      : 'Match detected - returning...',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.9),
                   ),
@@ -348,23 +389,6 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildTextTapArea(MatchedTextBlock block, ThemeData theme) {
-    return Positioned.fromRect(
-      rect: block.boundingBox,
-      child: GestureDetector(
-        onTap: () => _selectText(block.text),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: theme.colorScheme.primary.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
