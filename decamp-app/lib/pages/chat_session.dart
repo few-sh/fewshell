@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/project_list.dart';
+import 'package:hello_world/providers/theme_provider.dart';
 
-class ChatSession extends StatefulWidget {
-  final Function(ThemeMode)? onThemeChanged;
-
-  const ChatSession({super.key, this.onThemeChanged});
+class ChatSession extends ConsumerStatefulWidget {
+  const ChatSession({super.key});
 
   @override
-  State<ChatSession> createState() => _ChatSessionState();
+  ConsumerState<ChatSession> createState() => _ChatSessionState();
 }
 
-class _ChatSessionState extends State<ChatSession> {
+class _ChatSessionState extends ConsumerState<ChatSession> {
   // Controller for managing chat messages
   final _controller = ChatMessagesController();
 
@@ -191,9 +191,9 @@ class _ChatSessionState extends State<ChatSession> {
                 leading: const Icon(Icons.brightness_auto),
                 title: const Text('System Default'),
                 onTap: () {
-                  if (widget.onThemeChanged != null) {
-                    widget.onThemeChanged!(ThemeMode.system);
-                  }
+                  ref
+                      .read(themeProvider.notifier)
+                      .setThemeMode(ThemeMode.system);
                   Navigator.of(context).pop();
                 },
               ),
@@ -201,9 +201,9 @@ class _ChatSessionState extends State<ChatSession> {
                 leading: const Icon(Icons.light_mode),
                 title: const Text('Light'),
                 onTap: () {
-                  if (widget.onThemeChanged != null) {
-                    widget.onThemeChanged!(ThemeMode.light);
-                  }
+                  ref
+                      .read(themeProvider.notifier)
+                      .setThemeMode(ThemeMode.light);
                   Navigator.of(context).pop();
                 },
               ),
@@ -211,9 +211,7 @@ class _ChatSessionState extends State<ChatSession> {
                 leading: const Icon(Icons.dark_mode),
                 title: const Text('Dark (Neon)'),
                 onTap: () {
-                  if (widget.onThemeChanged != null) {
-                    widget.onThemeChanged!(ThemeMode.dark);
-                  }
+                  ref.read(themeProvider.notifier).setThemeMode(ThemeMode.dark);
                   Navigator.of(context).pop();
                 },
               ),
