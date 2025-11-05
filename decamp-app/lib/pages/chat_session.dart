@@ -4,6 +4,7 @@ import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/project_list.dart';
 import 'package:hello_world/providers/theme_provider.dart';
+import 'package:hello_world/pages/projects_page.dart';
 
 class ChatSession extends ConsumerStatefulWidget {
   const ChatSession({super.key});
@@ -119,58 +120,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 ),
               );
               // TODO: Load the selected session
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showProjectSwitcher() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Switch Project'),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          ),
-          body: ProjectList(
-            projects: _projects,
-            onProjectTap: (project) {
-              setState(() {
-                _currentProjectId = project.id;
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Switched to project: ${project.name}'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-              // TODO: Load project data and sessions
-            },
-            onProjectDelete: (project) {
-              setState(() {
-                _projects.removeWhere((p) => p.id == project.id);
-              });
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Deleted project: ${project.name}'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-              // TODO: Delete project data from storage
-            },
-            onCreateProject: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Create project dialog coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              // TODO: Show create project dialog
             },
           ),
         ),
@@ -302,7 +251,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                           iconSize: 28,
                           onPressed: () {
                             Navigator.pop(context);
-                            _showProjectSwitcher();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ProjectsPage(),
+                              ),
+                            );
                           },
                         ),
                       ],
