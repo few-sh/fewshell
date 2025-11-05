@@ -21,6 +21,11 @@ AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$AppSettings {
+  /// List of configured LLM API endpoints at the global level
+  List<LlmApiSettings> get llmSettings => throw _privateConstructorUsedError;
+
+  /// Default LLM identifier to use when not overridden by project
+  String? get defaultLlmIdentifier => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -41,7 +46,12 @@ abstract class $AppSettingsCopyWith<$Res> {
     $Res Function(AppSettings) then,
   ) = _$AppSettingsCopyWithImpl<$Res, AppSettings>;
   @useResult
-  $Res call({DateTime? createdAt, DateTime? updatedAt});
+  $Res call({
+    List<LlmApiSettings> llmSettings,
+    String? defaultLlmIdentifier,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  });
 }
 
 /// @nodoc
@@ -58,9 +68,22 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? createdAt = freezed, Object? updatedAt = freezed}) {
+  $Res call({
+    Object? llmSettings = null,
+    Object? defaultLlmIdentifier = freezed,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
+  }) {
     return _then(
       _value.copyWith(
+            llmSettings: null == llmSettings
+                ? _value.llmSettings
+                : llmSettings // ignore: cast_nullable_to_non_nullable
+                      as List<LlmApiSettings>,
+            defaultLlmIdentifier: freezed == defaultLlmIdentifier
+                ? _value.defaultLlmIdentifier
+                : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+                      as String?,
             createdAt: freezed == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -84,7 +107,12 @@ abstract class _$$AppSettingsImplCopyWith<$Res>
   ) = __$$AppSettingsImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({DateTime? createdAt, DateTime? updatedAt});
+  $Res call({
+    List<LlmApiSettings> llmSettings,
+    String? defaultLlmIdentifier,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  });
 }
 
 /// @nodoc
@@ -100,9 +128,22 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
   /// with the given fields replaced by the non-null parameter values.
   @pragma('vm:prefer-inline')
   @override
-  $Res call({Object? createdAt = freezed, Object? updatedAt = freezed}) {
+  $Res call({
+    Object? llmSettings = null,
+    Object? defaultLlmIdentifier = freezed,
+    Object? createdAt = freezed,
+    Object? updatedAt = freezed,
+  }) {
     return _then(
       _$AppSettingsImpl(
+        llmSettings: null == llmSettings
+            ? _value._llmSettings
+            : llmSettings // ignore: cast_nullable_to_non_nullable
+                  as List<LlmApiSettings>,
+        defaultLlmIdentifier: freezed == defaultLlmIdentifier
+            ? _value.defaultLlmIdentifier
+            : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+                  as String?,
         createdAt: freezed == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -119,11 +160,31 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
 /// @nodoc
 @JsonSerializable()
 class _$AppSettingsImpl implements _AppSettings {
-  const _$AppSettingsImpl({this.createdAt, this.updatedAt});
+  const _$AppSettingsImpl({
+    final List<LlmApiSettings> llmSettings = const [],
+    this.defaultLlmIdentifier,
+    this.createdAt,
+    this.updatedAt,
+  }) : _llmSettings = llmSettings;
 
   factory _$AppSettingsImpl.fromJson(Map<String, dynamic> json) =>
       _$$AppSettingsImplFromJson(json);
 
+  /// List of configured LLM API endpoints at the global level
+  final List<LlmApiSettings> _llmSettings;
+
+  /// List of configured LLM API endpoints at the global level
+  @override
+  @JsonKey()
+  List<LlmApiSettings> get llmSettings {
+    if (_llmSettings is EqualUnmodifiableListView) return _llmSettings;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_llmSettings);
+  }
+
+  /// Default LLM identifier to use when not overridden by project
+  @override
+  final String? defaultLlmIdentifier;
   @override
   final DateTime? createdAt;
   @override
@@ -131,7 +192,7 @@ class _$AppSettingsImpl implements _AppSettings {
 
   @override
   String toString() {
-    return 'AppSettings(createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'AppSettings(llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -139,6 +200,12 @@ class _$AppSettingsImpl implements _AppSettings {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$AppSettingsImpl &&
+            const DeepCollectionEquality().equals(
+              other._llmSettings,
+              _llmSettings,
+            ) &&
+            (identical(other.defaultLlmIdentifier, defaultLlmIdentifier) ||
+                other.defaultLlmIdentifier == defaultLlmIdentifier) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -147,7 +214,13 @@ class _$AppSettingsImpl implements _AppSettings {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    runtimeType,
+    const DeepCollectionEquality().hash(_llmSettings),
+    defaultLlmIdentifier,
+    createdAt,
+    updatedAt,
+  );
 
   /// Create a copy of AppSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -165,6 +238,8 @@ class _$AppSettingsImpl implements _AppSettings {
 
 abstract class _AppSettings implements AppSettings {
   const factory _AppSettings({
+    final List<LlmApiSettings> llmSettings,
+    final String? defaultLlmIdentifier,
     final DateTime? createdAt,
     final DateTime? updatedAt,
   }) = _$AppSettingsImpl;
@@ -172,6 +247,13 @@ abstract class _AppSettings implements AppSettings {
   factory _AppSettings.fromJson(Map<String, dynamic> json) =
       _$AppSettingsImpl.fromJson;
 
+  /// List of configured LLM API endpoints at the global level
+  @override
+  List<LlmApiSettings> get llmSettings;
+
+  /// Default LLM identifier to use when not overridden by project
+  @override
+  String? get defaultLlmIdentifier;
   @override
   DateTime? get createdAt;
   @override
@@ -192,6 +274,14 @@ ProjectSettings _$ProjectSettingsFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$ProjectSettings {
   String get projectId => throw _privateConstructorUsedError;
+
+  /// List of configured LLM API endpoints for this project
+  /// If empty, falls back to global settings
+  List<LlmApiSettings> get llmSettings => throw _privateConstructorUsedError;
+
+  /// Default LLM identifier for this project
+  /// If null, falls back to global default
+  String? get defaultLlmIdentifier => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -212,7 +302,13 @@ abstract class $ProjectSettingsCopyWith<$Res> {
     $Res Function(ProjectSettings) then,
   ) = _$ProjectSettingsCopyWithImpl<$Res, ProjectSettings>;
   @useResult
-  $Res call({String projectId, DateTime? createdAt, DateTime? updatedAt});
+  $Res call({
+    String projectId,
+    List<LlmApiSettings> llmSettings,
+    String? defaultLlmIdentifier,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  });
 }
 
 /// @nodoc
@@ -231,6 +327,8 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
   @override
   $Res call({
     Object? projectId = null,
+    Object? llmSettings = null,
+    Object? defaultLlmIdentifier = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -240,6 +338,14 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
                 ? _value.projectId
                 : projectId // ignore: cast_nullable_to_non_nullable
                       as String,
+            llmSettings: null == llmSettings
+                ? _value.llmSettings
+                : llmSettings // ignore: cast_nullable_to_non_nullable
+                      as List<LlmApiSettings>,
+            defaultLlmIdentifier: freezed == defaultLlmIdentifier
+                ? _value.defaultLlmIdentifier
+                : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+                      as String?,
             createdAt: freezed == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -263,7 +369,13 @@ abstract class _$$ProjectSettingsImplCopyWith<$Res>
   ) = __$$ProjectSettingsImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({String projectId, DateTime? createdAt, DateTime? updatedAt});
+  $Res call({
+    String projectId,
+    List<LlmApiSettings> llmSettings,
+    String? defaultLlmIdentifier,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  });
 }
 
 /// @nodoc
@@ -281,6 +393,8 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? projectId = null,
+    Object? llmSettings = null,
+    Object? defaultLlmIdentifier = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -290,6 +404,14 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
             ? _value.projectId
             : projectId // ignore: cast_nullable_to_non_nullable
                   as String,
+        llmSettings: null == llmSettings
+            ? _value._llmSettings
+            : llmSettings // ignore: cast_nullable_to_non_nullable
+                  as List<LlmApiSettings>,
+        defaultLlmIdentifier: freezed == defaultLlmIdentifier
+            ? _value.defaultLlmIdentifier
+            : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+                  as String?,
         createdAt: freezed == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -308,15 +430,36 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
 class _$ProjectSettingsImpl implements _ProjectSettings {
   const _$ProjectSettingsImpl({
     required this.projectId,
+    final List<LlmApiSettings> llmSettings = const [],
+    this.defaultLlmIdentifier,
     this.createdAt,
     this.updatedAt,
-  });
+  }) : _llmSettings = llmSettings;
 
   factory _$ProjectSettingsImpl.fromJson(Map<String, dynamic> json) =>
       _$$ProjectSettingsImplFromJson(json);
 
   @override
   final String projectId;
+
+  /// List of configured LLM API endpoints for this project
+  /// If empty, falls back to global settings
+  final List<LlmApiSettings> _llmSettings;
+
+  /// List of configured LLM API endpoints for this project
+  /// If empty, falls back to global settings
+  @override
+  @JsonKey()
+  List<LlmApiSettings> get llmSettings {
+    if (_llmSettings is EqualUnmodifiableListView) return _llmSettings;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_llmSettings);
+  }
+
+  /// Default LLM identifier for this project
+  /// If null, falls back to global default
+  @override
+  final String? defaultLlmIdentifier;
   @override
   final DateTime? createdAt;
   @override
@@ -324,7 +467,7 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
 
   @override
   String toString() {
-    return 'ProjectSettings(projectId: $projectId, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'ProjectSettings(projectId: $projectId, llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -334,6 +477,12 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
             other is _$ProjectSettingsImpl &&
             (identical(other.projectId, projectId) ||
                 other.projectId == projectId) &&
+            const DeepCollectionEquality().equals(
+              other._llmSettings,
+              _llmSettings,
+            ) &&
+            (identical(other.defaultLlmIdentifier, defaultLlmIdentifier) ||
+                other.defaultLlmIdentifier == defaultLlmIdentifier) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -342,7 +491,14 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, projectId, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    runtimeType,
+    projectId,
+    const DeepCollectionEquality().hash(_llmSettings),
+    defaultLlmIdentifier,
+    createdAt,
+    updatedAt,
+  );
 
   /// Create a copy of ProjectSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -364,6 +520,8 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
 abstract class _ProjectSettings implements ProjectSettings {
   const factory _ProjectSettings({
     required final String projectId,
+    final List<LlmApiSettings> llmSettings,
+    final String? defaultLlmIdentifier,
     final DateTime? createdAt,
     final DateTime? updatedAt,
   }) = _$ProjectSettingsImpl;
@@ -373,6 +531,16 @@ abstract class _ProjectSettings implements ProjectSettings {
 
   @override
   String get projectId;
+
+  /// List of configured LLM API endpoints for this project
+  /// If empty, falls back to global settings
+  @override
+  List<LlmApiSettings> get llmSettings;
+
+  /// Default LLM identifier for this project
+  /// If null, falls back to global default
+  @override
+  String? get defaultLlmIdentifier;
   @override
   DateTime? get createdAt;
   @override

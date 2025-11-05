@@ -33,6 +33,7 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
         state = AppSettings.fromJson(jsonDecode(json));
       } catch (e) {
         // If loading fails, keep default settings
+        state = const AppSettings();
       }
     }
   }
@@ -72,8 +73,12 @@ class ProjectSettingsNotifier extends StateNotifier<ProjectSettings?> {
       try {
         state = ProjectSettings.fromJson(jsonDecode(json));
       } catch (e) {
-        // If loading fails, keep null (will fall back to global)
+        // If loading fails, initialize with default
+        state = ProjectSettings(projectId: _projectId);
       }
+    } else {
+      // Initialize with default if not found
+      state = ProjectSettings(projectId: _projectId);
     }
   }
 

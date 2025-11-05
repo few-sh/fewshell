@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
+import '../providers/llm_settings_provider.dart';
+import '../models/llm_api_settings.dart';
 import '../utils/text_pattern_matcher.dart';
 import 'ocr_scanner_page.dart';
 
@@ -79,7 +81,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildAIModelsSection(),
+        _buildAIModelsSection(isGlobal: true),
         const SizedBox(height: 24),
         _buildThemeSection(),
       ],
@@ -92,7 +94,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       children: [
         _buildProjectSelector(),
         const SizedBox(height: 24),
-        _buildAIModelsSection(),
+        _buildAIModelsSection(isGlobal: false),
         const SizedBox(height: 24),
         _buildThemeSection(),
       ],
@@ -206,8 +208,19 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-  Widget _buildAIModelsSection() {
+  Widget _buildAIModelsSection({required bool isGlobal}) {
     final theme = Theme.of(context);
+
+    // Get the appropriate provider based on scope
+    final llmSettings = isGlobal
+        ? ref.watch(globalLlmSettingsProvider)
+        : (ref.watch(currentProjectIdProvider) != null
+              ? ref.watch(
+                  projectLlmSettingsProvider(
+                    ref.watch(currentProjectIdProvider)!,
+                  ),
+                )
+              : <LlmApiSettings>[]);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,37 +235,89 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ),
             ),
             FilledButton.icon(
-              onPressed: _showAddModelDialog,
+              onPressed: () => _showAddModelDialog(isGlobal: isGlobal),
               icon: const Icon(Icons.add),
               label: const Text('Add Model'),
             ),
           ],
         ),
         const SizedBox(height: 16),
-        // Placeholder model cards
-        _buildModelCard(
-          name: 'GPT-4 Turbo',
-          url: 'https://api.openai.com/v1',
-          apiKeyMasked: '••••••••••sk-1234',
-          onEdit: () => _showEditModelDialog('GPT-4 Turbo'),
-          onDelete: () => _showDeleteConfirmation('GPT-4 Turbo'),
-        ),
-        const SizedBox(height: 12),
-        _buildModelCard(
-          name: 'Claude 3.5 Sonnet',
-          url: 'https://api.anthropic.com',
-          apiKeyMasked: '••••••••••sk-ant-5678',
-          onEdit: () => _showEditModelDialog('Claude 3.5 Sonnet'),
-          onDelete: () => _showDeleteConfirmation('Claude 3.5 Sonnet'),
-        ),
+        // Show message if no project selected in project settings
+        if (!isGlobal && ref.watch(currentProjectIdProvider) == null)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outline),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Select a project to configure project-specific AI models.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (llmSettings.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outline),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No AI models configured yet. Click "Add Model" to get started.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...llmSettings.map(
+            (settings) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildModelCard(
+                settings: settings,
+                isGlobal: isGlobal,
+                onEdit: () => _showEditModelDialog(
+                  settings: settings,
+                  isGlobal: isGlobal,
+                ),
+                onDelete: () => _showDeleteConfirmation(
+                  settings: settings,
+                  isGlobal: isGlobal,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }
 
   Widget _buildModelCard({
-    required String name,
-    required String url,
-    required String apiKeyMasked,
+    required LlmApiSettings settings,
+    required bool isGlobal,
     required VoidCallback onEdit,
     required VoidCallback onDelete,
   }) {
@@ -269,7 +334,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               children: [
                 Expanded(
                   child: Text(
-                    name,
+                    settings.displayName,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -278,6 +343,18 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (!settings.enabled)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Chip(
+                          label: const Text('Disabled'),
+                          backgroundColor: theme.colorScheme.errorContainer,
+                          labelStyle: TextStyle(
+                            color: theme.colorScheme.onErrorContainer,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     IconButton(
                       icon: const Icon(Icons.edit),
                       onPressed: onEdit,
@@ -303,7 +380,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    url,
+                    settings.baseUrl,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                     ),
@@ -321,7 +398,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  apiKeyMasked,
+                  '••••••••••${settings.identifier.substring(0, settings.identifier.length > 4 ? 4 : settings.identifier.length)}',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                     fontFamily: 'monospace',
@@ -444,57 +521,225 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-  void _showAddModelDialog() {
+  void _showAddModelDialog({required bool isGlobal}) {
     showDialog(
       context: context,
       builder: (context) => _AIModelDialog(
         title: 'Add AI Model',
-        onSave: (identifier, url, apiKey) {
-          // TODO: Save to provider
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Added model: $identifier')));
-        },
+        isGlobal: isGlobal,
+        onSave:
+            (
+              identifier,
+              displayName,
+              url,
+              apiKey, {
+              modelName,
+              customHeaders,
+              maxTokens,
+              temperature,
+              enabled,
+            }) async {
+              try {
+                if (isGlobal) {
+                  await ref
+                      .read(globalLlmSettingsProvider.notifier)
+                      .addLlmSettings(
+                        identifier: identifier,
+                        displayName: displayName,
+                        baseUrl: url,
+                        apiKey: apiKey,
+                        modelName: modelName,
+                        customHeaders: customHeaders,
+                        maxTokens: maxTokens,
+                        temperature: temperature,
+                      );
+                } else {
+                  final projectId = ref.read(currentProjectIdProvider);
+                  if (projectId != null) {
+                    await ref
+                        .read(projectLlmSettingsProvider(projectId).notifier)
+                        .addLlmSettings(
+                          identifier: identifier,
+                          displayName: displayName,
+                          baseUrl: url,
+                          apiKey: apiKey,
+                          modelName: modelName,
+                          customHeaders: customHeaders,
+                          maxTokens: maxTokens,
+                          temperature: temperature,
+                        );
+                  }
+                }
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Added model: $displayName')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error adding model: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
+            },
       ),
     );
   }
 
-  void _showEditModelDialog(String modelName) {
+  void _showEditModelDialog({
+    required LlmApiSettings settings,
+    required bool isGlobal,
+  }) async {
+    // Fetch the API key from keychain
+    String? apiKey;
+    if (isGlobal) {
+      apiKey = await ref
+          .read(globalLlmSettingsProvider.notifier)
+          .getApiKey(settings.identifier);
+    } else {
+      final projectId = ref.read(currentProjectIdProvider);
+      if (projectId != null) {
+        apiKey = await ref
+            .read(projectLlmSettingsProvider(projectId).notifier)
+            .getApiKey(settings.identifier);
+      }
+    }
+
+    if (!mounted) return;
+
     showDialog(
       context: context,
       builder: (context) => _AIModelDialog(
         title: 'Edit AI Model',
-        initialIdentifier: modelName,
-        initialUrl: 'https://api.openai.com/v1',
-        initialApiKey: 'sk-placeholder',
-        onSave: (identifier, url, apiKey) {
-          // TODO: Update in provider
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Updated model: $identifier')));
-        },
+        isGlobal: isGlobal,
+        initialIdentifier: settings.identifier,
+        initialDisplayName: settings.displayName,
+        initialUrl: settings.baseUrl,
+        initialApiKey: apiKey ?? '',
+        initialModelName: settings.modelName,
+        initialEnabled: settings.enabled,
+        onSave:
+            (
+              identifier,
+              displayName,
+              url,
+              apiKey, {
+              modelName,
+              customHeaders,
+              maxTokens,
+              temperature,
+              enabled,
+            }) async {
+              try {
+                if (isGlobal) {
+                  await ref
+                      .read(globalLlmSettingsProvider.notifier)
+                      .updateLlmSettings(
+                        identifier: identifier,
+                        displayName: displayName,
+                        baseUrl: url,
+                        apiKey: apiKey.isNotEmpty ? apiKey : null,
+                        modelName: modelName,
+                        customHeaders: customHeaders,
+                        maxTokens: maxTokens,
+                        temperature: temperature,
+                        enabled: enabled,
+                      );
+                } else {
+                  final projectId = ref.read(currentProjectIdProvider);
+                  if (projectId != null) {
+                    await ref
+                        .read(projectLlmSettingsProvider(projectId).notifier)
+                        .updateLlmSettings(
+                          identifier: identifier,
+                          displayName: displayName,
+                          baseUrl: url,
+                          apiKey: apiKey.isNotEmpty ? apiKey : null,
+                          modelName: modelName,
+                          customHeaders: customHeaders,
+                          maxTokens: maxTokens,
+                          temperature: temperature,
+                          enabled: enabled,
+                        );
+                  }
+                }
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Updated model: $displayName')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error updating model: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
+            },
       ),
     );
   }
 
-  void _showDeleteConfirmation(String modelName) {
+  void _showDeleteConfirmation({
+    required LlmApiSettings settings,
+    required bool isGlobal,
+  }) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete AI Model'),
-        content: Text('Are you sure you want to delete "$modelName"?'),
+        content: Text(
+          'Are you sure you want to delete "${settings.displayName}"?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              // TODO: Delete from provider
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Deleted model: $modelName')),
-              );
+            onPressed: () async {
+              try {
+                if (isGlobal) {
+                  await ref
+                      .read(globalLlmSettingsProvider.notifier)
+                      .deleteLlmSettings(settings.identifier);
+                } else {
+                  final projectId = ref.read(currentProjectIdProvider);
+                  if (projectId != null) {
+                    await ref
+                        .read(projectLlmSettingsProvider(projectId).notifier)
+                        .deleteLlmSettings(settings.identifier);
+                  }
+                }
+
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Deleted model: ${settings.displayName}'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting model: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
@@ -510,17 +755,36 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 /// Dialog for adding/editing AI models
 class _AIModelDialog extends StatefulWidget {
   final String title;
+  final bool isGlobal;
   final String? initialIdentifier;
+  final String? initialDisplayName;
   final String? initialUrl;
   final String? initialApiKey;
-  final Function(String identifier, String url, String apiKey) onSave;
+  final String? initialModelName;
+  final bool? initialEnabled;
+  final Function(
+    String identifier,
+    String displayName,
+    String url,
+    String apiKey, {
+    String? modelName,
+    String? customHeaders,
+    int? maxTokens,
+    double? temperature,
+    bool? enabled,
+  })
+  onSave;
 
   const _AIModelDialog({
     required this.title,
+    required this.isGlobal,
     required this.onSave,
     this.initialIdentifier,
+    this.initialDisplayName,
     this.initialUrl,
     this.initialApiKey,
+    this.initialModelName,
+    this.initialEnabled,
   });
 
   @override
@@ -529,11 +793,14 @@ class _AIModelDialog extends StatefulWidget {
 
 class _AIModelDialogState extends State<_AIModelDialog> {
   late final TextEditingController _identifierController;
+  late final TextEditingController _displayNameController;
   late final TextEditingController _urlController;
   late final TextEditingController _apiKeyController;
+  late final TextEditingController _modelNameController;
   final _formKey = GlobalKey<FormState>();
   bool _obscureApiKey = true;
   bool _isTestingConnection = false;
+  late bool _enabled;
 
   @override
   void initState() {
@@ -541,15 +808,22 @@ class _AIModelDialogState extends State<_AIModelDialog> {
     _identifierController = TextEditingController(
       text: widget.initialIdentifier,
     );
+    _displayNameController = TextEditingController(
+      text: widget.initialDisplayName,
+    );
     _urlController = TextEditingController(text: widget.initialUrl);
     _apiKeyController = TextEditingController(text: widget.initialApiKey);
+    _modelNameController = TextEditingController(text: widget.initialModelName);
+    _enabled = widget.initialEnabled ?? true;
   }
 
   @override
   void dispose() {
     _identifierController.dispose();
+    _displayNameController.dispose();
     _urlController.dispose();
     _apiKeyController.dispose();
+    _modelNameController.dispose();
     super.dispose();
   }
 
@@ -570,9 +844,25 @@ class _AIModelDialogState extends State<_AIModelDialog> {
                   hintText: 'e.g., gpt-4-turbo, claude-3-5-sonnet',
                   prefixIcon: Icon(Icons.info),
                 ),
+                enabled: widget.initialIdentifier == null,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a model identifier';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _displayNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Display Name',
+                  hintText: 'e.g., GPT-4 Turbo, Claude 3.5 Sonnet',
+                  prefixIcon: Icon(Icons.title),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter a display name';
                   }
                   return null;
                 },
@@ -606,7 +896,9 @@ class _AIModelDialogState extends State<_AIModelDialog> {
                 controller: _apiKeyController,
                 decoration: InputDecoration(
                   labelText: 'API Key',
-                  hintText: 'Enter your API key',
+                  hintText: widget.initialApiKey != null
+                      ? 'Leave blank to keep current key'
+                      : 'Enter your API key',
                   prefixIcon: const Icon(Icons.key),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -633,12 +925,36 @@ class _AIModelDialogState extends State<_AIModelDialog> {
                 ),
                 obscureText: _obscureApiKey,
                 validator: (value) {
-                  if (value == null || value.isEmpty) {
+                  // API key is required for new models but optional for edits
+                  if (widget.initialApiKey == null &&
+                      (value == null || value.isEmpty)) {
                     return 'Please enter an API key';
                   }
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _modelNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Model Name (Optional)',
+                  hintText: 'Override model name for API requests',
+                  prefixIcon: Icon(Icons.smart_toy),
+                ),
+              ),
+              if (widget.initialIdentifier != null) ...[
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Enabled'),
+                  subtitle: const Text('Allow this model to be used'),
+                  value: _enabled,
+                  onChanged: (value) {
+                    setState(() {
+                      _enabled = value;
+                    });
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -700,8 +1016,13 @@ class _AIModelDialogState extends State<_AIModelDialog> {
     if (_formKey.currentState!.validate()) {
       widget.onSave(
         _identifierController.text,
+        _displayNameController.text,
         _urlController.text,
         _apiKeyController.text,
+        modelName: _modelNameController.text.isNotEmpty
+            ? _modelNameController.text
+            : null,
+        enabled: widget.initialIdentifier != null ? _enabled : null,
       );
       Navigator.of(context).pop();
     }
