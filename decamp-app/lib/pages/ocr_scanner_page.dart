@@ -26,6 +26,13 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   List<MatchedTextBlock> _matchedBlocks = [];
   bool _isInitialized = false;
   String? _errorMessage;
+  bool _hasFoundMatch = false; // Stop processing once we find matches
+
+  // Throttle image processing to improve performance
+  DateTime? _lastProcessedTime;
+  static const _processingInterval = Duration(
+    milliseconds: 500,
+  ); // Process every 2 seconds
 
   @override
   void initState() {
@@ -49,11 +56,12 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
         return;
       }
 
-      // Initialize camera controller
+      // Initialize camera controller with medium resolution (faster)
       // On iOS, this will automatically trigger the permission dialog if needed
       _cameraController = CameraController(
         cameras.first,
-        ResolutionPreset.high,
+        ResolutionPreset
+            .medium, // Changed from high to medium for better performance
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.nv21,
       );
@@ -101,26 +109,38 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   Future<void> _processCameraImage(CameraImage image) async {
     if (_isDetecting) return;
 
+    // Stop processing if we already found matches (to save battery/CPU)
+    if (_hasFoundMatch && _matchedBlocks.isNotEmpty) return;
+
+    // Throttle processing to avoid overwhelming the device
+    final now = DateTime.now();
+    if (_lastProcessedTime != null &&
+        now.difference(_lastProcessedTime!) < _processingInterval) {
+      return;
+    }
+    _lastProcessedTime = now;
+
     _isDetecting = true;
 
     try {
-      // Convert CameraImage to bytes (BGRA format for iOS)
+      // Convert CameraImage to bytes
       final bytes = _convertCameraImageToBytes(image);
       if (bytes == null) {
         _isDetecting = false;
         return;
       }
 
-      // Create RecognizeTextData for Apple Vision
-      final recognizeData = RecognizeTextData(
-        image: bytes,
-        imageSize: Size(image.width.toDouble(), image.height.toDouble()),
-        recognitionLevel: RecognitionLevel.accurate,
-        automaticallyDetectsLanguage: true,
-      );
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
 
-      // Process image with Apple Vision
-      final recognizedTexts = await _textRecognizer.processImage(recognizeData);
+      // Process image with Apple Vision - use FAST recognition for better performance
+      final recognizedTexts = await _textRecognizer.processImage(
+        RecognizeTextData(
+          image: bytes,
+          imageSize: imageSize,
+          recognitionLevel: RecognitionLevel.accurate,
+          automaticallyDetectsLanguage: false, // Disabled for speed
+        ),
+      );
 
       if (recognizedTexts == null) {
         _isDetecting = false;
@@ -155,6 +175,9 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       if (mounted) {
         setState(() {
           _matchedBlocks = matchedBlocks;
+          if (matchedBlocks.isNotEmpty) {
+            _hasFoundMatch = true; // Stop continuous processing
+          }
         });
       }
     } catch (e) {
