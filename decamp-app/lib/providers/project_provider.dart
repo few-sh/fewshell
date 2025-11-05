@@ -1,8 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' as drift;
 import '../database/database.dart';
 import '../database/daos/project_dao.dart';
 import 'database_provider.dart';
+import 'theme_provider.dart';
+
+/// Key for storing current project ID in SharedPreferences
+const String _currentProjectIdKey = 'current_project_id';
 
 /// Provider for streaming all projects from the database
 final projectsStreamProvider = StreamProvider<List<ProjectEntity>>((ref) {
@@ -11,7 +16,13 @@ final projectsStreamProvider = StreamProvider<List<ProjectEntity>>((ref) {
 });
 
 /// StateProvider for the currently selected project ID
-final currentProjectIdProvider = StateProvider<String?>((ref) => null);
+/// Initialized from SharedPreferences on first access
+final currentProjectIdProvider = StateProvider<String?>((ref) {
+  // Load from SharedPreferences on initialization
+  final prefs = ref.watch(sharedPreferencesProvider);
+  final savedProjectId = prefs.getString(_currentProjectIdKey);
+  return savedProjectId;
+});
 
 /// Provider for the currently selected project
 /// Returns null if no project is selected or project doesn't exist
@@ -94,8 +105,17 @@ class ProjectActions {
   }
 
   /// Select a project as the current project
-  void selectProject(String? id) {
+  /// Persists the selection to SharedPreferences
+  Future<void> selectProject(String? id) async {
     _ref.read(currentProjectIdProvider.notifier).state = id;
+
+    // Persist to SharedPreferences
+    final prefs = _ref.read(sharedPreferencesProvider);
+    if (id != null) {
+      await prefs.setString(_currentProjectIdKey, id);
+    } else {
+      await prefs.remove(_currentProjectIdKey);
+    }
   }
 
   /// Update the last session date for a project
