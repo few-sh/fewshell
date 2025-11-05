@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
+import '../utils/text_pattern_matcher.dart';
+import 'ocr_scanner_page.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -578,10 +580,15 @@ class _AIModelDialogState extends State<_AIModelDialog> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _urlController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'API URL',
                   hintText: 'https://api.example.com/v1',
-                  prefixIcon: Icon(Icons.link),
+                  prefixIcon: const Icon(Icons.link),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.camera_alt),
+                    onPressed: _scanUrl,
+                    tooltip: 'Scan URL with camera',
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -601,15 +608,27 @@ class _AIModelDialogState extends State<_AIModelDialog> {
                   labelText: 'API Key',
                   hintText: 'Enter your API key',
                   prefixIcon: const Icon(Icons.key),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureApiKey ? Icons.visibility : Icons.visibility_off,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureApiKey = !_obscureApiKey;
-                      });
-                    },
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.camera_alt),
+                        onPressed: _scanApiKey,
+                        tooltip: 'Scan API key with camera',
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          _obscureApiKey
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureApiKey = !_obscureApiKey;
+                          });
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 obscureText: _obscureApiKey,
@@ -685,6 +704,36 @@ class _AIModelDialogState extends State<_AIModelDialog> {
         _apiKeyController.text,
       );
       Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _scanApiKey() async {
+    final scannedText = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OcrScannerPage(scanType: ScanType.apiKey),
+      ),
+    );
+
+    if (scannedText != null && mounted) {
+      setState(() {
+        _apiKeyController.text = scannedText;
+      });
+    }
+  }
+
+  Future<void> _scanUrl() async {
+    final scannedText = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const OcrScannerPage(scanType: ScanType.url),
+      ),
+    );
+
+    if (scannedText != null && mounted) {
+      setState(() {
+        _urlController.text = scannedText;
+      });
     }
   }
 }
