@@ -8,6 +8,9 @@ import 'tables/projects_table.dart';
 import 'tables/sessions_table.dart';
 import 'tables/messages_table.dart';
 import 'tables/snippets_table.dart';
+import 'daos/project_dao.dart';
+import 'daos/session_dao.dart';
+import 'daos/message_dao.dart';
 
 part 'database.g.dart';
 
@@ -16,6 +19,11 @@ part 'database.g.dart';
 @DriftDatabase(tables: [Projects, Sessions, Messages, Snippets])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+
+  // DAOs - lazy initialized
+  late final ProjectDao projectDao = ProjectDao(this);
+  late final SessionDao sessionDao = SessionDao(this);
+  late final MessageDao messageDao = MessageDao(this);
 
   @override
   int get schemaVersion => 1;
