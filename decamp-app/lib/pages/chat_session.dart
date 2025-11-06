@@ -241,6 +241,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   /// Handle sending messages
   Future<void> _handleSendMessage(ChatMessage message) async {
+    // Add the user's message to the chat history first
+    _controller.addMessage(message);
+
     setState(() => _isLoading = true);
 
     try {
