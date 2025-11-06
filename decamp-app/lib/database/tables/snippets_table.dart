@@ -22,6 +22,9 @@ class Snippets extends Table {
   /// Tags as comma-separated string
   TextColumn get tags => text().withDefault(const Constant(''))();
 
+  /// Position for ordering snippets (lower = higher in list)
+  IntColumn get position => integer().withDefault(const Constant(0))();
+
   /// Timestamp when the snippet was created
   DateTimeColumn get createdAt => dateTime()();
 

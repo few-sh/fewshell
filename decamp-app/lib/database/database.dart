@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   late final SnippetDao snippetDao = SnippetDao(this);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -63,11 +63,41 @@ class AppDatabase extends _$AppDatabase {
         );
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Future migrations will go here
-        // Example for version 2:
-        // if (from < 2) {
-        //   await m.addColumn(projects, projects.newColumn);
-        // }
+        // Migration from version 1 to 2: Add position column to snippets
+        if (from < 2) {
+          // Add position column with default value 0
+          await m.addColumn(snippets, snippets.position);
+
+          // Initialize positions based on current updatedAt order
+          // For global snippets
+          await customStatement('''
+            UPDATE snippets 
+            SET position = (
+              SELECT COUNT(*) 
+              FROM snippets s2 
+              WHERE s2.project_id IS NULL 
+              AND s2.updated_at > snippets.updated_at
+            )
+            WHERE project_id IS NULL
+          ''');
+
+          // For each project's snippets
+          await customStatement('''
+            UPDATE snippets 
+            SET position = (
+              SELECT COUNT(*) 
+              FROM snippets s2 
+              WHERE s2.project_id = snippets.project_id 
+              AND s2.updated_at > snippets.updated_at
+            )
+            WHERE project_id IS NOT NULL
+          ''');
+
+          // Create index for position ordering
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
+          );
+        }
       },
       beforeOpen: (details) async {
         // Enable foreign keys

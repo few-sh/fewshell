@@ -70,6 +70,13 @@ class SnippetNotifier extends StateNotifier<AsyncValue<List<Snippet>>> {
   }) async {
     try {
       final now = DateTime.now();
+
+      // Get the next position (max + 1)
+      final maxPosition = await _db.snippetDao.getMaxPosition(
+        projectId: _projectId,
+      );
+      final nextPosition = maxPosition + 1;
+
       final snippet = SnippetEntityCompanion(
         id: Value(_generateSnippetId()),
         projectId: Value(_projectId),
@@ -77,6 +84,7 @@ class SnippetNotifier extends StateNotifier<AsyncValue<List<Snippet>>> {
         content: Value(content),
         description: Value(description),
         tags: Value(tags.join(',')),
+        position: Value(nextPosition),
         createdAt: Value(now),
         updatedAt: Value(now),
       );
@@ -128,7 +136,7 @@ class SnippetNotifier extends StateNotifier<AsyncValue<List<Snippet>>> {
     }
   }
 
-  /// Reorder snippets (updates the updatedAt timestamp to change order)
+  /// Reorder snippets (updates position values)
   Future<void> reorderSnippets(int oldIndex, int newIndex) async {
     try {
       final currentState = state;
@@ -147,15 +155,10 @@ class SnippetNotifier extends StateNotifier<AsyncValue<List<Snippet>>> {
       // Update state optimistically
       state = AsyncValue.data(snippets);
 
-      // Update timestamps in reverse order to maintain the new order
-      for (int i = snippets.length - 1; i >= 0; i--) {
+      // Update position values for all snippets in the new order
+      for (int i = 0; i < snippets.length; i++) {
         await _db.snippetDao.updateSnippet(
-          SnippetEntityCompanion(
-            id: Value(snippets[i].id),
-            updatedAt: Value(
-              DateTime.now().subtract(Duration(seconds: snippets.length - i)),
-            ),
-          ),
+          SnippetEntityCompanion(id: Value(snippets[i].id), position: Value(i)),
         );
       }
 

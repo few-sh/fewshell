@@ -14,6 +14,7 @@ class Snippet with _$Snippet {
     required String content,
     String? description,
     @Default([]) List<String> tags,
+    @Default(0) int position,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _Snippet;

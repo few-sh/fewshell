@@ -1516,6 +1516,18 @@ class $SnippetsTable extends Snippets
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1546,6 +1558,7 @@ class $SnippetsTable extends Snippets
     content,
     description,
     tags,
+    position,
     createdAt,
     updatedAt,
   ];
@@ -1603,6 +1616,12 @@ class $SnippetsTable extends Snippets
         tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
       );
     }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1652,6 +1671,10 @@ class $SnippetsTable extends Snippets
         DriftSqlType.string,
         data['${effectivePrefix}tags'],
       )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1688,6 +1711,9 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
   /// Tags as comma-separated string
   final String tags;
 
+  /// Position for ordering snippets (lower = higher in list)
+  final int position;
+
   /// Timestamp when the snippet was created
   final DateTime createdAt;
 
@@ -1700,6 +1726,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
     required this.content,
     this.description,
     required this.tags,
+    required this.position,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -1716,6 +1743,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
       map['description'] = Variable<String>(description);
     }
     map['tags'] = Variable<String>(tags);
+    map['position'] = Variable<int>(position);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1733,6 +1761,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
           ? const Value.absent()
           : Value(description),
       tags: Value(tags),
+      position: Value(position),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1750,6 +1779,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
       content: serializer.fromJson<String>(json['content']),
       description: serializer.fromJson<String?>(json['description']),
       tags: serializer.fromJson<String>(json['tags']),
+      position: serializer.fromJson<int>(json['position']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1764,6 +1794,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
       'content': serializer.toJson<String>(content),
       'description': serializer.toJson<String?>(description),
       'tags': serializer.toJson<String>(tags),
+      'position': serializer.toJson<int>(position),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1776,6 +1807,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
     String? content,
     Value<String?> description = const Value.absent(),
     String? tags,
+    int? position,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => SnippetEntity(
@@ -1785,6 +1817,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
     content: content ?? this.content,
     description: description.present ? description.value : this.description,
     tags: tags ?? this.tags,
+    position: position ?? this.position,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -1798,6 +1831,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
           ? data.description.value
           : this.description,
       tags: data.tags.present ? data.tags.value : this.tags,
+      position: data.position.present ? data.position.value : this.position,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1812,6 +1846,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
           ..write('content: $content, ')
           ..write('description: $description, ')
           ..write('tags: $tags, ')
+          ..write('position: $position, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1826,6 +1861,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
     content,
     description,
     tags,
+    position,
     createdAt,
     updatedAt,
   );
@@ -1839,6 +1875,7 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
           other.content == this.content &&
           other.description == this.description &&
           other.tags == this.tags &&
+          other.position == this.position &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1850,6 +1887,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
   final Value<String> content;
   final Value<String?> description;
   final Value<String> tags;
+  final Value<int> position;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1860,6 +1898,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     this.content = const Value.absent(),
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
+    this.position = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1871,6 +1910,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     required String content,
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
+    this.position = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -1886,6 +1926,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     Expression<String>? content,
     Expression<String>? description,
     Expression<String>? tags,
+    Expression<int>? position,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1897,6 +1938,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
       if (content != null) 'content': content,
       if (description != null) 'description': description,
       if (tags != null) 'tags': tags,
+      if (position != null) 'position': position,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1910,6 +1952,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     Value<String>? content,
     Value<String?>? description,
     Value<String>? tags,
+    Value<int>? position,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -1921,6 +1964,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
       content: content ?? this.content,
       description: description ?? this.description,
       tags: tags ?? this.tags,
+      position: position ?? this.position,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1948,6 +1992,9 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     if (tags.present) {
       map['tags'] = Variable<String>(tags.value);
     }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1969,6 +2016,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
           ..write('content: $content, ')
           ..write('description: $description, ')
           ..write('tags: $tags, ')
+          ..write('position: $position, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -2724,6 +2772,7 @@ typedef $$SnippetsTableCreateCompanionBuilder =
       required String content,
       Value<String?> description,
       Value<String> tags,
+      Value<int> position,
       required DateTime createdAt,
       required DateTime updatedAt,
       Value<int> rowid,
@@ -2736,6 +2785,7 @@ typedef $$SnippetsTableUpdateCompanionBuilder =
       Value<String> content,
       Value<String?> description,
       Value<String> tags,
+      Value<int> position,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -2777,6 +2827,11 @@ class $$SnippetsTableFilterComposer
 
   ColumnFilters<String> get tags => $composableBuilder(
     column: $table.tags,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2830,6 +2885,11 @@ class $$SnippetsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -2869,6 +2929,9 @@ class $$SnippetsTableAnnotationComposer
 
   GeneratedColumn<String> get tags =>
       $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2914,6 +2977,7 @@ class $$SnippetsTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String> tags = const Value.absent(),
+                Value<int> position = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -2924,6 +2988,7 @@ class $$SnippetsTableTableManager
                 content: content,
                 description: description,
                 tags: tags,
+                position: position,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -2936,6 +3001,7 @@ class $$SnippetsTableTableManager
                 required String content,
                 Value<String?> description = const Value.absent(),
                 Value<String> tags = const Value.absent(),
+                Value<int> position = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -2946,6 +3012,7 @@ class $$SnippetsTableTableManager
                 content: content,
                 description: description,
                 tags: tags,
+                position: position,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 rowid: rowid,

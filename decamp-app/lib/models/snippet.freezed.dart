@@ -28,6 +28,7 @@ mixin _$Snippet {
   String get content => throw _privateConstructorUsedError;
   String? get description => throw _privateConstructorUsedError;
   List<String> get tags => throw _privateConstructorUsedError;
+  int get position => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
 
@@ -52,6 +53,7 @@ abstract class $SnippetCopyWith<$Res> {
     String content,
     String? description,
     List<String> tags,
+    int position,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -78,6 +80,7 @@ class _$SnippetCopyWithImpl<$Res, $Val extends Snippet>
     Object? content = null,
     Object? description = freezed,
     Object? tags = null,
+    Object? position = null,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -107,6 +110,10 @@ class _$SnippetCopyWithImpl<$Res, $Val extends Snippet>
                 ? _value.tags
                 : tags // ignore: cast_nullable_to_non_nullable
                       as List<String>,
+            position: null == position
+                ? _value.position
+                : position // ignore: cast_nullable_to_non_nullable
+                      as int,
             createdAt: null == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -136,6 +143,7 @@ abstract class _$$SnippetImplCopyWith<$Res> implements $SnippetCopyWith<$Res> {
     String content,
     String? description,
     List<String> tags,
+    int position,
     DateTime createdAt,
     DateTime updatedAt,
   });
@@ -161,6 +169,7 @@ class __$$SnippetImplCopyWithImpl<$Res>
     Object? content = null,
     Object? description = freezed,
     Object? tags = null,
+    Object? position = null,
     Object? createdAt = null,
     Object? updatedAt = null,
   }) {
@@ -190,6 +199,10 @@ class __$$SnippetImplCopyWithImpl<$Res>
             ? _value._tags
             : tags // ignore: cast_nullable_to_non_nullable
                   as List<String>,
+        position: null == position
+            ? _value.position
+            : position // ignore: cast_nullable_to_non_nullable
+                  as int,
         createdAt: null == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -213,6 +226,7 @@ class _$SnippetImpl implements _Snippet {
     required this.content,
     this.description,
     final List<String> tags = const [],
+    this.position = 0,
     required this.createdAt,
     required this.updatedAt,
   }) : _tags = tags;
@@ -241,13 +255,16 @@ class _$SnippetImpl implements _Snippet {
   }
 
   @override
+  @JsonKey()
+  final int position;
+  @override
   final DateTime createdAt;
   @override
   final DateTime updatedAt;
 
   @override
   String toString() {
-    return 'Snippet(id: $id, projectId: $projectId, name: $name, content: $content, description: $description, tags: $tags, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Snippet(id: $id, projectId: $projectId, name: $name, content: $content, description: $description, tags: $tags, position: $position, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -263,6 +280,8 @@ class _$SnippetImpl implements _Snippet {
             (identical(other.description, description) ||
                 other.description == description) &&
             const DeepCollectionEquality().equals(other._tags, _tags) &&
+            (identical(other.position, position) ||
+                other.position == position) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -279,6 +298,7 @@ class _$SnippetImpl implements _Snippet {
     content,
     description,
     const DeepCollectionEquality().hash(_tags),
+    position,
     createdAt,
     updatedAt,
   );
@@ -305,6 +325,7 @@ abstract class _Snippet implements Snippet {
     required final String content,
     final String? description,
     final List<String> tags,
+    final int position,
     required final DateTime createdAt,
     required final DateTime updatedAt,
   }) = _$SnippetImpl;
@@ -323,6 +344,8 @@ abstract class _Snippet implements Snippet {
   String? get description;
   @override
   List<String> get tags;
+  @override
+  int get position;
   @override
   DateTime get createdAt;
   @override

@@ -15,8 +15,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
     return (select(snippets)
           ..where((s) => s.projectId.isNull())
           ..orderBy([
-            (s) =>
-                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
+            (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
         .watch();
   }
@@ -26,8 +25,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
     return (select(snippets)
           ..where((s) => s.projectId.equals(projectId))
           ..orderBy([
-            (s) =>
-                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
+            (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
         .watch();
   }
@@ -37,8 +35,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
     return (select(snippets)
           ..where((s) => s.projectId.isNull())
           ..orderBy([
-            (s) =>
-                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
+            (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
         .get();
   }
@@ -48,8 +45,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
     return (select(snippets)
           ..where((s) => s.projectId.equals(projectId))
           ..orderBy([
-            (s) =>
-                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
+            (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
         .get();
   }
@@ -101,7 +97,22 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
         .get();
   }
 
-  /// Update snippet order (by updating updatedAt timestamp)
+  /// Get the maximum position value for snippets in a given scope
+  Future<int> getMaxPosition({String? projectId}) async {
+    final query = selectOnly(snippets)..addColumns([snippets.position.max()]);
+
+    if (projectId != null) {
+      query.where(snippets.projectId.equals(projectId));
+    } else {
+      query.where(snippets.projectId.isNull());
+    }
+
+    final result = await query.getSingleOrNull();
+    return result?.read(snippets.position.max()) ?? -1;
+  }
+
+  /// Update snippet order (deprecated - use position field instead)
+  @Deprecated('Use position field for ordering instead')
   Future<void> updateSnippetOrder(String id) {
     return (update(snippets)..where((s) => s.id.equals(id))).write(
       SnippetEntityCompanion(updatedAt: Value(DateTime.now())),

@@ -20,6 +20,7 @@ _$SnippetImpl _$$SnippetImplFromJson(
       (v) =>
           (v as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
     ),
+    position: $checkedConvert('position', (v) => (v as num?)?.toInt() ?? 0),
     createdAt: $checkedConvert('createdAt', (v) => DateTime.parse(v as String)),
     updatedAt: $checkedConvert('updatedAt', (v) => DateTime.parse(v as String)),
   );
@@ -34,6 +35,7 @@ Map<String, dynamic> _$$SnippetImplToJson(_$SnippetImpl instance) =>
       'content': instance.content,
       'description': instance.description,
       'tags': instance.tags,
+      'position': instance.position,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
     };
