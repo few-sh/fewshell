@@ -593,17 +593,21 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Drag handle at top center
+          Center(
+            child: ReorderableDragStartListener(
+              index: widget.index,
+              child: Icon(
+                Icons.drag_handle,
+                size: 20,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Description with status indicator
           Row(
             children: [
-              ReorderableDragStartListener(
-                index: widget.index,
-                child: Icon(
-                  Icons.drag_handle,
-                  size: 20,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                ),
-              ),
-              const SizedBox(width: 8),
               if (_isSaving)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
