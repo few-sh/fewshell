@@ -33,48 +33,54 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Snippets'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+    return GestureDetector(
+      onTap: () {
+        // Dismiss keyboard when tapping outside text fields
+        FocusScope.of(context).unfocus();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Snippets'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
-      ),
-      body: Column(
-        children: [
-          // Stationary tab bar
-          Container(
-            color: theme.colorScheme.surface,
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: theme.colorScheme.primary,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurface.withValues(
-                alpha: 0.6,
+        body: Column(
+          children: [
+            // Stationary tab bar
+            Container(
+              color: theme.colorScheme.surface,
+              child: TabBar(
+                controller: _tabController,
+                indicatorColor: theme.colorScheme.primary,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.onSurface.withValues(
+                  alpha: 0.6,
+                ),
+                labelStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                tabs: const [
+                  Tab(text: 'User Snippets'),
+                  Tab(text: 'Project Snippets'),
+                ],
               ),
-              labelStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            ),
+            // Scrollable content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [_buildUserSnippets(), _buildProjectSnippets()],
               ),
-              tabs: const [
-                Tab(text: 'User Snippets'),
-                Tab(text: 'Project Snippets'),
-              ],
             ),
-          ),
-          // Scrollable content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildUserSnippets(), _buildProjectSnippets()],
-            ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addNewSnippet,
-        child: const Icon(Icons.add),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _addNewSnippet,
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
@@ -598,13 +604,6 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
                     onSubmitted: (_) => _autoSave(),
                     onTapOutside: (_) => _autoSave(),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: widget.onDelete,
-                  tooltip: 'Delete',
-                  iconSize: 20,
-                  color: theme.colorScheme.error,
                 ),
               ],
             ),
