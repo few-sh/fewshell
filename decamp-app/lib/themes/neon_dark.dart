@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'terminal_theme.dart';
 
 final neonDarkTheme = ThemeData(
   brightness: Brightness.dark,
@@ -32,4 +33,5 @@ final neonDarkTheme = ThemeData(
     backgroundColor: Color(0xFF00E5FF),
     foregroundColor: Colors.black,
   ),
+  extensions: const <ThemeExtension<dynamic>>[TerminalTheme.dark],
 );

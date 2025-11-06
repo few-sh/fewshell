@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/chat_session.dart';
 import 'providers/theme_provider.dart';
 import 'themes/neon_dark.dart';
+import 'themes/terminal_theme.dart';
 
 void main() async {
   // Ensure Flutter bindings are initialized before async operations
@@ -36,6 +37,7 @@ class DecampApp extends ConsumerWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
+        extensions: const <ThemeExtension<dynamic>>[TerminalTheme.light],
       ),
       darkTheme: neonDarkTheme,
       themeMode: themeMode,

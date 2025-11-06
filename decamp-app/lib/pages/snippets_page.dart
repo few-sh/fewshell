@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../models/snippet.dart';
+import '../themes/terminal_theme.dart';
 
 /// Snippets page with User and Project snippets tabs
 class SnippetsPage extends ConsumerStatefulWidget {
@@ -431,29 +432,29 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
               decoration: InputDecoration(
                 hintText: 'Command (e.g., kubectl get pods)',
                 hintStyle: TextStyle(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey.shade600
-                      : Colors.grey.shade400,
+                  color:
+                      theme.extension<TerminalTheme>()?.hintColor ??
+                      Colors.grey.shade600,
                 ),
                 isDense: true,
                 filled: true,
-                fillColor: theme.brightness == Brightness.dark
-                    ? Colors.black
-                    : Colors.grey.shade900,
+                fillColor:
+                    theme.extension<TerminalTheme>()?.backgroundColor ??
+                    Colors.black,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade700,
+                    color:
+                        theme.extension<TerminalTheme>()?.borderColor ??
+                        Colors.grey.shade800,
                   ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade700,
+                    color:
+                        theme.extension<TerminalTheme>()?.borderColor ??
+                        Colors.grey.shade800,
                   ),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -470,9 +471,9 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 14,
-                color: theme.brightness == Brightness.dark
-                    ? Colors.greenAccent.shade400
-                    : Colors.greenAccent.shade200,
+                color:
+                    theme.extension<TerminalTheme>()?.textColor ??
+                    Colors.greenAccent.shade400,
                 height: 1.5,
               ),
               textInputAction: TextInputAction.done,
@@ -653,29 +654,29 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             decoration: InputDecoration(
               hintText: 'Command',
               hintStyle: TextStyle(
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey.shade600
-                    : Colors.grey.shade400,
+                color:
+                    theme.extension<TerminalTheme>()?.hintColor ??
+                    Colors.grey.shade600,
               ),
               isDense: true,
               filled: true,
-              fillColor: theme.brightness == Brightness.dark
-                  ? Colors.black
-                  : Colors.grey.shade900,
+              fillColor:
+                  theme.extension<TerminalTheme>()?.backgroundColor ??
+                  Colors.black,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey.shade800
-                      : Colors.grey.shade700,
+                  color:
+                      theme.extension<TerminalTheme>()?.borderColor ??
+                      Colors.grey.shade800,
                 ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey.shade800
-                      : Colors.grey.shade700,
+                  color:
+                      theme.extension<TerminalTheme>()?.borderColor ??
+                      Colors.grey.shade800,
                 ),
               ),
               focusedBorder: OutlineInputBorder(
@@ -692,9 +693,9 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 14,
-              color: theme.brightness == Brightness.dark
-                  ? Colors.greenAccent.shade400
-                  : Colors.greenAccent.shade200,
+              color:
+                  theme.extension<TerminalTheme>()?.textColor ??
+                  Colors.greenAccent.shade400,
               height: 1.5,
             ),
             onSubmitted: (_) => _autoSave(),
