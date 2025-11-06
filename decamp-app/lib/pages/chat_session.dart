@@ -25,12 +25,18 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Loading state
   bool _isLoading = false;
 
+  // Current model identifier
+  String? _currentModelIdentifier;
+
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
 
   @override
   void initState() {
     super.initState();
+
+    // Load current model identifier
+    _loadCurrentModel();
 
     // Initialize sample sessions
     _chatSessions = [
@@ -66,6 +72,17 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Load the current model identifier
+  Future<void> _loadCurrentModel() async {
+    final llmService = ref.read(llmServiceProvider);
+    final identifier = await llmService.getCurrentIdentifier();
+    if (mounted) {
+      setState(() {
+        _currentModelIdentifier = identifier;
+      });
+    }
   }
 
   void _showSessionHistory() {
@@ -165,7 +182,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               color: Theme.of(context).colorScheme.onSurface,
             ),
             decoration: InputDecoration(
-              hintText: 'Ask me anything...',
+              hintText: _currentModelIdentifier != null
+                  ? 'Send to $_currentModelIdentifier...'
+                  : 'Type your message...',
               hintStyle: TextStyle(
                 color: Theme.of(
                   context,
@@ -189,19 +208,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             maxLines: 1,
           ),
 
-          // Welcome message configuration
-          welcomeMessageConfig: WelcomeMessageConfig(
-            title: 'Welcome to AI Chat',
-            questionsSectionTitle: 'Try asking me:',
-          ),
-
-          // Example questions for users
-          exampleQuestions: [
-            ExampleQuestion(question: "What can you help me with?"),
-            ExampleQuestion(question: "Tell me about your features"),
-            ExampleQuestion(question: "How does this chat work?"),
-          ],
-
           // Enable animations and streaming
           enableAnimation: true,
           enableMarkdownStreaming: true,
@@ -212,6 +218,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           messageOptions: MessageOptions(
             showTime: true,
             showUserName: true,
+            containerMargin: const EdgeInsets.symmetric(
+              horizontal: 0,
+              vertical: 4,
+            ),
             bubbleStyle: BubbleStyle(
               userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
               aiBubbleColor: Theme.of(
@@ -233,7 +243,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
           // Layout options
           maxWidth: 800,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         ),
       ),
     );
@@ -249,6 +259,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     try {
       // Get the LLM service
       final llmService = ref.read(llmServiceProvider);
+
+      // Update current model identifier
+      final identifier = await llmService.getCurrentIdentifier();
+      if (mounted) {
+        setState(() {
+          _currentModelIdentifier = identifier;
+        });
+      }
 
       // Check if LLM is configured
       final isConfigured = await llmService.isConfigured();
