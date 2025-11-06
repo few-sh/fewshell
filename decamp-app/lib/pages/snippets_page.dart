@@ -199,13 +199,14 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           return _NewSnippetCard(
             key: ValueKey(_newSnippetId),
             isGlobal: isGlobal,
-            onSave: (name, content, description) async {
+            onSave: (description, content) async {
               if (notifier != null) {
                 try {
                   await notifier.addSnippet(
-                    name: name,
+                    name:
+                        description, // Use description as name for backwards compatibility
                     content: content,
-                    description: description.isEmpty ? null : description,
+                    description: description,
                   );
                   setState(() {
                     _newSnippetId = null;
@@ -268,8 +269,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 /// Widget for creating a new snippet inline
 class _NewSnippetCard extends StatefulWidget {
   final bool isGlobal;
-  final Future<void> Function(String name, String content, String description)
-  onSave;
+  final Future<void> Function(String description, String content) onSave;
   final VoidCallback onCancel;
 
   const _NewSnippetCard({
@@ -284,41 +284,38 @@ class _NewSnippetCard extends StatefulWidget {
 }
 
 class _NewSnippetCardState extends State<_NewSnippetCard> {
-  final _nameController = TextEditingController();
-  final _contentController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _nameFocus = FocusNode();
+  final _contentController = TextEditingController();
+  final _descriptionFocus = FocusNode();
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    // Auto-focus on name field
+    // Auto-focus on description field
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _nameFocus.requestFocus();
+      _descriptionFocus.requestFocus();
     });
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _contentController.dispose();
     _descriptionController.dispose();
-    _nameFocus.dispose();
+    _contentController.dispose();
+    _descriptionFocus.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty ||
+    if (_descriptionController.text.trim().isEmpty ||
         _contentController.text.trim().isEmpty) {
       return; // Don't save if required fields are empty
     }
 
     setState(() => _isSaving = true);
     await widget.onSave(
-      _nameController.text.trim(),
-      _contentController.text.trim(),
       _descriptionController.text.trim(),
+      _contentController.text.trim(),
     );
     setState(() => _isSaving = false);
   }
@@ -367,19 +364,18 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _nameController,
-              focusNode: _nameFocus,
+              controller: _descriptionController,
+              focusNode: _descriptionFocus,
               decoration: InputDecoration(
-                hintText: 'Snippet name (e.g., List pods)',
+                hintText: 'Description (e.g., List all pods)',
                 isDense: true,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 contentPadding: const EdgeInsets.all(12),
               ),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              maxLines: 1,
+              style: theme.textTheme.bodyMedium,
               textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 12),
@@ -387,32 +383,50 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
               controller: _contentController,
               decoration: InputDecoration(
                 hintText: 'Command (e.g., kubectl get pods)',
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
+                hintStyle: TextStyle(
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.grey.shade600
+                      : Colors.grey.shade400,
                 ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-              maxLines: 3,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color: theme.colorScheme.primary,
-              ),
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                hintText: 'Description (optional)',
                 isDense: true,
+                filled: true,
+                fillColor: theme.brightness == Brightness.dark
+                    ? Colors.black
+                    : Colors.grey.shade900,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.all(12),
               ),
               maxLines: 2,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                color: theme.brightness == Brightness.dark
+                    ? Colors.greenAccent.shade400
+                    : Colors.greenAccent.shade200,
+                height: 1.5,
+              ),
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _save(),
             ),
@@ -450,7 +464,6 @@ class _SnippetCardContent extends ConsumerStatefulWidget {
 }
 
 class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
-  late TextEditingController _nameController;
   late TextEditingController _contentController;
   late TextEditingController _descriptionController;
   bool _hasChanges = false;
@@ -459,14 +472,12 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.snippet.name);
     _contentController = TextEditingController(text: widget.snippet.content);
     _descriptionController = TextEditingController(
       text: widget.snippet.description ?? '',
     );
 
     // Listen for changes
-    _nameController.addListener(_markChanged);
     _contentController.addListener(_markChanged);
     _descriptionController.addListener(_markChanged);
   }
@@ -479,7 +490,6 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
 
   @override
   void dispose() {
-    _nameController.dispose();
     _contentController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -487,7 +497,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
 
   Future<void> _autoSave() async {
     if (!_hasChanges) return;
-    if (_nameController.text.trim().isEmpty ||
+    if (_descriptionController.text.trim().isEmpty ||
         _contentController.text.trim().isEmpty) {
       return;
     }
@@ -502,11 +512,9 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
 
       await notifier.updateSnippet(
         id: widget.snippet.id,
-        name: _nameController.text.trim(),
+        name: _descriptionController.text.trim(), // Use description as name
         content: _contentController.text.trim(),
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
+        description: _descriptionController.text.trim(),
       );
 
       if (mounted) {
@@ -575,16 +583,15 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
                   ),
                 Expanded(
                   child: TextField(
-                    controller: _nameController,
+                    controller: _descriptionController,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
-                      hintText: 'Snippet name',
+                      hintText: 'Description',
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
                     ),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: theme.textTheme.bodyMedium,
+                    maxLines: 1,
                     onSubmitted: (_) => _autoSave(),
                     onTapOutside: (_) => _autoSave(),
                   ),
@@ -603,42 +610,50 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
               controller: _contentController,
               decoration: InputDecoration(
                 hintText: 'Command',
+                hintStyle: TextStyle(
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.grey.shade600
+                      : Colors.grey.shade400,
+                ),
                 isDense: true,
                 filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-              maxLines: null,
-              minLines: 2,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color: theme.colorScheme.primary,
-              ),
-              onSubmitted: (_) => _autoSave(),
-              onTapOutside: (_) => _autoSave(),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              decoration: InputDecoration(
-                hintText: 'Description (optional)',
-                isDense: true,
+                fillColor: theme.brightness == Brightness.dark
+                    ? Colors.black
+                    : Colors.grey.shade900,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade700,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                    width: 2,
                   ),
                 ),
                 contentPadding: const EdgeInsets.all(12),
               ),
-              maxLines: null,
-              minLines: 1,
-              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                color: theme.brightness == Brightness.dark
+                    ? Colors.greenAccent.shade400
+                    : Colors.greenAccent.shade200,
+                height: 1.5,
+              ),
               onSubmitted: (_) => _autoSave(),
               onTapOutside: (_) => _autoSave(),
             ),
