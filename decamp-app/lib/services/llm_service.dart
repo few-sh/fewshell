@@ -91,12 +91,14 @@ class LlmService {
         projectSettingsProvider(currentProjectId!),
       );
       final projectInstruction = projectSettings?.agentInstruction;
-      includeUserInstructions = projectSettings?.includeUserInstructions ?? false;
+      includeUserInstructions =
+          projectSettings?.includeUserInstructions ?? false;
 
       if (projectInstruction != null) {
         // Check for model-specific override first
         if (projectInstruction.modelOverrides.containsKey(modelIdentifier)) {
-          projectInstructionText = projectInstruction.modelOverrides[modelIdentifier];
+          projectInstructionText =
+              projectInstruction.modelOverrides[modelIdentifier];
         } else if (projectInstruction.defaultInstruction.isNotEmpty) {
           // Use project default instruction
           projectInstructionText = projectInstruction.defaultInstruction;
@@ -118,7 +120,9 @@ class LlmService {
 
     // Combine instructions based on settings
     if (projectInstructionText != null && projectInstructionText.isNotEmpty) {
-      if (includeUserInstructions && userInstructionText != null && userInstructionText.isNotEmpty) {
+      if (includeUserInstructions &&
+          userInstructionText != null &&
+          userInstructionText.isNotEmpty) {
         // Prepend user instructions to project instructions
         return '$userInstructionText\n\n$projectInstructionText';
       }
@@ -241,7 +245,9 @@ class LlmService {
       final messages = <ChatMessage>[];
 
       // Add system message with agent instruction if configured
-      final agentInstruction = getAgentInstruction(activeConfig.config.identifier);
+      final agentInstruction = getAgentInstruction(
+        activeConfig.config.identifier,
+      );
       if (agentInstruction != null && agentInstruction.isNotEmpty) {
         messages.add(ChatMessage.system(agentInstruction));
       }
