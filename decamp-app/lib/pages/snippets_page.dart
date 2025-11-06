@@ -196,52 +196,48 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: snippets.length + (_newSnippetId != null ? 1 : 0),
-      itemBuilder: (context, index) {
-        // Show new snippet card at the top
-        if (_newSnippetId != null && index == 0) {
-          return _NewSnippetCard(
-            key: ValueKey(_newSnippetId),
-            isGlobal: isGlobal,
-            onSave: (description, content) async {
-              if (notifier != null) {
-                try {
-                  await notifier.addSnippet(
-                    name:
-                        description, // Use description as name for backwards compatibility
-                    content: content,
-                    description: description,
+    // Build list items with new snippet card at top if needed
+    final listItems = <Widget>[
+      if (_newSnippetId != null)
+        _NewSnippetCard(
+          key: ValueKey(_newSnippetId),
+          isGlobal: isGlobal,
+          onSave: (description, content) async {
+            if (notifier != null) {
+              try {
+                await notifier.addSnippet(
+                  name:
+                      description, // Use description as name for backwards compatibility
+                  content: content,
+                  description: description,
+                );
+                setState(() {
+                  _newSnippetId = null;
+                });
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error adding snippet: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
                   );
-                  setState(() {
-                    _newSnippetId = null;
-                  });
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error adding snippet: $e'),
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                      ),
-                    );
-                  }
                 }
               }
-            },
-            onCancel: () {
-              setState(() {
-                _newSnippetId = null;
-              });
-            },
-          );
-        }
-
-        final snippetIndex = _newSnippetId != null ? index - 1 : index;
-        final snippet = snippets[snippetIndex];
-
+            }
+          },
+          onCancel: () {
+            setState(() {
+              _newSnippetId = null;
+            });
+          },
+        ),
+      ...snippets.asMap().entries.map((entry) {
+        final index = entry.key + (_newSnippetId != null ? 1 : 0);
+        final snippet = entry.value;
         return _buildSnippetCard(
           key: ValueKey(snippet.id),
+          index: index,
           snippet: snippet,
           isGlobal: isGlobal,
           onDelete: () async {
@@ -250,23 +246,67 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
             }
           },
         );
+      }).toList(),
+    ];
+
+    return ReorderableListView(
+      padding: const EdgeInsets.all(16),
+      onReorder: (oldIndex, newIndex) async {
+        // Skip reordering if trying to move the new snippet card
+        if (_newSnippetId != null && (oldIndex == 0 || newIndex == 0)) {
+          return;
+        }
+
+        // Adjust indices if new snippet card is present
+        final adjustedOldIndex = _newSnippetId != null
+            ? oldIndex - 1
+            : oldIndex;
+        final adjustedNewIndex = _newSnippetId != null
+            ? newIndex - 1
+            : newIndex;
+
+        // Update the order in the database
+        if (notifier != null) {
+          await notifier.reorderSnippets(adjustedOldIndex, adjustedNewIndex);
+        }
       },
+      children: listItems,
     );
   }
 
   Widget _buildSnippetCard({
     required Key key,
+    required int index,
     required Snippet snippet,
     required bool isGlobal,
     required VoidCallback onDelete,
   }) {
-    return Card(
+    final theme = Theme.of(context);
+
+    return Dismissible(
       key: key,
-      margin: const EdgeInsets.only(bottom: 12),
-      child: _SnippetCardContent(
-        snippet: snippet,
-        isGlobal: isGlobal,
-        onDelete: onDelete,
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.error,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(Icons.delete, color: theme.colorScheme.onError),
+      ),
+      confirmDismiss: (direction) async {
+        onDelete();
+        return true;
+      },
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: _SnippetCardContent(
+          index: index,
+          snippet: snippet,
+          isGlobal: isGlobal,
+        ),
       ),
     );
   }
@@ -456,14 +496,14 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
 
 /// Widget for displaying and editing a snippet inline
 class _SnippetCardContent extends ConsumerStatefulWidget {
+  final int index;
   final Snippet snippet;
   final bool isGlobal;
-  final VoidCallback onDelete;
 
   const _SnippetCardContent({
+    required this.index,
     required this.snippet,
     required this.isGlobal,
-    required this.onDelete,
   });
 
   @override
@@ -548,120 +588,115 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Dismissible(
-      key: ValueKey(widget.snippet.id),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: theme.colorScheme.error,
-        child: Icon(Icons.delete, color: theme.colorScheme.onError),
-      ),
-      confirmDismiss: (direction) async {
-        widget.onDelete();
-        return true;
-      },
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                if (_isSaving)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  )
-                else if (_hasChanges)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Icon(
-                      Icons.circle,
-                      size: 8,
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ReorderableDragStartListener(
+                index: widget.index,
+                child: Icon(
+                  Icons.drag_handle,
+                  size: 20,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (_isSaving)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
                       color: theme.colorScheme.primary,
                     ),
                   ),
-                Expanded(
-                  child: TextField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: 'Description',
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    style: theme.textTheme.bodyMedium,
-                    minLines: 1,
-                    maxLines: null,
-                    onSubmitted: (_) => _autoSave(),
-                    onTapOutside: (_) => _autoSave(),
+                )
+              else if (_hasChanges)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(
+                    Icons.circle,
+                    size: 8,
+                    color: theme.colorScheme.primary,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _contentController,
-              decoration: InputDecoration(
-                hintText: 'Command',
-                hintStyle: TextStyle(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey.shade600
-                      : Colors.grey.shade400,
-                ),
-                isDense: true,
-                filled: true,
-                fillColor: theme.brightness == Brightness.dark
-                    ? Colors.black
-                    : Colors.grey.shade900,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade700,
+              Expanded(
+                child: TextField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    border: InputBorder.none,
+                    hintText: 'Description',
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
                   ),
+                  style: theme.textTheme.bodyMedium,
+                  minLines: 1,
+                  maxLines: null,
+                  onSubmitted: (_) => _autoSave(),
+                  onTapOutside: (_) => _autoSave(),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade700,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.all(12),
               ),
-              minLines: 2,
-              maxLines: null,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _contentController,
+            decoration: InputDecoration(
+              hintText: 'Command',
+              hintStyle: TextStyle(
                 color: theme.brightness == Brightness.dark
-                    ? Colors.greenAccent.shade400
-                    : Colors.greenAccent.shade200,
-                height: 1.5,
+                    ? Colors.grey.shade600
+                    : Colors.grey.shade400,
               ),
-              onSubmitted: (_) => _autoSave(),
-              onTapOutside: (_) => _autoSave(),
+              isDense: true,
+              filled: true,
+              fillColor: theme.brightness == Brightness.dark
+                  ? Colors.black
+                  : Colors.grey.shade900,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.grey.shade800
+                      : Colors.grey.shade700,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.grey.shade800
+                      : Colors.grey.shade700,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
+                  width: 2,
+                ),
+              ),
+              contentPadding: const EdgeInsets.all(12),
             ),
-          ],
-        ),
+            minLines: 2,
+            maxLines: null,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              color: theme.brightness == Brightness.dark
+                  ? Colors.greenAccent.shade400
+                  : Colors.greenAccent.shade200,
+              height: 1.5,
+            ),
+            onSubmitted: (_) => _autoSave(),
+            onTapOutside: (_) => _autoSave(),
+          ),
+        ],
       ),
     );
   }
