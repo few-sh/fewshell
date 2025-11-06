@@ -23,6 +23,12 @@ _$AppSettingsImpl _$$AppSettingsImplFromJson(Map<String, dynamic> json) =>
           'defaultLlmIdentifier',
           (v) => v as String?,
         ),
+        agentInstruction: $checkedConvert(
+          'agentInstruction',
+          (v) => v == null
+              ? null
+              : AgentInstruction.fromJson(v as Map<String, dynamic>),
+        ),
         createdAt: $checkedConvert(
           'createdAt',
           (v) => v == null ? null : DateTime.parse(v as String),
@@ -39,6 +45,7 @@ Map<String, dynamic> _$$AppSettingsImplToJson(_$AppSettingsImpl instance) =>
     <String, dynamic>{
       'llmSettings': instance.llmSettings,
       'defaultLlmIdentifier': instance.defaultLlmIdentifier,
+      'agentInstruction': instance.agentInstruction,
       'createdAt': instance.createdAt?.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),
     };
@@ -60,6 +67,16 @@ _$ProjectSettingsImpl _$$ProjectSettingsImplFromJson(
       'defaultLlmIdentifier',
       (v) => v as String?,
     ),
+    agentInstruction: $checkedConvert(
+      'agentInstruction',
+      (v) => v == null
+          ? null
+          : AgentInstruction.fromJson(v as Map<String, dynamic>),
+    ),
+    includeUserInstructions: $checkedConvert(
+      'includeUserInstructions',
+      (v) => v as bool? ?? false,
+    ),
     createdAt: $checkedConvert(
       'createdAt',
       (v) => v == null ? null : DateTime.parse(v as String),
@@ -78,6 +95,8 @@ Map<String, dynamic> _$$ProjectSettingsImplToJson(
   'projectId': instance.projectId,
   'llmSettings': instance.llmSettings,
   'defaultLlmIdentifier': instance.defaultLlmIdentifier,
+  'agentInstruction': instance.agentInstruction,
+  'includeUserInstructions': instance.includeUserInstructions,
   'createdAt': instance.createdAt?.toIso8601String(),
   'updatedAt': instance.updatedAt?.toIso8601String(),
 };

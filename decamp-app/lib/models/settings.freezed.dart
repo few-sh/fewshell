@@ -26,6 +26,9 @@ mixin _$AppSettings {
 
   /// Default LLM identifier to use when not overridden by project
   String? get defaultLlmIdentifier => throw _privateConstructorUsedError;
+
+  /// User-level agent instructions
+  AgentInstruction? get agentInstruction => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -49,9 +52,12 @@ abstract class $AppSettingsCopyWith<$Res> {
   $Res call({
     List<LlmApiSettings> llmSettings,
     String? defaultLlmIdentifier,
+    AgentInstruction? agentInstruction,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
+
+  $AgentInstructionCopyWith<$Res>? get agentInstruction;
 }
 
 /// @nodoc
@@ -71,6 +77,7 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
   $Res call({
     Object? llmSettings = null,
     Object? defaultLlmIdentifier = freezed,
+    Object? agentInstruction = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -84,6 +91,10 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
                 ? _value.defaultLlmIdentifier
                 : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
                       as String?,
+            agentInstruction: freezed == agentInstruction
+                ? _value.agentInstruction
+                : agentInstruction // ignore: cast_nullable_to_non_nullable
+                      as AgentInstruction?,
             createdAt: freezed == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -95,6 +106,20 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
           )
           as $Val,
     );
+  }
+
+  /// Create a copy of AppSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $AgentInstructionCopyWith<$Res>? get agentInstruction {
+    if (_value.agentInstruction == null) {
+      return null;
+    }
+
+    return $AgentInstructionCopyWith<$Res>(_value.agentInstruction!, (value) {
+      return _then(_value.copyWith(agentInstruction: value) as $Val);
+    });
   }
 }
 
@@ -110,9 +135,13 @@ abstract class _$$AppSettingsImplCopyWith<$Res>
   $Res call({
     List<LlmApiSettings> llmSettings,
     String? defaultLlmIdentifier,
+    AgentInstruction? agentInstruction,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
+
+  @override
+  $AgentInstructionCopyWith<$Res>? get agentInstruction;
 }
 
 /// @nodoc
@@ -131,6 +160,7 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
   $Res call({
     Object? llmSettings = null,
     Object? defaultLlmIdentifier = freezed,
+    Object? agentInstruction = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -144,6 +174,10 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
             ? _value.defaultLlmIdentifier
             : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
                   as String?,
+        agentInstruction: freezed == agentInstruction
+            ? _value.agentInstruction
+            : agentInstruction // ignore: cast_nullable_to_non_nullable
+                  as AgentInstruction?,
         createdAt: freezed == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -163,6 +197,7 @@ class _$AppSettingsImpl implements _AppSettings {
   const _$AppSettingsImpl({
     final List<LlmApiSettings> llmSettings = const [],
     this.defaultLlmIdentifier,
+    this.agentInstruction,
     this.createdAt,
     this.updatedAt,
   }) : _llmSettings = llmSettings;
@@ -185,6 +220,10 @@ class _$AppSettingsImpl implements _AppSettings {
   /// Default LLM identifier to use when not overridden by project
   @override
   final String? defaultLlmIdentifier;
+
+  /// User-level agent instructions
+  @override
+  final AgentInstruction? agentInstruction;
   @override
   final DateTime? createdAt;
   @override
@@ -192,7 +231,7 @@ class _$AppSettingsImpl implements _AppSettings {
 
   @override
   String toString() {
-    return 'AppSettings(llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'AppSettings(llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, agentInstruction: $agentInstruction, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -206,6 +245,8 @@ class _$AppSettingsImpl implements _AppSettings {
             ) &&
             (identical(other.defaultLlmIdentifier, defaultLlmIdentifier) ||
                 other.defaultLlmIdentifier == defaultLlmIdentifier) &&
+            (identical(other.agentInstruction, agentInstruction) ||
+                other.agentInstruction == agentInstruction) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -218,6 +259,7 @@ class _$AppSettingsImpl implements _AppSettings {
     runtimeType,
     const DeepCollectionEquality().hash(_llmSettings),
     defaultLlmIdentifier,
+    agentInstruction,
     createdAt,
     updatedAt,
   );
@@ -240,6 +282,7 @@ abstract class _AppSettings implements AppSettings {
   const factory _AppSettings({
     final List<LlmApiSettings> llmSettings,
     final String? defaultLlmIdentifier,
+    final AgentInstruction? agentInstruction,
     final DateTime? createdAt,
     final DateTime? updatedAt,
   }) = _$AppSettingsImpl;
@@ -254,6 +297,10 @@ abstract class _AppSettings implements AppSettings {
   /// Default LLM identifier to use when not overridden by project
   @override
   String? get defaultLlmIdentifier;
+
+  /// User-level agent instructions
+  @override
+  AgentInstruction? get agentInstruction;
   @override
   DateTime? get createdAt;
   @override
@@ -282,6 +329,12 @@ mixin _$ProjectSettings {
   /// Default LLM identifier for this project
   /// If null, falls back to global default
   String? get defaultLlmIdentifier => throw _privateConstructorUsedError;
+
+  /// Project-level agent instructions
+  AgentInstruction? get agentInstruction => throw _privateConstructorUsedError;
+
+  /// Whether to include user-level instructions when using project instructions
+  bool get includeUserInstructions => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -306,9 +359,13 @@ abstract class $ProjectSettingsCopyWith<$Res> {
     String projectId,
     List<LlmApiSettings> llmSettings,
     String? defaultLlmIdentifier,
+    AgentInstruction? agentInstruction,
+    bool includeUserInstructions,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
+
+  $AgentInstructionCopyWith<$Res>? get agentInstruction;
 }
 
 /// @nodoc
@@ -329,6 +386,8 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
     Object? projectId = null,
     Object? llmSettings = null,
     Object? defaultLlmIdentifier = freezed,
+    Object? agentInstruction = freezed,
+    Object? includeUserInstructions = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -346,6 +405,14 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
                 ? _value.defaultLlmIdentifier
                 : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
                       as String?,
+            agentInstruction: freezed == agentInstruction
+                ? _value.agentInstruction
+                : agentInstruction // ignore: cast_nullable_to_non_nullable
+                      as AgentInstruction?,
+            includeUserInstructions: null == includeUserInstructions
+                ? _value.includeUserInstructions
+                : includeUserInstructions // ignore: cast_nullable_to_non_nullable
+                      as bool,
             createdAt: freezed == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -357,6 +424,20 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
           )
           as $Val,
     );
+  }
+
+  /// Create a copy of ProjectSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $AgentInstructionCopyWith<$Res>? get agentInstruction {
+    if (_value.agentInstruction == null) {
+      return null;
+    }
+
+    return $AgentInstructionCopyWith<$Res>(_value.agentInstruction!, (value) {
+      return _then(_value.copyWith(agentInstruction: value) as $Val);
+    });
   }
 }
 
@@ -373,9 +454,14 @@ abstract class _$$ProjectSettingsImplCopyWith<$Res>
     String projectId,
     List<LlmApiSettings> llmSettings,
     String? defaultLlmIdentifier,
+    AgentInstruction? agentInstruction,
+    bool includeUserInstructions,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
+
+  @override
+  $AgentInstructionCopyWith<$Res>? get agentInstruction;
 }
 
 /// @nodoc
@@ -395,6 +481,8 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
     Object? projectId = null,
     Object? llmSettings = null,
     Object? defaultLlmIdentifier = freezed,
+    Object? agentInstruction = freezed,
+    Object? includeUserInstructions = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -412,6 +500,14 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
             ? _value.defaultLlmIdentifier
             : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
                   as String?,
+        agentInstruction: freezed == agentInstruction
+            ? _value.agentInstruction
+            : agentInstruction // ignore: cast_nullable_to_non_nullable
+                  as AgentInstruction?,
+        includeUserInstructions: null == includeUserInstructions
+            ? _value.includeUserInstructions
+            : includeUserInstructions // ignore: cast_nullable_to_non_nullable
+                  as bool,
         createdAt: freezed == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -432,6 +528,8 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
     required this.projectId,
     final List<LlmApiSettings> llmSettings = const [],
     this.defaultLlmIdentifier,
+    this.agentInstruction,
+    this.includeUserInstructions = false,
     this.createdAt,
     this.updatedAt,
   }) : _llmSettings = llmSettings;
@@ -460,6 +558,15 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
   /// If null, falls back to global default
   @override
   final String? defaultLlmIdentifier;
+
+  /// Project-level agent instructions
+  @override
+  final AgentInstruction? agentInstruction;
+
+  /// Whether to include user-level instructions when using project instructions
+  @override
+  @JsonKey()
+  final bool includeUserInstructions;
   @override
   final DateTime? createdAt;
   @override
@@ -467,7 +574,7 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
 
   @override
   String toString() {
-    return 'ProjectSettings(projectId: $projectId, llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'ProjectSettings(projectId: $projectId, llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, agentInstruction: $agentInstruction, includeUserInstructions: $includeUserInstructions, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -483,6 +590,13 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
             ) &&
             (identical(other.defaultLlmIdentifier, defaultLlmIdentifier) ||
                 other.defaultLlmIdentifier == defaultLlmIdentifier) &&
+            (identical(other.agentInstruction, agentInstruction) ||
+                other.agentInstruction == agentInstruction) &&
+            (identical(
+                  other.includeUserInstructions,
+                  includeUserInstructions,
+                ) ||
+                other.includeUserInstructions == includeUserInstructions) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -496,6 +610,8 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
     projectId,
     const DeepCollectionEquality().hash(_llmSettings),
     defaultLlmIdentifier,
+    agentInstruction,
+    includeUserInstructions,
     createdAt,
     updatedAt,
   );
@@ -522,6 +638,8 @@ abstract class _ProjectSettings implements ProjectSettings {
     required final String projectId,
     final List<LlmApiSettings> llmSettings,
     final String? defaultLlmIdentifier,
+    final AgentInstruction? agentInstruction,
+    final bool includeUserInstructions,
     final DateTime? createdAt,
     final DateTime? updatedAt,
   }) = _$ProjectSettingsImpl;
@@ -541,6 +659,14 @@ abstract class _ProjectSettings implements ProjectSettings {
   /// If null, falls back to global default
   @override
   String? get defaultLlmIdentifier;
+
+  /// Project-level agent instructions
+  @override
+  AgentInstruction? get agentInstruction;
+
+  /// Whether to include user-level instructions when using project instructions
+  @override
+  bool get includeUserInstructions;
   @override
   DateTime? get createdAt;
   @override

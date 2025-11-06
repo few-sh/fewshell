@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'llm_api_settings.dart';
+import 'agent_instruction.dart';
 
 part 'settings.freezed.dart';
 part 'settings.g.dart';
@@ -14,6 +15,9 @@ class AppSettings with _$AppSettings {
 
     /// Default LLM identifier to use when not overridden by project
     String? defaultLlmIdentifier,
+
+    /// User-level agent instructions
+    AgentInstruction? agentInstruction,
 
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -37,6 +41,12 @@ class ProjectSettings with _$ProjectSettings {
     /// Default LLM identifier for this project
     /// If null, falls back to global default
     String? defaultLlmIdentifier,
+
+    /// Project-level agent instructions
+    AgentInstruction? agentInstruction,
+
+    /// Whether to include user-level instructions when using project instructions
+    @Default(false) bool includeUserInstructions,
 
     DateTime? createdAt,
     DateTime? updatedAt,
