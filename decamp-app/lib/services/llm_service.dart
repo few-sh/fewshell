@@ -3,6 +3,7 @@ import 'package:llm_dart/llm_dart.dart';
 import '../models/llm_api_settings.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
+import '../providers/settings_provider.dart';
 import '../services/keychain_service.dart';
 
 /// Provider for the LLM service
@@ -65,6 +66,67 @@ class LlmService {
     }
 
     return (config: config, apiKey: apiKey);
+  }
+
+  /// Get the final agent instruction based on settings hierarchy
+  /// Returns the appropriate instruction considering:
+  /// 1. Project-specific model override (if project exists and override defined)
+  /// 2. Project-specific default instruction (if project exists and defined)
+  /// 3. User-level model override (if override defined)
+  /// 4. User-level default instruction (if defined)
+  /// 5. null (if no instructions configured)
+  ///
+  /// If project settings have includeUserInstructions=true, user instructions
+  /// are prepended to project instructions.
+  String? getAgentInstruction(String modelIdentifier) {
+    final userSettings = ref.read(globalSettingsProvider);
+    final userInstruction = userSettings.agentInstruction;
+
+    String? projectInstructionText;
+    bool includeUserInstructions = false;
+
+    // Get project-specific instructions if we have a project
+    if (currentProjectId != null) {
+      final projectSettings = ref.read(
+        projectSettingsProvider(currentProjectId!),
+      );
+      final projectInstruction = projectSettings?.agentInstruction;
+      includeUserInstructions = projectSettings?.includeUserInstructions ?? false;
+
+      if (projectInstruction != null) {
+        // Check for model-specific override first
+        if (projectInstruction.modelOverrides.containsKey(modelIdentifier)) {
+          projectInstructionText = projectInstruction.modelOverrides[modelIdentifier];
+        } else if (projectInstruction.defaultInstruction.isNotEmpty) {
+          // Use project default instruction
+          projectInstructionText = projectInstruction.defaultInstruction;
+        }
+      }
+    }
+
+    // Get user-level instructions
+    String? userInstructionText;
+    if (userInstruction != null) {
+      // Check for model-specific override first
+      if (userInstruction.modelOverrides.containsKey(modelIdentifier)) {
+        userInstructionText = userInstruction.modelOverrides[modelIdentifier];
+      } else if (userInstruction.defaultInstruction.isNotEmpty) {
+        // Use user default instruction
+        userInstructionText = userInstruction.defaultInstruction;
+      }
+    }
+
+    // Combine instructions based on settings
+    if (projectInstructionText != null && projectInstructionText.isNotEmpty) {
+      if (includeUserInstructions && userInstructionText != null && userInstructionText.isNotEmpty) {
+        // Prepend user instructions to project instructions
+        return '$userInstructionText\n\n$projectInstructionText';
+      }
+      return projectInstructionText;
+    }
+
+    // Fall back to user instructions if no project instructions
+    return userInstructionText;
   }
 
   /// Create an LLM provider based on the API type
@@ -178,6 +240,12 @@ class LlmService {
       // Build messages array
       final messages = <ChatMessage>[];
 
+      // Add system message with agent instruction if configured
+      final agentInstruction = getAgentInstruction(activeConfig.config.identifier);
+      if (agentInstruction != null && agentInstruction.isNotEmpty) {
+        messages.add(ChatMessage.system(agentInstruction));
+      }
+
       // Add history if provided
       if (history != null) {
         for (final msg in history) {
@@ -232,5 +300,13 @@ class LlmService {
   Future<String?> getCurrentIdentifier() async {
     final config = await _getActiveConfig();
     return config?.config.identifier;
+  }
+
+  /// Get the current agent instruction that would be used for the active model
+  /// Useful for debugging or displaying in UI
+  Future<String?> getCurrentAgentInstruction() async {
+    final identifier = await getCurrentIdentifier();
+    if (identifier == null) return null;
+    return getAgentInstruction(identifier);
   }
 }
