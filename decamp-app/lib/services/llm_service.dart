@@ -67,116 +67,93 @@ class LlmService {
     return (config: config, apiKey: apiKey);
   }
 
-  /// Create an LLM provider based on the identifier and baseUrl
+  /// Create an LLM provider based on the API type
   Future<ChatCapability> _createProvider(
-    String identifier,
-    String baseUrl,
-    String apiKey, {
-    double? temperature,
-    int? maxTokens,
-  }) async {
-    final lowerIdentifier = identifier.toLowerCase();
+    LlmApiSettings config,
+    String apiKey,
+  ) async {
+    final temperature = config.temperature ?? 0.7;
+    final maxTokens = config.maxTokens;
 
-    // OpenAI or OpenAI-compatible
-    if (lowerIdentifier.contains('gpt') ||
-        lowerIdentifier.contains('openai') ||
-        baseUrl.contains('openai.com')) {
-      final builder = ai()
-          .openai()
-          .apiKey(apiKey)
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7);
-      if (maxTokens != null) builder.maxTokens(maxTokens);
-      return await builder.build();
+    switch (config.apiType) {
+      case LlmApiType.openai:
+        final builder = ai()
+            .openai()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
+
+      case LlmApiType.anthropic:
+        final builder = ai()
+            .anthropic()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
+
+      case LlmApiType.google:
+        final builder = ai()
+            .google()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
+
+      case LlmApiType.ollama:
+        return await ai()
+            .ollama()
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature)
+            .build();
+
+      case LlmApiType.groq:
+        final builder = ai()
+            .groq()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
+
+      case LlmApiType.deepseek:
+        final builder = ai()
+            .deepseek()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
+
+      case LlmApiType.xai:
+        final builder = ai()
+            .xai()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
+
+      case LlmApiType.openaiCompatible:
+        final builder = ai()
+            .openai()
+            .apiKey(apiKey)
+            .baseUrl(config.baseUrl)
+            .model(config.identifier)
+            .temperature(temperature);
+        if (maxTokens != null) builder.maxTokens(maxTokens);
+        return await builder.build();
     }
-
-    // Anthropic Claude
-    if (lowerIdentifier.contains('claude') ||
-        lowerIdentifier.contains('anthropic') ||
-        baseUrl.contains('anthropic.com')) {
-      final builder = ai()
-          .anthropic()
-          .apiKey(apiKey)
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7);
-      if (maxTokens != null) builder.maxTokens(maxTokens);
-      return await builder.build();
-    }
-
-    // Google Gemini
-    if (lowerIdentifier.contains('gemini') ||
-        lowerIdentifier.contains('google') ||
-        baseUrl.contains('generativelanguage.googleapis.com')) {
-      final builder = ai()
-          .google()
-          .apiKey(apiKey)
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7);
-      if (maxTokens != null) builder.maxTokens(maxTokens);
-      return await builder.build();
-    }
-
-    // Ollama (local)
-    if (lowerIdentifier.contains('ollama') || baseUrl.contains('localhost')) {
-      return await ai()
-          .ollama()
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7)
-          .build();
-    }
-
-    // Groq
-    if (lowerIdentifier.contains('groq') || baseUrl.contains('groq.com')) {
-      final builder = ai()
-          .groq()
-          .apiKey(apiKey)
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7);
-      if (maxTokens != null) builder.maxTokens(maxTokens);
-      return await builder.build();
-    }
-
-    // DeepSeek
-    if (lowerIdentifier.contains('deepseek') ||
-        baseUrl.contains('deepseek.com')) {
-      final builder = ai()
-          .deepseek()
-          .apiKey(apiKey)
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7);
-      if (maxTokens != null) builder.maxTokens(maxTokens);
-      return await builder.build();
-    }
-
-    // xAI (Grok)
-    if (lowerIdentifier.contains('grok') ||
-        lowerIdentifier.contains('xai') ||
-        baseUrl.contains('x.ai')) {
-      final builder = ai()
-          .xai()
-          .apiKey(apiKey)
-          .baseUrl(baseUrl)
-          .model(identifier)
-          .temperature(temperature ?? 0.7);
-      if (maxTokens != null) builder.maxTokens(maxTokens);
-      return await builder.build();
-    }
-
-    // Default to OpenAI-compatible API
-    final builder = ai()
-        .openai()
-        .apiKey(apiKey)
-        .baseUrl(baseUrl)
-        .model(identifier)
-        .temperature(temperature ?? 0.7);
-    if (maxTokens != null) builder.maxTokens(maxTokens);
-    return await builder.build();
   }
 
   /// Send a chat message and get a streaming response
@@ -194,11 +171,8 @@ class LlmService {
 
     try {
       final provider = await _createProvider(
-        activeConfig.config.identifier,
-        activeConfig.config.baseUrl,
+        activeConfig.config,
         activeConfig.apiKey,
-        temperature: activeConfig.config.temperature,
-        maxTokens: activeConfig.config.maxTokens,
       );
 
       // Build messages array

@@ -24,6 +24,9 @@ mixin _$LlmApiSettings {
   /// Unique identifier for this LLM configuration (e.g., "gpt-4-turbo", "claude-3-5-sonnet")
   String get identifier => throw _privateConstructorUsedError;
 
+  /// Type of API (OpenAI, Anthropic, etc.)
+  LlmApiType get apiType => throw _privateConstructorUsedError;
+
   /// Base URL for the API endpoint
   String get baseUrl => throw _privateConstructorUsedError;
 
@@ -65,6 +68,7 @@ abstract class $LlmApiSettingsCopyWith<$Res> {
   @useResult
   $Res call({
     String identifier,
+    LlmApiType apiType,
     String baseUrl,
     String? customHeaders,
     int? maxTokens,
@@ -91,6 +95,7 @@ class _$LlmApiSettingsCopyWithImpl<$Res, $Val extends LlmApiSettings>
   @override
   $Res call({
     Object? identifier = null,
+    Object? apiType = null,
     Object? baseUrl = null,
     Object? customHeaders = freezed,
     Object? maxTokens = freezed,
@@ -105,6 +110,10 @@ class _$LlmApiSettingsCopyWithImpl<$Res, $Val extends LlmApiSettings>
                 ? _value.identifier
                 : identifier // ignore: cast_nullable_to_non_nullable
                       as String,
+            apiType: null == apiType
+                ? _value.apiType
+                : apiType // ignore: cast_nullable_to_non_nullable
+                      as LlmApiType,
             baseUrl: null == baseUrl
                 ? _value.baseUrl
                 : baseUrl // ignore: cast_nullable_to_non_nullable
@@ -150,6 +159,7 @@ abstract class _$$LlmApiSettingsImplCopyWith<$Res>
   @useResult
   $Res call({
     String identifier,
+    LlmApiType apiType,
     String baseUrl,
     String? customHeaders,
     int? maxTokens,
@@ -175,6 +185,7 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? identifier = null,
+    Object? apiType = null,
     Object? baseUrl = null,
     Object? customHeaders = freezed,
     Object? maxTokens = freezed,
@@ -189,6 +200,10 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
             ? _value.identifier
             : identifier // ignore: cast_nullable_to_non_nullable
                   as String,
+        apiType: null == apiType
+            ? _value.apiType
+            : apiType // ignore: cast_nullable_to_non_nullable
+                  as LlmApiType,
         baseUrl: null == baseUrl
             ? _value.baseUrl
             : baseUrl // ignore: cast_nullable_to_non_nullable
@@ -227,6 +242,7 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
 class _$LlmApiSettingsImpl implements _LlmApiSettings {
   const _$LlmApiSettingsImpl({
     required this.identifier,
+    required this.apiType,
     required this.baseUrl,
     this.customHeaders,
     this.maxTokens,
@@ -242,6 +258,10 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
   /// Unique identifier for this LLM configuration (e.g., "gpt-4-turbo", "claude-3-5-sonnet")
   @override
   final String identifier;
+
+  /// Type of API (OpenAI, Anthropic, etc.)
+  @override
+  final LlmApiType apiType;
 
   /// Base URL for the API endpoint
   @override
@@ -275,7 +295,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
 
   @override
   String toString() {
-    return 'LlmApiSettings(identifier: $identifier, baseUrl: $baseUrl, customHeaders: $customHeaders, maxTokens: $maxTokens, temperature: $temperature, enabled: $enabled, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'LlmApiSettings(identifier: $identifier, apiType: $apiType, baseUrl: $baseUrl, customHeaders: $customHeaders, maxTokens: $maxTokens, temperature: $temperature, enabled: $enabled, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -285,6 +305,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
             other is _$LlmApiSettingsImpl &&
             (identical(other.identifier, identifier) ||
                 other.identifier == identifier) &&
+            (identical(other.apiType, apiType) || other.apiType == apiType) &&
             (identical(other.baseUrl, baseUrl) || other.baseUrl == baseUrl) &&
             (identical(other.customHeaders, customHeaders) ||
                 other.customHeaders == customHeaders) &&
@@ -304,6 +325,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
   int get hashCode => Object.hash(
     runtimeType,
     identifier,
+    apiType,
     baseUrl,
     customHeaders,
     maxTokens,
@@ -333,6 +355,7 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
 abstract class _LlmApiSettings implements LlmApiSettings {
   const factory _LlmApiSettings({
     required final String identifier,
+    required final LlmApiType apiType,
     required final String baseUrl,
     final String? customHeaders,
     final int? maxTokens,
@@ -348,6 +371,10 @@ abstract class _LlmApiSettings implements LlmApiSettings {
   /// Unique identifier for this LLM configuration (e.g., "gpt-4-turbo", "claude-3-5-sonnet")
   @override
   String get identifier;
+
+  /// Type of API (OpenAI, Anthropic, etc.)
+  @override
+  LlmApiType get apiType;
 
   /// Base URL for the API endpoint
   @override

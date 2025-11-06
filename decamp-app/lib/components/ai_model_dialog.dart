@@ -45,12 +45,14 @@ class AIModelDialog {
         title: isEditMode ? 'Edit AI Model' : 'Add AI Model',
         isGlobal: isGlobal,
         initialIdentifier: existingSettings?.identifier,
+        initialApiType: existingSettings?.apiType,
         initialUrl: existingSettings?.baseUrl,
         initialApiKey: apiKey ?? '',
         initialEnabled: existingSettings?.enabled,
         onSave:
             (
               identifier,
+              apiType,
               url,
               apiKey, {
               customHeaders,
@@ -64,6 +66,7 @@ class AIModelDialog {
                 isGlobal: isGlobal,
                 isEditMode: isEditMode,
                 identifier: identifier,
+                apiType: apiType,
                 url: url,
                 apiKey: apiKey,
                 customHeaders: customHeaders,
@@ -83,6 +86,7 @@ class AIModelDialog {
     required bool isGlobal,
     required bool isEditMode,
     required String identifier,
+    required LlmApiType apiType,
     required String url,
     required String apiKey,
     String? customHeaders,
@@ -96,6 +100,7 @@ class AIModelDialog {
         if (isEditMode) {
           await notifier.updateLlmSettings(
             identifier: identifier,
+            apiType: apiType,
             baseUrl: url,
             apiKey: apiKey.isNotEmpty ? apiKey : null,
             customHeaders: customHeaders,
@@ -106,6 +111,7 @@ class AIModelDialog {
         } else {
           await notifier.addLlmSettings(
             identifier: identifier,
+            apiType: apiType,
             baseUrl: url,
             apiKey: apiKey,
             customHeaders: customHeaders,
@@ -122,6 +128,7 @@ class AIModelDialog {
           if (isEditMode) {
             await notifier.updateLlmSettings(
               identifier: identifier,
+              apiType: apiType,
               baseUrl: url,
               apiKey: apiKey.isNotEmpty ? apiKey : null,
               customHeaders: customHeaders,
@@ -132,6 +139,7 @@ class AIModelDialog {
           } else {
             await notifier.addLlmSettings(
               identifier: identifier,
+              apiType: apiType,
               baseUrl: url,
               apiKey: apiKey,
               customHeaders: customHeaders,
@@ -175,11 +183,13 @@ class _AIModelDialogForm extends StatefulWidget {
   final String title;
   final bool isGlobal;
   final String? initialIdentifier;
+  final LlmApiType? initialApiType;
   final String? initialUrl;
   final String? initialApiKey;
   final bool? initialEnabled;
   final Function(
     String identifier,
+    LlmApiType apiType,
     String url,
     String apiKey, {
     String? customHeaders,
@@ -192,11 +202,12 @@ class _AIModelDialogForm extends StatefulWidget {
   const _AIModelDialogForm({
     required this.title,
     required this.isGlobal,
-    required this.onSave,
     this.initialIdentifier,
+    this.initialApiType,
     this.initialUrl,
     this.initialApiKey,
     this.initialEnabled,
+    required this.onSave,
   });
 
   @override
@@ -211,6 +222,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
   bool _obscureApiKey = true;
   bool _isTestingConnection = false;
   late bool _enabled;
+  late LlmApiType _selectedApiType;
 
   bool get _isEditMode => widget.initialIdentifier != null;
 
@@ -223,6 +235,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
     _urlController = TextEditingController(text: widget.initialUrl);
     _apiKeyController = TextEditingController(text: widget.initialApiKey);
     _enabled = widget.initialEnabled ?? true;
+    _selectedApiType = widget.initialApiType ?? LlmApiType.openai;
   }
 
   @override
@@ -256,6 +269,33 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                     return 'Please enter a model identifier';
                   }
                   return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<LlmApiType>(
+                value: _selectedApiType,
+                decoration: const InputDecoration(
+                  labelText: 'API Type',
+                  prefixIcon: Icon(Icons.cloud),
+                ),
+                items: LlmApiType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Text(type.displayName),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedApiType = value;
+                      // Update URL to default for selected API type if it's empty or unchanged
+                      if (_urlController.text.isEmpty ||
+                          _urlController.text ==
+                              _selectedApiType.defaultBaseUrl) {
+                        _urlController.text = value.defaultBaseUrl;
+                      }
+                    });
+                  }
                 },
               ),
               const SizedBox(height: 16),
@@ -397,6 +437,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
     if (_formKey.currentState!.validate()) {
       widget.onSave(
         _identifierController.text,
+        _selectedApiType,
         _urlController.text,
         _apiKeyController.text,
         enabled: _isEditMode ? _enabled : null,

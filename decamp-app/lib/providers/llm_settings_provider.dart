@@ -55,6 +55,7 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Add a new LLM configuration with API key
   Future<void> addLlmSettings({
     required String identifier,
+    required LlmApiType apiType,
     required String baseUrl,
     required String apiKey,
     String? customHeaders,
@@ -64,6 +65,7 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     final now = DateTime.now();
     final newSettings = LlmApiSettings(
       identifier: identifier,
+      apiType: apiType,
       baseUrl: baseUrl,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
@@ -94,6 +96,7 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Update an existing LLM configuration
   Future<void> updateLlmSettings({
     required String identifier,
+    LlmApiType? apiType,
     required String baseUrl,
     String? apiKey,
     String? customHeaders,
@@ -199,6 +202,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Add a new LLM configuration with API key for this project
   Future<void> addLlmSettings({
     required String identifier,
+    required LlmApiType apiType,
     required String baseUrl,
     required String apiKey,
     String? customHeaders,
@@ -208,6 +212,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     final now = DateTime.now();
     final newSettings = LlmApiSettings(
       identifier: identifier,
+      apiType: apiType,
       baseUrl: baseUrl,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
@@ -240,6 +245,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Update an existing LLM configuration for this project
   Future<void> updateLlmSettings({
     required String identifier,
+    LlmApiType? apiType,
     required String baseUrl,
     String? apiKey,
     String? customHeaders,
@@ -256,6 +262,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
 
     final existing = state[index];
     final updatedSettings = existing.copyWith(
+      apiType: apiType ?? existing.apiType,
       baseUrl: baseUrl,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
