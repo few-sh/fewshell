@@ -11,6 +11,7 @@ import 'tables/snippets_table.dart';
 import 'daos/project_dao.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
+import 'daos/snippet_dao.dart';
 
 part 'database.g.dart';
 
@@ -24,6 +25,7 @@ class AppDatabase extends _$AppDatabase {
   late final ProjectDao projectDao = ProjectDao(this);
   late final SessionDao sessionDao = SessionDao(this);
   late final MessageDao messageDao = MessageDao(this);
+  late final SnippetDao snippetDao = SnippetDao(this);
 
   @override
   int get schemaVersion => 1;

@@ -5,6 +5,7 @@ import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/pages/main_settings.dart';
 import 'package:hello_world/pages/agent_instructions_page.dart';
 import 'package:hello_world/pages/secrets_page.dart';
+import 'package:hello_world/pages/snippets_page.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key});
@@ -117,11 +118,9 @@ class MainDrawer extends ConsumerWidget {
             title: const Text('Snippets'),
             onTap: () {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Snippets page coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SnippetsPage()),
               );
             },
           ),
