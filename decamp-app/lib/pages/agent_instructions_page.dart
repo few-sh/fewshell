@@ -403,17 +403,11 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
     final settings = ref.watch(projectSettingsProvider(projectId));
     final llmSettings = ref.watch(projectLlmSettingsProvider(projectId));
 
-    // Load settings when they change
+    // Load settings when they change (only if we haven't loaded yet or don't have unsaved changes)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_defaultController.text.isEmpty &&
           settings?.agentInstruction != null) {
         _loadSettings(projectId);
-      }
-      if (settings != null &&
-          _includeUserInstructions != settings.includeUserInstructions) {
-        setState(() {
-          _includeUserInstructions = settings.includeUserInstructions;
-        });
       }
     });
 
