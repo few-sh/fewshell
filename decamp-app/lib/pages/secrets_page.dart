@@ -93,6 +93,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
         return Column(
           children: [
+            _buildSecurityInfoBanner(),
             Expanded(
               child: secrets.isEmpty
                   ? _buildEmptyState('No user secrets yet')
@@ -116,7 +117,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
         return Column(
           children: [
             _buildProjectSelector(projects, currentProjectId),
-            const SizedBox(height: 16),
+            _buildSecurityInfoBanner(),
             Expanded(
               child: currentProjectId == null
                   ? _buildEmptyState('Please select a project')
@@ -374,6 +375,49 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
             message,
             style: theme.textTheme.titleMedium?.copyWith(
               color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityInfoBanner() {
+    final theme = Theme.of(context);
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.security, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '• All secrets are stored using secure system keychain',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• Secrets are always redacted from the LLM',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
