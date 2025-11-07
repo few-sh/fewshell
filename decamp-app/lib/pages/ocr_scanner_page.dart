@@ -153,9 +153,22 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
         // Check each text candidate in the block
         for (final text in textBlock.listText) {
           final trimmedText = text.trim();
-          final matches = widget.scanType == ScanType.apiKey
-              ? TextPatternMatcher.isApiKey(trimmedText)
-              : TextPatternMatcher.isUrl(trimmedText);
+          bool matches = false;
+
+          switch (widget.scanType) {
+            case ScanType.apiKey:
+              matches = TextPatternMatcher.isApiKey(trimmedText);
+              break;
+            case ScanType.url:
+              matches = TextPatternMatcher.isUrl(trimmedText);
+              break;
+            case ScanType.sshKey:
+              matches = TextPatternMatcher.isSshKey(trimmedText);
+              break;
+            case ScanType.hostname:
+              matches = TextPatternMatcher.isHostname(trimmedText);
+              break;
+          }
 
           if (matches) {
             final extractedText =
@@ -261,7 +274,27 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scanTypeName = widget.scanType == ScanType.apiKey ? 'API Key' : 'URL';
+    String scanTypeName;
+    IconData scanIcon;
+
+    switch (widget.scanType) {
+      case ScanType.apiKey:
+        scanTypeName = 'API Key';
+        scanIcon = Icons.key;
+        break;
+      case ScanType.url:
+        scanTypeName = 'URL';
+        scanIcon = Icons.link;
+        break;
+      case ScanType.sshKey:
+        scanTypeName = 'SSH Private Key';
+        scanIcon = Icons.vpn_key;
+        break;
+      case ScanType.hostname:
+        scanTypeName = 'Hostname/IP';
+        scanIcon = Icons.dns;
+        break;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -275,7 +308,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
           ? _buildErrorView(theme)
           : !_isInitialized
           ? _buildLoadingView()
-          : _buildCameraView(theme, scanTypeName),
+          : _buildCameraView(theme, scanTypeName, scanIcon),
     );
   }
 
@@ -324,7 +357,11 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     return const Center(child: CircularProgressIndicator());
   }
 
-  Widget _buildCameraView(ThemeData theme, String scanTypeName) {
+  Widget _buildCameraView(
+    ThemeData theme,
+    String scanTypeName,
+    IconData scanIcon,
+  ) {
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -360,11 +397,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  widget.scanType == ScanType.apiKey ? Icons.key : Icons.link,
-                  color: Colors.white,
-                  size: 32,
-                ),
+                Icon(scanIcon, color: Colors.white, size: 32),
                 const SizedBox(height: 8),
                 Text(
                   'Point camera at $scanTypeName',

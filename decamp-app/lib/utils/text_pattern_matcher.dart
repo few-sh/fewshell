@@ -25,6 +25,38 @@ class TextPatternMatcher {
     caseSensitive: false,
   );
 
+  /// Regex pattern for detecting SSH private keys
+  /// Matches various SSH key formats:
+  /// - RSA keys (-----BEGIN RSA PRIVATE KEY-----)
+  /// - OpenSSH format (-----BEGIN OPENSSH PRIVATE KEY-----)
+  /// - DSA keys (-----BEGIN DSA PRIVATE KEY-----)
+  /// - EC keys (-----BEGIN EC PRIVATE KEY-----)
+  /// - Generic encrypted keys (-----BEGIN ENCRYPTED PRIVATE KEY-----)
+  static final RegExp sshKeyPattern = RegExp(
+    r'-----BEGIN\s+(?:RSA|DSA|EC|OPENSSH|ENCRYPTED)?\s*PRIVATE\s+KEY-----[\s\S]*?-----END\s+(?:RSA|DSA|EC|OPENSSH|ENCRYPTED)?\s*PRIVATE\s+KEY-----',
+    caseSensitive: false,
+    multiLine: true,
+  );
+
+  /// Regex pattern for detecting hostnames and IP addresses
+  /// Matches:
+  /// - IPv4 addresses (e.g., 192.168.1.1)
+  /// - IPv6 addresses (basic support)
+  /// - Fully qualified domain names (e.g., example.com, sub.example.co.uk)
+  /// - Hostnames with ports (e.g., example.com:8080, 192.168.1.1:22)
+  static final RegExp hostnamePattern = RegExp(
+    r'(?:'
+    // IPv4 address with optional port
+    r'(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::[0-9]{1,5})?'
+    r'|'
+    // IPv6 address (simplified pattern)
+    r'\[?(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\]?(?::[0-9]{1,5})?'
+    r'|'
+    // Domain name with optional port (requires at least one dot)
+    r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::[0-9]{1,5})?'
+    r')',
+  );
+
   /// Check if text contains ellipsis or other indicators of incomplete text
   static bool hasEllipsisOrIncomplete(String text) {
     return text.contains('...') ||
@@ -94,19 +126,69 @@ class TextPatternMatcher {
     return matchedText.length >= 10;
   }
 
+  /// Check if text matches SSH private key pattern
+  static bool isSshKey(String text) {
+    final match = sshKeyPattern.firstMatch(text.trim());
+    if (match == null) return false;
+
+    // Must contain BEGIN and END markers
+    final matchedText = match.group(0) ?? '';
+    return matchedText.contains('BEGIN') && matchedText.contains('END');
+  }
+
+  /// Check if text matches hostname or IP address pattern
+  static bool isHostname(String text) {
+    final trimmed = text.trim();
+    final match = hostnamePattern.firstMatch(trimmed);
+    if (match == null) return false;
+
+    // The match should be the entire trimmed text (or very close to it)
+    final matchedText = match.group(0) ?? '';
+    return matchedText.length >= trimmed.length * 0.8;
+  }
+
   /// Extract the matched portion from text based on pattern
   static String? extractMatch(String text, ScanType scanType) {
-    final pattern = scanType == ScanType.apiKey ? apiKeyPattern : urlPattern;
-    final input = scanType == ScanType.url ? normalizeUrl(text) : text.trim();
+    final RegExp pattern;
+    String input;
+
+    switch (scanType) {
+      case ScanType.apiKey:
+        pattern = apiKeyPattern;
+        input = text.trim();
+        break;
+      case ScanType.url:
+        pattern = urlPattern;
+        input = normalizeUrl(text);
+        break;
+      case ScanType.sshKey:
+        pattern = sshKeyPattern;
+        input = text.trim();
+        break;
+      case ScanType.hostname:
+        pattern = hostnamePattern;
+        input = text.trim();
+        break;
+    }
+
     final match = pattern.firstMatch(input);
     return match?.group(0);
   }
 
   /// Get the appropriate pattern based on scan type
   static RegExp getPattern(ScanType scanType) {
-    return scanType == ScanType.apiKey ? apiKeyPattern : urlPattern;
+    switch (scanType) {
+      case ScanType.apiKey:
+        return apiKeyPattern;
+      case ScanType.url:
+        return urlPattern;
+      case ScanType.sshKey:
+        return sshKeyPattern;
+      case ScanType.hostname:
+        return hostnamePattern;
+    }
   }
 }
 
 /// Type of text being scanned for
-enum ScanType { apiKey, url }
+enum ScanType { apiKey, url, sshKey, hostname }

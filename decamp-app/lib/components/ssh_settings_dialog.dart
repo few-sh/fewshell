@@ -584,7 +584,7 @@ class _SshSettingsDialogFormState extends State<_SshSettingsDialogForm> {
     final scannedText = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.url),
+        builder: (context) => const OcrScannerPage(scanType: ScanType.hostname),
       ),
     );
 
@@ -614,7 +614,7 @@ class _SshSettingsDialogFormState extends State<_SshSettingsDialogForm> {
     final scannedText = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.apiKey),
+        builder: (context) => const OcrScannerPage(scanType: ScanType.sshKey),
       ),
     );
 
