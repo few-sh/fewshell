@@ -41,14 +41,8 @@ AiActionConfig createAiActionsConfig(ShellService shellService) {
             required: true,
           ),
         ],
-        // Human-in-the-loop confirmation
-        confirmationConfig: ActionConfirmationConfig(
-          required: true, // ALWAYS ask for confirmation before executing
-          title: 'Execute Shell Command',
-          message:
-              'The AI wants to execute the following command.\n\n'
-              'Review the parameters below and confirm if you want to proceed.',
-        ),
+        // No confirmation dialog - we handle approval with custom overlay
+        confirmationConfig: null,
         // Custom rendering for action status
         render: (context, status, params, {result, error}) {
           final command = params['command'] as String?;
