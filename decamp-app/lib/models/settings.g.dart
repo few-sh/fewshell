@@ -77,6 +77,10 @@ _$ProjectSettingsImpl _$$ProjectSettingsImplFromJson(
       'includeUserInstructions',
       (v) => v as bool? ?? false,
     ),
+    sshSettings: $checkedConvert(
+      'sshSettings',
+      (v) => v == null ? null : SshSettings.fromJson(v as Map<String, dynamic>),
+    ),
     createdAt: $checkedConvert(
       'createdAt',
       (v) => v == null ? null : DateTime.parse(v as String),
@@ -97,6 +101,7 @@ Map<String, dynamic> _$$ProjectSettingsImplToJson(
   'defaultLlmIdentifier': instance.defaultLlmIdentifier,
   'agentInstruction': instance.agentInstruction,
   'includeUserInstructions': instance.includeUserInstructions,
+  'sshSettings': instance.sshSettings,
   'createdAt': instance.createdAt?.toIso8601String(),
   'updatedAt': instance.updatedAt?.toIso8601String(),
 };

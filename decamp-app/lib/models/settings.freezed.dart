@@ -335,6 +335,9 @@ mixin _$ProjectSettings {
 
   /// Whether to include user-level instructions when using project instructions
   bool get includeUserInstructions => throw _privateConstructorUsedError;
+
+  /// SSH/Remote shell configuration for this project
+  SshSettings? get sshSettings => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
   DateTime? get updatedAt => throw _privateConstructorUsedError;
 
@@ -361,11 +364,13 @@ abstract class $ProjectSettingsCopyWith<$Res> {
     String? defaultLlmIdentifier,
     AgentInstruction? agentInstruction,
     bool includeUserInstructions,
+    SshSettings? sshSettings,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
 
   $AgentInstructionCopyWith<$Res>? get agentInstruction;
+  $SshSettingsCopyWith<$Res>? get sshSettings;
 }
 
 /// @nodoc
@@ -388,6 +393,7 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
     Object? defaultLlmIdentifier = freezed,
     Object? agentInstruction = freezed,
     Object? includeUserInstructions = null,
+    Object? sshSettings = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -413,6 +419,10 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
                 ? _value.includeUserInstructions
                 : includeUserInstructions // ignore: cast_nullable_to_non_nullable
                       as bool,
+            sshSettings: freezed == sshSettings
+                ? _value.sshSettings
+                : sshSettings // ignore: cast_nullable_to_non_nullable
+                      as SshSettings?,
             createdAt: freezed == createdAt
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
@@ -439,6 +449,20 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
       return _then(_value.copyWith(agentInstruction: value) as $Val);
     });
   }
+
+  /// Create a copy of ProjectSettings
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SshSettingsCopyWith<$Res>? get sshSettings {
+    if (_value.sshSettings == null) {
+      return null;
+    }
+
+    return $SshSettingsCopyWith<$Res>(_value.sshSettings!, (value) {
+      return _then(_value.copyWith(sshSettings: value) as $Val);
+    });
+  }
 }
 
 /// @nodoc
@@ -456,12 +480,15 @@ abstract class _$$ProjectSettingsImplCopyWith<$Res>
     String? defaultLlmIdentifier,
     AgentInstruction? agentInstruction,
     bool includeUserInstructions,
+    SshSettings? sshSettings,
     DateTime? createdAt,
     DateTime? updatedAt,
   });
 
   @override
   $AgentInstructionCopyWith<$Res>? get agentInstruction;
+  @override
+  $SshSettingsCopyWith<$Res>? get sshSettings;
 }
 
 /// @nodoc
@@ -483,6 +510,7 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
     Object? defaultLlmIdentifier = freezed,
     Object? agentInstruction = freezed,
     Object? includeUserInstructions = null,
+    Object? sshSettings = freezed,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
@@ -508,6 +536,10 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
             ? _value.includeUserInstructions
             : includeUserInstructions // ignore: cast_nullable_to_non_nullable
                   as bool,
+        sshSettings: freezed == sshSettings
+            ? _value.sshSettings
+            : sshSettings // ignore: cast_nullable_to_non_nullable
+                  as SshSettings?,
         createdAt: freezed == createdAt
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
@@ -530,6 +562,7 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
     this.defaultLlmIdentifier,
     this.agentInstruction,
     this.includeUserInstructions = false,
+    this.sshSettings,
     this.createdAt,
     this.updatedAt,
   }) : _llmSettings = llmSettings;
@@ -567,6 +600,10 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
   @override
   @JsonKey()
   final bool includeUserInstructions;
+
+  /// SSH/Remote shell configuration for this project
+  @override
+  final SshSettings? sshSettings;
   @override
   final DateTime? createdAt;
   @override
@@ -574,7 +611,7 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
 
   @override
   String toString() {
-    return 'ProjectSettings(projectId: $projectId, llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, agentInstruction: $agentInstruction, includeUserInstructions: $includeUserInstructions, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'ProjectSettings(projectId: $projectId, llmSettings: $llmSettings, defaultLlmIdentifier: $defaultLlmIdentifier, agentInstruction: $agentInstruction, includeUserInstructions: $includeUserInstructions, sshSettings: $sshSettings, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -597,6 +634,8 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
                   includeUserInstructions,
                 ) ||
                 other.includeUserInstructions == includeUserInstructions) &&
+            (identical(other.sshSettings, sshSettings) ||
+                other.sshSettings == sshSettings) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -612,6 +651,7 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
     defaultLlmIdentifier,
     agentInstruction,
     includeUserInstructions,
+    sshSettings,
     createdAt,
     updatedAt,
   );
@@ -640,6 +680,7 @@ abstract class _ProjectSettings implements ProjectSettings {
     final String? defaultLlmIdentifier,
     final AgentInstruction? agentInstruction,
     final bool includeUserInstructions,
+    final SshSettings? sshSettings,
     final DateTime? createdAt,
     final DateTime? updatedAt,
   }) = _$ProjectSettingsImpl;
@@ -667,6 +708,10 @@ abstract class _ProjectSettings implements ProjectSettings {
   /// Whether to include user-level instructions when using project instructions
   @override
   bool get includeUserInstructions;
+
+  /// SSH/Remote shell configuration for this project
+  @override
+  SshSettings? get sshSettings;
   @override
   DateTime? get createdAt;
   @override

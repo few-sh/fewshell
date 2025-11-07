@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'llm_api_settings.dart';
 import 'agent_instruction.dart';
+import 'ssh_settings.dart';
 
 part 'settings.freezed.dart';
 part 'settings.g.dart';
@@ -47,6 +48,9 @@ class ProjectSettings with _$ProjectSettings {
 
     /// Whether to include user-level instructions when using project instructions
     @Default(false) bool includeUserInstructions,
+
+    /// SSH/Remote shell configuration for this project
+    SshSettings? sshSettings,
 
     DateTime? createdAt,
     DateTime? updatedAt,

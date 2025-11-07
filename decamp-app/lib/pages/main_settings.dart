@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
+import '../providers/ssh_settings_provider.dart';
 import '../models/llm_api_settings.dart';
+import '../models/ssh_settings.dart';
 import '../components/ai_model_dialog.dart';
+import '../components/ssh_settings_dialog.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -94,6 +97,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         _buildProjectSelector(),
         const SizedBox(height: 24),
         _buildAIModelsSection(isGlobal: false),
+        const SizedBox(height: 24),
+        _buildRemoteShellSection(),
         const SizedBox(height: 24),
         _buildThemeSection(),
       ],
@@ -407,6 +412,274 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRemoteShellSection() {
+    final theme = Theme.of(context);
+    final currentProjectId = ref.watch(currentProjectIdProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Remote Shell',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Show message if no project selected
+        if (currentProjectId == null)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: theme.colorScheme.outline),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Select a project to configure remote shell connection.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          _buildSshSettingsCard(currentProjectId),
+      ],
+    );
+  }
+
+  Widget _buildSshSettingsCard(String projectId) {
+    final theme = Theme.of(context);
+    final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
+
+    if (sshSettings == null) {
+      // No SSH configuration yet
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outline),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.terminal,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'No remote shell configured yet.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () => _showSshSettingsDialog(projectId: projectId),
+                icon: const Icon(Icons.add),
+                label: const Text('Configure Connection'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // SSH configuration exists
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.terminal,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${sshSettings.username}@${sshSettings.host}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!sshSettings.enabled)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Chip(
+                          label: const Text('Disabled'),
+                          backgroundColor: theme.colorScheme.errorContainer,
+                          labelStyle: TextStyle(
+                            color: theme.colorScheme.onErrorContainer,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _showSshSettingsDialog(
+                        projectId: projectId,
+                        existingSettings: sshSettings,
+                      ),
+                      tooltip: 'Edit',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () =>
+                          _showDeleteSshConfirmation(projectId: projectId),
+                      tooltip: 'Delete',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  Icons.dns,
+                  size: 16,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${sshSettings.host}:${sshSettings.port}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  sshSettings.authMethod == SshAuthMethod.password
+                      ? Icons.password
+                      : Icons.key,
+                  size: 16,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  sshSettings.authMethod == SshAuthMethod.password
+                      ? 'Password Authentication'
+                      : 'Private Key Authentication',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSshSettingsDialog({
+    required String projectId,
+    SshSettings? existingSettings,
+  }) {
+    SshSettingsDialog.show(
+      context,
+      ref,
+      projectId: projectId,
+      existingSettings: existingSettings,
+    );
+  }
+
+  void _showDeleteSshConfirmation({required String projectId}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Remote Shell Configuration'),
+        content: const Text(
+          'Are you sure you want to delete the remote shell configuration? '
+          'This will also delete all associated credentials.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              try {
+                await ref
+                    .read(projectSshSettingsProvider(projectId).notifier)
+                    .deleteSshSettings();
+
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Remote shell configuration deleted'),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting configuration: $e'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
