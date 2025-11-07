@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../pages/ocr_scanner_page.dart';
@@ -158,7 +159,7 @@ class SshSettingsDialog {
 }
 
 /// Internal form widget for the SSH settings dialog
-class _SshSettingsDialogForm extends StatefulWidget {
+class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   final String title;
   final String projectId;
   final String? initialHost;
@@ -196,10 +197,12 @@ class _SshSettingsDialogForm extends StatefulWidget {
   });
 
   @override
-  State<_SshSettingsDialogForm> createState() => _SshSettingsDialogFormState();
+  ConsumerState<_SshSettingsDialogForm> createState() =>
+      _SshSettingsDialogFormState();
 }
 
-class _SshSettingsDialogFormState extends State<_SshSettingsDialogForm> {
+class _SshSettingsDialogFormState
+    extends ConsumerState<_SshSettingsDialogForm> {
   late final TextEditingController _hostController;
   late final TextEditingController _portController;
   late final TextEditingController _usernameController;
@@ -211,6 +214,8 @@ class _SshSettingsDialogFormState extends State<_SshSettingsDialogForm> {
   bool _obscurePassword = true;
   bool _obscurePassphrase = true;
   bool _isTestingConnection = false;
+  String? _testResultMessage;
+  bool? _testResultSuccess;
   late bool _enabled;
   late SshAuthMethod _authMethod;
 
@@ -488,6 +493,51 @@ class _SshSettingsDialogFormState extends State<_SshSettingsDialogForm> {
                   ),
                 ),
               ),
+
+              // Display test result message
+              if (_testResultMessage != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _testResultSuccess == true
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _testResultSuccess == true
+                          ? Colors.green
+                          : Colors.red,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _testResultSuccess == true
+                            ? Icons.check_circle
+                            : Icons.error,
+                        color: _testResultSuccess == true
+                            ? Colors.green
+                            : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _testResultMessage!,
+                          style: TextStyle(
+                            color: _testResultSuccess == true
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -559,24 +609,119 @@ class _SshSettingsDialogFormState extends State<_SshSettingsDialogForm> {
       return;
     }
 
+    // TODO: We should make sure we return complete error information
+    // if there is a failure.
+    // The error text should be selectable/copyable.
+
     setState(() {
       _isTestingConnection = true;
+      _testResultMessage = null;
+      _testResultSuccess = null;
     });
 
-    // TODO: Implement actual SSH connection test
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isTestingConnection = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connection test successful! (Not yet implemented)'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      // Create temporary SSH settings for testing
+      final testSettings = SshSettings(
+        host: _hostController.text.trim(),
+        port: int.tryParse(_portController.text.trim()) ?? 22,
+        username: _usernameController.text.trim(),
+        authMethod: _authMethod,
+        passwordSecretId: null,
+        privateKeySecretId: null,
+        passphraseSecretId: null,
+        enabled: true,
       );
+
+      // Attempt to connect with inline credentials
+      bool connected = false;
+
+      if (_authMethod == SshAuthMethod.password) {
+        connected = await _testConnectionWithPassword(
+          testSettings,
+          _passwordController.text,
+        );
+      } else {
+        connected = await _testConnectionWithPrivateKey(
+          testSettings,
+          _privateKeyController.text,
+          _passphraseController.text.isEmpty
+              ? null
+              : _passphraseController.text,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _isTestingConnection = false;
+          _testResultSuccess = connected;
+          _testResultMessage = connected
+              ? 'Connection successful!'
+              : 'Connection failed. Please check your settings.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTestingConnection = false;
+          _testResultSuccess = false;
+          _testResultMessage = 'Connection error: $e';
+        });
+      }
+    }
+  }
+
+  Future<bool> _testConnectionWithPassword(
+    SshSettings settings,
+    String password,
+  ) async {
+    try {
+      final socket = await SSHSocket.connect(
+        settings.host,
+        settings.port,
+        timeout: const Duration(seconds: 30),
+      );
+
+      final client = SSHClient(
+        socket,
+        username: settings.username,
+        onPasswordRequest: () => password,
+      );
+
+      // Test with a simple command
+      await client.run('echo test');
+      client.close();
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> _testConnectionWithPrivateKey(
+    SshSettings settings,
+    String privateKey,
+    String? passphrase,
+  ) async {
+    try {
+      final socket = await SSHSocket.connect(
+        settings.host,
+        settings.port,
+        timeout: const Duration(seconds: 30),
+      );
+
+      final client = SSHClient(
+        socket,
+        username: settings.username,
+        identities: [...SSHKeyPair.fromPem(privateKey, passphrase)],
+      );
+
+      // Test with a simple command
+      await client.run('echo test');
+      client.close();
+
+      return true;
+    } catch (e) {
+      return false;
     }
   }
 
