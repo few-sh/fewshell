@@ -2,15 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'shell_service.dart';
+import '../providers/ssh_settings_provider.dart';
 
 /// Provider for AI action configuration
-final aiActionsConfigProvider = Provider<AiActionConfig>((ref) {
-  final shellService = ref.watch(shellServiceProvider);
-  return createAiActionsConfig(shellService);
+/// Now requires a project ID to access SSH settings and shell service
+final aiActionsConfigProvider = Provider.family<AiActionConfig, String?>((
+  ref,
+  projectId,
+) {
+  final shellService = ref.watch(shellServiceProvider(projectId));
+  final sshSettings = projectId != null
+      ? ref.watch(projectSshSettingsProvider(projectId))
+      : null;
+
+  return createAiActionsConfig(shellService, sshSettings, ref, projectId);
 });
 
 /// Create the AI actions configuration
-AiActionConfig createAiActionsConfig(ShellService shellService) {
+AiActionConfig createAiActionsConfig(
+  ShellService shellService,
+  dynamic sshSettings,
+  ProviderRef ref,
+  String? projectId,
+) {
   return AiActionConfig(
     actions: [
       // Shell command execution action
@@ -443,8 +457,33 @@ AiActionConfig createAiActionsConfig(ShellService shellService) {
           final command = params['command'] as String;
 
           try {
+            // Ensure SSH connection is established
+            if (!shellService.isConnected) {
+              if (sshSettings == null || !sshSettings.enabled) {
+                return ActionResult.createFailure(
+                  'No SSH connection configured. Please configure SSH settings in project settings.',
+                );
+              }
+
+              // Attempt to connect
+              final connected = await shellService.connect(sshSettings);
+              if (!connected) {
+                return ActionResult.createFailure(
+                  'Failed to connect to SSH server. Please check your SSH settings.',
+                );
+              }
+            }
+
+            // Execute the command
             final result = await shellService.executeCommand(command);
-            return ActionResult.createSuccess(result);
+
+            if (result['executed'] == true) {
+              return ActionResult.createSuccess(result);
+            } else {
+              return ActionResult.createFailure(
+                result['stderr'] ?? 'Command execution failed',
+              );
+            }
           } catch (e) {
             return ActionResult.createFailure('Failed to execute command: $e');
           }

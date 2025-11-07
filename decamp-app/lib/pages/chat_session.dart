@@ -176,7 +176,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           children: [
             // Main chat widget
             AiActionProvider(
-              config: ref.watch(aiActionsConfigProvider),
+              config: ref.watch(aiActionsConfigProvider(currentProject?.id)),
               // Use a Builder to get the correct context inside AiActionProvider
               child: Builder(
                 builder: (actionContext) {
@@ -419,8 +419,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       );
 
       // Get AI actions and convert to tools
-      developer.log('� Getting AI actions config...', name: 'ChatSession');
-      final aiActionsConfig = ref.read(aiActionsConfigProvider);
+      developer.log('🔧 Getting AI actions config...', name: 'ChatSession');
+      final currentProject = ref.read(currentProjectProvider);
+      final aiActionsConfig = ref.read(
+        aiActionsConfigProvider(currentProject?.id),
+      );
       final tools = llmService.convertActionsToTools(aiActionsConfig.actions);
       developer.log(
         '🔧 Converted ${tools.length} actions to tools',

@@ -63,6 +63,9 @@ dependencies:
   # LLM Integration
   llm_dart: ^0.10.0
   
+  # SSH Client
+  dartssh2: ^2.9.2
+  
   # Markdown Editor
   flutter_markdown: ^0.7.4+1
 
