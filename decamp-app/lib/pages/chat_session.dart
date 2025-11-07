@@ -30,6 +30,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Current model identifier
   String? _currentModelIdentifier;
 
+  // Context for AiActionProvider (captured from Builder)
+  BuildContext? _actionContext;
+
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
 
@@ -167,87 +170,97 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         drawer: const MainDrawer(),
         body: AiActionProvider(
           config: ref.watch(aiActionsConfigProvider),
-          child: AiChatWidget(
-            // Required parameters
-            currentUser: _currentUser,
-            aiUser: _aiUser,
-            controller: _controller,
-            onSendMessage: _handleSendMessage,
+          // Use a Builder to get the correct context inside AiActionProvider
+          child: Builder(
+            builder: (actionContext) {
+              // Capture the action context for use in callbacks
+              _actionContext = actionContext;
 
-            // Loading configuration
-            loadingConfig: LoadingConfig(
-              isLoading: _isLoading,
-              showCenteredIndicator: true,
-            ),
+              return AiChatWidget(
+                // Required parameters
+                currentUser: _currentUser,
+                aiUser: _aiUser,
+                controller: _controller,
+                onSendMessage: _handleSendMessage,
 
-            // Input field customization
-            inputOptions: InputOptions(
-              textStyle: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                hintText: _currentModelIdentifier != null
-                    ? 'Send to $_currentModelIdentifier...'
-                    : 'Type your message...',
-                hintStyle: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                // Loading configuration
+                loadingConfig: LoadingConfig(
+                  isLoading: _isLoading,
+                  showCenteredIndicator: true,
                 ),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24.0),
-                  borderSide: BorderSide.none,
+
+                // Input field customization
+                inputOptions: InputOptions(
+                  textStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: _currentModelIdentifier != null
+                        ? 'Send to $_currentModelIdentifier...'
+                        : 'Type your message...',
+                    hintStyle: TextStyle(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).colorScheme.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24.0),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 10.0,
+                    ),
+                  ),
+                  useOuterContainer: false,
+                  autofocus: true,
+                  sendOnEnter: true,
+                  textInputAction: TextInputAction.send,
+                  maxLines: 1,
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 10.0,
+
+                // Enable animations and streaming
+                enableAnimation: true,
+                enableMarkdownStreaming: true,
+                streamingWordByWord: true,
+                streamingDuration: const Duration(milliseconds: 30),
+
+                // Message options
+                messageOptions: MessageOptions(
+                  showTime: true,
+                  showUserName: true,
+                  containerMargin: const EdgeInsets.symmetric(
+                    horizontal: 0,
+                    vertical: 4,
+                  ),
+                  bubbleStyle: BubbleStyle(
+                    userBubbleColor: Theme.of(
+                      context,
+                    ).colorScheme.primaryContainer,
+                    aiBubbleColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    userNameColor: Theme.of(context).colorScheme.primary,
+                    aiNameColor: Theme.of(context).colorScheme.secondary,
+                    bottomLeftRadius: 22,
+                    bottomRightRadius: 22,
+                    enableShadow: true,
+                  ),
                 ),
-              ),
-              useOuterContainer: false,
-              autofocus: true,
-              sendOnEnter: true,
-              textInputAction: TextInputAction.send,
-              maxLines: 1,
-            ),
 
-            // Enable animations and streaming
-            enableAnimation: true,
-            enableMarkdownStreaming: true,
-            streamingWordByWord: true,
-            streamingDuration: const Duration(milliseconds: 30),
+                // Scroll behavior
+                scrollBehaviorConfig: ScrollBehaviorConfig(
+                  autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
+                  scrollToFirstResponseMessage: true,
+                ),
 
-            // Message options
-            messageOptions: MessageOptions(
-              showTime: true,
-              showUserName: true,
-              containerMargin: const EdgeInsets.symmetric(
-                horizontal: 0,
-                vertical: 4,
-              ),
-              bubbleStyle: BubbleStyle(
-                userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
-                aiBubbleColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-                userNameColor: Theme.of(context).colorScheme.primary,
-                aiNameColor: Theme.of(context).colorScheme.secondary,
-                bottomLeftRadius: 22,
-                bottomRightRadius: 22,
-                enableShadow: true,
-              ),
-            ),
-
-            // Scroll behavior
-            scrollBehaviorConfig: ScrollBehaviorConfig(
-              autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
-              scrollToFirstResponseMessage: true,
-            ),
-
-            // Layout options
-            maxWidth: 800,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                // Layout options
+                maxWidth: 800,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              );
+            },
           ),
         ),
       ),
@@ -342,6 +355,44 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         message.text,
         history: history,
         tools: tools,
+        actionExecutor: (actionName, params) async {
+          developer.log(
+            '🎯 Action executor called for: $actionName with params: $params',
+            name: 'ChatSession',
+          );
+
+          // Check if we have the action context
+          if (_actionContext == null) {
+            developer.log(
+              '❌ Action context not available',
+              name: 'ChatSession',
+            );
+            return {
+              'success': false,
+              'error': 'Action execution context not available',
+            };
+          }
+
+          try {
+            // Get the action hook to execute the action
+            final actionHook = AiActionHook.of(_actionContext!);
+
+            // Execute the action (this will show confirmation dialog if needed)
+            final result = await actionHook.executeAction(actionName, params);
+
+            developer.log(
+              '✅ Action result: success=${result.success}, data=${result.data}',
+              name: 'ChatSession',
+            );
+
+            // Return result data for LLM to process
+            return result.data ??
+                {'success': result.success, 'error': result.error};
+          } catch (e) {
+            developer.log('❌ Action execution error: $e', name: 'ChatSession');
+            return {'success': false, 'error': e.toString()};
+          }
+        },
       )) {
         chunkCount++;
         developer.log('📦 Chunk #$chunkCount: "$chunk"', name: 'ChatSession');

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
@@ -387,12 +388,19 @@ class LlmService {
   /// Send a chat message with tool support
   /// This demonstrates how to use llm_dart's native tool calling
   ///
+  /// The actionExecutor callback will be called when the LLM decides to use a tool.
+  /// It should execute the action and return the result.
+  ///
   /// Example usage:
   /// ```dart
   /// final tools = llmService.convertActionsToTools(aiActions);
   /// await for (final chunk in llmService.sendMessageWithTools(
   ///   'Check disk space',
   ///   tools: tools,
+  ///   actionExecutor: (name, params) async {
+  ///     final hook = AiActionHook.of(context);
+  ///     return await hook.executeAction(name, params);
+  ///   },
   /// )) {
   ///   print(chunk);
   /// }
@@ -401,6 +409,11 @@ class LlmService {
     String message, {
     List<Map<String, String>>? history,
     List<Tool>? tools,
+    Future<Map<String, dynamic>> Function(
+      String actionName,
+      Map<String, dynamic> params,
+    )?
+    actionExecutor,
   }) async* {
     final activeConfig = await _getActiveConfig();
 
@@ -440,22 +453,86 @@ class LlmService {
       // Add current message
       messages.add(ChatMessage.user(message));
 
+      developer.log(
+        '📤 Calling provider.chatStream with ${messages.length} messages and ${tools?.length ?? 0} tools',
+        name: 'LlmService',
+      );
+
       // Stream the response with tools
-      // The provider will automatically handle tool calls based on the LLM's response
       final stream = provider.chatStream(messages, tools: tools);
 
       await for (final event in stream) {
+        developer.log(
+          '📥 Received event: ${event.runtimeType}',
+          name: 'LlmService',
+        );
+
         if (event is TextDeltaEvent) {
+          developer.log('💬 Text delta: "${event.delta}"', name: 'LlmService');
           yield event.delta;
         } else if (event is ToolCallDeltaEvent) {
-          // Tool call detected - yield information about it
-          yield '\n[Tool Call: ${event.toolCall.function.name}]\n';
+          developer.log(
+            '🔧 Tool call detected: ${event.toolCall.function.name}',
+            name: 'LlmService',
+          );
+          developer.log(
+            '🔧 Tool arguments: ${event.toolCall.function.arguments}',
+            name: 'LlmService',
+          );
+
+          // Parse tool call parameters
+          final toolName = event.toolCall.function.name;
+          final argumentsJson = event.toolCall.function.arguments;
+
+          // If we have an action executor, call it
+          if (actionExecutor != null) {
+            try {
+              developer.log(
+                '🚀 Executing action: $toolName',
+                name: 'LlmService',
+              );
+
+              // Parse arguments
+              final params = argumentsJson.isNotEmpty
+                  ? Map<String, dynamic>.from(json.decode(argumentsJson))
+                  : <String, dynamic>{};
+
+              developer.log(
+                '🔧 Action parameters: $params',
+                name: 'LlmService',
+              );
+
+              // Execute the action
+              final result = await actionExecutor(toolName, params);
+
+              developer.log('✅ Action completed: $result', name: 'LlmService');
+
+              // The result will be handled by the UI layer
+              // We don't yield anything here as the action will update the UI
+            } catch (e) {
+              developer.log(
+                '❌ Action execution failed: $e',
+                name: 'LlmService',
+              );
+              yield '\n⚠️ Action failed: $e\n';
+            }
+          } else {
+            // No executor provided, just show the tool call
+            yield '\n[Tool Call: $toolName]\n';
+          }
         } else if (event is ErrorEvent) {
+          developer.log('❌ Error event: ${event.error}', name: 'LlmService');
           yield 'Error: ${event.error}';
           break;
         }
       }
+
+      developer.log('✅ Stream completed', name: 'LlmService');
     } catch (e) {
+      developer.log(
+        '❌ Exception in sendMessageWithTools: $e',
+        name: 'LlmService',
+      );
       yield 'Error: ${e.toString()}';
     }
   }
