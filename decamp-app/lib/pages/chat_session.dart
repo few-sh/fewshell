@@ -6,6 +6,8 @@ import 'package:hello_world/components/main_drawer.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/services/llm_service.dart';
+import 'package:hello_world/services/ai_actions_config.dart';
+import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
   const ChatSession({super.key});
@@ -163,87 +165,90 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           ],
         ),
         drawer: const MainDrawer(),
-        body: AiChatWidget(
-          // Required parameters
-          currentUser: _currentUser,
-          aiUser: _aiUser,
-          controller: _controller,
-          onSendMessage: _handleSendMessage,
+        body: AiActionProvider(
+          config: ref.watch(aiActionsConfigProvider),
+          child: AiChatWidget(
+            // Required parameters
+            currentUser: _currentUser,
+            aiUser: _aiUser,
+            controller: _controller,
+            onSendMessage: _handleSendMessage,
 
-          // Loading configuration
-          loadingConfig: LoadingConfig(
-            isLoading: _isLoading,
-            showCenteredIndicator: true,
-          ),
-
-          // Input field customization
-          inputOptions: InputOptions(
-            textStyle: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
+            // Loading configuration
+            loadingConfig: LoadingConfig(
+              isLoading: _isLoading,
+              showCenteredIndicator: true,
             ),
-            decoration: InputDecoration(
-              hintText: _currentModelIdentifier != null
-                  ? 'Send to $_currentModelIdentifier...'
-                  : 'Type your message...',
-              hintStyle: TextStyle(
-                color: Theme.of(
+
+            // Input field customization
+            inputOptions: InputOptions(
+              textStyle: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              decoration: InputDecoration(
+                hintText: _currentModelIdentifier != null
+                    ? 'Send to $_currentModelIdentifier...'
+                    : 'Type your message...',
+                hintStyle: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24.0),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16.0,
+                  vertical: 10.0,
+                ),
+              ),
+              useOuterContainer: false,
+              autofocus: true,
+              sendOnEnter: true,
+              textInputAction: TextInputAction.send,
+              maxLines: 1,
+            ),
+
+            // Enable animations and streaming
+            enableAnimation: true,
+            enableMarkdownStreaming: true,
+            streamingWordByWord: true,
+            streamingDuration: const Duration(milliseconds: 30),
+
+            // Message options
+            messageOptions: MessageOptions(
+              showTime: true,
+              showUserName: true,
+              containerMargin: const EdgeInsets.symmetric(
+                horizontal: 0,
+                vertical: 4,
+              ),
+              bubbleStyle: BubbleStyle(
+                userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
+                aiBubbleColor: Theme.of(
                   context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surface,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(24.0),
-                borderSide: BorderSide.none,
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 10.0,
+                ).colorScheme.surfaceContainerHighest,
+                userNameColor: Theme.of(context).colorScheme.primary,
+                aiNameColor: Theme.of(context).colorScheme.secondary,
+                bottomLeftRadius: 22,
+                bottomRightRadius: 22,
+                enableShadow: true,
               ),
             ),
-            useOuterContainer: false,
-            autofocus: true,
-            sendOnEnter: true,
-            textInputAction: TextInputAction.send,
-            maxLines: 1,
-          ),
 
-          // Enable animations and streaming
-          enableAnimation: true,
-          enableMarkdownStreaming: true,
-          streamingWordByWord: true,
-          streamingDuration: const Duration(milliseconds: 30),
-
-          // Message options
-          messageOptions: MessageOptions(
-            showTime: true,
-            showUserName: true,
-            containerMargin: const EdgeInsets.symmetric(
-              horizontal: 0,
-              vertical: 4,
+            // Scroll behavior
+            scrollBehaviorConfig: ScrollBehaviorConfig(
+              autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
+              scrollToFirstResponseMessage: true,
             ),
-            bubbleStyle: BubbleStyle(
-              userBubbleColor: Theme.of(context).colorScheme.primaryContainer,
-              aiBubbleColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest,
-              userNameColor: Theme.of(context).colorScheme.primary,
-              aiNameColor: Theme.of(context).colorScheme.secondary,
-              bottomLeftRadius: 22,
-              bottomRightRadius: 22,
-              enableShadow: true,
-            ),
-          ),
 
-          // Scroll behavior
-          scrollBehaviorConfig: ScrollBehaviorConfig(
-            autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
-            scrollToFirstResponseMessage: true,
+            // Layout options
+            maxWidth: 800,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           ),
-
-          // Layout options
-          maxWidth: 800,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         ),
       ),
     );
@@ -251,17 +256,25 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   /// Handle sending messages
   Future<void> _handleSendMessage(ChatMessage message) async {
+    developer.log('🎯 _handleSendMessage called', name: 'ChatSession');
+    developer.log('User message: ${message.text}', name: 'ChatSession');
+
     // Add the user's message to the chat history first
     _controller.addMessage(message);
+    developer.log('✅ User message added to controller', name: 'ChatSession');
 
     setState(() => _isLoading = true);
+    developer.log('⏳ Loading state set to true', name: 'ChatSession');
 
     try {
       // Get the LLM service
       final llmService = ref.read(llmServiceProvider);
+      developer.log('✅ LLM service obtained', name: 'ChatSession');
 
       // Update current model identifier
       final identifier = await llmService.getCurrentIdentifier();
+      developer.log('Model identifier: $identifier', name: 'ChatSession');
+
       if (mounted) {
         setState(() {
           _currentModelIdentifier = identifier;
@@ -270,7 +283,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
       // Check if LLM is configured
       final isConfigured = await llmService.isConfigured();
+      developer.log('Is configured: $isConfigured', name: 'ChatSession');
+
       if (!isConfigured) {
+        developer.log('❌ LLM not configured', name: 'ChatSession');
         _controller.addMessage(
           ChatMessage(
             text:
@@ -284,6 +300,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       }
 
       // Build conversation history for context (excluding the current user message)
+      developer.log(
+        '📚 Building history from ${_controller.messages.length} messages',
+        name: 'ChatSession',
+      );
+
       final history = _controller.messages
           .where((msg) => msg.text.isNotEmpty) // Skip empty messages
           .map(
@@ -294,16 +315,50 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           )
           .toList();
 
+      developer.log(
+        '📚 History built: ${history.length} messages',
+        name: 'ChatSession',
+      );
+
+      // Get AI actions and convert to tools
+      developer.log('� Getting AI actions config...', name: 'ChatSession');
+      final aiActionsConfig = ref.read(aiActionsConfigProvider);
+      final tools = llmService.convertActionsToTools(aiActionsConfig.actions);
+      developer.log(
+        '🔧 Converted ${tools.length} actions to tools',
+        name: 'ChatSession',
+      );
+
+      developer.log(
+        '�🚀 Calling llmService.sendMessageWithTools...',
+        name: 'ChatSession',
+      );
+
       // Collect the full response
       final buffer = StringBuffer();
-      await for (final chunk in llmService.sendMessage(
+      var chunkCount = 0;
+
+      await for (final chunk in llmService.sendMessageWithTools(
         message.text,
         history: history,
+        tools: tools,
       )) {
+        chunkCount++;
+        developer.log('📦 Chunk #$chunkCount: "$chunk"', name: 'ChatSession');
         buffer.write(chunk);
       }
 
+      developer.log(
+        '✅ Stream completed. Total chunks: $chunkCount',
+        name: 'ChatSession',
+      );
+      developer.log(
+        '📝 Complete response: "${buffer.toString()}"',
+        name: 'ChatSession',
+      );
+
       // Add the complete response
+      developer.log('💬 Adding AI response to controller', name: 'ChatSession');
       _controller.addMessage(
         ChatMessage(
           text: buffer.toString(),
@@ -311,8 +366,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           createdAt: DateTime.now(),
         ),
       );
+      developer.log('✅ AI response added to controller', name: 'ChatSession');
     } catch (e) {
       // Handle errors
+      developer.log('❌ Error in _handleSendMessage: $e', name: 'ChatSession');
       _controller.addMessage(
         ChatMessage(
           text: "Sorry, I encountered an error: $e",
@@ -321,6 +378,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         ),
       );
     } finally {
+      developer.log(
+        '🏁 Finally block - setting loading to false',
+        name: 'ChatSession',
+      );
       setState(() => _isLoading = false);
     }
   }

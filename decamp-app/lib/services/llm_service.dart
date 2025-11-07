@@ -1,5 +1,9 @@
+import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
+import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart'
+    as chat_ui
+    show AiAction, ActionParameterType;
 import '../models/llm_api_settings.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
@@ -19,6 +23,26 @@ final llmServiceProvider = Provider<LlmService>((ref) {
 });
 
 /// Service for interacting with LLM APIs using llm_dart
+///
+/// This service provides integration between llm_dart and flutter_gen_ai_chat_ui,
+/// including native tool calling support through llm_dart's built-in Tool system.
+///
+/// Tool Calling Example:
+/// ```dart
+/// // 1. Get AI actions from the AiActionProvider
+/// final aiActions = [...]; // Your AiAction definitions
+///
+/// // 2. Convert to llm_dart Tools
+/// final tools = llmService.convertActionsToTools(aiActions);
+///
+/// // 3. Send message with tools
+/// await for (final chunk in llmService.sendMessageWithTools(
+///   'Check disk space on the server',
+///   tools: tools,
+/// )) {
+///   print(chunk);
+/// }
+/// ```
 class LlmService {
   final Ref ref;
   final KeychainService keychainService;
@@ -233,12 +257,29 @@ class LlmService {
     String message, {
     List<Map<String, String>>? history,
   }) async* {
+    developer.log('🚀 sendMessage called', name: 'LlmService');
+    developer.log('Message: $message', name: 'LlmService');
+    developer.log(
+      'History length: ${history?.length ?? 0}',
+      name: 'LlmService',
+    );
+
     final activeConfig = await _getActiveConfig();
 
     if (activeConfig == null) {
+      developer.log('❌ No active config found', name: 'LlmService');
       yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
       return;
     }
+
+    developer.log(
+      '✅ Active config: ${activeConfig.config.identifier}',
+      name: 'LlmService',
+    );
+    developer.log(
+      'API Type: ${activeConfig.config.apiType}',
+      name: 'LlmService',
+    );
 
     try {
       // Get agent instruction if configured
@@ -246,12 +287,21 @@ class LlmService {
         activeConfig.config.identifier,
       );
 
+      if (agentInstruction != null) {
+        developer.log(
+          '📝 Agent instruction: ${agentInstruction.substring(0, agentInstruction.length > 100 ? 100 : agentInstruction.length)}...',
+          name: 'LlmService',
+        );
+      }
+
       // Create provider with system instruction in config
+      developer.log('🔧 Creating provider...', name: 'LlmService');
       final provider = await _createProvider(
         activeConfig.config,
         activeConfig.apiKey,
         systemInstruction: agentInstruction,
       );
+      developer.log('✅ Provider created', name: 'LlmService');
 
       // Build messages array
       final messages = <ChatMessage>[];
@@ -263,6 +313,10 @@ class LlmService {
 
       // Add history if provided
       if (history != null) {
+        developer.log(
+          '📚 Adding ${history.length} history messages',
+          name: 'LlmService',
+        );
         for (final msg in history) {
           if (msg['role'] == 'user') {
             messages.add(ChatMessage.user(msg['content'] ?? ''));
@@ -274,19 +328,44 @@ class LlmService {
 
       // Add current message
       messages.add(ChatMessage.user(message));
+      developer.log(
+        '📤 Total messages to send: ${messages.length}',
+        name: 'LlmService',
+      );
 
       // Stream the response
+      developer.log('🌊 Starting stream...', name: 'LlmService');
       final stream = provider.chatStream(messages);
 
+      var chunkCount = 0;
       await for (final event in stream) {
+        chunkCount++;
+        developer.log(
+          '📨 Event #$chunkCount: ${event.runtimeType}',
+          name: 'LlmService',
+        );
+
         if (event is TextDeltaEvent) {
+          developer.log('💬 Text chunk: "${event.delta}"', name: 'LlmService');
           yield event.delta;
         } else if (event is ErrorEvent) {
+          developer.log('❌ Error event: ${event.error}', name: 'LlmService');
           yield 'Error: ${event.error}';
           break;
+        } else {
+          developer.log(
+            'ℹ️ Other event type: ${event.runtimeType}',
+            name: 'LlmService',
+          );
         }
       }
+
+      developer.log(
+        '✅ Stream completed. Total chunks: $chunkCount',
+        name: 'LlmService',
+      );
     } catch (e) {
+      developer.log('❌ Exception in sendMessage: $e', name: 'LlmService');
       yield 'Error: ${e.toString()}';
     }
   }
@@ -303,6 +382,82 @@ class LlmService {
     }
 
     return buffer.toString();
+  }
+
+  /// Send a chat message with tool support
+  /// This demonstrates how to use llm_dart's native tool calling
+  ///
+  /// Example usage:
+  /// ```dart
+  /// final tools = llmService.convertActionsToTools(aiActions);
+  /// await for (final chunk in llmService.sendMessageWithTools(
+  ///   'Check disk space',
+  ///   tools: tools,
+  /// )) {
+  ///   print(chunk);
+  /// }
+  /// ```
+  Stream<String> sendMessageWithTools(
+    String message, {
+    List<Map<String, String>>? history,
+    List<Tool>? tools,
+  }) async* {
+    final activeConfig = await _getActiveConfig();
+
+    if (activeConfig == null) {
+      yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
+      return;
+    }
+
+    try {
+      // Get agent instruction if configured
+      final agentInstruction = getAgentInstruction(
+        activeConfig.config.identifier,
+      );
+
+      // Create provider with system instruction
+      // Note: Tools are passed to the chat methods, not the provider
+      final provider = await _createProvider(
+        activeConfig.config,
+        activeConfig.apiKey,
+        systemInstruction: agentInstruction,
+      );
+
+      // Build messages array
+      final messages = <ChatMessage>[];
+
+      // Add history if provided
+      if (history != null) {
+        for (final msg in history) {
+          if (msg['role'] == 'user') {
+            messages.add(ChatMessage.user(msg['content'] ?? ''));
+          } else {
+            messages.add(ChatMessage.assistant(msg['content'] ?? ''));
+          }
+        }
+      }
+
+      // Add current message
+      messages.add(ChatMessage.user(message));
+
+      // Stream the response with tools
+      // The provider will automatically handle tool calls based on the LLM's response
+      final stream = provider.chatStream(messages, tools: tools);
+
+      await for (final event in stream) {
+        if (event is TextDeltaEvent) {
+          yield event.delta;
+        } else if (event is ToolCallDeltaEvent) {
+          // Tool call detected - yield information about it
+          yield '\n[Tool Call: ${event.toolCall.function.name}]\n';
+        } else if (event is ErrorEvent) {
+          yield 'Error: ${event.error}';
+          break;
+        }
+      }
+    } catch (e) {
+      yield 'Error: ${e.toString()}';
+    }
   }
 
   /// Check if LLM is configured and ready
@@ -323,5 +478,55 @@ class LlmService {
     final identifier = await getCurrentIdentifier();
     if (identifier == null) return null;
     return getAgentInstruction(identifier);
+  }
+
+  /// Convert AiActions to llm_dart Tool objects
+  /// This uses llm_dart's native tool support instead of manual conversion
+  List<Tool> convertActionsToTools(List<chat_ui.AiAction> actions) {
+    return actions.map((action) {
+      // Build parameters schema
+      final properties = <String, ParameterProperty>{};
+      final required = <String>[];
+
+      for (final param in action.parameters) {
+        properties[param.name] = ParameterProperty(
+          propertyType: _mapParameterTypeToString(param.type),
+          description: param.description,
+          enumList: param.enumValues,
+        );
+
+        if (param.required) {
+          required.add(param.name);
+        }
+      }
+
+      return Tool.function(
+        name: action.name,
+        description: action.description,
+        parameters: ParametersSchema(
+          schemaType: 'object',
+          properties: properties,
+          required: required,
+        ),
+      );
+    }).toList();
+  }
+
+  /// Map ActionParameterType to string type for llm_dart
+  String _mapParameterTypeToString(chat_ui.ActionParameterType type) {
+    switch (type) {
+      case chat_ui.ActionParameterType.string:
+        return 'string';
+      case chat_ui.ActionParameterType.number:
+        return 'number';
+      case chat_ui.ActionParameterType.boolean:
+        return 'boolean';
+      case chat_ui.ActionParameterType.object:
+        return 'object';
+      case chat_ui.ActionParameterType.array:
+        return 'array';
+      case chat_ui.ActionParameterType.objectArray:
+        return 'array';
+    }
   }
 }
