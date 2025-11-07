@@ -386,34 +386,18 @@ class LlmService {
   }
 
   /// Send a chat message with tool support
-  /// This demonstrates how to use llm_dart's native tool calling
   ///
-  /// The actionExecutor callback will be called when the LLM decides to use a tool.
-  /// It should execute the action and return the result.
+  /// When a tool call is detected, yields a Map with tool call information
+  /// instead of executing it directly. The UI layer should handle execution
+  /// through AiActionHook.executeAction() to show confirmation dialogs.
   ///
-  /// Example usage:
-  /// ```dart
-  /// final tools = llmService.convertActionsToTools(aiActions);
-  /// await for (final chunk in llmService.sendMessageWithTools(
-  ///   'Check disk space',
-  ///   tools: tools,
-  ///   actionExecutor: (name, params) async {
-  ///     final hook = AiActionHook.of(context);
-  ///     return await hook.executeAction(name, params);
-  ///   },
-  /// )) {
-  ///   print(chunk);
-  /// }
-  /// ```
-  Stream<String> sendMessageWithTools(
+  /// Yields either:
+  /// - String: text chunks from the LLM
+  /// - Map: {'type': 'tool_call', 'name': '...', 'params': {...}}
+  Stream<dynamic> sendMessageWithTools(
     String message, {
     List<Map<String, String>>? history,
     List<Tool>? tools,
-    Future<Map<String, dynamic>> Function(
-      String actionName,
-      Map<String, dynamic> params,
-    )?
-    actionExecutor,
   }) async* {
     final activeConfig = await _getActiveConfig();
 
@@ -484,42 +468,19 @@ class LlmService {
           final toolName = event.toolCall.function.name;
           final argumentsJson = event.toolCall.function.arguments;
 
-          // If we have an action executor, call it
-          if (actionExecutor != null) {
-            try {
-              developer.log(
-                '🚀 Executing action: $toolName',
-                name: 'LlmService',
-              );
+          // Parse arguments
+          final params = argumentsJson.isNotEmpty
+              ? Map<String, dynamic>.from(json.decode(argumentsJson))
+              : <String, dynamic>{};
 
-              // Parse arguments
-              final params = argumentsJson.isNotEmpty
-                  ? Map<String, dynamic>.from(json.decode(argumentsJson))
-                  : <String, dynamic>{};
+          developer.log(
+            '🔧 Yielding tool call to UI layer: $toolName',
+            name: 'LlmService',
+          );
 
-              developer.log(
-                '🔧 Action parameters: $params',
-                name: 'LlmService',
-              );
-
-              // Execute the action
-              final result = await actionExecutor(toolName, params);
-
-              developer.log('✅ Action completed: $result', name: 'LlmService');
-
-              // The result will be handled by the UI layer
-              // We don't yield anything here as the action will update the UI
-            } catch (e) {
-              developer.log(
-                '❌ Action execution failed: $e',
-                name: 'LlmService',
-              );
-              yield '\n⚠️ Action failed: $e\n';
-            }
-          } else {
-            // No executor provided, just show the tool call
-            yield '\n[Tool Call: $toolName]\n';
-          }
+          // Yield tool call information to the UI layer
+          // The UI will handle execution through AiActionHook
+          yield {'type': 'tool_call', 'name': toolName, 'params': params};
         } else if (event is ErrorEvent) {
           developer.log('❌ Error event: ${event.error}', name: 'LlmService');
           yield 'Error: ${event.error}';

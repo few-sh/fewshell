@@ -347,7 +347,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         name: 'ChatSession',
       );
 
-      // Collect the full response
+      // Collect the response and handle tool calls
       final buffer = StringBuffer();
       var chunkCount = 0;
 
@@ -355,9 +355,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         message.text,
         history: history,
         tools: tools,
-        actionExecutor: (actionName, params) async {
+      )) {
+        chunkCount++;
+        developer.log('📦 Chunk #$chunkCount: $chunk', name: 'ChatSession');
+
+        // Check if this is a tool call
+        if (chunk is Map && chunk['type'] == 'tool_call') {
           developer.log(
-            '🎯 Action executor called for: $actionName with params: $params',
+            '🔧 Tool call received: ${chunk['name']}',
             name: 'ChatSession',
           );
 
@@ -367,36 +372,45 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               '❌ Action context not available',
               name: 'ChatSession',
             );
-            return {
-              'success': false,
-              'error': 'Action execution context not available',
-            };
+            buffer.write('\n⚠️ Cannot execute action: context not available\n');
+            continue;
           }
 
           try {
             // Get the action hook to execute the action
             final actionHook = AiActionHook.of(_actionContext!);
+            final actionName = chunk['name'] as String;
+            final params = chunk['params'] as Map<String, dynamic>;
+
+            developer.log(
+              '🎯 Executing action through AiActionHook: $actionName',
+              name: 'ChatSession',
+            );
 
             // Execute the action (this will show confirmation dialog if needed)
             final result = await actionHook.executeAction(actionName, params);
 
             developer.log(
-              '✅ Action result: success=${result.success}, data=${result.data}',
+              '✅ Action result: success=${result.success}',
               name: 'ChatSession',
             );
 
-            // Return result data for LLM to process
-            return result.data ??
-                {'success': result.success, 'error': result.error};
+            // Add the result to the chat
+            // Note: The custom render() in ai_actions_config.dart will display the UI
+            // We just add a text summary
+            if (result.success) {
+              buffer.write('\n✅ Action completed successfully\n');
+            } else {
+              buffer.write('\n❌ Action failed: ${result.error}\n');
+            }
           } catch (e) {
             developer.log('❌ Action execution error: $e', name: 'ChatSession');
-            return {'success': false, 'error': e.toString()};
+            buffer.write('\n❌ Action execution error: $e\n');
           }
-        },
-      )) {
-        chunkCount++;
-        developer.log('📦 Chunk #$chunkCount: "$chunk"', name: 'ChatSession');
-        buffer.write(chunk);
+        } else if (chunk is String) {
+          // Regular text chunk
+          buffer.write(chunk);
+        }
       }
 
       developer.log(

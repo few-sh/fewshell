@@ -43,6 +43,7 @@ AiActionConfig createAiActionsConfig(ShellService shellService) {
         ],
         // Human-in-the-loop confirmation
         confirmationConfig: ActionConfirmationConfig(
+          required: true, // ALWAYS ask for confirmation before executing
           title: 'Execute Shell Command',
           message:
               'The AI wants to execute the following command:\n\n'
