@@ -136,8 +136,9 @@ class LlmService {
   /// Create an LLM provider based on the API type
   Future<ChatCapability> _createProvider(
     LlmApiSettings config,
-    String apiKey,
-  ) async {
+    String apiKey, {
+    String? systemInstruction,
+  }) async {
     final temperature = config.temperature ?? 0.7;
     final maxTokens = config.maxTokens;
 
@@ -150,6 +151,7 @@ class LlmService {
             .model(config.identifier)
             .temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
+        if (systemInstruction != null) builder.systemPrompt(systemInstruction);
         return await builder.build();
 
       case LlmApiType.anthropic:
@@ -160,6 +162,7 @@ class LlmService {
             .model(config.identifier)
             .temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
+        if (systemInstruction != null) builder.systemPrompt(systemInstruction);
         return await builder.build();
 
       case LlmApiType.google:
@@ -170,6 +173,8 @@ class LlmService {
             .model(config.identifier)
             .temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
+        // Google Gemini requires system instruction in config, not in messages
+        if (systemInstruction != null) builder.systemPrompt(systemInstruction);
         return await builder.build();
 
       case LlmApiType.ollama:
@@ -236,21 +241,25 @@ class LlmService {
     }
 
     try {
+      // Get agent instruction if configured
+      final agentInstruction = getAgentInstruction(
+        activeConfig.config.identifier,
+      );
+
+      // Create provider with system instruction in config
       final provider = await _createProvider(
         activeConfig.config,
         activeConfig.apiKey,
+        systemInstruction: agentInstruction,
       );
 
       // Build messages array
       final messages = <ChatMessage>[];
 
-      // Add system message with agent instruction if configured
-      final agentInstruction = getAgentInstruction(
-        activeConfig.config.identifier,
-      );
-      if (agentInstruction != null && agentInstruction.isNotEmpty) {
-        messages.add(ChatMessage.system(agentInstruction));
-      }
+      // For Google Gemini, DO NOT add system message to messages array
+      // It's handled via systemPrompt in the config
+      // For other providers (OpenAI, Anthropic), the systemPrompt in config
+      // will be properly handled by the llm_dart library
 
       // Add history if provided
       if (history != null) {
