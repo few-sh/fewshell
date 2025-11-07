@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  ssh-gateway:
+    build: .
+    container_name: minimal-appliance
+    ports:
+      - "8222:22"
+    restart: unless-stopped
+    volumes:
+      # Optional: Mount a volume for persistent data
+      - ./data:/home/ubuntu/data

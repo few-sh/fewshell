@@ -1,0 +1,8 @@
+# SSH keys directory (local key storage)
+default-key/
+
+# Data directory
+data/
+
+# Docker
+.env
