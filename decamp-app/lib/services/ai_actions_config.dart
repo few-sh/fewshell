@@ -46,10 +46,8 @@ AiActionConfig createAiActionsConfig(ShellService shellService) {
           required: true, // ALWAYS ask for confirmation before executing
           title: 'Execute Shell Command',
           message:
-              'The AI wants to execute the following command:\n\n'
-              '{command}\n\n'
-              'Explanation: {explanation}\n\n'
-              'Do you want to proceed?',
+              'The AI wants to execute the following command.\n\n'
+              'Review the parameters below and confirm if you want to proceed.',
         ),
         // Custom rendering for action status
         render: (context, status, params, {result, error}) {
