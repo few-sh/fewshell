@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/main_drawer.dart';
+import 'package:hello_world/components/action_approval_overlay.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/services/llm_service.dart';
@@ -32,6 +33,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   // Context for AiActionProvider (captured from Builder)
   BuildContext? _actionContext;
+
+  // Pending action approval
+  Map<String, dynamic>? _pendingAction;
 
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
@@ -168,103 +172,184 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           ],
         ),
         drawer: const MainDrawer(),
-        body: AiActionProvider(
-          config: ref.watch(aiActionsConfigProvider),
-          // Use a Builder to get the correct context inside AiActionProvider
-          child: Builder(
-            builder: (actionContext) {
-              // Capture the action context for use in callbacks
-              _actionContext = actionContext;
+        body: Stack(
+          children: [
+            // Main chat widget
+            AiActionProvider(
+              config: ref.watch(aiActionsConfigProvider),
+              // Use a Builder to get the correct context inside AiActionProvider
+              child: Builder(
+                builder: (actionContext) {
+                  // Capture the action context for use in callbacks
+                  _actionContext = actionContext;
 
-              return AiChatWidget(
-                // Required parameters
-                currentUser: _currentUser,
-                aiUser: _aiUser,
-                controller: _controller,
-                onSendMessage: _handleSendMessage,
+                  return AiChatWidget(
+                    // Required parameters
+                    currentUser: _currentUser,
+                    aiUser: _aiUser,
+                    controller: _controller,
+                    onSendMessage: _handleSendMessage,
 
-                // Loading configuration
-                loadingConfig: LoadingConfig(
-                  isLoading: _isLoading,
-                  showCenteredIndicator: true,
-                ),
-
-                // Input field customization
-                inputOptions: InputOptions(
-                  textStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: _currentModelIdentifier != null
-                        ? 'Send to $_currentModelIdentifier...'
-                        : 'Type your message...',
-                    hintStyle: TextStyle(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
+                    // Loading configuration
+                    loadingConfig: LoadingConfig(
+                      isLoading: _isLoading,
+                      showCenteredIndicator: true,
                     ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(24.0),
-                      borderSide: BorderSide.none,
+
+                    // Input field customization
+                    inputOptions: InputOptions(
+                      textStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: _currentModelIdentifier != null
+                            ? 'Send to $_currentModelIdentifier...'
+                            : 'Type your message...',
+                        hintStyle: TextStyle(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                        filled: true,
+                        fillColor: Theme.of(context).colorScheme.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 10.0,
+                        ),
+                      ),
+                      useOuterContainer: false,
+                      autofocus: true,
+                      sendOnEnter: true,
+                      textInputAction: TextInputAction.send,
+                      maxLines: 1,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 10.0,
+
+                    // Enable animations and streaming
+                    enableAnimation: true,
+                    enableMarkdownStreaming: true,
+                    streamingWordByWord: true,
+                    streamingDuration: const Duration(milliseconds: 30),
+
+                    // Message options
+                    messageOptions: MessageOptions(
+                      showTime: true,
+                      showUserName: true,
+                      containerMargin: const EdgeInsets.symmetric(
+                        horizontal: 0,
+                        vertical: 4,
+                      ),
+                      bubbleStyle: BubbleStyle(
+                        userBubbleColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
+                        aiBubbleColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        userNameColor: Theme.of(context).colorScheme.primary,
+                        aiNameColor: Theme.of(context).colorScheme.secondary,
+                        bottomLeftRadius: 22,
+                        bottomRightRadius: 22,
+                        enableShadow: true,
+                      ),
                     ),
-                  ),
-                  useOuterContainer: false,
-                  autofocus: true,
-                  sendOnEnter: true,
-                  textInputAction: TextInputAction.send,
-                  maxLines: 1,
+
+                    // Scroll behavior
+                    scrollBehaviorConfig: ScrollBehaviorConfig(
+                      autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
+                      scrollToFirstResponseMessage: true,
+                    ),
+
+                    // Layout options
+                    maxWidth: 800,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Action approval overlay (shown when a tool call is pending)
+            if (_pendingAction != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: ActionApprovalOverlay(
+                  actionName: _pendingAction!['name'] as String,
+                  params: _pendingAction!['params'] as Map<String, dynamic>,
+                  onExecute: _executeAction,
+                  onDismiss: () {
+                    setState(() {
+                      _pendingAction = null;
+                    });
+                  },
                 ),
-
-                // Enable animations and streaming
-                enableAnimation: true,
-                enableMarkdownStreaming: true,
-                streamingWordByWord: true,
-                streamingDuration: const Duration(milliseconds: 30),
-
-                // Message options
-                messageOptions: MessageOptions(
-                  showTime: true,
-                  showUserName: true,
-                  containerMargin: const EdgeInsets.symmetric(
-                    horizontal: 0,
-                    vertical: 4,
-                  ),
-                  bubbleStyle: BubbleStyle(
-                    userBubbleColor: Theme.of(
-                      context,
-                    ).colorScheme.primaryContainer,
-                    aiBubbleColor: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    userNameColor: Theme.of(context).colorScheme.primary,
-                    aiNameColor: Theme.of(context).colorScheme.secondary,
-                    bottomLeftRadius: 22,
-                    bottomRightRadius: 22,
-                    enableShadow: true,
-                  ),
-                ),
-
-                // Scroll behavior
-                scrollBehaviorConfig: ScrollBehaviorConfig(
-                  autoScrollBehavior: AutoScrollBehavior.onUserMessageOnly,
-                  scrollToFirstResponseMessage: true,
-                ),
-
-                // Layout options
-                maxWidth: 800,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              );
-            },
-          ),
+              ),
+          ],
         ),
       ),
     );
+  }
+
+  /// Execute an action with the given parameters
+  Future<void> _executeAction(
+    String actionName,
+    Map<String, dynamic> params,
+  ) async {
+    developer.log(
+      '🚀 Executing action: $actionName with params: $params',
+      name: 'ChatSession',
+    );
+
+    if (_actionContext == null) {
+      developer.log('❌ Action context not available', name: 'ChatSession');
+      return;
+    }
+
+    try {
+      // Get the action hook to execute the action
+      final actionHook = AiActionHook.of(_actionContext!);
+
+      // Execute the action (this will call the handler)
+      final result = await actionHook.executeAction(actionName, params);
+
+      developer.log(
+        '✅ Action completed: success=${result.success}',
+        name: 'ChatSession',
+      );
+
+      // Add result message to chat with the actual command details
+      final command = params['command'] ?? 'unknown command';
+      _controller.addMessage(
+        ChatMessage(
+          text: result.success
+              ? '✅ Executed: `$command`\n\nResult: ${result.data}'
+              : '❌ Failed to execute: `$command`\n\nError: ${result.error}',
+          user: _aiUser,
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      // Clear pending action
+      setState(() {
+        _pendingAction = null;
+      });
+    } catch (e) {
+      developer.log('❌ Action execution error: $e', name: 'ChatSession');
+      _controller.addMessage(
+        ChatMessage(
+          text: '❌ Error executing command: $e',
+          user: _aiUser,
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
   }
 
   /// Handle sending messages
@@ -366,47 +451,26 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             name: 'ChatSession',
           );
 
-          // Check if we have the action context
-          if (_actionContext == null) {
-            developer.log(
-              '❌ Action context not available',
-              name: 'ChatSession',
-            );
-            buffer.write('\n⚠️ Cannot execute action: context not available\n');
-            continue;
-          }
+          // Add the tool call to chat history so the LLM remembers it
+          final command = chunk['params']?['command'] ?? 'unknown';
+          final explanation = chunk['params']?['explanation'] ?? '';
+          _controller.addMessage(
+            ChatMessage(
+              text: '🔧 Requesting to execute: `$command`\n$explanation',
+              user: _aiUser,
+              createdAt: DateTime.now(),
+            ),
+          );
 
-          try {
-            // Get the action hook to execute the action
-            final actionHook = AiActionHook.of(_actionContext!);
-            final actionName = chunk['name'] as String;
-            final params = chunk['params'] as Map<String, dynamic>;
+          // Show the action approval overlay
+          setState(() {
+            _pendingAction = Map<String, dynamic>.from(chunk);
+            _isLoading = false; // Stop loading while waiting for user approval
+          });
 
-            developer.log(
-              '🎯 Executing action through AiActionHook: $actionName',
-              name: 'ChatSession',
-            );
-
-            // Execute the action (this will show confirmation dialog if needed)
-            final result = await actionHook.executeAction(actionName, params);
-
-            developer.log(
-              '✅ Action result: success=${result.success}',
-              name: 'ChatSession',
-            );
-
-            // Add the result to the chat
-            // Note: The custom render() in ai_actions_config.dart will display the UI
-            // We just add a text summary
-            if (result.success) {
-              buffer.write('\n✅ Action completed successfully\n');
-            } else {
-              buffer.write('\n❌ Action failed: ${result.error}\n');
-            }
-          } catch (e) {
-            developer.log('❌ Action execution error: $e', name: 'ChatSession');
-            buffer.write('\n❌ Action execution error: $e\n');
-          }
+          // Note: We return here and let the overlay handle execution
+          // The buffer will be added to chat when action completes
+          return;
         } else if (chunk is String) {
           // Regular text chunk
           buffer.write(chunk);
