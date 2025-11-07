@@ -176,6 +176,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           children: [
             // Main chat widget
             AiActionProvider(
+              key: ValueKey('actions_${currentProject?.id}'),
               config: ref.watch(aiActionsConfigProvider(currentProject?.id)),
               // Use a Builder to get the correct context inside AiActionProvider
               child: Builder(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:developer' as developer;
 import 'shell_service.dart';
+import '../models/ssh_settings.dart';
 import '../providers/ssh_settings_provider.dart';
 
 /// Provider for AI action configuration
@@ -10,10 +12,20 @@ final aiActionsConfigProvider = Provider.family<AiActionConfig, String?>((
   ref,
   projectId,
 ) {
+  developer.log(
+    'aiActionsConfigProvider called with projectId: $projectId',
+    name: 'AiActionsConfig',
+  );
+
   final shellService = ref.watch(shellServiceProvider(projectId));
   final sshSettings = projectId != null
       ? ref.watch(projectSshSettingsProvider(projectId))
       : null;
+
+  developer.log(
+    'SSH settings loaded: ${sshSettings != null ? "exists (enabled=${sshSettings.enabled})" : "null"}',
+    name: 'AiActionsConfig',
+  );
 
   return createAiActionsConfig(shellService, sshSettings, ref, projectId);
 });
@@ -21,7 +33,7 @@ final aiActionsConfigProvider = Provider.family<AiActionConfig, String?>((
 /// Create the AI actions configuration
 AiActionConfig createAiActionsConfig(
   ShellService shellService,
-  dynamic sshSettings,
+  SshSettings? sshSettings,
   ProviderRef ref,
   String? projectId,
 ) {
@@ -457,21 +469,57 @@ AiActionConfig createAiActionsConfig(
           final command = params['command'] as String;
 
           try {
+            developer.log(
+              'Executing shell command: $command',
+              name: 'AiActionsConfig',
+            );
+            developer.log(
+              'SSH Settings: enabled=${sshSettings?.enabled}, host=${sshSettings?.host}',
+              name: 'AiActionsConfig',
+            );
+            developer.log(
+              'Shell service connected: ${shellService.isConnected}',
+              name: 'AiActionsConfig',
+            );
+
             // Ensure SSH connection is established
             if (!shellService.isConnected) {
+              if (projectId == null) {
+                developer.log(
+                  'No project selected - cannot execute commands',
+                  name: 'AiActionsConfig',
+                );
+                return ActionResult.createFailure(
+                  'No project selected. Please create or select a project first.',
+                );
+              }
+
               if (sshSettings == null || !sshSettings.enabled) {
+                developer.log(
+                  'No SSH connection: sshSettings=${sshSettings != null}, enabled=${sshSettings?.enabled}',
+                  name: 'AiActionsConfig',
+                );
                 return ActionResult.createFailure(
                   'No SSH connection configured. Please configure SSH settings in project settings.',
                 );
               }
 
               // Attempt to connect
+              developer.log(
+                'Attempting to connect to SSH...',
+                name: 'AiActionsConfig',
+              );
               final connected = await shellService.connect(sshSettings);
               if (!connected) {
+                developer.log('SSH connection failed', name: 'AiActionsConfig');
                 return ActionResult.createFailure(
                   'Failed to connect to SSH server. Please check your SSH settings.',
                 );
               }
+              developer.log(
+                'SSH connection successful',
+                name: 'AiActionsConfig',
+              );
             }
 
             // Execute the command
