@@ -77,6 +77,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Track last synced session to avoid duplicate syncs
   String? _lastSyncedSessionId;
 
+  // Track synced message IDs to avoid recreating existing messages
+  final Set<String> _syncedMessageIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -99,16 +102,24 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentSessionId = ref.read(currentSessionIdProvider);
     if (currentSessionId == null) {
       _controller.clearMessages();
+      _syncedMessageIds.clear();
       return;
     }
 
     try {
       final messages = await ref.read(currentSessionMessagesProvider.future);
 
-      // Only sync if controller doesn't match provider
-      if (_controller.messages.length != messages.length) {
+      // Check if this is a new session - if so, clear everything
+      if (_lastSyncedSessionId != currentSessionId) {
         _controller.clearMessages();
-        for (final msg in messages) {
+        _syncedMessageIds.clear();
+        _lastSyncedSessionId = currentSessionId;
+      }
+
+      // Only add messages that aren't already in the controller
+      for (final msg in messages) {
+        if (!_syncedMessageIds.contains(msg.id)) {
+          _syncedMessageIds.add(msg.id);
           _controller.addMessage(
             ChatMessage(
               text: msg.content,
@@ -168,7 +179,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Listen to session changes and sync messages ONLY when session changes
     ref.listen(currentSessionIdProvider, (previous, next) {
       if (previous != next) {
-        _lastSyncedSessionId = next;
         // Sync runs as side effect, not during build
         Future.microtask(() => _syncMessagesFromProvider());
       }
@@ -176,12 +186,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Listen to messages changes and sync ONLY when messages actually change
     ref.listen(currentSessionMessagesProvider, (previous, next) {
-      // Only sync if we're watching the current session
-      if (_lastSyncedSessionId == currentSessionId) {
+      // Compare actual message lists to avoid unnecessary syncs
+      final prevData = previous?.asData?.value ?? [];
+      final nextData = next.asData?.value ?? [];
+
+      // Only sync if message count changed or we have the current session
+      if (prevData.length != nextData.length &&
+          _lastSyncedSessionId == currentSessionId) {
         // Sync runs as side effect, not during build
-        next.whenData(
-          (messages) => Future.microtask(() => _syncMessagesFromProvider()),
-        );
+        Future.microtask(() => _syncMessagesFromProvider());
       }
     });
 
