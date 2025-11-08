@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
-import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/main_drawer.dart';
 import 'package:hello_world/components/action_approval_overlay.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/providers/session_provider.dart';
 import 'package:hello_world/providers/message_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
+import 'package:hello_world/pages/sessions_history.dart';
 import 'package:hello_world/services/llm_service.dart';
 import 'package:hello_world/services/ai_actions_config.dart';
 import 'dart:developer' as developer;
@@ -74,47 +74,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Pending action approval
   Map<String, dynamic>? _pendingAction;
 
-  // Sample chat sessions (replace with actual data later)
-  late final List<ChatSessionItem> _chatSessions;
-
   @override
   void initState() {
     super.initState();
 
     // Load current model identifier
     _loadCurrentModel();
-
-    // Note: Session initialization moved to didChangeDependencies
-    // to ensure we have access to the project provider
-
-    // Initialize sample sessions
-    _chatSessions = [
-      ChatSessionItem(
-        id: '1',
-        description: 'Troubleshooting site outage due to MySQL',
-        timestamp: DateTime.now().subtract(const Duration(hours: 2)),
-      ),
-      ChatSessionItem(
-        id: '2',
-        description: 'Restart of redis server on production',
-        timestamp: DateTime.now().subtract(const Duration(days: 1)),
-      ),
-      ChatSessionItem(
-        id: '3',
-        description: 'Help investigating elevated errors on the app server',
-        timestamp: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-      ChatSessionItem(
-        id: '4',
-        description: 'Out of memory errors in background jobs',
-        timestamp: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      ChatSessionItem(
-        id: '5',
-        description: 'RL Cluster not responding',
-        timestamp: DateTime.now().subtract(const Duration(days: 14)),
-      ),
-    ];
   }
 
   @override
@@ -137,27 +102,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   void _showSessionHistory() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Session History'),
-            backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          ),
-          body: SessionList(
-            sessions: _chatSessions,
-            onSessionTap: (session) {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Opening session: ${session.description}'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-              // TODO: Load the selected session
-            },
-          ),
-        ),
-      ),
+      MaterialPageRoute(builder: (context) => const SessionsHistoryPage()),
     );
   }
 
