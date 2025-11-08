@@ -5,6 +5,8 @@ import 'package:hello_world/components/session_list.dart';
 import 'package:hello_world/components/main_drawer.dart';
 import 'package:hello_world/components/action_approval_overlay.dart';
 import 'package:hello_world/providers/project_provider.dart';
+import 'package:hello_world/providers/session_provider.dart';
+import 'package:hello_world/providers/message_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/services/llm_service.dart';
 import 'package:hello_world/services/ai_actions_config.dart';
@@ -20,6 +22,41 @@ class ChatSession extends ConsumerStatefulWidget {
 class _ChatSessionState extends ConsumerState<ChatSession> {
   // Controller for managing chat messages
   final _controller = ChatMessagesController();
+
+  // Counter for generating unique message IDs
+  int _messageIdCounter = 0;
+
+  /// Generate a unique message ID
+  String _generateMessageId() {
+    return 'msg_${DateTime.now().millisecondsSinceEpoch}_${_messageIdCounter++}';
+  }
+
+  /// Save a message to the database
+  Future<String> _saveMessageToDatabase({
+    required String content,
+    required String userId,
+    required String userName,
+  }) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) {
+      developer.log(
+        'No session selected, cannot save message',
+        name: 'ChatSession',
+      );
+      return _generateMessageId(); // Return temp ID for in-memory message
+    }
+
+    final messageActions = ref.read(messageActionsProvider);
+    final messageId = await messageActions.sendMessage(
+      sessionId: currentSessionId,
+      userId: userId,
+      userName: userName,
+      content: content,
+    );
+
+    developer.log('Saved message to database: $messageId', name: 'ChatSession');
+    return messageId;
+  }
 
   // Define users
   final _currentUser = ChatUser(id: 'user', firstName: 'You');
@@ -37,6 +74,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Pending action approval
   Map<String, dynamic>? _pendingAction;
 
+  // Flag to track if messages have been loaded
+  bool _messagesLoaded = false;
+
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
 
@@ -46,6 +86,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Load current model identifier
     _loadCurrentModel();
+
+    // Note: Session initialization moved to didChangeDependencies
+    // to ensure we have access to the project provider
 
     // Initialize sample sessions
     _chatSessions = [
@@ -81,6 +124,125 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Initialize or create a session for the current project
+  Future<void> _initializeSession() async {
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject == null) {
+      developer.log(
+        'No project selected, skipping session init',
+        name: 'ChatSession',
+      );
+      return;
+    }
+
+    final currentSessionId = ref.read(currentSessionIdProvider);
+
+    // If no session is selected, create a new one
+    if (currentSessionId == null) {
+      developer.log(
+        'Creating new session for project ${currentProject.id}',
+        name: 'ChatSession',
+      );
+      final sessionActions = ref.read(sessionActionsProvider);
+      final newSessionId = await sessionActions.createSession(
+        projectId: currentProject.id,
+        description: 'New Session', // Will be updated with first message
+      );
+
+      if (mounted) {
+        ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+        developer.log(
+          'New session created: $newSessionId',
+          name: 'ChatSession',
+        );
+        // Note: didChangeDependencies will handle loading messages
+      }
+    }
+  }
+
+  /// Load messages from database into the chat controller
+  Future<void> _loadMessages() async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null || _messagesLoaded) return;
+
+    developer.log(
+      'Loading messages for session $currentSessionId',
+      name: 'ChatSession',
+    );
+
+    try {
+      // Get messages from provider
+      final messagesAsync = await ref.read(
+        currentSessionMessagesProvider.future,
+      );
+
+      developer.log(
+        'Loading ${messagesAsync.length} messages from database',
+        name: 'ChatSession',
+      );
+
+      // Clear existing messages
+      _controller.clearMessages();
+
+      // Convert MessageEntity to ChatMessage and add to controller
+      for (final messageEntity in messagesAsync) {
+        final chatMessage = ChatMessage(
+          text: messageEntity.content,
+          user: messageEntity.userId == 'user' ? _currentUser : _aiUser,
+          createdAt: messageEntity.createdAt,
+          customProperties: {'id': messageEntity.id},
+        );
+        _controller.addMessage(chatMessage);
+      }
+
+      _messagesLoaded = true;
+      developer.log('Messages loaded successfully', name: 'ChatSession');
+    } catch (e) {
+      developer.log('Error loading messages: $e', name: 'ChatSession');
+    }
+  }
+
+  /// Handle project change - create session if needed
+  void _handleProjectChange(dynamic project, String? currentSessionId) {
+    if (project == null) {
+      developer.log('Project cleared, clearing messages', name: 'ChatSession');
+      _controller.clearMessages();
+      _messagesLoaded = false;
+      return;
+    }
+
+    developer.log(
+      'Handling project change, session=$currentSessionId',
+      name: 'ChatSession',
+    );
+    _messagesLoaded = false;
+
+    // If no active session for this project, create one
+    if (currentSessionId == null) {
+      developer.log(
+        'No session for project, initializing',
+        name: 'ChatSession',
+      );
+      _initializeSession();
+    }
+  }
+
+  /// Handle session change - reload messages
+  void _handleSessionChange(String? sessionId) {
+    _messagesLoaded = false;
+
+    if (sessionId == null) {
+      developer.log('No session, clearing messages', name: 'ChatSession');
+      _controller.clearMessages();
+    } else {
+      developer.log(
+        'New session selected, loading messages',
+        name: 'ChatSession',
+      );
+      _loadMessages();
+    }
   }
 
   /// Load the current model identifier
@@ -123,8 +285,34 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the current project from the provider
+    // Watch the current project and session from providers
     final currentProject = ref.watch(currentProjectProvider);
+    final currentSessionId = ref.watch(currentSessionIdProvider);
+
+    // Listen to project changes and handle session initialization
+    ref.listen(currentProjectProvider, (previous, next) {
+      final previousId = previous?.id;
+      final nextId = next?.id;
+
+      developer.log(
+        'Project changed: $previousId -> $nextId',
+        name: 'ChatSession',
+      );
+
+      if (previousId != nextId) {
+        _handleProjectChange(next, currentSessionId);
+      }
+    });
+
+    // Listen to session changes and handle message loading
+    ref.listen(currentSessionIdProvider, (previous, next) {
+      developer.log('Session changed: $previous -> $next', name: 'ChatSession');
+
+      if (previous != next) {
+        _handleSessionChange(next);
+      }
+    });
+
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
 
@@ -327,13 +515,23 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
       // Add result message to chat with the actual command details
       final command = params['command'] ?? 'unknown command';
+      final resultMessage = result.success
+          ? '✅ Executed: `$command`\n\nResult: ${result.data}'
+          : '❌ Failed to execute: `$command`\n\nError: ${result.error}';
+
+      // Save result message to database
+      final resultMessageId = await _saveMessageToDatabase(
+        content: resultMessage,
+        userId: 'ai',
+        userName: 'Ops Agent',
+      );
+
       _controller.addMessage(
         ChatMessage(
-          text: result.success
-              ? '✅ Executed: `$command`\n\nResult: ${result.data}'
-              : '❌ Failed to execute: `$command`\n\nError: ${result.error}',
+          text: resultMessage,
           user: _aiUser,
           createdAt: DateTime.now(),
+          customProperties: {'id': resultMessageId},
         ),
       );
 
@@ -343,11 +541,22 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       });
     } catch (e) {
       developer.log('❌ Action execution error: $e', name: 'ChatSession');
+
+      final errorMessage = '❌ Error executing command: $e';
+
+      // Save error message to database
+      final errorMessageId = await _saveMessageToDatabase(
+        content: errorMessage,
+        userId: 'ai',
+        userName: 'Ops Agent',
+      );
+
       _controller.addMessage(
         ChatMessage(
-          text: '❌ Error executing command: $e',
+          text: errorMessage,
           user: _aiUser,
           createdAt: DateTime.now(),
+          customProperties: {'id': errorMessageId},
         ),
       );
     }
@@ -358,8 +567,39 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     developer.log('🎯 _handleSendMessage called', name: 'ChatSession');
     developer.log('User message: ${message.text}', name: 'ChatSession');
 
-    // Add the user's message to the chat history first
-    _controller.addMessage(message);
+    // Save user message to database
+    final userMessageId = await _saveMessageToDatabase(
+      content: message.text,
+      userId: 'user',
+      userName: 'You',
+    );
+
+    // Check if this is the first message to update session description
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId != null && _controller.messages.isEmpty) {
+      final sessionActions = ref.read(sessionActionsProvider);
+      // Use first 50 characters of message as description
+      final description = message.text.length > 50
+          ? '${message.text.substring(0, 50)}...'
+          : message.text;
+      await sessionActions.updateSession(
+        id: currentSessionId,
+        description: description,
+      );
+      developer.log(
+        'Updated session description: $description',
+        name: 'ChatSession',
+      );
+    }
+
+    // Add the user's message to the chat UI with the database ID
+    final userChatMessage = ChatMessage(
+      text: message.text,
+      user: _currentUser,
+      createdAt: DateTime.now(),
+      customProperties: {'id': userMessageId},
+    );
+    _controller.addMessage(userChatMessage);
     developer.log('✅ User message added to controller', name: 'ChatSession');
 
     setState(() => _isLoading = true);
@@ -386,12 +626,23 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
       if (!isConfigured) {
         developer.log('❌ LLM not configured', name: 'ChatSession');
+
+        final configMessage =
+            "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
+
+        // Save config warning to database
+        final configMessageId = await _saveMessageToDatabase(
+          content: configMessage,
+          userId: 'ai',
+          userName: 'Ops Agent',
+        );
+
         _controller.addMessage(
           ChatMessage(
-            text:
-                "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.",
+            text: configMessage,
             user: _aiUser,
             createdAt: DateTime.now(),
+            customProperties: {'id': configMessageId},
           ),
         );
         setState(() => _isLoading = false);
@@ -458,11 +709,22 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           // Add the tool call to chat history so the LLM remembers it
           final command = chunk['params']?['command'] ?? 'unknown';
           final explanation = chunk['params']?['explanation'] ?? '';
+          final toolCallMessage =
+              '🔧 Requesting to execute: `$command`\n$explanation';
+
+          // Save tool call message to database
+          final toolCallMessageId = await _saveMessageToDatabase(
+            content: toolCallMessage,
+            userId: 'ai',
+            userName: 'Ops Agent',
+          );
+
           _controller.addMessage(
             ChatMessage(
-              text: '🔧 Requesting to execute: `$command`\n$explanation',
+              text: toolCallMessage,
               user: _aiUser,
               createdAt: DateTime.now(),
+              customProperties: {'id': toolCallMessageId},
             ),
           );
 
@@ -492,22 +754,42 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
       // Add the complete response
       developer.log('💬 Adding AI response to controller', name: 'ChatSession');
+
+      // Save AI message to database
+      final aiMessageId = await _saveMessageToDatabase(
+        content: buffer.toString(),
+        userId: 'ai',
+        userName: 'Ops Agent',
+      );
+
       _controller.addMessage(
         ChatMessage(
           text: buffer.toString(),
           user: _aiUser,
           createdAt: DateTime.now(),
+          customProperties: {'id': aiMessageId},
         ),
       );
       developer.log('✅ AI response added to controller', name: 'ChatSession');
     } catch (e) {
       // Handle errors
       developer.log('❌ Error in _handleSendMessage: $e', name: 'ChatSession');
+
+      final errorMessage = "Sorry, I encountered an error: $e";
+
+      // Save error message to database
+      final errorMessageId = await _saveMessageToDatabase(
+        content: errorMessage,
+        userId: 'ai',
+        userName: 'Ops Agent',
+      );
+
       _controller.addMessage(
         ChatMessage(
-          text: "Sorry, I encountered an error: $e",
+          text: errorMessage,
           user: _aiUser,
           createdAt: DateTime.now(),
+          customProperties: {'id': errorMessageId},
         ),
       );
     } finally {

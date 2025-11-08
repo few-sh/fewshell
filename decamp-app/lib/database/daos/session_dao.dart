@@ -32,8 +32,11 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
   }
 
   /// Update an existing session
-  Future<bool> updateSession(SessionEntityCompanion session) {
-    return update(sessions).replace(session);
+  /// Uses partial updates - only updates fields that are provided
+  Future<int> updateSession(SessionEntityCompanion session) {
+    return (update(
+      sessions,
+    )..where((s) => s.id.equals(session.id.value))).write(session);
   }
 
   /// Delete a session by ID
