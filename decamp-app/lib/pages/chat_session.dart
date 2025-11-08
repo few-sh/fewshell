@@ -99,6 +99,16 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     }
   }
 
+  Future<void> _createNewSession() async {
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject == null) return;
+
+    final sessionActions = ref.read(sessionActionsProvider);
+    await sessionActions.createNewSessionAndSwitch(
+      projectId: currentProject.id,
+    );
+  }
+
   void _showSessionHistory() {
     Navigator.push(
       context,
@@ -172,6 +182,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           centerTitle: false,
           backgroundColor: Theme.of(context).colorScheme.inversePrimary,
           actions: [
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'New Session',
+              onPressed: hasProject ? _createNewSession : null,
+            ),
             IconButton(
               icon: const Icon(Icons.history),
               tooltip: 'Session History',

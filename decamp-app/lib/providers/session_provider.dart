@@ -4,6 +4,7 @@ import '../database/database.dart';
 import '../database/daos/session_dao.dart';
 import 'database_provider.dart';
 import 'project_provider.dart';
+import 'message_provider.dart';
 
 /// Provider for streaming sessions for a specific project (family provider)
 final sessionsStreamProvider =
@@ -146,6 +147,33 @@ class SessionActions {
     await projectActions.updateLastSessionDate(projectId, now);
 
     return id;
+  }
+
+  /// Create a new session and switch to it
+  /// Only creates if current session is not empty (has messages)
+  /// Returns the new session ID if created, null if skipped
+  Future<String?> createNewSessionAndSwitch({required String projectId}) async {
+    // Check if current session has messages
+    final currentSessionId = _ref.read(currentSessionIdProvider);
+    if (currentSessionId != null) {
+      final messageActions = _ref.read(messageActionsProvider);
+      final messages = await messageActions.getMessagesBySession(
+        currentSessionId,
+      );
+
+      // If current session is empty, don't create a new one
+      if (messages.isEmpty) {
+        return null;
+      }
+    }
+
+    // Create new session
+    final newSessionId = await createSession(projectId: projectId);
+
+    // Switch to the new session
+    _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+
+    return newSessionId;
   }
 
   /// Update an existing session
