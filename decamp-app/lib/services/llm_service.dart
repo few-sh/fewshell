@@ -498,6 +498,84 @@ class LlmService {
     }
   }
 
+  /// Continue conversation after tool execution
+  /// Sends the tool result back to the LLM and streams its response
+  Stream<String> continueWithToolResult(
+    String toolName,
+    Map<String, dynamic> toolParams,
+    String toolResult, {
+    required List<Map<String, String>> history,
+    List<Tool>? tools,
+  }) async* {
+    final activeConfig = await _getActiveConfig();
+
+    if (activeConfig == null) {
+      yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
+      return;
+    }
+
+    try {
+      // Get agent instruction if configured
+      final agentInstruction = getAgentInstruction(
+        activeConfig.config.identifier,
+      );
+
+      // Create provider with system instruction
+      final provider = await _createProvider(
+        activeConfig.config,
+        activeConfig.apiKey,
+        systemInstruction: agentInstruction,
+      );
+
+      // Build messages array from history
+      final messages = <ChatMessage>[];
+
+      // Add history (everything up to and including the tool call request)
+      if (history.isNotEmpty) {
+        for (final msg in history) {
+          if (msg['role'] == 'user') {
+            messages.add(ChatMessage.user(msg['content'] ?? ''));
+          } else {
+            messages.add(ChatMessage.assistant(msg['content'] ?? ''));
+          }
+        }
+      }
+
+      // Add the tool call result as a message
+      // The LLM will see this as context for its next response
+      messages.add(
+        ChatMessage.user('Tool execution result for $toolName:\n$toolResult'),
+      );
+
+      developer.log(
+        '📤 Continuing conversation with tool result. Messages: ${messages.length}',
+        name: 'LlmService',
+      );
+
+      // Stream the LLM's response
+      final stream = provider.chatStream(messages, tools: tools);
+
+      await for (final event in stream) {
+        if (event is TextDeltaEvent) {
+          yield event.delta;
+        } else if (event is ErrorEvent) {
+          developer.log('❌ Error event: ${event.error}', name: 'LlmService');
+          yield 'Error: ${event.error}';
+          break;
+        }
+        // Note: We could handle additional tool calls here if needed
+      }
+
+      developer.log('✅ Tool result stream completed', name: 'LlmService');
+    } catch (e) {
+      developer.log(
+        '❌ Exception in continueWithToolResult: $e',
+        name: 'LlmService',
+      );
+      yield 'Error: ${e.toString()}';
+    }
+  }
+
   /// Check if LLM is configured and ready
   Future<bool> isConfigured() async {
     final config = await _getActiveConfig();

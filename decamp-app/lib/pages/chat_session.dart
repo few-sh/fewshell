@@ -416,6 +416,62 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       setState(() {
         _pendingAction = null;
       });
+
+      // Send the tool result back to the LLM and get its response
+      developer.log('🔄 Sending tool result back to LLM', name: 'ChatSession');
+
+      // Build current conversation history
+      final history = _controller.messages
+          .where((msg) => msg.text.isNotEmpty)
+          .map(
+            (msg) => {
+              'role': msg.user.id == 'user' ? 'user' : 'assistant',
+              'content': msg.text,
+            },
+          )
+          .toList();
+
+      // Get AI actions and convert to tools for potential follow-up calls
+      final currentProject = ref.read(currentProjectProvider);
+      final aiActionsConfig = ref.read(
+        aiActionsConfigProvider(currentProject?.id),
+      );
+      final tools = ref
+          .read(llmServiceProvider)
+          .convertActionsToTools(aiActionsConfig.actions);
+
+      // Stream the LLM's response to the tool result
+      final llmResponseBuffer = StringBuffer();
+      final llmService = ref.read(llmServiceProvider);
+
+      await for (final chunk in llmService.continueWithToolResult(
+        actionName,
+        params,
+        resultMessage,
+        history: history,
+        tools: tools,
+      )) {
+        llmResponseBuffer.write(chunk);
+      }
+
+      // Add LLM's response to chat if not empty
+      final llmResponse = llmResponseBuffer.toString().trim();
+      if (llmResponse.isNotEmpty) {
+        final llmMessageId = await _saveMessageToDatabase(
+          content: llmResponse,
+          userId: 'ai',
+          userName: 'Ops Agent',
+        );
+
+        _controller.addMessage(
+          ChatMessage(
+            text: llmResponse,
+            user: _aiUser,
+            createdAt: DateTime.now(),
+            customProperties: {'id': llmMessageId},
+          ),
+        );
+      }
     } catch (e) {
       developer.log('❌ Action execution error: $e', name: 'ChatSession');
 
