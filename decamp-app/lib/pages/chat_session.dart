@@ -74,18 +74,54 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Pending action approval
   Map<String, dynamic>? _pendingAction;
 
+  // Track last synced session to avoid duplicate syncs
+  String? _lastSyncedSessionId;
+
   @override
   void initState() {
     super.initState();
 
     // Load current model identifier
     _loadCurrentModel();
+
+    // Initial message sync will happen in first build via listeners
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  /// Sync messages from provider to controller
+  /// Only called when messages actually change, not on every build
+  Future<void> _syncMessagesFromProvider() async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) {
+      _controller.clearMessages();
+      return;
+    }
+
+    try {
+      final messages = await ref.read(currentSessionMessagesProvider.future);
+
+      // Only sync if controller doesn't match provider
+      if (_controller.messages.length != messages.length) {
+        _controller.clearMessages();
+        for (final msg in messages) {
+          _controller.addMessage(
+            ChatMessage(
+              text: msg.content,
+              user: msg.userId == 'user' ? _currentUser : _aiUser,
+              createdAt: msg.createdAt,
+              customProperties: {'id': msg.id},
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      developer.log('Error syncing messages: $e', name: 'ChatSession');
+    }
   }
 
   /// Load the current model identifier
@@ -123,23 +159,29 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
-    final messagesAsync = ref.watch(currentSessionMessagesProvider);
+    final currentSessionId = ref.watch(currentSessionIdProvider);
 
-    // Sync messages from provider to controller
-    messagesAsync.whenData((messages) {
-      // Only sync if controller doesn't match provider
-      if (_controller.messages.length != messages.length) {
-        _controller.clearMessages();
-        for (final msg in messages) {
-          _controller.addMessage(
-            ChatMessage(
-              text: msg.content,
-              user: msg.userId == 'user' ? _currentUser : _aiUser,
-              createdAt: msg.createdAt,
-              customProperties: {'id': msg.id},
-            ),
-          );
-        }
+    // NOTE: ref.listen() in build() is the correct Riverpod pattern
+    // It's automatically deduplicated and cleaned up by the framework
+    // See: https://riverpod.dev/docs/concepts/reading#using-reflisten-to-react-to-a-provider-change
+
+    // Listen to session changes and sync messages ONLY when session changes
+    ref.listen(currentSessionIdProvider, (previous, next) {
+      if (previous != next) {
+        _lastSyncedSessionId = next;
+        // Sync runs as side effect, not during build
+        Future.microtask(() => _syncMessagesFromProvider());
+      }
+    });
+
+    // Listen to messages changes and sync ONLY when messages actually change
+    ref.listen(currentSessionMessagesProvider, (previous, next) {
+      // Only sync if we're watching the current session
+      if (_lastSyncedSessionId == currentSessionId) {
+        // Sync runs as side effect, not during build
+        next.whenData(
+          (messages) => Future.microtask(() => _syncMessagesFromProvider()),
+        );
       }
     });
 
