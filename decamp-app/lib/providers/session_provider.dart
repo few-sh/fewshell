@@ -27,6 +27,72 @@ final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>((
 /// StateProvider for the currently selected session ID
 final currentSessionIdProvider = StateProvider<String?>((ref) => null);
 
+/// Session manager that auto-creates/selects sessions
+/// Watches project changes and sessions list to ensure a session is always selected
+class SessionManager extends StateNotifier<void> {
+  final Ref _ref;
+  String? _lastProjectId;
+
+  SessionManager(this._ref) : super(null) {
+    // Listen to project ID changes
+    _ref.listen(currentProjectIdProvider, (previous, next) {
+      if (_lastProjectId != next) {
+        _lastProjectId = next;
+        _handleProjectChange(next);
+      }
+    });
+
+    // Listen to sessions list changes
+    _ref.listen(currentProjectSessionsProvider, (previous, next) {
+      next.whenData((sessions) => _ensureSessionSelected(sessions));
+    });
+  }
+
+  void _handleProjectChange(String? projectId) {
+    if (projectId == null) {
+      // Clear session when no project
+      _ref.read(currentSessionIdProvider.notifier).state = null;
+      return;
+    }
+
+    // Project changed - ensure we have a session
+    final sessionsAsync = _ref.read(currentProjectSessionsProvider);
+    sessionsAsync.whenData(_ensureSessionSelected);
+  }
+
+  void _ensureSessionSelected(List<SessionEntity> sessions) {
+    final projectId = _ref.read(currentProjectIdProvider);
+    final currentSessionId = _ref.read(currentSessionIdProvider);
+
+    if (projectId == null) return;
+
+    // Check if current session belongs to this project
+    final needsSession =
+        currentSessionId == null ||
+        !sessions.any((s) => s.id == currentSessionId);
+
+    if (needsSession) {
+      if (sessions.isEmpty) {
+        // Create new session
+        final sessionActions = _ref.read(sessionActionsProvider);
+        sessionActions.createSession(projectId: projectId).then((newSessionId) {
+          _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+        });
+      } else {
+        // Select most recent session
+        _ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
+      }
+    }
+  }
+}
+
+/// Provider for the session manager
+final sessionManagerProvider = StateNotifierProvider<SessionManager, void>((
+  ref,
+) {
+  return SessionManager(ref);
+});
+
 /// Provider for the currently selected session
 /// Returns null if no session is selected or session doesn't exist
 final currentSessionProvider = Provider<SessionEntity?>((ref) {
@@ -59,7 +125,7 @@ class SessionActions {
   /// Create a new session for a project
   Future<String> createSession({
     required String projectId,
-    required String description,
+    String? description,
   }) async {
     final now = DateTime.now();
     final id = _generateSessionId();
@@ -67,7 +133,7 @@ class SessionActions {
     final companion = SessionEntityCompanion(
       id: drift.Value(id),
       projectId: drift.Value(projectId),
-      description: drift.Value(description),
+      description: drift.Value(description ?? 'New conversation'),
       timestamp: drift.Value(now),
       createdAt: drift.Value(now),
       updatedAt: drift.Value(now),

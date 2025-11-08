@@ -74,9 +74,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Pending action approval
   Map<String, dynamic>? _pendingAction;
 
-  // Flag to track if messages have been loaded
-  bool _messagesLoaded = false;
-
   // Sample chat sessions (replace with actual data later)
   late final List<ChatSessionItem> _chatSessions;
 
@@ -126,125 +123,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     super.dispose();
   }
 
-  /// Initialize or create a session for the current project
-  Future<void> _initializeSession() async {
-    final currentProject = ref.read(currentProjectProvider);
-    if (currentProject == null) {
-      developer.log(
-        'No project selected, skipping session init',
-        name: 'ChatSession',
-      );
-      return;
-    }
-
-    final currentSessionId = ref.read(currentSessionIdProvider);
-
-    // If no session is selected, create a new one
-    if (currentSessionId == null) {
-      developer.log(
-        'Creating new session for project ${currentProject.id}',
-        name: 'ChatSession',
-      );
-      final sessionActions = ref.read(sessionActionsProvider);
-      final newSessionId = await sessionActions.createSession(
-        projectId: currentProject.id,
-        description: 'New Session', // Will be updated with first message
-      );
-
-      if (mounted) {
-        ref.read(currentSessionIdProvider.notifier).state = newSessionId;
-        developer.log(
-          'New session created: $newSessionId',
-          name: 'ChatSession',
-        );
-        // Note: didChangeDependencies will handle loading messages
-      }
-    }
-  }
-
-  /// Load messages from database into the chat controller
-  Future<void> _loadMessages() async {
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId == null || _messagesLoaded) return;
-
-    developer.log(
-      'Loading messages for session $currentSessionId',
-      name: 'ChatSession',
-    );
-
-    try {
-      // Get messages from provider
-      final messagesAsync = await ref.read(
-        currentSessionMessagesProvider.future,
-      );
-
-      developer.log(
-        'Loading ${messagesAsync.length} messages from database',
-        name: 'ChatSession',
-      );
-
-      // Clear existing messages
-      _controller.clearMessages();
-
-      // Convert MessageEntity to ChatMessage and add to controller
-      for (final messageEntity in messagesAsync) {
-        final chatMessage = ChatMessage(
-          text: messageEntity.content,
-          user: messageEntity.userId == 'user' ? _currentUser : _aiUser,
-          createdAt: messageEntity.createdAt,
-          customProperties: {'id': messageEntity.id},
-        );
-        _controller.addMessage(chatMessage);
-      }
-
-      _messagesLoaded = true;
-      developer.log('Messages loaded successfully', name: 'ChatSession');
-    } catch (e) {
-      developer.log('Error loading messages: $e', name: 'ChatSession');
-    }
-  }
-
-  /// Handle project change - create session if needed
-  void _handleProjectChange(dynamic project, String? currentSessionId) {
-    if (project == null) {
-      developer.log('Project cleared, clearing messages', name: 'ChatSession');
-      _controller.clearMessages();
-      _messagesLoaded = false;
-      return;
-    }
-
-    developer.log(
-      'Handling project change, session=$currentSessionId',
-      name: 'ChatSession',
-    );
-    _messagesLoaded = false;
-
-    // If no active session for this project, create one
-    if (currentSessionId == null) {
-      developer.log(
-        'No session for project, initializing',
-        name: 'ChatSession',
-      );
-      _initializeSession();
-    }
-  }
-
-  /// Handle session change - reload messages
-  void _handleSessionChange(String? sessionId) {
-    _messagesLoaded = false;
-
-    if (sessionId == null) {
-      developer.log('No session, clearing messages', name: 'ChatSession');
-      _controller.clearMessages();
-    } else {
-      developer.log(
-        'New session selected, loading messages',
-        name: 'ChatSession',
-      );
-      _loadMessages();
-    }
-  }
-
   /// Load the current model identifier
   Future<void> _loadCurrentModel() async {
     final llmService = ref.read(llmServiceProvider);
@@ -285,31 +163,28 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch the current project and session from providers
+    // Activate the session manager (handles all business logic)
+    ref.watch(sessionManagerProvider);
+
+    // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
-    final currentSessionId = ref.watch(currentSessionIdProvider);
+    final messagesAsync = ref.watch(currentSessionMessagesProvider);
 
-    // Listen to project changes and handle session initialization
-    ref.listen(currentProjectProvider, (previous, next) {
-      final previousId = previous?.id;
-      final nextId = next?.id;
-
-      developer.log(
-        'Project changed: $previousId -> $nextId',
-        name: 'ChatSession',
-      );
-
-      if (previousId != nextId) {
-        _handleProjectChange(next, currentSessionId);
-      }
-    });
-
-    // Listen to session changes and handle message loading
-    ref.listen(currentSessionIdProvider, (previous, next) {
-      developer.log('Session changed: $previous -> $next', name: 'ChatSession');
-
-      if (previous != next) {
-        _handleSessionChange(next);
+    // Sync messages from provider to controller
+    messagesAsync.whenData((messages) {
+      // Only sync if controller doesn't match provider
+      if (_controller.messages.length != messages.length) {
+        _controller.clearMessages();
+        for (final msg in messages) {
+          _controller.addMessage(
+            ChatMessage(
+              text: msg.content,
+              user: msg.userId == 'user' ? _currentUser : _aiUser,
+              createdAt: msg.createdAt,
+              customProperties: {'id': msg.id},
+            ),
+          );
+        }
       }
     });
 
