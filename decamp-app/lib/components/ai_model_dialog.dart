@@ -223,8 +223,11 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
   late final TextEditingController _urlController;
   late final TextEditingController _apiKeyController;
   final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
   bool _obscureApiKey = true;
   bool _isTestingConnection = false;
+  String? _testResultMessage;
+  bool? _testResultSuccess;
   late bool _enabled;
   late LlmApiType _selectedApiType;
 
@@ -247,6 +250,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
     _identifierController.dispose();
     _urlController.dispose();
     _apiKeyController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -257,6 +261,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
+          controller: _scrollController,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -397,6 +402,51 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   ),
                 ),
               ),
+
+              // Display test result message
+              if (_testResultMessage != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _testResultSuccess == true
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _testResultSuccess == true
+                          ? Colors.green
+                          : Colors.red,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _testResultSuccess == true
+                            ? Icons.check_circle
+                            : Icons.error,
+                        color: _testResultSuccess == true
+                            ? Colors.green
+                            : Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _testResultMessage!,
+                          style: TextStyle(
+                            color: _testResultSuccess == true
+                                ? Colors.green.shade700
+                                : Colors.red.shade700,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -418,6 +468,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
 
     setState(() {
       _isTestingConnection = true;
+      _testResultMessage = null;
+      _testResultSuccess = null;
     });
 
     try {
@@ -434,13 +486,10 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
         if (mounted) {
           setState(() {
             _isTestingConnection = false;
+            _testResultSuccess = false;
+            _testResultMessage = 'API key is required for testing';
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('API key is required for testing'),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          _scrollToBottom();
         }
         return;
       }
@@ -455,50 +504,34 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
       if (mounted) {
         setState(() {
           _isTestingConnection = false;
+          _testResultSuccess = errorMessage == null;
+          _testResultMessage = errorMessage ?? 'Connection successful!';
         });
-
-        if (errorMessage == null) {
-          // Success
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Connection successful!'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        } else {
-          // Error - show detailed diagnostic message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Theme.of(context).colorScheme.error,
-              duration: const Duration(seconds: 5),
-              action: SnackBarAction(
-                label: 'Dismiss',
-                textColor: Colors.white,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                },
-              ),
-            ),
-          );
-        }
+        _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isTestingConnection = false;
+          _testResultSuccess = false;
+          _testResultMessage = 'Unexpected error: ${e.toString()}';
         });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Unexpected error: ${e.toString()}'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        _scrollToBottom();
       }
     }
+  }
+
+  void _scrollToBottom() {
+    // Wait for the widget tree to rebuild with the new message
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   void _save() {
