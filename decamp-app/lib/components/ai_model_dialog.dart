@@ -277,6 +277,9 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   isDense: true,
                 ),
                 enabled: !_isEditMode,
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a model identifier';
@@ -373,6 +376,11 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                       ),
                     ],
                   ),
+                ),
+                style: const TextStyle(
+                  fontFamily: 'Courier New',
+                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
                 minLines: 1,
                 maxLines: _obscureApiKey ? 1 : 3,
