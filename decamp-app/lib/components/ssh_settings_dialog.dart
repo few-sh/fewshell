@@ -211,6 +211,7 @@ class _SshSettingsDialogFormState
   late final TextEditingController _passphraseController;
 
   final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
   bool _obscurePassword = true;
   bool _obscurePassphrase = true;
   bool _isTestingConnection = false;
@@ -248,6 +249,7 @@ class _SshSettingsDialogFormState
     _passwordController.dispose();
     _privateKeyController.dispose();
     _passphraseController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -260,6 +262,7 @@ class _SshSettingsDialogFormState
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
+          controller: _scrollController,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -658,6 +661,7 @@ class _SshSettingsDialogFormState
               ? 'Connection successful!'
               : 'Connection failed. Please check your settings.';
         });
+        _scrollToBottom();
       }
     } catch (e) {
       if (mounted) {
@@ -666,8 +670,22 @@ class _SshSettingsDialogFormState
           _testResultSuccess = false;
           _testResultMessage = 'Connection error: $e';
         });
+        _scrollToBottom();
       }
     }
+  }
+
+  void _scrollToBottom() {
+    // Wait for the widget tree to rebuild with the new message
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<bool> _testConnectionWithPassword(
