@@ -5,6 +5,7 @@ import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../pages/ocr_scanner_page.dart';
 import '../utils/text_pattern_matcher.dart';
+import '../services/llm_service.dart';
 
 /// Reusable dialog for adding or editing AI model configurations
 class AIModelDialog {
@@ -42,6 +43,7 @@ class AIModelDialog {
     await showDialog(
       context: context,
       builder: (context) => _AIModelDialogForm(
+        ref: ref,
         title: isEditMode ? 'Edit AI Model' : 'Add AI Model',
         isGlobal: isGlobal,
         initialIdentifier: existingSettings?.identifier,
@@ -180,6 +182,7 @@ class AIModelDialog {
 
 /// Internal form widget for the AI model dialog
 class _AIModelDialogForm extends StatefulWidget {
+  final WidgetRef ref;
   final String title;
   final bool isGlobal;
   final String? initialIdentifier;
@@ -200,6 +203,7 @@ class _AIModelDialogForm extends StatefulWidget {
   onSave;
 
   const _AIModelDialogForm({
+    required this.ref,
     required this.title,
     required this.isGlobal,
     this.initialIdentifier,
@@ -416,20 +420,84 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
       _isTestingConnection = true;
     });
 
-    // TODO: Implement actual connection test
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _isTestingConnection = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Connection test successful! (Placeholder)'),
-          backgroundColor: Colors.green,
-        ),
+    try {
+      // Create temporary settings for testing
+      final testSettings = LlmApiSettings(
+        identifier: _identifierController.text,
+        apiType: _selectedApiType,
+        baseUrl: _urlController.text,
       );
+
+      // Use empty string if no API key provided (for edit mode)
+      final apiKey = _apiKeyController.text;
+      if (apiKey.isEmpty && !_isEditMode) {
+        if (mounted) {
+          setState(() {
+            _isTestingConnection = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('API key is required for testing'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Get LLM service and test connection
+      final llmService = widget.ref.read(llmServiceProvider);
+      final errorMessage = await llmService.testConnection(
+        config: testSettings,
+        apiKey: apiKey,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isTestingConnection = false;
+        });
+
+        if (errorMessage == null) {
+          // Success
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Connection successful!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        } else {
+          // Error - show detailed diagnostic message
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              duration: const Duration(seconds: 5),
+              action: SnackBarAction(
+                label: 'Dismiss',
+                textColor: Colors.white,
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                },
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isTestingConnection = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unexpected error: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 

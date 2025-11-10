@@ -645,4 +645,69 @@ class LlmService {
         return 'array';
     }
   }
+
+  /// Test API connection with the provided settings
+  /// Returns null if successful, or an error message if failed
+  Future<String?> testConnection({
+    required LlmApiSettings config,
+    required String apiKey,
+  }) async {
+    try {
+      developer.log(
+        '🧪 Testing connection for ${config.identifier}',
+        name: 'LlmService',
+      );
+
+      // Create provider without system instruction for testing
+      final provider = await _createProvider(config, apiKey);
+
+      // Send a minimal test message
+      final messages = [ChatMessage.user('Hi')];
+
+      developer.log('📤 Sending test message...', name: 'LlmService');
+
+      // Try to get a response with a short timeout
+      final stream = provider.chatStream(messages);
+      bool receivedResponse = false;
+
+      await for (final event in stream.timeout(
+        const Duration(seconds: 30),
+        onTimeout: (sink) {
+          sink.addError(Exception('Connection timeout after 30 seconds'));
+          sink.close();
+        },
+      )) {
+        developer.log(
+          '📨 Test event: ${event.runtimeType}',
+          name: 'LlmService',
+        );
+
+        if (event is TextDeltaEvent) {
+          developer.log('✅ Received text response', name: 'LlmService');
+          receivedResponse = true;
+          break; // Got a response, test successful
+        } else if (event is ErrorEvent) {
+          developer.log('❌ Error event: ${event.error}', name: 'LlmService');
+          return 'API Error: ${event.error}';
+        }
+      }
+
+      if (!receivedResponse) {
+        return 'No response received from API';
+      }
+
+      developer.log('✅ Connection test successful', name: 'LlmService');
+      return null; // Success
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ Connection test failed: $e',
+        name: 'LlmService',
+        error: e,
+        stackTrace: stackTrace,
+      );
+
+      // Return the actual error message
+      return e.toString();
+    }
+  }
 }
