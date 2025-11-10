@@ -258,6 +258,10 @@ class _SshSettingsDialogFormState
     final theme = Theme.of(context);
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.all(16),
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       title: Text(widget.title),
       content: Form(
         key: _formKey,
@@ -273,11 +277,13 @@ class _SshSettingsDialogFormState
                 decoration: InputDecoration(
                   labelText: 'Host',
                   hintText: 'example.com or 192.168.1.100',
-                  prefixIcon: const Icon(Icons.dns),
+                  isDense: true,
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.camera_alt),
+                    icon: const Icon(Icons.camera_alt, size: 20),
                     onPressed: _scanHost,
                     tooltip: 'Scan host with camera',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ),
                 validator: (value) {
@@ -287,7 +293,7 @@ class _SshSettingsDialogFormState
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Port field
               TextFormField(
@@ -295,7 +301,7 @@ class _SshSettingsDialogFormState
                 decoration: const InputDecoration(
                   labelText: 'Port',
                   hintText: '22',
-                  prefixIcon: Icon(Icons.settings_ethernet),
+                  isDense: true,
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -310,7 +316,7 @@ class _SshSettingsDialogFormState
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Username field
               TextFormField(
@@ -318,7 +324,7 @@ class _SshSettingsDialogFormState
                 decoration: const InputDecoration(
                   labelText: 'Username',
                   hintText: 'root or admin',
-                  prefixIcon: Icon(Icons.person),
+                  isDense: true,
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -327,7 +333,7 @@ class _SshSettingsDialogFormState
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               // Authentication method selector
               Text(
@@ -369,7 +375,7 @@ class _SshSettingsDialogFormState
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Conditional fields based on auth method
               if (_authMethod == SshAuthMethod.password) ...[
@@ -380,30 +386,37 @@ class _SshSettingsDialogFormState
                     hintText: _isEditMode
                         ? 'Leave blank to keep current password'
                         : 'Enter your password',
-                    prefixIcon: const Icon(Icons.lock),
+                    isDense: true,
                     suffixIcon: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.camera_alt),
+                          icon: const Icon(Icons.camera_alt, size: 20),
                           onPressed: _scanPassword,
                           tooltip: 'Scan password with camera',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                         ),
                         IconButton(
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility
                                 : Icons.visibility_off,
+                            size: 20,
                           ),
                           onPressed: () {
                             setState(() {
                               _obscurePassword = !_obscurePassword;
                             });
                           },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
                         ),
                       ],
                     ),
                   ),
+                  minLines: 1,
+                  maxLines: _obscurePassword ? 1 : 3,
                   obscureText: _obscurePassword,
                   validator: (value) {
                     if (!_isEditMode && (value == null || value.isEmpty)) {
@@ -420,11 +433,13 @@ class _SshSettingsDialogFormState
                     hintText: _isEditMode
                         ? 'Leave blank to keep current key'
                         : 'Paste your private key',
-                    prefixIcon: const Icon(Icons.vpn_key),
+                    isDense: true,
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.camera_alt),
+                      icon: const Icon(Icons.camera_alt, size: 20),
                       onPressed: _scanPrivateKey,
                       tooltip: 'Scan private key with camera',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                     helperText: 'Paste the contents of your private key file',
                   ),
@@ -436,32 +451,37 @@ class _SshSettingsDialogFormState
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _passphraseController,
                   decoration: InputDecoration(
                     labelText: 'Passphrase (Optional)',
                     hintText: 'Enter passphrase if key is encrypted',
-                    prefixIcon: const Icon(Icons.security),
+                    isDense: true,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassphrase
                             ? Icons.visibility
                             : Icons.visibility_off,
+                        size: 20,
                       ),
                       onPressed: () {
                         setState(() {
                           _obscurePassphrase = !_obscurePassphrase;
                         });
                       },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                     ),
                   ),
+                  minLines: 1,
+                  maxLines: _obscurePassphrase ? 1 : 3,
                   obscureText: _obscurePassphrase,
                 ),
               ],
 
               if (_isEditMode) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 SwitchListTile(
                   title: const Text('Enabled'),
                   subtitle: const Text(
@@ -474,10 +494,11 @@ class _SshSettingsDialogFormState
                     });
                   },
                   contentPadding: EdgeInsets.zero,
+                  dense: true,
                 ),
               ],
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -488,20 +509,23 @@ class _SshSettingsDialogFormState
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.network_check),
+                      : const Icon(Icons.network_check, size: 20),
                   label: Text(
                     _isTestingConnection
                         ? 'Testing Connection...'
                         : 'Test Connection',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
 
               // Display test result message
               if (_testResultMessage != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _testResultSuccess == true
                         ? Colors.green.withValues(alpha: 0.1)
@@ -523,7 +547,7 @@ class _SshSettingsDialogFormState
                         color: _testResultSuccess == true
                             ? Colors.green
                             : Colors.red,
-                        size: 20,
+                        size: 18,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -533,7 +557,7 @@ class _SshSettingsDialogFormState
                             color: _testResultSuccess == true
                                 ? Colors.green.shade700
                                 : Colors.red.shade700,
-                            fontSize: 14,
+                            fontSize: 13,
                           ),
                         ),
                       ),
