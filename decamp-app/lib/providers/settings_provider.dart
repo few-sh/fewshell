@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/settings.dart';
+import '../models/agent_instruction.dart';
+import '../utils/default_prompt_loader.dart';
 import 'theme_provider.dart';
 
 /// Key for storing global settings in SharedPreferences
@@ -26,16 +28,39 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
   }
 
   /// Load settings from persistent storage
-  void _loadSettings() {
+  Future<void> _loadSettings() async {
     final json = _prefs.getString(_globalSettingsKey);
     if (json != null) {
       try {
-        state = AppSettings.fromJson(jsonDecode(json));
+        final settings = AppSettings.fromJson(jsonDecode(json));
+
+        // If no agent instruction exists, load the default one
+        if (settings.agentInstruction == null) {
+          final defaultPrompt = await loadDefaultSystemPrompt();
+          state = settings.copyWith(
+            agentInstruction: AgentInstruction(
+              defaultInstruction: defaultPrompt,
+            ),
+          );
+        } else {
+          state = settings;
+        }
       } catch (e) {
-        // If loading fails, keep default settings
-        state = const AppSettings();
+        // If loading fails, initialize with default settings and default prompt
+        await _initializeWithDefault();
       }
+    } else {
+      // No saved settings, initialize with default prompt
+      await _initializeWithDefault();
     }
+  }
+
+  /// Initialize settings with the default system prompt
+  Future<void> _initializeWithDefault() async {
+    final defaultPrompt = await loadDefaultSystemPrompt();
+    state = AppSettings(
+      agentInstruction: AgentInstruction(defaultInstruction: defaultPrompt),
+    );
   }
 
   /// Update settings and persist
