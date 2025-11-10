@@ -60,8 +60,7 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       // On iOS, this will automatically trigger the permission dialog if needed
       _cameraController = CameraController(
         cameras.first,
-        ResolutionPreset
-            .medium, // Changed from high to medium for better performance
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.nv21,
       );
@@ -69,6 +68,15 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       try {
         await _cameraController!.initialize();
         debugPrint('Camera initialized successfully');
+
+        // Enable continuous auto-focus for better OCR scanning
+        // This is crucial for scanning text at close range
+        await _cameraController!.setFocusMode(FocusMode.auto);
+
+        // Optional: Set exposure mode to auto for better text recognition
+        await _cameraController!.setExposureMode(ExposureMode.auto);
+
+        debugPrint('Auto-focus and exposure mode configured');
       } on CameraException catch (e) {
         debugPrint('Camera exception: ${e.code} - ${e.description}');
 
