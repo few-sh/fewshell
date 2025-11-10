@@ -473,8 +473,14 @@ AiActionConfig createAiActionsConfig(
               'Executing shell command: $command',
               name: 'AiActionsConfig',
             );
+
+            // Read fresh SSH settings from provider to avoid stale data
+            final currentSshSettings = projectId != null
+                ? ref.read(projectSshSettingsProvider(projectId))
+                : null;
+
             developer.log(
-              'SSH Settings: enabled=${sshSettings?.enabled}, host=${sshSettings?.host}',
+              'SSH Settings: enabled=${currentSshSettings?.enabled}, host=${currentSshSettings?.host}',
               name: 'AiActionsConfig',
             );
             developer.log(
@@ -494,9 +500,9 @@ AiActionConfig createAiActionsConfig(
                 );
               }
 
-              if (sshSettings == null || !sshSettings.enabled) {
+              if (currentSshSettings == null || !currentSshSettings.enabled) {
                 developer.log(
-                  'No SSH connection: sshSettings=${sshSettings != null}, enabled=${sshSettings?.enabled}',
+                  'No SSH connection: sshSettings=${currentSshSettings != null}, enabled=${currentSshSettings?.enabled}',
                   name: 'AiActionsConfig',
                 );
                 return ActionResult.createFailure(
@@ -509,7 +515,7 @@ AiActionConfig createAiActionsConfig(
                 'Attempting to connect to SSH...',
                 name: 'AiActionsConfig',
               );
-              final connected = await shellService.connect(sshSettings);
+              final connected = await shellService.connect(currentSshSettings);
               if (!connected) {
                 developer.log('SSH connection failed', name: 'AiActionsConfig');
                 return ActionResult.createFailure(
