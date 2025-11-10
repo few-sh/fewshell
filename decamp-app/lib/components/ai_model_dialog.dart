@@ -257,6 +257,10 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.all(16),
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       title: Text(widget.title),
       content: Form(
         key: _formKey,
@@ -270,7 +274,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                 decoration: const InputDecoration(
                   labelText: 'Model Identifier',
                   hintText: 'e.g., gpt-4-turbo, claude-3-5-sonnet',
-                  prefixIcon: Icon(Icons.info),
+                  isDense: true,
                 ),
                 enabled: !_isEditMode,
                 validator: (value) {
@@ -280,12 +284,12 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               DropdownButtonFormField<LlmApiType>(
                 value: _selectedApiType,
                 decoration: const InputDecoration(
                   labelText: 'API Type',
-                  prefixIcon: Icon(Icons.cloud),
+                  isDense: true,
                 ),
                 items: LlmApiType.values.map((type) {
                   return DropdownMenuItem(
@@ -307,17 +311,19 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   }
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _urlController,
                 decoration: InputDecoration(
                   labelText: 'API URL',
                   hintText: 'https://api.example.com/v1',
-                  prefixIcon: const Icon(Icons.link),
+                  isDense: true,
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.camera_alt),
+                    icon: const Icon(Icons.camera_alt, size: 20),
                     onPressed: _scanUrl,
                     tooltip: 'Scan URL with camera',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ),
                 validator: (value) {
@@ -331,7 +337,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _apiKeyController,
                 decoration: InputDecoration(
@@ -339,30 +345,37 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   hintText: _isEditMode
                       ? 'Leave blank to keep current key'
                       : 'Enter your API key',
-                  prefixIcon: const Icon(Icons.key),
+                  isDense: true,
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.camera_alt),
+                        icon: const Icon(Icons.camera_alt, size: 20),
                         onPressed: _scanApiKey,
                         tooltip: 'Scan API key with camera',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                       IconButton(
                         icon: Icon(
                           _obscureApiKey
                               ? Icons.visibility
                               : Icons.visibility_off,
+                          size: 20,
                         ),
                         onPressed: () {
                           setState(() {
                             _obscureApiKey = !_obscureApiKey;
                           });
                         },
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
                 ),
+                minLines: 1,
+                maxLines: _obscureApiKey ? 1 : 3,
                 obscureText: _obscureApiKey,
                 validator: (value) {
                   // API key is required for new models but optional for edits
@@ -373,7 +386,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                 },
               ),
               if (_isEditMode) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 SwitchListTile(
                   title: const Text('Enabled'),
                   subtitle: const Text('Allow this model to be used'),
@@ -383,9 +396,11 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                       _enabled = value;
                     });
                   },
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
                 ),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -396,18 +411,21 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.network_check),
+                      : const Icon(Icons.network_check, size: 20),
                   label: Text(
                     _isTestingConnection ? 'Testing...' : 'Test Connection',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
               ),
 
               // Display test result message
               if (_testResultMessage != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _testResultSuccess == true
                         ? Colors.green.withValues(alpha: 0.1)
@@ -429,7 +447,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                         color: _testResultSuccess == true
                             ? Colors.green
                             : Colors.red,
-                        size: 20,
+                        size: 18,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -439,7 +457,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                             color: _testResultSuccess == true
                                 ? Colors.green.shade700
                                 : Colors.red.shade700,
-                            fontSize: 14,
+                            fontSize: 13,
                           ),
                         ),
                       ),
