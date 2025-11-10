@@ -286,6 +286,14 @@ class _SshSettingsDialogFormState
                     constraints: const BoxConstraints(),
                   ),
                 ),
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                style: const TextStyle(
+                  fontFamily: 'Courier New',
+                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a host';
@@ -305,6 +313,14 @@ class _SshSettingsDialogFormState
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                style: const TextStyle(
+                  fontFamily: 'Courier New',
+                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter a port';
@@ -325,6 +341,14 @@ class _SshSettingsDialogFormState
                   labelText: 'Username',
                   hintText: 'root or admin',
                   isDense: true,
+                ),
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                style: const TextStyle(
+                  fontFamily: 'Courier New',
+                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -415,6 +439,14 @@ class _SshSettingsDialogFormState
                       ],
                     ),
                   ),
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textCapitalization: TextCapitalization.none,
+                  style: const TextStyle(
+                    fontFamily: 'Courier New',
+                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
                   minLines: 1,
                   maxLines: _obscurePassword ? 1 : 3,
                   obscureText: _obscurePassword,
@@ -442,6 +474,14 @@ class _SshSettingsDialogFormState
                       constraints: const BoxConstraints(),
                     ),
                     helperText: 'Paste the contents of your private key file',
+                  ),
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textCapitalization: TextCapitalization.none,
+                  style: const TextStyle(
+                    fontFamily: 'Courier New',
+                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
                   maxLines: 5,
                   validator: (value) {
@@ -473,6 +513,14 @@ class _SshSettingsDialogFormState
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),
+                  ),
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  textCapitalization: TextCapitalization.none,
+                  style: const TextStyle(
+                    fontFamily: 'Courier New',
+                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                    fontFeatures: [FontFeature.tabularFigures()],
                   ),
                   minLines: 1,
                   maxLines: _obscurePassphrase ? 1 : 3,
