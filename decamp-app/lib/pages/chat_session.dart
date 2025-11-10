@@ -308,7 +308,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     ),
 
                     // Enable animations and streaming
-                    enableAnimation: true,
+                    enableAnimation:
+                        false, // Disabled to prevent re-animation on scroll
                     enableMarkdownStreaming: true,
                     streamingWordByWord: true,
                     streamingDuration: const Duration(milliseconds: 30),
