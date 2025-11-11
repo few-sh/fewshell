@@ -43,7 +43,7 @@ extension LlmApiTypeExtension on LlmApiType {
       case LlmApiType.openai:
         return 'https://api.openai.com/v1/';
       case LlmApiType.anthropic:
-        return 'https://api.anthropic.com/';
+        return 'https://api.anthropic.com/v1/';
       case LlmApiType.google:
         return 'https://generativelanguage.googleapis.com/v1beta/';
       case LlmApiType.deepseek:
