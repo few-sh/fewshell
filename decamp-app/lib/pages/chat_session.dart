@@ -109,25 +109,46 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     try {
       final messages = await ref.read(currentSessionMessagesProvider.future);
 
-      // Check if this is a new session - if so, clear everything
+      // Check if this is a new session - if so, use setMessages for bulk load
       if (_lastSyncedSessionId != currentSessionId) {
-        _controller.clearMessages();
-        _syncedMessageIds.clear();
         _lastSyncedSessionId = currentSessionId;
-      }
 
-      // Only add messages that aren't already in the controller
-      for (final msg in messages) {
-        if (!_syncedMessageIds.contains(msg.id)) {
-          _syncedMessageIds.add(msg.id);
-          _controller.addMessage(
-            ChatMessage(
-              text: msg.content,
-              user: msg.userId == 'user' ? _currentUser : _aiUser,
-              createdAt: msg.createdAt,
-              customProperties: {'id': msg.id},
-            ),
+        // Convert all messages to ChatMessage format
+        final chatMessages = messages.map((msg) {
+          return ChatMessage(
+            text: msg.content,
+            user: msg.userId == 'user' ? _currentUser : _aiUser,
+            createdAt: msg.createdAt,
+            customProperties: {'id': msg.id},
           );
+        }).toList();
+
+        // Use setMessages for bulk persistence loading (no animation per message)
+        _controller.setMessages(chatMessages);
+
+        // Update synced IDs
+        _syncedMessageIds.clear();
+        _syncedMessageIds.addAll(messages.map((m) => m.id));
+      } else {
+        // For incremental updates within same session, only add new messages
+        final newMessages = <ChatMessage>[];
+        for (final msg in messages) {
+          if (!_syncedMessageIds.contains(msg.id)) {
+            _syncedMessageIds.add(msg.id);
+            newMessages.add(
+              ChatMessage(
+                text: msg.content,
+                user: msg.userId == 'user' ? _currentUser : _aiUser,
+                createdAt: msg.createdAt,
+                customProperties: {'id': msg.id},
+              ),
+            );
+          }
+        }
+
+        // Use addMessage for real-time new messages (with animation)
+        for (final message in newMessages) {
+          _controller.addMessage(message);
         }
       }
     } catch (e) {
