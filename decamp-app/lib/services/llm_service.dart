@@ -59,11 +59,15 @@ class LlmService {
   Future<({LlmApiSettings config, String apiKey})?> _getActiveConfig() async {
     List<LlmApiSettings> settings;
     String? projectId;
+    String? defaultIdentifier;
 
     // Try project-specific settings first if we have a project
     if (currentProjectId != null) {
       settings = ref.read(projectLlmSettingsProvider(currentProjectId!));
       projectId = currentProjectId;
+      defaultIdentifier = ref
+          .read(projectSettingsProvider(currentProjectId!))
+          ?.defaultLlmIdentifier;
     } else {
       settings = [];
     }
@@ -72,10 +76,20 @@ class LlmService {
     if (settings.isEmpty) {
       settings = ref.read(globalLlmSettingsProvider);
       projectId = null;
+      defaultIdentifier = ref.read(globalSettingsProvider).defaultLlmIdentifier;
     }
 
-    // Find first enabled configuration
-    final config = settings.where((s) => s.enabled).firstOrNull;
+    // Try to use the default model if set and enabled
+    LlmApiSettings? config;
+    if (defaultIdentifier != null) {
+      config = settings
+          .where((s) => s.identifier == defaultIdentifier && s.enabled)
+          .firstOrNull;
+    }
+
+    // Fall back to first enabled configuration if default is not available
+    config ??= settings.where((s) => s.enabled).firstOrNull;
+
     if (config == null) {
       return null;
     }

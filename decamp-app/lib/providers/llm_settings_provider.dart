@@ -85,9 +85,16 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     final updatedList = [...state, newSettings];
     state = updatedList;
 
+    // If this is the first model, automatically set it as default
+    final isFirstModel = state.isEmpty;
+    final defaultLlmIdentifier = isFirstModel
+        ? identifier
+        : _settingsNotifier.state.defaultLlmIdentifier;
+
     await _settingsNotifier.updateSettings(
       _settingsNotifier.state.copyWith(
         llmSettings: updatedList,
+        defaultLlmIdentifier: defaultLlmIdentifier,
         updatedAt: now,
       ),
     );
@@ -153,9 +160,14 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     final updatedList = state.where((s) => s.identifier != identifier).toList();
     state = updatedList;
 
+    // If deleting the default model, clear the default
+    final currentDefault = _settingsNotifier.state.defaultLlmIdentifier;
+    final newDefault = currentDefault == identifier ? null : currentDefault;
+
     await _settingsNotifier.updateSettings(
       _settingsNotifier.state.copyWith(
         llmSettings: updatedList,
+        defaultLlmIdentifier: newDefault,
         updatedAt: DateTime.now(),
       ),
     );
@@ -237,8 +249,18 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
         _settingsNotifier.state ??
         ProjectSettings(projectId: _projectId, createdAt: now, updatedAt: now);
 
+    // If this is the first model, automatically set it as default
+    final isFirstModel = state.isEmpty;
+    final defaultLlmIdentifier = isFirstModel
+        ? identifier
+        : currentSettings.defaultLlmIdentifier;
+
     await _settingsNotifier.updateSettings(
-      currentSettings.copyWith(llmSettings: updatedList, updatedAt: now),
+      currentSettings.copyWith(
+        llmSettings: updatedList,
+        defaultLlmIdentifier: defaultLlmIdentifier,
+        updatedAt: now,
+      ),
     );
   }
 
@@ -307,9 +329,14 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
 
     final currentSettings = _settingsNotifier.state;
     if (currentSettings != null) {
+      // If deleting the default model, clear the default
+      final currentDefault = currentSettings.defaultLlmIdentifier;
+      final newDefault = currentDefault == identifier ? null : currentDefault;
+
       await _settingsNotifier.updateSettings(
         currentSettings.copyWith(
           llmSettings: updatedList,
+          defaultLlmIdentifier: newDefault,
           updatedAt: DateTime.now(),
         ),
       );

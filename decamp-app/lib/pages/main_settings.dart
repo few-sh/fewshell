@@ -4,6 +4,7 @@ import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/ssh_settings_provider.dart';
+import '../providers/settings_provider.dart';
 import '../models/llm_api_settings.dart';
 import '../models/ssh_settings.dart';
 import '../components/ai_model_dialog.dart';
@@ -327,6 +328,19 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }) {
     final theme = Theme.of(context);
 
+    // Get the current default identifier
+    final String? currentDefault;
+    if (isGlobal) {
+      currentDefault = ref.watch(globalSettingsProvider).defaultLlmIdentifier;
+    } else {
+      final currentProjectId = ref.watch(currentProjectIdProvider);
+      currentDefault = currentProjectId != null
+          ? ref
+                .watch(projectSettingsProvider(currentProjectId))
+                ?.defaultLlmIdentifier
+          : null;
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -334,16 +348,34 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
-                  child: Text(
-                    settings.identifier,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                InkWell(
+                  onTap: () =>
+                      _setDefaultModel(settings.identifier, isGlobal: isGlobal),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Radio<String>(
+                        value: settings.identifier,
+                        groupValue: currentDefault,
+                        onChanged: (value) {
+                          if (value != null) {
+                            _setDefaultModel(value, isGlobal: isGlobal);
+                          }
+                        },
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      Text(
+                        settings.identifier,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                const Spacer(),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -374,41 +406,59 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(
-                  Icons.link,
-                  size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    settings.baseUrl,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                    ),
+            Padding(
+              padding: const EdgeInsets.only(
+                left: 48,
+              ), // Align with text after radio
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.link,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          settings.baseUrl,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.8,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.key,
-                  size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '••••••••••${settings.identifier.substring(0, settings.identifier.length > 4 ? 4 : settings.identifier.length)}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                    fontFamily: 'monospace',
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.key,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '••••••••••${settings.identifier.substring(0, settings.identifier.length > 4 ? 4 : settings.identifier.length)}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.8,
+                          ),
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -791,6 +841,19 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         ),
       ),
     );
+  }
+
+  void _setDefaultModel(String identifier, {required bool isGlobal}) {
+    if (isGlobal) {
+      ref.read(globalLlmSettingsProvider.notifier).setDefaultLlm(identifier);
+    } else {
+      final currentProjectId = ref.read(currentProjectIdProvider);
+      if (currentProjectId != null) {
+        ref
+            .read(projectLlmSettingsProvider(currentProjectId).notifier)
+            .setDefaultLlm(identifier);
+      }
+    }
   }
 
   void _showAddModelDialog({required bool isGlobal}) {
