@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:hello_world/components/main_drawer.dart';
-import 'package:hello_world/components/action_approval_overlay.dart';
+import 'package:hello_world/components/multi_command_approval_overlay.dart';
+import 'package:hello_world/components/execution_progress_overlay.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/providers/session_provider.dart';
 import 'package:hello_world/providers/message_provider.dart';
@@ -74,8 +75,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Context for AiActionProvider (captured from Builder)
   BuildContext? _actionContext;
 
-  // Pending action approval
-  Map<String, dynamic>? _pendingAction;
+  // Pending actions approval (updated for multi-command support)
+  List<CommandAction>? _pendingActions;
+
+  // Execution progress tracking
+  int? _currentExecutingIndex;
+  int? _totalExecutingCommands;
+  String? _currentExecutingCommand;
 
   // Track conversation state for tool calls (following official pattern)
   List<llm.ChatMessage>? _conversationForToolCalls;
@@ -422,22 +428,31 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               ),
             ),
 
-            // Action approval overlay (shown when a tool call is pending)
-            if (_pendingAction != null)
+            // Multi-command approval overlay (shown when tool calls are pending)
+            if (_pendingActions != null && _pendingActions!.isNotEmpty)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: ActionApprovalOverlay(
-                  actionName: _pendingAction!['name'] as String,
-                  params: _pendingAction!['params'] as Map<String, dynamic>,
-                  onExecute: _executeAction,
+                child: MultiCommandApprovalOverlay(
+                  actions: _pendingActions!,
+                  onExecute: _executeMultipleActions,
                   onDismiss: () {
                     setState(() {
-                      _pendingAction = null;
+                      _pendingActions = null;
                     });
                   },
                 ),
+              ),
+
+            // Execution progress overlay (shown during command execution)
+            if (_currentExecutingIndex != null &&
+                _totalExecutingCommands != null &&
+                _currentExecutingCommand != null)
+              ExecutionProgressOverlay(
+                currentCommand: _currentExecutingIndex!,
+                totalCommands: _totalExecutingCommands!,
+                commandName: _currentExecutingCommand!,
               ),
           ],
         ),
@@ -445,14 +460,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
   }
 
-  /// Execute an action with the given parameters
-  /// Now follows the official llm_dart pattern for tool execution
-  Future<void> _executeAction(
-    String actionName,
-    Map<String, dynamic> params,
+  /// Execute multiple actions sequentially with accumulated results
+  /// Now follows the official llm_dart pattern for multi-tool execution
+  Future<void> _executeMultipleActions(
+    List<CommandAction> selectedActions,
   ) async {
     developer.log(
-      '🚀 Executing action: $actionName with params: $params',
+      '🚀 Executing ${selectedActions.length} actions',
       name: 'ChatSession',
     );
 
@@ -461,84 +475,125 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       return;
     }
 
+    // Clear the approval overlay
+    setState(() {
+      _pendingActions = null;
+      _totalExecutingCommands = selectedActions.length;
+    });
+
+    // Get the action hook
+    final actionHook = AiActionHook.of(_actionContext!);
+
+    // Accumulate all results
+    final toolResults = <String, String>{};
+    final resultsForChat = <String>[];
+
     try {
-      // Get the action hook to execute the action
-      final actionHook = AiActionHook.of(_actionContext!);
+      // Execute each selected action in sequence
+      for (var i = 0; i < selectedActions.length; i++) {
+        final action = selectedActions[i];
+        final command = action.params['command'] ?? 'unknown command';
 
-      // Execute the action (this will call the handler)
-      final result = await actionHook.executeAction(actionName, params);
+        // Update progress overlay
+        setState(() {
+          _currentExecutingIndex = i + 1;
+          _currentExecutingCommand = command;
+        });
 
-      developer.log(
-        '✅ Action completed: success=${result.success}',
-        name: 'ChatSession',
-      );
+        developer.log(
+          '🔄 Executing action ${i + 1}/${selectedActions.length}: ${action.actionName}',
+          name: 'ChatSession',
+        );
 
-      // Add result message to chat UI with the actual command details
-      final command = params['command'] ?? 'unknown command';
+        // Execute the action
+        final result = await actionHook.executeAction(
+          action.actionName,
+          action.params,
+        );
 
-      String resultMessage;
-      if (result.success) {
-        final buffer = StringBuffer();
-        buffer.writeln('✅ Executed: `$command`');
-        buffer.writeln();
+        developer.log(
+          '✅ Action ${i + 1} completed: success=${result.success}',
+          name: 'ChatSession',
+        );
 
-        // Print stdout if available
-        final stdout = result.data?['stdout']?.toString().trim() ?? '';
-        if (stdout.isNotEmpty) {
-          buffer.writeln('Result:');
-          buffer.writeln('```');
-          buffer.writeln(stdout);
-          buffer.writeln('```');
-        }
-
-        // Print stderr in red if available
-        final stderr = result.data?['stderr']?.toString().trim() ?? '';
-        if (stderr.isNotEmpty) {
+        // Build result message for chat UI
+        String resultMessage;
+        if (result.success) {
+          final buffer = StringBuffer();
+          buffer.writeln('✅ Executed: `$command`');
           buffer.writeln();
-          buffer.writeln('**⚠️ stderr:**');
-          buffer.writeln('```');
-          buffer.writeln(stderr);
-          buffer.writeln('```');
+
+          // Print stdout if available
+          final stdout = result.data?['stdout']?.toString().trim() ?? '';
+          if (stdout.isNotEmpty) {
+            buffer.writeln('Result:');
+            buffer.writeln('```');
+            buffer.writeln(stdout);
+            buffer.writeln('```');
+          }
+
+          // Print stderr if available
+          final stderr = result.data?['stderr']?.toString().trim() ?? '';
+          if (stderr.isNotEmpty) {
+            buffer.writeln();
+            buffer.writeln('**⚠️ stderr:**');
+            buffer.writeln('```');
+            buffer.writeln(stderr);
+            buffer.writeln('```');
+          }
+
+          // Print exit code only if non-zero
+          final exitCode = result.data?['exitCode'] as int?;
+          if (exitCode != null && exitCode != 0) {
+            buffer.writeln();
+            buffer.writeln('**Exit Code:** $exitCode');
+          }
+
+          resultMessage = buffer.toString().trim();
+        } else {
+          resultMessage =
+              '❌ Failed to execute: `$command`\n\nError: ${result.error}';
         }
 
-        // Print exit code only if non-zero
-        final exitCode = result.data?['exitCode'] as int?;
-        if (exitCode != null && exitCode != 0) {
-          buffer.writeln();
-          buffer.writeln('**Exit Code:** $exitCode');
-        }
+        resultsForChat.add(resultMessage);
 
-        resultMessage = buffer.toString().trim();
-      } else {
-        resultMessage =
-            '❌ Failed to execute: `$command`\n\nError: ${result.error}';
+        // Save result to database
+        final resultMessageId = await _saveMessageToDatabase(
+          content: resultMessage,
+          userId: 'ai',
+          userName: 'Ops Agent',
+        );
+
+        // Add to chat UI
+        _controller.addMessage(
+          ChatMessage(
+            text: resultMessage,
+            user: _aiUser,
+            createdAt: DateTime.now(),
+            customProperties: {'id': resultMessageId},
+            isMarkdown: true,
+          ),
+        );
+
+        // Map result to tool call ID for LLM
+        if (_pendingToolCalls != null && i < _pendingToolCalls!.length) {
+          final toolCallId = _pendingToolCalls![i].id;
+          toolResults[toolCallId] = result.success
+              ? result.data?.toString() ?? 'Success'
+              : 'Error: ${result.error}';
+        }
       }
 
-      // Save result message to database
-      final resultMessageId = await _saveMessageToDatabase(
-        content: resultMessage,
-        userId: 'ai',
-        userName: 'Ops Agent',
-      );
-
-      _controller.addMessage(
-        ChatMessage(
-          text: resultMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': resultMessageId},
-          isMarkdown: true,
-        ),
-      );
-
-      // Clear pending action UI
+      // Clear progress overlay, show loading for LLM response
       setState(() {
-        _pendingAction = null;
-        _isLoading = true; // Show loading while getting LLM response
+        _currentExecutingIndex = null;
+        _totalExecutingCommands = null;
+        _currentExecutingCommand = null;
+        _isLoading = true;
       });
 
       developer.log(
-        '🔄 Continuing conversation after tool execution',
+        '🔄 Continuing conversation with ${toolResults.length} tool results',
         name: 'ChatSession',
       );
 
@@ -550,24 +605,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       final llmService = ref.read(llmServiceProvider);
       final tools = llmService.convertActionsToTools(aiActionsConfig.actions);
 
-      // Check if we have the new conversation state (for providers with completion events)
+      // Check if we have the new conversation state
       final llmResponseBuffer = StringBuffer();
 
       if (_conversationForToolCalls != null && _pendingToolCalls != null) {
         developer.log(
-          '✅ Using new continueWithToolResults pattern',
+          '✅ Using continueWithToolResults pattern',
           name: 'ChatSession',
         );
-
-        // Build tool results map (tool call ID -> result content)
-        final toolResults = <String, String>{};
-        for (final toolCall in _pendingToolCalls!) {
-          if (toolCall.function.name == actionName) {
-            toolResults[toolCall.id] = result.success
-                ? result.data?.toString() ?? 'Success'
-                : 'Error: ${result.error}';
-          }
-        }
 
         // Use the new continueWithToolResults method (official pattern)
         await for (final chunk in llmService.continueWithToolResults(
@@ -587,7 +632,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         });
       } else {
         developer.log(
-          '⚠️ Falling back to legacy continueWithToolResult (no completion event)',
+          '⚠️ Falling back to legacy pattern (no completion event)',
           name: 'ChatSession',
         );
 
@@ -605,16 +650,19 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             .reversed
             .toList();
 
-        // Use deprecated method as fallback
-        // ignore: deprecated_member_use
-        await for (final chunk in llmService.continueWithToolResult(
-          actionName,
-          params,
-          resultMessage,
-          history: history,
-          tools: tools,
-        )) {
-          llmResponseBuffer.write(chunk);
+        // Use deprecated method as fallback for first action
+        if (selectedActions.isNotEmpty) {
+          final firstAction = selectedActions.first;
+          // ignore: deprecated_member_use
+          await for (final chunk in llmService.continueWithToolResult(
+            firstAction.actionName,
+            firstAction.params,
+            resultsForChat.join('\n\n'),
+            history: history,
+            tools: tools,
+          )) {
+            llmResponseBuffer.write(chunk);
+          }
         }
       }
 
@@ -643,13 +691,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       });
     } catch (e, stackTrace) {
       developer.log(
-        '❌ Action execution error: $e',
+        '❌ Multi-action execution error: $e',
         name: 'ChatSession',
         error: e,
         stackTrace: stackTrace,
       );
 
-      final errorMessage = '❌ Error executing command: $e';
+      final errorMessage = '❌ Error executing commands: $e';
 
       // Save error message to database
       final errorMessageId = await _saveMessageToDatabase(
@@ -673,6 +721,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         _conversationForToolCalls = null;
         _pendingToolCalls = null;
         _assistantTextBeforeTools = null;
+        _currentExecutingIndex = null;
+        _totalExecutingCommands = null;
+        _currentExecutingCommand = null;
         _isLoading = false;
       });
     }
@@ -809,6 +860,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       final buffer = StringBuffer();
       var chunkCount = 0;
       final collectedToolCalls = <llm.ToolCall>[];
+      final collectedToolCallMaps = <Map<String, dynamic>>[];
 
       await for (final chunk in llmService.sendMessageWithTools(
         message.text,
@@ -831,6 +883,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             final toolCall = chunk['toolCall'] as llm.ToolCall?;
             if (toolCall != null) {
               collectedToolCalls.add(toolCall);
+              // Also store the map for creating CommandAction objects
+              collectedToolCallMaps.add(Map<String, dynamic>.from(chunk));
             }
 
             // Add the tool call to chat history so the LLM remembers it
@@ -856,10 +910,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             );
 
             // Don't return yet - collect all tool calls first
-            // Store for approval overlay
-            if (_pendingAction == null) {
-              _pendingAction = Map<String, dynamic>.from(chunk);
-            }
           } else if (type == 'completion') {
             developer.log(
               '🏁 Completion event received with ${collectedToolCalls.length} tool calls',
@@ -881,8 +931,19 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 name: 'ChatSession',
               );
 
-              // Show the action approval overlay for the first tool call
+              // Create CommandAction objects from collected tool calls
+              final actions = collectedToolCallMaps.map((chunk) {
+                return CommandAction(
+                  id: chunk['toolCall']?.id ?? DateTime.now().toString(),
+                  actionName: chunk['name'] as String,
+                  params: chunk['params'] as Map<String, dynamic>,
+                  isSelected: true, // All selected by default
+                );
+              }).toList();
+
+              // Show the multi-command approval overlay
               setState(() {
+                _pendingActions = actions;
                 _isLoading =
                     false; // Stop loading while waiting for user approval
               });
