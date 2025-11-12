@@ -1,0 +1,3 @@
+[submodule "llm_dart"]
+	path = llm_dart
+	url = https://github.com/few-sh/llm_dart.git

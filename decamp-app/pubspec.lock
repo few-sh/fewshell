@@ -627,11 +627,10 @@ packages:
   llm_dart:
     dependency: "direct main"
     description:
-      name: llm_dart
-      sha256: "15259a999dde9b848422a193996dbdba7074903e3eaa9ca8abbcda83922f6dab"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.10.0"
+      path: "../llm_dart"
+      relative: true
+    source: path
+    version: "0.10.1"
   logging:
     dependency: transitive
     description:
