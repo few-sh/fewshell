@@ -435,9 +435,44 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
       // Add result message to chat UI with the actual command details
       final command = params['command'] ?? 'unknown command';
-      final resultMessage = result.success
-          ? '✅ Executed: `$command`\n\nResult: ${result.data}'
-          : '❌ Failed to execute: `$command`\n\nError: ${result.error}';
+
+      String resultMessage;
+      if (result.success) {
+        final buffer = StringBuffer();
+        buffer.writeln('✅ Executed: `$command`');
+        buffer.writeln();
+
+        // Print stdout if available
+        final stdout = result.data?['stdout']?.toString().trim() ?? '';
+        if (stdout.isNotEmpty) {
+          buffer.writeln('Result:');
+          buffer.writeln('```');
+          buffer.writeln(stdout);
+          buffer.writeln('```');
+        }
+
+        // Print stderr in red if available
+        final stderr = result.data?['stderr']?.toString().trim() ?? '';
+        if (stderr.isNotEmpty) {
+          buffer.writeln();
+          buffer.writeln('**⚠️ stderr:**');
+          buffer.writeln('```');
+          buffer.writeln(stderr);
+          buffer.writeln('```');
+        }
+
+        // Print exit code only if non-zero
+        final exitCode = result.data?['exitCode'] as int?;
+        if (exitCode != null && exitCode != 0) {
+          buffer.writeln();
+          buffer.writeln('**Exit Code:** $exitCode');
+        }
+
+        resultMessage = buffer.toString().trim();
+      } else {
+        resultMessage =
+            '❌ Failed to execute: `$command`\n\nError: ${result.error}';
+      }
 
       // Save result message to database
       final resultMessageId = await _saveMessageToDatabase(
@@ -452,6 +487,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           user: _aiUser,
           createdAt: DateTime.now(),
           customProperties: {'id': resultMessageId},
+          isMarkdown: true,
         ),
       );
 
@@ -557,6 +593,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             user: _aiUser,
             createdAt: DateTime.now(),
             customProperties: {'id': llmMessageId},
+            isMarkdown: true,
           ),
         );
       }
@@ -587,6 +624,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           user: _aiUser,
           createdAt: DateTime.now(),
           customProperties: {'id': errorMessageId},
+          isMarkdown: true,
         ),
       );
 
