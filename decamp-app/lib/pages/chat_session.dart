@@ -421,15 +421,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       return;
     }
 
-    // Ensure we have the conversation and tool calls from the stream
-    if (_conversationForToolCalls == null || _pendingToolCalls == null) {
-      developer.log(
-        '❌ Missing conversation or tool calls state',
-        name: 'ChatSession',
-      );
-      return;
-    }
-
     try {
       // Get the action hook to execute the action
       final actionHook = AiActionHook.of(_actionContext!);
@@ -470,18 +461,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         _isLoading = true; // Show loading while getting LLM response
       });
 
-      // Build tool results map (tool call ID -> result content)
-      final toolResults = <String, String>{};
-      for (final toolCall in _pendingToolCalls!) {
-        if (toolCall.function.name == actionName) {
-          toolResults[toolCall.id] = result.success
-              ? result.data?.toString() ?? 'Success'
-              : 'Error: ${result.error}';
-        }
-      }
-
       developer.log(
-        '🔄 Continuing with tool results using official pattern',
+        '🔄 Continuing conversation after tool execution',
         name: 'ChatSession',
       );
 
@@ -490,21 +471,75 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       final aiActionsConfig = ref.read(
         aiActionsConfigProvider(currentProject?.id),
       );
-      final tools = ref
-          .read(llmServiceProvider)
-          .convertActionsToTools(aiActionsConfig.actions);
-
-      // Use the new continueWithToolResults method (official pattern)
-      final llmResponseBuffer = StringBuffer();
       final llmService = ref.read(llmServiceProvider);
+      final tools = llmService.convertActionsToTools(aiActionsConfig.actions);
 
-      await for (final chunk in llmService.continueWithToolResults(
-        _conversationForToolCalls!,
-        _pendingToolCalls!,
-        toolResults,
-        tools: tools,
-      )) {
-        llmResponseBuffer.write(chunk);
+      // Check if we have the new conversation state (for providers with completion events)
+      final llmResponseBuffer = StringBuffer();
+
+      if (_conversationForToolCalls != null && _pendingToolCalls != null) {
+        developer.log(
+          '✅ Using new continueWithToolResults pattern',
+          name: 'ChatSession',
+        );
+
+        // Build tool results map (tool call ID -> result content)
+        final toolResults = <String, String>{};
+        for (final toolCall in _pendingToolCalls!) {
+          if (toolCall.function.name == actionName) {
+            toolResults[toolCall.id] = result.success
+                ? result.data?.toString() ?? 'Success'
+                : 'Error: ${result.error}';
+          }
+        }
+
+        // Use the new continueWithToolResults method (official pattern)
+        await for (final chunk in llmService.continueWithToolResults(
+          _conversationForToolCalls!,
+          _pendingToolCalls!,
+          toolResults,
+          tools: tools,
+        )) {
+          llmResponseBuffer.write(chunk);
+        }
+
+        // Clear conversation state
+        setState(() {
+          _conversationForToolCalls = null;
+          _pendingToolCalls = null;
+          _assistantTextBeforeTools = null;
+        });
+      } else {
+        developer.log(
+          '⚠️ Falling back to legacy continueWithToolResult (no completion event)',
+          name: 'ChatSession',
+        );
+
+        // Fall back to old pattern for providers that don't send completion events
+        // Build current conversation history
+        final history = _controller.messages
+            .where((msg) => msg.text.isNotEmpty)
+            .map(
+              (msg) => {
+                'role': msg.user.id == 'user' ? 'user' : 'assistant',
+                'content': msg.text,
+              },
+            )
+            .toList()
+            .reversed
+            .toList();
+
+        // Use deprecated method as fallback
+        // ignore: deprecated_member_use
+        await for (final chunk in llmService.continueWithToolResult(
+          actionName,
+          params,
+          resultMessage,
+          history: history,
+          tools: tools,
+        )) {
+          llmResponseBuffer.write(chunk);
+        }
       }
 
       // Add LLM's response to chat if not empty
@@ -526,11 +561,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         );
       }
 
-      // Clear conversation state
       setState(() {
-        _conversationForToolCalls = null;
-        _pendingToolCalls = null;
-        _assistantTextBeforeTools = null;
         _isLoading = false;
       });
     } catch (e, stackTrace) {
