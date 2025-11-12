@@ -563,7 +563,11 @@ class LlmService {
   /// - toolCalls: The ToolCall objects collected from the stream
   /// - toolResults: Map of tool call ID to result content
   /// - tools: Available tools for potential follow-up calls
-  Stream<String> continueWithToolResults(
+  ///
+  /// Yields:
+  /// - String: Text delta for streaming response
+  /// - Map: Tool call or completion events (same format as sendMessageWithTools)
+  Stream<dynamic> continueWithToolResults(
     List<ChatMessage> conversation,
     List<ToolCall> toolCalls,
     Map<String, String> toolResults, {
@@ -625,18 +629,43 @@ class LlmService {
       // Get final response
       final stream = provider.chatStream(updatedConversation, tools: tools);
 
+      // Collect follow-up tool calls
+      final followUpToolCalls = <ToolCall>[];
+      final followUpTextBuffer = StringBuffer();
+
       await for (final event in stream) {
         switch (event) {
           case TextDeltaEvent(delta: final delta):
+            followUpTextBuffer.write(delta);
             yield delta;
 
-          case ToolCallDeltaEvent():
-            // Handle potential follow-up tool calls
+          case ToolCallDeltaEvent(toolCall: final toolCall):
+            // Handle follow-up tool calls
             developer.log(
-              '🔧 Follow-up tool call detected',
+              '🔧 Follow-up tool call detected: ${toolCall.function.name}',
               name: 'LlmService',
             );
-          // For now, just log. Could yield tool call info if needed
+
+            followUpToolCalls.add(toolCall);
+
+            // Parse and yield tool call info to UI
+            final toolName = toolCall.function.name;
+            final argumentsJson = toolCall.function.arguments;
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(json.decode(argumentsJson))
+                : <String, dynamic>{};
+
+            developer.log(
+              '🔧 Yielding follow-up tool call: $toolName',
+              name: 'LlmService',
+            );
+
+            yield {
+              'type': 'tool_call',
+              'name': toolName,
+              'params': params,
+              'toolCall': toolCall,
+            };
 
           case ErrorEvent(error: final error):
             developer.log('❌ Error event: $error', name: 'LlmService');
@@ -645,6 +674,21 @@ class LlmService {
 
           case CompletionEvent():
             developer.log('🏁 Final response completed', name: 'LlmService');
+
+            // If follow-up tool calls were collected, yield completion info
+            if (followUpToolCalls.isNotEmpty) {
+              developer.log(
+                '📦 Collected ${followUpToolCalls.length} follow-up tool calls',
+                name: 'LlmService',
+              );
+
+              yield {
+                'type': 'completion',
+                'toolCalls': followUpToolCalls,
+                'text': followUpTextBuffer.toString(),
+                'conversation': updatedConversation,
+              };
+            }
 
           case ThinkingDeltaEvent():
             developer.log('💭 Thinking event', name: 'LlmService');

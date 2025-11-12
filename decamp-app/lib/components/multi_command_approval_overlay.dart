@@ -69,21 +69,27 @@ class _MultiCommandApprovalOverlayState
         .toList();
 
     if (selectedActions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one command')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select at least one command')),
+        );
+      }
       return;
     }
 
-    setState(() => _isExecuting = true);
+    if (mounted) {
+      setState(() => _isExecuting = true);
+    }
 
     try {
       await widget.onExecute(selectedActions);
-      await _animationController.reverse();
+      if (mounted) {
+        await _animationController.reverse();
+      }
       widget.onDismiss();
     } catch (e) {
-      setState(() => _isExecuting = false);
       if (mounted) {
+        setState(() => _isExecuting = false);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -92,11 +98,14 @@ class _MultiCommandApprovalOverlayState
   }
 
   Future<void> _handleCancel() async {
-    await _animationController.reverse();
+    if (mounted) {
+      await _animationController.reverse();
+    }
     widget.onDismiss();
   }
 
   void _toggleSelectAll(bool? value) {
+    if (!mounted) return;
     setState(() {
       for (final action in widget.actions) {
         action.isSelected = value ?? false;

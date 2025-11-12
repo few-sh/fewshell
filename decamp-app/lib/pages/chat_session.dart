@@ -575,13 +575,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           ),
         );
 
-        // Map result to tool call ID for LLM
-        if (_pendingToolCalls != null && i < _pendingToolCalls!.length) {
-          final toolCallId = _pendingToolCalls![i].id;
-          toolResults[toolCallId] = result.success
-              ? result.data?.toString() ?? 'Success'
-              : 'Error: ${result.error}';
-        }
+        // Map result to tool call ID for LLM using the CommandAction ID
+        // The CommandAction.id corresponds to the ToolCall.id
+        toolResults[action.id] = result.success
+            ? result.data?.toString() ?? 'Success'
+            : 'Error: ${result.error}';
       }
 
       // Clear progress overlay, show loading for LLM response
@@ -614,6 +612,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           name: 'ChatSession',
         );
 
+        // Track follow-up tool calls
+        final followUpToolCalls = <llm.ToolCall>[];
+        final followUpToolCallMaps = <Map<String, dynamic>>[];
+
         // Use the new continueWithToolResults method (official pattern)
         await for (final chunk in llmService.continueWithToolResults(
           _conversationForToolCalls!,
@@ -621,10 +623,88 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           toolResults,
           tools: tools,
         )) {
-          llmResponseBuffer.write(chunk);
+          if (chunk is Map) {
+            final type = chunk['type'] as String?;
+
+            if (type == 'tool_call') {
+              developer.log(
+                '🔧 Follow-up tool call received: ${chunk['name']}',
+                name: 'ChatSession',
+              );
+
+              // Extract the ToolCall object
+              final toolCall = chunk['toolCall'] as llm.ToolCall?;
+              if (toolCall != null) {
+                followUpToolCalls.add(toolCall);
+                followUpToolCallMaps.add(Map<String, dynamic>.from(chunk));
+              }
+
+              // Add the tool call to chat history
+              final command = chunk['params']?['command'] ?? 'unknown';
+              final explanation = chunk['params']?['explanation'] ?? '';
+              final toolCallMessage =
+                  '🔧 Requesting to execute: `$command`\n$explanation';
+
+              final toolCallMessageId = await _saveMessageToDatabase(
+                content: toolCallMessage,
+                userId: 'ai',
+                userName: 'Ops Agent',
+              );
+
+              _controller.addMessage(
+                ChatMessage(
+                  text: toolCallMessage,
+                  user: _aiUser,
+                  createdAt: DateTime.now(),
+                  customProperties: {'id': toolCallMessageId},
+                ),
+              );
+            } else if (type == 'completion') {
+              developer.log(
+                '🏁 Follow-up completion event with ${followUpToolCalls.length} tool calls',
+                name: 'ChatSession',
+              );
+
+              final conversation =
+                  chunk['conversation'] as List<llm.ChatMessage>?;
+
+              if (followUpToolCalls.isNotEmpty && conversation != null) {
+                // Update state for follow-up tool execution
+                _conversationForToolCalls = conversation;
+                _pendingToolCalls = followUpToolCalls;
+                _assistantTextBeforeTools = llmResponseBuffer.toString();
+
+                developer.log(
+                  '📦 Saved follow-up conversation state',
+                  name: 'ChatSession',
+                );
+
+                // Create CommandAction objects for follow-up
+                final actions = followUpToolCallMaps.map((chunk) {
+                  return CommandAction(
+                    id: chunk['toolCall']?.id ?? DateTime.now().toString(),
+                    actionName: chunk['name'] as String,
+                    params: chunk['params'] as Map<String, dynamic>,
+                    isSelected: true,
+                  );
+                }).toList();
+
+                // Show the multi-command approval overlay again
+                setState(() {
+                  _pendingActions = actions;
+                  _isLoading = false;
+                });
+
+                // Return to let user approve follow-up commands
+                return;
+              }
+            }
+          } else if (chunk is String) {
+            llmResponseBuffer.write(chunk);
+          }
         }
 
-        // Clear conversation state
+        // Clear conversation state if no follow-up
         setState(() {
           _conversationForToolCalls = null;
           _pendingToolCalls = null;
