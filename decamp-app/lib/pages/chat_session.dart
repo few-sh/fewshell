@@ -6,6 +6,8 @@ import 'package:hello_world/components/action_approval_overlay.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/providers/session_provider.dart';
 import 'package:hello_world/providers/message_provider.dart';
+import 'package:hello_world/providers/llm_settings_provider.dart';
+import 'package:hello_world/providers/settings_provider.dart';
 import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/pages/sessions_history.dart';
 import 'package:hello_world/services/llm_service.dart';
@@ -225,6 +227,44 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         Future.microtask(() => _syncMessagesFromProvider());
       }
     });
+
+    // Listen to global settings changes to update model identifier when default changes
+    ref.listen(globalSettingsProvider.select((s) => s.defaultLlmIdentifier), (
+      previous,
+      next,
+    ) {
+      if (previous != next) {
+        Future.microtask(() => _loadCurrentModel());
+      }
+    });
+
+    // Listen to project settings changes to update model identifier when default changes
+    if (currentProject?.id != null) {
+      ref.listen(
+        projectSettingsProvider(
+          currentProject!.id,
+        ).select((s) => s?.defaultLlmIdentifier),
+        (previous, next) {
+          if (previous != next) {
+            Future.microtask(() => _loadCurrentModel());
+          }
+        },
+      );
+    }
+
+    // Also listen to LLM settings in case models are added/removed/enabled/disabled
+    ref.listen(globalLlmSettingsProvider, (previous, next) {
+      Future.microtask(() => _loadCurrentModel());
+    });
+
+    if (currentProject?.id != null) {
+      ref.listen(projectLlmSettingsProvider(currentProject!.id), (
+        previous,
+        next,
+      ) {
+        Future.microtask(() => _loadCurrentModel());
+      });
+    }
 
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
