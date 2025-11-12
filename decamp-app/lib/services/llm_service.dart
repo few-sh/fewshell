@@ -401,13 +401,14 @@ class LlmService {
 
   /// Send a chat message with tool support
   ///
-  /// When a tool call is detected, yields a Map with tool call information
-  /// instead of executing it directly. The UI layer should handle execution
-  /// through AiActionHook.executeAction() to show confirmation dialogs.
+  /// Follows the official llm_dart pattern for handling tool calls:
+  /// 1. Collect tool calls during streaming
+  /// 2. Yield tool call info to UI for approval/execution
+  /// 3. UI should call continueWithToolResults() with results
   ///
   /// Yields either:
   /// - String: text chunks from the LLM
-  /// - Map: {'type': 'tool_call', 'name': '...', 'params': {...}}
+  /// - Map: {'type': 'tool_call', 'name': '...', 'params': {...}, 'toolCall': ToolCall}
   Stream<dynamic> sendMessageWithTools(
     String message, {
     List<Map<String, String>>? history,
@@ -427,37 +428,40 @@ class LlmService {
       );
 
       // Create provider with system instruction
-      // Note: Tools are passed to the chat methods, not the provider
       final provider = await _createProvider(
         activeConfig.config,
         activeConfig.apiKey,
         systemInstruction: agentInstruction,
       );
 
-      // Build messages array
-      final messages = <ChatMessage>[];
+      // Build conversation messages
+      final conversation = <ChatMessage>[];
 
       // Add history if provided
       if (history != null) {
         for (final msg in history) {
           if (msg['role'] == 'user') {
-            messages.add(ChatMessage.user(msg['content'] ?? ''));
+            conversation.add(ChatMessage.user(msg['content'] ?? ''));
           } else {
-            messages.add(ChatMessage.assistant(msg['content'] ?? ''));
+            conversation.add(ChatMessage.assistant(msg['content'] ?? ''));
           }
         }
       }
 
       // Add current message
-      messages.add(ChatMessage.user(message));
+      conversation.add(ChatMessage.user(message));
 
       developer.log(
-        '📤 Calling provider.chatStream with ${messages.length} messages and ${tools?.length ?? 0} tools',
+        '📤 Calling provider.chatStream with ${conversation.length} messages and ${tools?.length ?? 0} tools',
         name: 'LlmService',
       );
 
+      // Collect tool calls as they arrive
+      final toolCallsCollected = <ToolCall>[];
+      final textBuffer = StringBuffer();
+
       // Stream the response with tools
-      final stream = provider.chatStream(messages, tools: tools);
+      final stream = provider.chatStream(conversation, tools: tools);
 
       await for (final event in stream) {
         developer.log(
@@ -465,55 +469,204 @@ class LlmService {
           name: 'LlmService',
         );
 
-        if (event is TextDeltaEvent) {
-          developer.log('💬 Text delta: "${event.delta}"', name: 'LlmService');
-          yield event.delta;
-        } else if (event is ToolCallDeltaEvent) {
-          developer.log(
-            '🔧 Tool call detected: ${event.toolCall.function.name}',
-            name: 'LlmService',
-          );
-          developer.log(
-            '🔧 Tool arguments: ${event.toolCall.function.arguments}',
-            name: 'LlmService',
-          );
+        switch (event) {
+          case TextDeltaEvent(delta: final delta):
+            developer.log('💬 Text delta: "$delta"', name: 'LlmService');
+            textBuffer.write(delta);
+            yield delta;
 
-          // Parse tool call parameters
-          final toolName = event.toolCall.function.name;
-          final argumentsJson = event.toolCall.function.arguments;
+          case ToolCallDeltaEvent(toolCall: final toolCall):
+            developer.log(
+              '🔧 Tool call detected: ${toolCall.function.name}',
+              name: 'LlmService',
+            );
+            developer.log(
+              '🔧 Tool arguments: ${toolCall.function.arguments}',
+              name: 'LlmService',
+            );
 
-          // Parse arguments
-          final params = argumentsJson.isNotEmpty
-              ? Map<String, dynamic>.from(json.decode(argumentsJson))
-              : <String, dynamic>{};
+            toolCallsCollected.add(toolCall);
 
-          developer.log(
-            '🔧 Yielding tool call to UI layer: $toolName',
-            name: 'LlmService',
-          );
+            // Parse tool call parameters
+            final toolName = toolCall.function.name;
+            final argumentsJson = toolCall.function.arguments;
 
-          // Yield tool call information to the UI layer
-          // The UI will handle execution through AiActionHook
-          yield {'type': 'tool_call', 'name': toolName, 'params': params};
-        } else if (event is ErrorEvent) {
-          developer.log('❌ Error event: ${event.error}', name: 'LlmService');
-          yield 'Error: ${event.error}';
-          break;
+            // Parse arguments
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(json.decode(argumentsJson))
+                : <String, dynamic>{};
+
+            developer.log(
+              '🔧 Yielding tool call to UI layer: $toolName',
+              name: 'LlmService',
+            );
+
+            // Yield tool call information to the UI layer
+            // Include the ToolCall object so UI can use it with continueWithToolResults
+            yield {
+              'type': 'tool_call',
+              'name': toolName,
+              'params': params,
+              'toolCall': toolCall,
+            };
+
+          case CompletionEvent():
+            developer.log('🏁 Stream completed', name: 'LlmService');
+
+            // If tool calls were collected, yield completion info
+            if (toolCallsCollected.isNotEmpty) {
+              developer.log(
+                '📦 Collected ${toolCallsCollected.length} tool calls',
+                name: 'LlmService',
+              );
+
+              // Yield completion event with conversation and tool calls
+              // UI can use this to continue the conversation after tool execution
+              yield {
+                'type': 'completion',
+                'toolCalls': toolCallsCollected,
+                'text': textBuffer.toString(),
+                'conversation': conversation,
+              };
+            }
+
+          case ErrorEvent(error: final error):
+            developer.log('❌ Error event: $error', name: 'LlmService');
+            yield 'Error: $error';
+            break;
+
+          case ThinkingDeltaEvent():
+            // Handle thinking if needed in the future
+            developer.log('💭 Thinking event', name: 'LlmService');
         }
       }
 
       developer.log('✅ Stream completed', name: 'LlmService');
-    } catch (e) {
+    } catch (e, stackTrace) {
       developer.log(
         '❌ Exception in sendMessageWithTools: $e',
         name: 'LlmService',
+        error: e,
+        stackTrace: stackTrace,
       );
       yield 'Error: ${e.toString()}';
     }
   }
 
+  /// Continue conversation after tool execution (following official pattern)
+  ///
+  /// Takes the conversation state, tool calls, and results, then continues
+  /// the conversation with the LLM to get the final response.
+  ///
+  /// Parameters:
+  /// - conversation: The conversation up to the point of tool calls
+  /// - toolCalls: The ToolCall objects collected from the stream
+  /// - toolResults: Map of tool call ID to result content
+  /// - tools: Available tools for potential follow-up calls
+  Stream<String> continueWithToolResults(
+    List<ChatMessage> conversation,
+    List<ToolCall> toolCalls,
+    Map<String, String> toolResults, {
+    List<Tool>? tools,
+  }) async* {
+    final activeConfig = await _getActiveConfig();
+
+    if (activeConfig == null) {
+      yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
+      return;
+    }
+
+    try {
+      developer.log(
+        '🔄 Continuing with ${toolCalls.length} tool results',
+        name: 'LlmService',
+      );
+
+      // Get agent instruction if configured
+      final agentInstruction = getAgentInstruction(
+        activeConfig.config.identifier,
+      );
+
+      // Create provider with system instruction
+      final provider = await _createProvider(
+        activeConfig.config,
+        activeConfig.apiKey,
+        systemInstruction: agentInstruction,
+      );
+
+      // Build the continuation conversation
+      final updatedConversation = List<ChatMessage>.from(conversation);
+
+      // Add assistant message with tool calls
+      // Collect all text content that was yielded before tool calls
+      final assistantText = ''; // Tool calls typically don't have text content
+      updatedConversation.add(
+        ChatMessage.toolUse(toolCalls: toolCalls, content: assistantText),
+      );
+
+      // Add tool results
+      for (final toolCall in toolCalls) {
+        final result = toolResults[toolCall.id] ?? 'No result provided';
+        developer.log(
+          '📄 Adding result for ${toolCall.function.name}: ${result.length} chars',
+          name: 'LlmService',
+        );
+
+        updatedConversation.add(
+          ChatMessage.toolResult(results: [toolCall], content: result),
+        );
+      }
+
+      developer.log(
+        '📤 Getting final response with ${updatedConversation.length} messages',
+        name: 'LlmService',
+      );
+
+      // Get final response
+      final stream = provider.chatStream(updatedConversation, tools: tools);
+
+      await for (final event in stream) {
+        switch (event) {
+          case TextDeltaEvent(delta: final delta):
+            yield delta;
+
+          case ToolCallDeltaEvent():
+            // Handle potential follow-up tool calls
+            developer.log(
+              '🔧 Follow-up tool call detected',
+              name: 'LlmService',
+            );
+          // For now, just log. Could yield tool call info if needed
+
+          case ErrorEvent(error: final error):
+            developer.log('❌ Error event: $error', name: 'LlmService');
+            yield 'Error: $error';
+            break;
+
+          case CompletionEvent():
+            developer.log('🏁 Final response completed', name: 'LlmService');
+
+          case ThinkingDeltaEvent():
+            developer.log('💭 Thinking event', name: 'LlmService');
+        }
+      }
+
+      developer.log('✅ Continuation completed', name: 'LlmService');
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ Exception in continueWithToolResults: $e',
+        name: 'LlmService',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      yield 'Error: ${e.toString()}';
+    }
+  }
+
+  /// DEPRECATED: Use continueWithToolResults instead
   /// Continue conversation after tool execution
   /// Sends the tool result back to the LLM and streams its response
+  @Deprecated('Use continueWithToolResults with proper conversation state')
   Stream<String> continueWithToolResult(
     String toolName,
     Map<String, dynamic> toolParams,

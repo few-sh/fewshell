@@ -10,6 +10,7 @@ import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/pages/sessions_history.dart';
 import 'package:hello_world/services/llm_service.dart';
 import 'package:hello_world/services/ai_actions_config.dart';
+import 'package:llm_dart/llm_dart.dart' as llm show ChatMessage, ToolCall;
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -73,6 +74,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   // Pending action approval
   Map<String, dynamic>? _pendingAction;
+
+  // Track conversation state for tool calls (following official pattern)
+  List<llm.ChatMessage>? _conversationForToolCalls;
+  List<llm.ToolCall>? _pendingToolCalls;
+  // ignore: unused_field
+  String? _assistantTextBeforeTools; // For potential future use
 
   // Track last synced session to avoid duplicate syncs
   String? _lastSyncedSessionId;
@@ -399,6 +406,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   }
 
   /// Execute an action with the given parameters
+  /// Now follows the official llm_dart pattern for tool execution
   Future<void> _executeAction(
     String actionName,
     Map<String, dynamic> params,
@@ -410,6 +418,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     if (_actionContext == null) {
       developer.log('❌ Action context not available', name: 'ChatSession');
+      return;
+    }
+
+    // Ensure we have the conversation and tool calls from the stream
+    if (_conversationForToolCalls == null || _pendingToolCalls == null) {
+      developer.log(
+        '❌ Missing conversation or tool calls state',
+        name: 'ChatSession',
+      );
       return;
     }
 
@@ -425,7 +442,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         name: 'ChatSession',
       );
 
-      // Add result message to chat with the actual command details
+      // Add result message to chat UI with the actual command details
       final command = params['command'] ?? 'unknown command';
       final resultMessage = result.success
           ? '✅ Executed: `$command`\n\nResult: ${result.data}'
@@ -447,24 +464,26 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         ),
       );
 
-      // Clear pending action
+      // Clear pending action UI
       setState(() {
         _pendingAction = null;
+        _isLoading = true; // Show loading while getting LLM response
       });
 
-      // Send the tool result back to the LLM and get its response
-      developer.log('🔄 Sending tool result back to LLM', name: 'ChatSession');
+      // Build tool results map (tool call ID -> result content)
+      final toolResults = <String, String>{};
+      for (final toolCall in _pendingToolCalls!) {
+        if (toolCall.function.name == actionName) {
+          toolResults[toolCall.id] = result.success
+              ? result.data?.toString() ?? 'Success'
+              : 'Error: ${result.error}';
+        }
+      }
 
-      // Build current conversation history
-      final history = _controller.messages
-          .where((msg) => msg.text.isNotEmpty)
-          .map(
-            (msg) => {
-              'role': msg.user.id == 'user' ? 'user' : 'assistant',
-              'content': msg.text,
-            },
-          )
-          .toList();
+      developer.log(
+        '🔄 Continuing with tool results using official pattern',
+        name: 'ChatSession',
+      );
 
       // Get AI actions and convert to tools for potential follow-up calls
       final currentProject = ref.read(currentProjectProvider);
@@ -475,15 +494,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           .read(llmServiceProvider)
           .convertActionsToTools(aiActionsConfig.actions);
 
-      // Stream the LLM's response to the tool result
+      // Use the new continueWithToolResults method (official pattern)
       final llmResponseBuffer = StringBuffer();
       final llmService = ref.read(llmServiceProvider);
 
-      await for (final chunk in llmService.continueWithToolResult(
-        actionName,
-        params,
-        resultMessage,
-        history: history,
+      await for (final chunk in llmService.continueWithToolResults(
+        _conversationForToolCalls!,
+        _pendingToolCalls!,
+        toolResults,
         tools: tools,
       )) {
         llmResponseBuffer.write(chunk);
@@ -507,8 +525,21 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           ),
         );
       }
-    } catch (e) {
-      developer.log('❌ Action execution error: $e', name: 'ChatSession');
+
+      // Clear conversation state
+      setState(() {
+        _conversationForToolCalls = null;
+        _pendingToolCalls = null;
+        _assistantTextBeforeTools = null;
+        _isLoading = false;
+      });
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ Action execution error: $e',
+        name: 'ChatSession',
+        error: e,
+        stackTrace: stackTrace,
+      );
 
       final errorMessage = '❌ Error executing command: $e';
 
@@ -527,6 +558,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           customProperties: {'id': errorMessageId},
         ),
       );
+
+      // Clear state on error
+      setState(() {
+        _conversationForToolCalls = null;
+        _pendingToolCalls = null;
+        _assistantTextBeforeTools = null;
+        _isLoading = false;
+      });
     }
   }
 
@@ -631,7 +670,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               'content': msg.text,
             },
           )
-          .toList();
+          .toList()
+          .reversed
+          .toList(); // Reverse to chronological order for LLM
 
       developer.log(
         '📚 History built: ${history.length} messages',
@@ -651,13 +692,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       );
 
       developer.log(
-        '�🚀 Calling llmService.sendMessageWithTools...',
+        '🚀 Calling llmService.sendMessageWithTools...',
         name: 'ChatSession',
       );
 
-      // Collect the response and handle tool calls
+      // Collect the response and handle tool calls (following official pattern)
       final buffer = StringBuffer();
       var chunkCount = 0;
+      final collectedToolCalls = <llm.ToolCall>[];
 
       await for (final chunk in llmService.sendMessageWithTools(
         message.text,
@@ -667,44 +709,79 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         chunkCount++;
         developer.log('📦 Chunk #$chunkCount: $chunk', name: 'ChatSession');
 
-        // Check if this is a tool call
-        if (chunk is Map && chunk['type'] == 'tool_call') {
-          developer.log(
-            '🔧 Tool call received: ${chunk['name']}',
-            name: 'ChatSession',
-          );
+        if (chunk is Map) {
+          final type = chunk['type'] as String?;
 
-          // Add the tool call to chat history so the LLM remembers it
-          final command = chunk['params']?['command'] ?? 'unknown';
-          final explanation = chunk['params']?['explanation'] ?? '';
-          final toolCallMessage =
-              '🔧 Requesting to execute: `$command`\n$explanation';
+          if (type == 'tool_call') {
+            developer.log(
+              '🔧 Tool call received: ${chunk['name']}',
+              name: 'ChatSession',
+            );
 
-          // Save tool call message to database
-          final toolCallMessageId = await _saveMessageToDatabase(
-            content: toolCallMessage,
-            userId: 'ai',
-            userName: 'Ops Agent',
-          );
+            // Extract the ToolCall object
+            final toolCall = chunk['toolCall'] as llm.ToolCall?;
+            if (toolCall != null) {
+              collectedToolCalls.add(toolCall);
+            }
 
-          _controller.addMessage(
-            ChatMessage(
-              text: toolCallMessage,
-              user: _aiUser,
-              createdAt: DateTime.now(),
-              customProperties: {'id': toolCallMessageId},
-            ),
-          );
+            // Add the tool call to chat history so the LLM remembers it
+            final command = chunk['params']?['command'] ?? 'unknown';
+            final explanation = chunk['params']?['explanation'] ?? '';
+            final toolCallMessage =
+                '🔧 Requesting to execute: `$command`\n$explanation';
 
-          // Show the action approval overlay
-          setState(() {
-            _pendingAction = Map<String, dynamic>.from(chunk);
-            _isLoading = false; // Stop loading while waiting for user approval
-          });
+            // Save tool call message to database
+            final toolCallMessageId = await _saveMessageToDatabase(
+              content: toolCallMessage,
+              userId: 'ai',
+              userName: 'Ops Agent',
+            );
 
-          // Note: We return here and let the overlay handle execution
-          // The buffer will be added to chat when action completes
-          return;
+            _controller.addMessage(
+              ChatMessage(
+                text: toolCallMessage,
+                user: _aiUser,
+                createdAt: DateTime.now(),
+                customProperties: {'id': toolCallMessageId},
+              ),
+            );
+
+            // Don't return yet - collect all tool calls first
+            // Store for approval overlay
+            if (_pendingAction == null) {
+              _pendingAction = Map<String, dynamic>.from(chunk);
+            }
+          } else if (type == 'completion') {
+            developer.log(
+              '🏁 Completion event received with ${collectedToolCalls.length} tool calls',
+              name: 'ChatSession',
+            );
+
+            // Extract conversation state
+            final conversation =
+                chunk['conversation'] as List<llm.ChatMessage>?;
+
+            if (collectedToolCalls.isNotEmpty && conversation != null) {
+              // Save state for tool execution continuation
+              _conversationForToolCalls = conversation;
+              _pendingToolCalls = collectedToolCalls;
+              _assistantTextBeforeTools = buffer.toString();
+
+              developer.log(
+                '📦 Saved conversation state with ${conversation.length} messages',
+                name: 'ChatSession',
+              );
+
+              // Show the action approval overlay for the first tool call
+              setState(() {
+                _isLoading =
+                    false; // Stop loading while waiting for user approval
+              });
+
+              // Return here and let the overlay handle execution
+              return;
+            }
+          }
         } else if (chunk is String) {
           // Regular text chunk
           buffer.write(chunk);
