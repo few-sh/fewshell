@@ -430,29 +430,50 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
             // Multi-command approval overlay (shown when tool calls are pending)
             if (_pendingActions != null && _pendingActions!.isNotEmpty)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: MultiCommandApprovalOverlay(
-                  actions: _pendingActions!,
-                  onExecute: _executeMultipleActions,
-                  onDismiss: () {
-                    setState(() {
-                      _pendingActions = null;
-                    });
-                  },
-                ),
+              Builder(
+                builder: (context) {
+                  developer.log(
+                    '🎨 BUILD: Rendering approval overlay with ${_pendingActions!.length} actions',
+                    name: 'ChatSession',
+                  );
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: MultiCommandApprovalOverlay(
+                      actions: _pendingActions!,
+                      onExecute: _executeMultipleActions,
+                      onDismiss: () {
+                        developer.log(
+                          '🧹 CLEARING _pendingActions from onDismiss',
+                          name: 'ChatSession',
+                          stackTrace: StackTrace.current,
+                        );
+                        setState(() {
+                          _pendingActions = null;
+                        });
+                      },
+                    ),
+                  );
+                },
               ),
 
             // Execution progress overlay (shown during command execution)
             if (_currentExecutingIndex != null &&
                 _totalExecutingCommands != null &&
                 _currentExecutingCommand != null)
-              ExecutionProgressOverlay(
-                currentCommand: _currentExecutingIndex!,
-                totalCommands: _totalExecutingCommands!,
-                commandName: _currentExecutingCommand!,
+              Builder(
+                builder: (context) {
+                  developer.log(
+                    '⏳ BUILD: Rendering progress overlay - ${_currentExecutingIndex}/${_totalExecutingCommands}',
+                    name: 'ChatSession',
+                  );
+                  return ExecutionProgressOverlay(
+                    currentCommand: _currentExecutingIndex!,
+                    totalCommands: _totalExecutingCommands!,
+                    commandName: _currentExecutingCommand!,
+                  );
+                },
               ),
           ],
         ),
@@ -476,6 +497,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     }
 
     // Clear the approval overlay
+    developer.log(
+      '🧹 CLEARING _pendingActions at start of execution',
+      name: 'ChatSession',
+      stackTrace: StackTrace.current,
+    );
     setState(() {
       _pendingActions = null;
       _totalExecutingCommands = selectedActions.length;
@@ -665,10 +691,24 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 name: 'ChatSession',
               );
 
+              developer.log(
+                '📊 followUpToolCallMaps length: ${followUpToolCallMaps.length}',
+                name: 'ChatSession',
+              );
+
               final conversation =
                   chunk['conversation'] as List<llm.ChatMessage>?;
 
+              developer.log(
+                '📝 Conversation null? ${conversation == null}',
+                name: 'ChatSession',
+              );
+
               if (followUpToolCalls.isNotEmpty && conversation != null) {
+                developer.log(
+                  '✅ Both conditions met - proceeding with follow-up',
+                  name: 'ChatSession',
+                );
                 // Update state for follow-up tool execution
                 _conversationForToolCalls = conversation;
                 _pendingToolCalls = followUpToolCalls;
@@ -681,19 +721,63 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
                 // Create CommandAction objects for follow-up
                 final actions = followUpToolCallMaps.map((chunk) {
+                  final toolCall = chunk['toolCall'] as llm.ToolCall?;
+                  final toolCallId = toolCall?.id ?? DateTime.now().toString();
+
+                  developer.log(
+                    '🔧 Creating CommandAction with ID: $toolCallId, name: ${chunk['name']}',
+                    name: 'ChatSession',
+                  );
+
                   return CommandAction(
-                    id: chunk['toolCall']?.id ?? DateTime.now().toString(),
+                    id: toolCallId,
                     actionName: chunk['name'] as String,
                     params: chunk['params'] as Map<String, dynamic>,
                     isSelected: true,
                   );
                 }).toList();
 
+                developer.log(
+                  '🎯 Created ${actions.length} CommandAction objects for follow-up',
+                  name: 'ChatSession',
+                );
+
+                developer.log(
+                  '🔍 Widget mounted: $mounted, actions isEmpty: ${actions.isEmpty}',
+                  name: 'ChatSession',
+                );
+
                 // Show the multi-command approval overlay again
-                setState(() {
-                  _pendingActions = actions;
-                  _isLoading = false;
-                });
+                if (mounted) {
+                  setState(() {
+                    _pendingActions = actions;
+                    _isLoading = false;
+                    // Clear execution progress overlay so approval overlay can show
+                    _currentExecutingIndex = null;
+                    _totalExecutingCommands = null;
+                    _currentExecutingCommand = null;
+                  });
+
+                  developer.log(
+                    '🎬 setState called - _pendingActions set to ${_pendingActions?.length} actions',
+                    name: 'ChatSession',
+                  );
+
+                  // Check state after next frame to verify it persists
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    developer.log(
+                      '🖼️ POST-FRAME: _pendingActions = ${_pendingActions?.length}, '
+                      '_currentExecutingIndex = $_currentExecutingIndex, '
+                      '_totalExecutingCommands = $_totalExecutingCommands',
+                      name: 'ChatSession',
+                    );
+                  });
+                } else {
+                  developer.log(
+                    '❌ Widget not mounted - cannot show overlay',
+                    name: 'ChatSession',
+                  );
+                }
 
                 // Return to let user approve follow-up commands
                 return;

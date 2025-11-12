@@ -82,11 +82,19 @@ class _MultiCommandApprovalOverlayState
     }
 
     try {
+      // Execute and check if we should dismiss
+      // onExecute may set new pending actions for follow-up commands
       await widget.onExecute(selectedActions);
+
+      // Only dismiss if the callback is provided
+      // The parent will handle dismissal logic
       if (mounted) {
         await _animationController.reverse();
       }
-      widget.onDismiss();
+
+      // Note: We don't call onDismiss here anymore
+      // The parent (_executeMultipleActions) will clear _pendingActions
+      // at the start of execution, and will set it again if there are follow-ups
     } catch (e) {
       if (mounted) {
         setState(() => _isExecuting = false);
