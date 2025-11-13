@@ -97,6 +97,11 @@ class ChatRepository {
     return await _llmService.getCurrentIdentifier();
   }
 
+  /// Generate a unique message ID
+  String generateMessageId() {
+    return _messageActions.generateMessageId();
+  }
+
   /// Save a user message to the database
   /// Returns the message ID
   Future<String> saveUserMessage({
@@ -114,10 +119,12 @@ class ChatRepository {
   /// Save an AI message to the database
   /// Returns the message ID
   Future<String> saveAiMessage({
+    String? id, // Optional pre-generated ID
     required String sessionId,
     required String content,
   }) async {
     return await _messageActions.insertMessage(
+      id: id,
       sessionId: sessionId,
       userId: 'ai',
       userName: 'Ops Agent',
@@ -167,9 +174,11 @@ class ChatRepository {
   Future<MessageResult> sendMessageToAI({
     required String messageContent,
     required List<Map<String, String>> conversationHistory,
+    required String
+    messageId, // Pre-generated message ID to use for streaming and DB
     void Function(String messageId)? onStreamStart,
     void Function(String messageId, String currentText)? onStreamChunk,
-    void Function(String messageId)? onStreamEnd,
+    void Function(String streamingMessageId)? onStreamEnd,
   }) async {
     try {
       developer.log('🚀 Sending message to AI', name: 'ChatRepository');
@@ -191,9 +200,6 @@ class ChatRepository {
       final collectedToolCalls = <ToolCallRequest>[];
       List<llm.ChatMessage>? conversationState;
 
-      // Generate a temporary message ID for streaming
-      final streamingMessageId =
-          'streaming_${DateTime.now().millisecondsSinceEpoch}';
       var hasStartedStreaming = false;
 
       await for (final chunk in _llmService.sendMessageWithTools(
@@ -232,21 +238,21 @@ class ChatRepository {
         } else if (chunk is String) {
           buffer.write(chunk);
 
-          // Notify streaming callbacks
+          // Notify streaming callbacks with the pre-generated message ID
           if (!hasStartedStreaming && onStreamStart != null) {
-            onStreamStart(streamingMessageId);
+            onStreamStart(messageId);
             hasStartedStreaming = true;
           }
 
           if (onStreamChunk != null) {
-            onStreamChunk(streamingMessageId, buffer.toString());
+            onStreamChunk(messageId, buffer.toString());
           }
         }
       }
 
       // Stop streaming when complete
       if (hasStartedStreaming && onStreamEnd != null) {
-        onStreamEnd(streamingMessageId);
+        onStreamEnd(messageId);
       }
 
       developer.log('✅ AI response complete', name: 'ChatRepository');

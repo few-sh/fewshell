@@ -38,6 +38,7 @@ class MessageActions {
 
   /// Create a new message
   Future<String> insertMessage({
+    String? id, // Optional pre-generated ID
     required String sessionId,
     required String userId,
     required String userName,
@@ -46,10 +47,10 @@ class MessageActions {
     String? metadata,
   }) async {
     final now = DateTime.now();
-    final id = _generateMessageId();
+    final messageId = id ?? _generateMessageId();
 
     final companion = MessageEntityCompanion(
-      id: drift.Value(id),
+      id: drift.Value(messageId),
       sessionId: drift.Value(sessionId),
       userId: drift.Value(userId),
       userName: drift.Value(userName),
@@ -61,7 +62,7 @@ class MessageActions {
     );
 
     await _messageDao.insertMessage(companion);
-    return id;
+    return messageId;
   }
 
   /// Update an existing message
@@ -115,6 +116,11 @@ class MessageActions {
   /// Generate a unique message ID
   String _generateMessageId() {
     return 'msg_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
+  }
+
+  /// Generate a unique message ID (public method for pre-generation)
+  String generateMessageId() {
+    return _generateMessageId();
   }
 
   /// Generate a random string for ID uniqueness

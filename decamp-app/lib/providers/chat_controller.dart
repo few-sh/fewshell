@@ -109,10 +109,14 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
+      // Generate message ID upfront for consistent tracking across streaming and DB
+      final aiMessageId = _repository.generateMessageId();
+
       // Send message to AI with streaming support
       final result = await _repository.sendMessageToAI(
         messageContent: content,
         conversationHistory: conversationHistory,
+        messageId: aiMessageId, // Use pre-generated ID
         onStreamStart: (messageId) {
           startStreaming(messageId);
         },
@@ -178,20 +182,14 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Save text response if any
       if (result.hasTextResponse) {
-        final messageId = await _repository.saveAiMessage(
+        // Save with the pre-generated ID that was used during streaming
+        await _repository.saveAiMessage(
+          id: aiMessageId,
           sessionId: sessionId,
           content: result.textResponse!,
         );
 
-        addMessageToUI(
-          ChatMessage(
-            text: result.textResponse!,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
-        );
+        // Message is already in UI from streaming, no need to add it again
       }
 
       state = state.copyWith(isLoading: false);

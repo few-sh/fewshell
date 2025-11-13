@@ -119,7 +119,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         },
         startStreaming: (messageId) {
           if (mounted) {
-            // Add an empty message that will be updated
+            // Add an empty message that will be updated with the same ID
             final streamingMessage = ChatMessage(
               text: '',
               user: _aiUser,
@@ -129,6 +129,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             );
             _controller.addMessage(streamingMessage);
             _controller.setStreamingMessage(messageId);
+
+            // Mark this ID as synced to prevent database sync from re-adding it
+            _syncedMessageIds.add(messageId);
           }
         },
         updateStreamingMessage: (messageId, text) {
