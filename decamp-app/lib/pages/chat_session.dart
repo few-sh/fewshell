@@ -147,8 +147,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       if (_lastSyncedSessionId != currentSessionId) {
         _lastSyncedSessionId = currentSessionId;
 
-        // Convert all messages to ChatMessage format
-        final chatMessages = messages.map((msg) {
+        // Convert all messages to ChatMessage format (exclude 'tool' messages - they're for LLM only)
+        final chatMessages = messages.where((msg) => msg.userId != 'tool').map((
+          msg,
+        ) {
           return ChatMessage(
             text: msg.content,
             user: msg.userId == 'user' ? _currentUser : _aiUser,
@@ -170,15 +172,18 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         for (final msg in messages) {
           if (!_syncedMessageIds.contains(msg.id)) {
             _syncedMessageIds.add(msg.id);
-            newMessages.add(
-              ChatMessage(
-                text: msg.content,
-                user: msg.userId == 'user' ? _currentUser : _aiUser,
-                createdAt: msg.createdAt,
-                customProperties: {'id': msg.id},
-                isMarkdown: true,
-              ),
-            );
+            // Skip tool messages - they're for LLM conversation only, not UI display
+            if (msg.userId != 'tool') {
+              newMessages.add(
+                ChatMessage(
+                  text: msg.content,
+                  user: msg.userId == 'user' ? _currentUser : _aiUser,
+                  createdAt: msg.createdAt,
+                  customProperties: {'id': msg.id},
+                  isMarkdown: true,
+                ),
+              );
+            }
           }
         }
 
