@@ -74,18 +74,34 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
-    // Build conversation history
-    final history = _controller.messages
-        .where((msg) => msg.text.isNotEmpty)
+    // Build conversation history from DATABASE, not from UI controller
+    // The UI controller might not have the latest messages yet due to async sync
+    final messages = await ref.read(currentSessionMessagesProvider.future);
+    final history = messages
         .map(
           (msg) => {
-            'role': msg.user.id == 'user' ? 'user' : 'assistant',
-            'content': msg.text,
+            'role': msg.userId == 'user' ? 'user' : 'assistant',
+            'content': msg.content,
           },
         )
         .toList();
 
-    final isFirstMessage = _controller.messages.isEmpty;
+    developer.log(
+      '📚 History has ${history.length} messages (from database)',
+      name: 'ChatSession.New',
+    );
+    for (var i = 0; i < history.length; i++) {
+      final content = history[i]['content'] ?? '';
+      final preview = content.length > 50
+          ? '${content.substring(0, 50)}...'
+          : content;
+      developer.log(
+        '  [$i] ${history[i]['role']}: $preview',
+        name: 'ChatSession.New',
+      );
+    }
+
+    final isFirstMessage = messages.isEmpty;
 
     try {
       // Delegate to controller

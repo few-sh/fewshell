@@ -48,6 +48,18 @@ class ChatController extends StateNotifier<ChatState> {
   }) async {
     developer.log('🎯 sendMessage called', name: 'ChatController');
 
+    // Save user's message to database
+    // Note: The UI already has the message (added by AiChatWidget), we just save it
+    final userMessageId = await _repository.saveUserMessage(
+      sessionId: sessionId,
+      content: content,
+    );
+
+    developer.log(
+      'User message saved with ID: $userMessageId',
+      name: 'ChatController',
+    );
+
     // Update session description if first message
     await _repository.updateSessionDescriptionIfNeeded(
       sessionId: sessionId,
