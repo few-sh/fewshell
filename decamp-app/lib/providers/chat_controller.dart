@@ -305,7 +305,19 @@ class ChatController extends StateNotifier<ChatState> {
         executeAction: executeAction,
       );
 
-      // Save result messages to database and UI
+      // Save tool result messages to database with role 'tool'
+      // These are the actual tool execution results that the LLM needs
+      for (var i = 0; i < result.toolCalls.length; i++) {
+        final toolCall = result.toolCalls[i];
+        final toolResult = result.toolResults[toolCall.id] ?? 'No result';
+
+        await _repository.saveToolMessage(
+          sessionId: sessionId,
+          content: toolResult,
+        );
+      }
+
+      // Save human-readable result messages to database and UI
       for (final message in result.chatMessages) {
         final messageId = await _repository.saveAiMessage(
           sessionId: sessionId,

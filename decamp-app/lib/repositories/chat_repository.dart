@@ -55,12 +55,15 @@ class ToolCallRequest {
 class ToolExecutionResult {
   final Map<String, String> toolResults;
   final List<String> chatMessages;
+  final List<ToolCallRequest>
+  toolCalls; // Add this to track which tool calls were made
   final MessageResult? followUpResult;
   final String? error;
 
   const ToolExecutionResult({
     required this.toolResults,
     required this.chatMessages,
+    required this.toolCalls, // Add required parameter
     this.followUpResult,
     this.error,
   });
@@ -122,6 +125,20 @@ class ChatRepository {
       sessionId: sessionId,
       userId: 'ai',
       userName: 'Ops Agent',
+      content: content,
+    );
+  }
+
+  /// Save a tool result message to the database
+  /// Returns the message ID
+  Future<String> saveToolMessage({
+    required String sessionId,
+    required String content,
+  }) async {
+    return await _messageActions.sendMessage(
+      sessionId: sessionId,
+      userId: 'tool',
+      userName: 'Tool',
       content: content,
     );
   }
@@ -299,6 +316,7 @@ class ChatRepository {
       return ToolExecutionResult(
         toolResults: toolResults,
         chatMessages: chatMessages,
+        toolCalls: toolCalls, // Add the tool calls
         followUpResult: followUpResult,
       );
     } catch (e, stackTrace) {
@@ -312,6 +330,7 @@ class ChatRepository {
       return ToolExecutionResult(
         toolResults: toolResults,
         chatMessages: chatMessages,
+        toolCalls: toolCalls, // Add the tool calls even on error
         error: e.toString(),
       );
     }
