@@ -416,7 +416,10 @@ class ChatRepository {
     final buffer = StringBuffer();
 
     if (success) {
-      buffer.writeln('✅ **Executed:** `$command`');
+      buffer.writeln('✅ **Executed:**');
+      buffer.writeln('```');
+      buffer.writeln(command);
+      buffer.writeln('```');
       buffer.writeln();
 
       // Print stdout if available
