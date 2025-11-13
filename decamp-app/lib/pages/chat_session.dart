@@ -9,6 +9,7 @@ import 'package:hello_world/providers/session_provider.dart';
 import 'package:hello_world/providers/message_provider.dart';
 import 'package:hello_world/providers/llm_settings_provider.dart';
 import 'package:hello_world/providers/settings_provider.dart';
+import 'package:hello_world/providers/chat_controller.dart';
 import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/pages/sessions_history.dart';
 import 'package:hello_world/services/llm_service.dart';
@@ -111,6 +112,67 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     super.dispose();
   }
 
+  // ============================================================================
+  // NEW: Controller-based message handling (Phase 1 - parallel implementation)
+  // ============================================================================
+
+  /// NEW: Handle sending messages using ChatController
+  /// This will eventually replace _handleSendMessage
+  Future<void> _handleSendMessageWithController(ChatMessage message) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) {
+      developer.log('No session selected', name: 'ChatSession.New');
+      return;
+    }
+
+    developer.log(
+      '🎯 NEW: Sending message via controller',
+      name: 'ChatSession.New',
+    );
+
+    // Get the controller
+    final controller = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    // Build conversation history
+    final history = _controller.messages
+        .where((msg) => msg.text.isNotEmpty)
+        .map(
+          (msg) => {
+            'role': msg.user.id == 'user' ? 'user' : 'assistant',
+            'content': msg.text,
+          },
+        )
+        .toList();
+
+    final isFirstMessage = _controller.messages.isEmpty;
+
+    try {
+      // Delegate to controller
+      await controller.sendMessage(
+        content: message.text,
+        sessionId: currentSessionId,
+        conversationHistory: history,
+        isFirstMessage: isFirstMessage,
+        addMessageToUI: (chatMessage) {
+          if (mounted) {
+            _controller.addMessage(chatMessage);
+          }
+        },
+      );
+    } catch (e) {
+      developer.log(
+        '❌ Error in controller sendMessage: $e',
+        name: 'ChatSession.New',
+      );
+    }
+  }
+
+  // ============================================================================
+  // END NEW CODE
+  // ============================================================================
+
   /// Sync messages from provider to controller
   /// Only called when messages actually change, not on every build
   Future<void> _syncMessagesFromProvider() async {
@@ -207,6 +269,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
+
+    // NEW: Watch chat controller for the current session
+    // Controller auto-recreates when sessionId changes (family provider)
+    final chatState = ref.watch(chatControllerProvider(currentSessionId));
+    final chatController = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
 
     // NOTE: ref.listen() in build() is the correct Riverpod pattern
     // It's automatically deduplicated and cleaned up by the framework
@@ -428,12 +497,17 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               ),
             ),
 
-            // Multi-command approval overlay (shown when tool calls are pending)
-            if (_pendingActions != null && _pendingActions!.isNotEmpty)
+            // Multi-command approval overlay (NEW: also check chatState)
+            if (_pendingActions != null && _pendingActions!.isNotEmpty ||
+                chatState.hasPendingActions)
               Builder(
                 builder: (context) {
+                  // Use chatState if available, fall back to old state
+                  final actions =
+                      chatState.pendingActions ?? _pendingActions ?? [];
+
                   developer.log(
-                    '🎨 BUILD: Rendering approval overlay with ${_pendingActions!.length} actions',
+                    '🎨 BUILD: Rendering approval overlay with ${actions.length} actions',
                     name: 'ChatSession',
                   );
                   return Positioned(
@@ -441,7 +515,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     right: 0,
                     bottom: 0,
                     child: MultiCommandApprovalOverlay(
-                      actions: _pendingActions!,
+                      actions: actions,
                       onExecute: _executeMultipleActions,
                       onDismiss: () {
                         developer.log(
@@ -452,13 +526,19 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         setState(() {
                           _pendingActions = null;
                         });
+                        // Also clear from controller
+                        ref
+                            .read(
+                              chatControllerProvider(currentSessionId).notifier,
+                            )
+                            .cancelActions();
                       },
                     ),
                   );
                 },
               ),
 
-            // Execution progress overlay (shown during command execution)
+            // Execution progress overlay (NEW: also check chatState)
             if (_currentExecutingIndex != null &&
                 _totalExecutingCommands != null &&
                 _currentExecutingCommand != null)
