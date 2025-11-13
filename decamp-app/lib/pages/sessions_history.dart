@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hello_world/providers/project_provider.dart';
-import 'package:hello_world/providers/session_provider.dart';
-import 'package:hello_world/utils/date_formatter.dart';
+import 'package:decamp/providers/project_provider.dart';
+import 'package:decamp/providers/session_provider.dart';
+import 'package:decamp/utils/date_formatter.dart';
 
 /// Sessions History Page
 /// Displays all sessions for the current project

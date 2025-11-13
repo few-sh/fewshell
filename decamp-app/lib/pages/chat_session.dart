@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
-import 'package:hello_world/components/main_drawer.dart';
-import 'package:hello_world/components/multi_command_approval_overlay.dart';
-import 'package:hello_world/components/execution_progress_overlay.dart';
-import 'package:hello_world/providers/project_provider.dart';
-import 'package:hello_world/providers/session_provider.dart';
-import 'package:hello_world/providers/message_provider.dart';
-import 'package:hello_world/providers/chat_controller.dart';
-import 'package:hello_world/pages/projects_page.dart';
-import 'package:hello_world/pages/sessions_history.dart';
-import 'package:hello_world/services/ai_actions_config.dart';
+import 'package:decamp/components/main_drawer.dart';
+import 'package:decamp/components/multi_command_approval_overlay.dart';
+import 'package:decamp/components/execution_progress_overlay.dart';
+import 'package:decamp/providers/project_provider.dart';
+import 'package:decamp/providers/session_provider.dart';
+import 'package:decamp/providers/message_provider.dart';
+import 'package:decamp/providers/chat_controller.dart';
+import 'package:decamp/pages/projects_page.dart';
+import 'package:decamp/pages/sessions_history.dart';
+import 'package:decamp/services/ai_actions_config.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {

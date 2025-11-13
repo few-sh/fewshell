@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hello_world/providers/project_provider.dart';
-import 'package:hello_world/pages/projects_page.dart';
-import 'package:hello_world/pages/main_settings.dart';
-import 'package:hello_world/pages/agent_instructions_page.dart';
-import 'package:hello_world/pages/secrets_page.dart';
-import 'package:hello_world/pages/snippets_page.dart';
+import 'package:decamp/providers/project_provider.dart';
+import 'package:decamp/pages/projects_page.dart';
+import 'package:decamp/pages/main_settings.dart';
+import 'package:decamp/pages/agent_instructions_page.dart';
+import 'package:decamp/pages/secrets_page.dart';
+import 'package:decamp/pages/snippets_page.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key});

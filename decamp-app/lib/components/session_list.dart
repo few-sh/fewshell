@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hello_world/utils/date_formatter.dart';
+import 'package:decamp/utils/date_formatter.dart';
 
 class ChatSessionItem {
   final String id;

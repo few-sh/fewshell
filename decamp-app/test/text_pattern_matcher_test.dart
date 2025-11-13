@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hello_world/utils/text_pattern_matcher.dart';
+import 'package:decamp/utils/text_pattern_matcher.dart';
 
 void main() {
   group('URL normalization and matching', () {
