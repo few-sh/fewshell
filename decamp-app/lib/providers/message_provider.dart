@@ -36,8 +36,8 @@ class MessageActions {
 
   MessageActions(this._messageDao);
 
-  /// Send/create a new message
-  Future<String> sendMessage({
+  /// Create a new message
+  Future<String> insertMessage({
     required String sessionId,
     required String userId,
     required String userName,

@@ -107,7 +107,7 @@ class ChatRepository {
     required String sessionId,
     required String content,
   }) async {
-    return await _messageActions.sendMessage(
+    return await _messageActions.insertMessage(
       sessionId: sessionId,
       userId: 'user',
       userName: 'You',
@@ -121,7 +121,7 @@ class ChatRepository {
     required String sessionId,
     required String content,
   }) async {
-    return await _messageActions.sendMessage(
+    return await _messageActions.insertMessage(
       sessionId: sessionId,
       userId: 'ai',
       userName: 'Ops Agent',
@@ -135,7 +135,7 @@ class ChatRepository {
     required String sessionId,
     required String content,
   }) async {
-    return await _messageActions.sendMessage(
+    return await _messageActions.insertMessage(
       sessionId: sessionId,
       userId: 'tool',
       userName: 'Tool',
