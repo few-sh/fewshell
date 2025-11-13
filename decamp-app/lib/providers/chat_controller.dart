@@ -80,6 +80,7 @@ class ChatController extends StateNotifier<ChatState> {
             user: _aiUser,
             createdAt: DateTime.now(),
             customProperties: {'id': messageId},
+            isMarkdown: true,
           ),
         );
 
@@ -109,6 +110,7 @@ class ChatController extends StateNotifier<ChatState> {
             user: _aiUser,
             createdAt: DateTime.now(),
             customProperties: {'id': messageId},
+            isMarkdown: true,
           ),
         );
 
@@ -130,6 +132,7 @@ class ChatController extends StateNotifier<ChatState> {
               user: _aiUser,
               createdAt: DateTime.now(),
               customProperties: {'id': messageId},
+              isMarkdown: true,
             ),
           );
         }
@@ -202,6 +205,7 @@ class ChatController extends StateNotifier<ChatState> {
           user: _aiUser,
           createdAt: DateTime.now(),
           customProperties: {'id': messageId},
+          isMarkdown: true,
         ),
       );
 

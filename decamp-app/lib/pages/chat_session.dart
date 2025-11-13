@@ -136,6 +136,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             user: msg.userId == 'user' ? _currentUser : _aiUser,
             createdAt: msg.createdAt,
             customProperties: {'id': msg.id},
+            isMarkdown: true,
           );
         }).toList();
 
@@ -157,6 +158,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 user: msg.userId == 'user' ? _currentUser : _aiUser,
                 createdAt: msg.createdAt,
                 customProperties: {'id': msg.id},
+                isMarkdown: true,
               ),
             );
           }
