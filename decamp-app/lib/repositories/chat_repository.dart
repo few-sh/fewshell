@@ -45,10 +45,6 @@ class ToolCallRequest {
 
   /// Get the explanation from params (if applicable)
   String get explanation => params['explanation'] as String? ?? '';
-
-  /// Format as a human-readable message
-  String get formattedMessage =>
-      '🔧 Requesting to execute: `$command`\n$explanation';
 }
 
 /// Result of executing tool calls
@@ -417,15 +413,16 @@ class ChatRepository {
     dynamic data,
     dynamic error,
   ) {
+    final buffer = StringBuffer();
+
     if (success) {
-      final buffer = StringBuffer();
-      buffer.writeln('✅ Executed: `$command`');
+      buffer.writeln('✅ **Executed:** `$command`');
       buffer.writeln();
 
       // Print stdout if available
       final stdout = data?['stdout']?.toString().trim() ?? '';
       if (stdout.isNotEmpty) {
-        buffer.writeln('Result:');
+        buffer.writeln('**Result:**');
         buffer.writeln('```');
         buffer.writeln(stdout);
         buffer.writeln('```');
@@ -435,7 +432,7 @@ class ChatRepository {
       final stderr = data?['stderr']?.toString().trim() ?? '';
       if (stderr.isNotEmpty) {
         buffer.writeln();
-        buffer.writeln('**⚠️ stderr:**');
+        buffer.writeln('**⚠️ Warning (stderr):**');
         buffer.writeln('```');
         buffer.writeln(stderr);
         buffer.writeln('```');
@@ -447,11 +444,16 @@ class ChatRepository {
         buffer.writeln();
         buffer.writeln('**Exit Code:** $exitCode');
       }
-
-      return buffer.toString().trim();
     } else {
-      return '❌ Failed to execute: `$command`\n\nError: $error';
+      buffer.writeln('❌ **Failed:** `$command`');
+      buffer.writeln();
+      buffer.writeln('**Error:**');
+      buffer.writeln('```');
+      buffer.writeln(error?.toString() ?? 'Unknown error');
+      buffer.writeln('```');
     }
+
+    return buffer.toString().trim();
   }
 }
 

@@ -426,6 +426,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         final actionHook = AiActionHook.of(_actionContext!);
                         await chatController.executeActions(
                           selectedActions: selectedActions,
+                          allActions: actions,
                           sessionId: currentSessionId!,
                           executeAction: (actionName, params) async {
                             final result = await actionHook.executeAction(

@@ -130,26 +130,6 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
-      // Save tool call messages if any
-      if (result.toolCalls != null) {
-        for (final toolCall in result.toolCalls!) {
-          final messageId = await _repository.saveAiMessage(
-            sessionId: sessionId,
-            content: toolCall.formattedMessage,
-          );
-
-          addMessageToUI(
-            ChatMessage(
-              text: toolCall.formattedMessage,
-              user: _aiUser,
-              createdAt: DateTime.now(),
-              customProperties: {'id': messageId},
-              isMarkdown: true,
-            ),
-          );
-        }
-      }
-
       // Handle tool calls by showing approval overlay
       if (result.hasToolCalls && result.conversationState != null) {
         developer.log(
@@ -228,6 +208,7 @@ class ChatController extends StateNotifier<ChatState> {
   /// Execute multiple approved actions
   Future<void> executeActions({
     required List<CommandAction> selectedActions,
+    required List<CommandAction> allActions,
     required String sessionId,
     required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
     executeAction,
@@ -272,6 +253,32 @@ class ChatController extends StateNotifier<ChatState> {
       // Clear execution progress, show loading for LLM response
       state = state.copyWith(executionProgress: null, isLoading: true);
 
+      // Determine which actions were skipped
+      final selectedIds = selectedActions.map((a) => a.id).toSet();
+      final skippedActions = allActions
+          .where((a) => !selectedIds.contains(a.id))
+          .toList();
+
+      // Display "Skipped" messages for unselected actions
+      for (final skippedAction in skippedActions) {
+        final skippedMessage = '⏭️ **Skipped:** `${skippedAction.command}`';
+
+        final messageId = await _repository.saveAiMessage(
+          sessionId: sessionId,
+          content: skippedMessage,
+        );
+
+        addMessageToUI(
+          ChatMessage(
+            text: skippedMessage,
+            user: _aiUser,
+            createdAt: DateTime.now(),
+            customProperties: {'id': messageId},
+            isMarkdown: true,
+          ),
+        );
+      }
+
       // Execute tool calls through repository
       final result = await _repository.executeToolCalls(
         toolCalls: selectedActions.map((action) {
@@ -305,33 +312,32 @@ class ChatController extends StateNotifier<ChatState> {
         executeAction: executeAction,
       );
 
-      // Save tool result messages to database with role 'tool'
-      // These are the actual tool execution results that the LLM needs
+      // Save formatted tool result messages (these are now nicely formatted and user-visible)
       for (var i = 0; i < result.toolCalls.length; i++) {
         final toolCall = result.toolCalls[i];
-        final toolResult = result.toolResults[toolCall.id] ?? 'No result';
+        final formattedResult = result.chatMessages[i];
 
-        await _repository.saveToolMessage(
-          sessionId: sessionId,
-          content: toolResult,
-        );
-      }
-
-      // Save human-readable result messages to database and UI
-      for (final message in result.chatMessages) {
+        // Save the formatted message as an AI message for display
         final messageId = await _repository.saveAiMessage(
           sessionId: sessionId,
-          content: message,
+          content: formattedResult,
         );
 
         addMessageToUI(
           ChatMessage(
-            text: message,
+            text: formattedResult,
             user: _aiUser,
             createdAt: DateTime.now(),
             customProperties: {'id': messageId},
             isMarkdown: true,
           ),
+        );
+
+        // Also save raw result for LLM conversation (not displayed in UI)
+        final toolResult = result.toolResults[toolCall.id] ?? 'No result';
+        await _repository.saveToolMessage(
+          sessionId: sessionId,
+          content: toolResult,
         );
       }
 
@@ -339,24 +345,8 @@ class ChatController extends StateNotifier<ChatState> {
       if (result.hasFollowUp) {
         final followUp = result.followUpResult!;
 
-        // Save follow-up tool call messages
+        // Show approval overlay for follow-up (don't display messages yet)
         if (followUp.toolCalls != null) {
-          for (final toolCall in followUp.toolCalls!) {
-            final messageId = await _repository.saveAiMessage(
-              sessionId: sessionId,
-              content: toolCall.formattedMessage,
-            );
-
-            addMessageToUI(
-              ChatMessage(
-                text: toolCall.formattedMessage,
-                user: _aiUser,
-                createdAt: DateTime.now(),
-                customProperties: {'id': messageId},
-              ),
-            );
-          }
-
           // Show approval overlay for follow-up
           final actions = followUp.toolCalls!.map((tc) {
             return CommandAction(
