@@ -7,14 +7,10 @@ import 'package:hello_world/components/execution_progress_overlay.dart';
 import 'package:hello_world/providers/project_provider.dart';
 import 'package:hello_world/providers/session_provider.dart';
 import 'package:hello_world/providers/message_provider.dart';
-import 'package:hello_world/providers/llm_settings_provider.dart';
-import 'package:hello_world/providers/settings_provider.dart';
 import 'package:hello_world/providers/chat_controller.dart';
 import 'package:hello_world/pages/projects_page.dart';
 import 'package:hello_world/pages/sessions_history.dart';
-import 'package:hello_world/services/llm_service.dart';
 import 'package:hello_world/services/ai_actions_config.dart';
-import 'package:llm_dart/llm_dart.dart' as llm show ChatMessage, ToolCall;
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -28,81 +24,24 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Controller for managing chat messages
   final _controller = ChatMessagesController();
 
-  // Counter for generating unique message IDs
-  int _messageIdCounter = 0;
-
-  /// Generate a unique message ID
-  String _generateMessageId() {
-    return 'msg_${DateTime.now().millisecondsSinceEpoch}_${_messageIdCounter++}';
-  }
-
-  /// Save a message to the database
-  Future<String> _saveMessageToDatabase({
-    required String content,
-    required String userId,
-    required String userName,
-  }) async {
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId == null) {
-      developer.log(
-        'No session selected, cannot save message',
-        name: 'ChatSession',
-      );
-      return _generateMessageId(); // Return temp ID for in-memory message
-    }
-
-    final messageActions = ref.read(messageActionsProvider);
-    final messageId = await messageActions.sendMessage(
-      sessionId: currentSessionId,
-      userId: userId,
-      userName: userName,
-      content: content,
-    );
-
-    developer.log('Saved message to database: $messageId', name: 'ChatSession');
-    return messageId;
-  }
-
+  // Define users
   // Define users
   final _currentUser = ChatUser(id: 'user', firstName: 'You');
   final _aiUser = ChatUser(id: 'ai', firstName: 'Ops Agent');
 
-  // Loading state
-  bool _isLoading = false;
-
-  // Current model identifier
-  String? _currentModelIdentifier;
-
   // Context for AiActionProvider (captured from Builder)
   BuildContext? _actionContext;
 
-  // Pending actions approval (updated for multi-command support)
-  List<CommandAction>? _pendingActions;
-
-  // Execution progress tracking
-  int? _currentExecutingIndex;
-  int? _totalExecutingCommands;
-  String? _currentExecutingCommand;
-
-  // Track conversation state for tool calls (following official pattern)
-  List<llm.ChatMessage>? _conversationForToolCalls;
-  List<llm.ToolCall>? _pendingToolCalls;
-  // ignore: unused_field
-  String? _assistantTextBeforeTools; // For potential future use
-
-  // Track last synced session to avoid duplicate syncs
-  String? _lastSyncedSessionId;
-
-  // Track synced message IDs to avoid recreating existing messages
+  // Track synced message IDs to avoid recreating existing messages (UI layer concern)
   final Set<String> _syncedMessageIds = {};
+
+  // Track last synced session to avoid duplicate syncs (UI layer concern)
+  String? _lastSyncedSessionId;
 
   @override
   void initState() {
     super.initState();
-
-    // Load current model identifier
-    _loadCurrentModel();
-
+    // Controller handles model identifier and state
     // Initial message sync will happen in first build via listeners
   }
 
@@ -233,17 +172,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     }
   }
 
-  /// Load the current model identifier
-  Future<void> _loadCurrentModel() async {
-    final llmService = ref.read(llmServiceProvider);
-    final identifier = await llmService.getCurrentIdentifier();
-    if (mounted) {
-      setState(() {
-        _currentModelIdentifier = identifier;
-      });
-    }
-  }
-
   Future<void> _createNewSession() async {
     final currentProject = ref.read(currentProjectProvider);
     if (currentProject == null) return;
@@ -302,44 +230,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         Future.microtask(() => _syncMessagesFromProvider());
       }
     });
-
-    // Listen to global settings changes to update model identifier when default changes
-    ref.listen(globalSettingsProvider.select((s) => s.defaultLlmIdentifier), (
-      previous,
-      next,
-    ) {
-      if (previous != next) {
-        Future.microtask(() => _loadCurrentModel());
-      }
-    });
-
-    // Listen to project settings changes to update model identifier when default changes
-    if (currentProject?.id != null) {
-      ref.listen(
-        projectSettingsProvider(
-          currentProject!.id,
-        ).select((s) => s?.defaultLlmIdentifier),
-        (previous, next) {
-          if (previous != next) {
-            Future.microtask(() => _loadCurrentModel());
-          }
-        },
-      );
-    }
-
-    // Also listen to LLM settings in case models are added/removed/enabled/disabled
-    ref.listen(globalLlmSettingsProvider, (previous, next) {
-      Future.microtask(() => _loadCurrentModel());
-    });
-
-    if (currentProject?.id != null) {
-      ref.listen(projectLlmSettingsProvider(currentProject!.id), (
-        previous,
-        next,
-      ) {
-        Future.microtask(() => _loadCurrentModel());
-      });
-    }
 
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
@@ -410,11 +300,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     currentUser: _currentUser,
                     aiUser: _aiUser,
                     controller: _controller,
-                    onSendMessage: _handleSendMessage,
+                    onSendMessage: _handleSendMessageWithController,
 
-                    // Loading configuration
+                    // Loading configuration - use chatState
                     loadingConfig: LoadingConfig(
-                      isLoading: _isLoading,
+                      isLoading: chatState.isLoading,
                       showCenteredIndicator: true,
                     ),
 
@@ -424,9 +314,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         color: Theme.of(context).colorScheme.onSurface,
                       ),
                       decoration: InputDecoration(
-                        hintText: _currentModelIdentifier != null
-                            ? 'Send to $_currentModelIdentifier...'
-                            : 'Type your message...',
+                        hintText: 'Type your message...',
                         hintStyle: TextStyle(
                           color: Theme.of(
                             context,
@@ -497,14 +385,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               ),
             ),
 
-            // Multi-command approval overlay (NEW: also check chatState)
-            if (_pendingActions != null && _pendingActions!.isNotEmpty ||
-                chatState.hasPendingActions)
+            // Multi-command approval overlay
+            if (chatState.hasPendingActions)
               Builder(
                 builder: (context) {
-                  // Use chatState if available, fall back to old state
-                  final actions =
-                      chatState.pendingActions ?? _pendingActions ?? [];
+                  final actions = chatState.pendingActions ?? [];
 
                   developer.log(
                     '🎨 BUILD: Rendering approval overlay with ${actions.length} actions',
@@ -516,42 +401,54 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     bottom: 0,
                     child: MultiCommandApprovalOverlay(
                       actions: actions,
-                      onExecute: _executeMultipleActions,
+                      onExecute: (selectedActions) async {
+                        // Execute via controller
+                        final actionHook = AiActionHook.of(_actionContext!);
+                        await chatController.executeActions(
+                          selectedActions: selectedActions,
+                          sessionId: currentSessionId!,
+                          executeAction: (actionName, params) async {
+                            final result = await actionHook.executeAction(
+                              actionName,
+                              params,
+                            );
+                            return {
+                              'success': result.success,
+                              'data': result.data,
+                              'error': result.error,
+                            };
+                          },
+                          addMessageToUI: (message) {
+                            _controller.addMessage(message);
+                          },
+                        );
+                      },
                       onDismiss: () {
                         developer.log(
-                          '🧹 CLEARING _pendingActions from onDismiss',
+                          '🧹 CLEARING pendingActions from onDismiss',
                           name: 'ChatSession',
                           stackTrace: StackTrace.current,
                         );
-                        setState(() {
-                          _pendingActions = null;
-                        });
-                        // Also clear from controller
-                        ref
-                            .read(
-                              chatControllerProvider(currentSessionId).notifier,
-                            )
-                            .cancelActions();
+                        chatController.cancelActions();
                       },
                     ),
                   );
                 },
               ),
 
-            // Execution progress overlay (NEW: also check chatState)
-            if (_currentExecutingIndex != null &&
-                _totalExecutingCommands != null &&
-                _currentExecutingCommand != null)
+            // Execution progress overlay
+            if (chatState.isExecuting)
               Builder(
                 builder: (context) {
+                  final progress = chatState.executionProgress!;
                   developer.log(
-                    '⏳ BUILD: Rendering progress overlay - ${_currentExecutingIndex}/${_totalExecutingCommands}',
+                    '⏳ BUILD: Rendering progress overlay - ${progress.currentCommand}/${progress.totalCommands}',
                     name: 'ChatSession',
                   );
                   return ExecutionProgressOverlay(
-                    currentCommand: _currentExecutingIndex!,
-                    totalCommands: _totalExecutingCommands!,
-                    commandName: _currentExecutingCommand!,
+                    currentCommand: progress.currentCommand,
+                    totalCommands: progress.totalCommands,
+                    commandName: progress.commandName,
                   );
                 },
               ),
@@ -563,700 +460,5 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   /// Execute multiple actions sequentially with accumulated results
   /// Now follows the official llm_dart pattern for multi-tool execution
-  Future<void> _executeMultipleActions(
-    List<CommandAction> selectedActions,
-  ) async {
-    developer.log(
-      '🚀 Executing ${selectedActions.length} actions',
-      name: 'ChatSession',
-    );
-
-    if (_actionContext == null) {
-      developer.log('❌ Action context not available', name: 'ChatSession');
-      return;
-    }
-
-    // Clear the approval overlay
-    developer.log(
-      '🧹 CLEARING _pendingActions at start of execution',
-      name: 'ChatSession',
-      stackTrace: StackTrace.current,
-    );
-    setState(() {
-      _pendingActions = null;
-      _totalExecutingCommands = selectedActions.length;
-    });
-
-    // Get the action hook
-    final actionHook = AiActionHook.of(_actionContext!);
-
-    // Accumulate all results
-    final toolResults = <String, String>{};
-    final resultsForChat = <String>[];
-
-    try {
-      // Execute each selected action in sequence
-      for (var i = 0; i < selectedActions.length; i++) {
-        final action = selectedActions[i];
-        final command = action.params['command'] ?? 'unknown command';
-
-        // Update progress overlay
-        setState(() {
-          _currentExecutingIndex = i + 1;
-          _currentExecutingCommand = command;
-        });
-
-        developer.log(
-          '🔄 Executing action ${i + 1}/${selectedActions.length}: ${action.actionName}',
-          name: 'ChatSession',
-        );
-
-        // Execute the action
-        final result = await actionHook.executeAction(
-          action.actionName,
-          action.params,
-        );
-
-        developer.log(
-          '✅ Action ${i + 1} completed: success=${result.success}',
-          name: 'ChatSession',
-        );
-
-        // Build result message for chat UI
-        String resultMessage;
-        if (result.success) {
-          final buffer = StringBuffer();
-          buffer.writeln('✅ Executed: `$command`');
-          buffer.writeln();
-
-          // Print stdout if available
-          final stdout = result.data?['stdout']?.toString().trim() ?? '';
-          if (stdout.isNotEmpty) {
-            buffer.writeln('Result:');
-            buffer.writeln('```');
-            buffer.writeln(stdout);
-            buffer.writeln('```');
-          }
-
-          // Print stderr if available
-          final stderr = result.data?['stderr']?.toString().trim() ?? '';
-          if (stderr.isNotEmpty) {
-            buffer.writeln();
-            buffer.writeln('**⚠️ stderr:**');
-            buffer.writeln('```');
-            buffer.writeln(stderr);
-            buffer.writeln('```');
-          }
-
-          // Print exit code only if non-zero
-          final exitCode = result.data?['exitCode'] as int?;
-          if (exitCode != null && exitCode != 0) {
-            buffer.writeln();
-            buffer.writeln('**Exit Code:** $exitCode');
-          }
-
-          resultMessage = buffer.toString().trim();
-        } else {
-          resultMessage =
-              '❌ Failed to execute: `$command`\n\nError: ${result.error}';
-        }
-
-        resultsForChat.add(resultMessage);
-
-        // Save result to database
-        final resultMessageId = await _saveMessageToDatabase(
-          content: resultMessage,
-          userId: 'ai',
-          userName: 'Ops Agent',
-        );
-
-        // Add to chat UI
-        _controller.addMessage(
-          ChatMessage(
-            text: resultMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': resultMessageId},
-            isMarkdown: true,
-          ),
-        );
-
-        // Map result to tool call ID for LLM using the CommandAction ID
-        // The CommandAction.id corresponds to the ToolCall.id
-        toolResults[action.id] = result.success
-            ? result.data?.toString() ?? 'Success'
-            : 'Error: ${result.error}';
-      }
-
-      // Clear progress overlay, show loading for LLM response
-      setState(() {
-        _currentExecutingIndex = null;
-        _totalExecutingCommands = null;
-        _currentExecutingCommand = null;
-        _isLoading = true;
-      });
-
-      developer.log(
-        '🔄 Continuing conversation with ${toolResults.length} tool results',
-        name: 'ChatSession',
-      );
-
-      // Get AI actions and convert to tools for potential follow-up calls
-      final currentProject = ref.read(currentProjectProvider);
-      final aiActionsConfig = ref.read(
-        aiActionsConfigProvider(currentProject?.id),
-      );
-      final llmService = ref.read(llmServiceProvider);
-      final tools = llmService.convertActionsToTools(aiActionsConfig.actions);
-
-      // Check if we have the new conversation state
-      final llmResponseBuffer = StringBuffer();
-
-      if (_conversationForToolCalls != null && _pendingToolCalls != null) {
-        developer.log(
-          '✅ Using continueWithToolResults pattern',
-          name: 'ChatSession',
-        );
-
-        // Track follow-up tool calls
-        final followUpToolCalls = <llm.ToolCall>[];
-        final followUpToolCallMaps = <Map<String, dynamic>>[];
-
-        // Use the new continueWithToolResults method (official pattern)
-        await for (final chunk in llmService.continueWithToolResults(
-          _conversationForToolCalls!,
-          _pendingToolCalls!,
-          toolResults,
-          tools: tools,
-        )) {
-          if (chunk is Map) {
-            final type = chunk['type'] as String?;
-
-            if (type == 'tool_call') {
-              developer.log(
-                '🔧 Follow-up tool call received: ${chunk['name']}',
-                name: 'ChatSession',
-              );
-
-              // Extract the ToolCall object
-              final toolCall = chunk['toolCall'] as llm.ToolCall?;
-              if (toolCall != null) {
-                followUpToolCalls.add(toolCall);
-                followUpToolCallMaps.add(Map<String, dynamic>.from(chunk));
-              }
-
-              // Add the tool call to chat history
-              final command = chunk['params']?['command'] ?? 'unknown';
-              final explanation = chunk['params']?['explanation'] ?? '';
-              final toolCallMessage =
-                  '🔧 Requesting to execute: `$command`\n$explanation';
-
-              final toolCallMessageId = await _saveMessageToDatabase(
-                content: toolCallMessage,
-                userId: 'ai',
-                userName: 'Ops Agent',
-              );
-
-              _controller.addMessage(
-                ChatMessage(
-                  text: toolCallMessage,
-                  user: _aiUser,
-                  createdAt: DateTime.now(),
-                  customProperties: {'id': toolCallMessageId},
-                ),
-              );
-            } else if (type == 'completion') {
-              developer.log(
-                '🏁 Follow-up completion event with ${followUpToolCalls.length} tool calls',
-                name: 'ChatSession',
-              );
-
-              developer.log(
-                '📊 followUpToolCallMaps length: ${followUpToolCallMaps.length}',
-                name: 'ChatSession',
-              );
-
-              final conversation =
-                  chunk['conversation'] as List<llm.ChatMessage>?;
-
-              developer.log(
-                '📝 Conversation null? ${conversation == null}',
-                name: 'ChatSession',
-              );
-
-              if (followUpToolCalls.isNotEmpty && conversation != null) {
-                developer.log(
-                  '✅ Both conditions met - proceeding with follow-up',
-                  name: 'ChatSession',
-                );
-                // Update state for follow-up tool execution
-                _conversationForToolCalls = conversation;
-                _pendingToolCalls = followUpToolCalls;
-                _assistantTextBeforeTools = llmResponseBuffer.toString();
-
-                developer.log(
-                  '📦 Saved follow-up conversation state',
-                  name: 'ChatSession',
-                );
-
-                // Create CommandAction objects for follow-up
-                final actions = followUpToolCallMaps.map((chunk) {
-                  final toolCall = chunk['toolCall'] as llm.ToolCall?;
-                  final toolCallId = toolCall?.id ?? DateTime.now().toString();
-
-                  developer.log(
-                    '🔧 Creating CommandAction with ID: $toolCallId, name: ${chunk['name']}',
-                    name: 'ChatSession',
-                  );
-
-                  return CommandAction(
-                    id: toolCallId,
-                    actionName: chunk['name'] as String,
-                    params: chunk['params'] as Map<String, dynamic>,
-                    isSelected: true,
-                  );
-                }).toList();
-
-                developer.log(
-                  '🎯 Created ${actions.length} CommandAction objects for follow-up',
-                  name: 'ChatSession',
-                );
-
-                developer.log(
-                  '🔍 Widget mounted: $mounted, actions isEmpty: ${actions.isEmpty}',
-                  name: 'ChatSession',
-                );
-
-                // Show the multi-command approval overlay again
-                if (mounted) {
-                  setState(() {
-                    _pendingActions = actions;
-                    _isLoading = false;
-                    // Clear execution progress overlay so approval overlay can show
-                    _currentExecutingIndex = null;
-                    _totalExecutingCommands = null;
-                    _currentExecutingCommand = null;
-                  });
-
-                  developer.log(
-                    '🎬 setState called - _pendingActions set to ${_pendingActions?.length} actions',
-                    name: 'ChatSession',
-                  );
-
-                  // Check state after next frame to verify it persists
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    developer.log(
-                      '🖼️ POST-FRAME: _pendingActions = ${_pendingActions?.length}, '
-                      '_currentExecutingIndex = $_currentExecutingIndex, '
-                      '_totalExecutingCommands = $_totalExecutingCommands',
-                      name: 'ChatSession',
-                    );
-                  });
-                } else {
-                  developer.log(
-                    '❌ Widget not mounted - cannot show overlay',
-                    name: 'ChatSession',
-                  );
-                }
-
-                // Return to let user approve follow-up commands
-                return;
-              }
-            }
-          } else if (chunk is String) {
-            llmResponseBuffer.write(chunk);
-          }
-        }
-
-        // Clear conversation state if no follow-up
-        setState(() {
-          _conversationForToolCalls = null;
-          _pendingToolCalls = null;
-          _assistantTextBeforeTools = null;
-        });
-      } else {
-        developer.log(
-          '⚠️ Falling back to legacy pattern (no completion event)',
-          name: 'ChatSession',
-        );
-
-        // Fall back to old pattern for providers that don't send completion events
-        // Build current conversation history
-        final history = _controller.messages
-            .where((msg) => msg.text.isNotEmpty)
-            .map(
-              (msg) => {
-                'role': msg.user.id == 'user' ? 'user' : 'assistant',
-                'content': msg.text,
-              },
-            )
-            .toList()
-            .reversed
-            .toList();
-
-        // Use deprecated method as fallback for first action
-        if (selectedActions.isNotEmpty) {
-          final firstAction = selectedActions.first;
-          // ignore: deprecated_member_use
-          await for (final chunk in llmService.continueWithToolResult(
-            firstAction.actionName,
-            firstAction.params,
-            resultsForChat.join('\n\n'),
-            history: history,
-            tools: tools,
-          )) {
-            llmResponseBuffer.write(chunk);
-          }
-        }
-      }
-
-      // Add LLM's response to chat if not empty
-      final llmResponse = llmResponseBuffer.toString().trim();
-      if (llmResponse.isNotEmpty) {
-        final llmMessageId = await _saveMessageToDatabase(
-          content: llmResponse,
-          userId: 'ai',
-          userName: 'Ops Agent',
-        );
-
-        _controller.addMessage(
-          ChatMessage(
-            text: llmResponse,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': llmMessageId},
-            isMarkdown: true,
-          ),
-        );
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Multi-action execution error: $e',
-        name: 'ChatSession',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
-      final errorMessage = '❌ Error executing commands: $e';
-
-      // Save error message to database
-      final errorMessageId = await _saveMessageToDatabase(
-        content: errorMessage,
-        userId: 'ai',
-        userName: 'Ops Agent',
-      );
-
-      _controller.addMessage(
-        ChatMessage(
-          text: errorMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': errorMessageId},
-          isMarkdown: true,
-        ),
-      );
-
-      // Clear state on error
-      setState(() {
-        _conversationForToolCalls = null;
-        _pendingToolCalls = null;
-        _assistantTextBeforeTools = null;
-        _currentExecutingIndex = null;
-        _totalExecutingCommands = null;
-        _currentExecutingCommand = null;
-        _isLoading = false;
-      });
-    }
-  }
-
-  /// Handle sending messages
-  Future<void> _handleSendMessage(ChatMessage message) async {
-    developer.log('🎯 _handleSendMessage called', name: 'ChatSession');
-    developer.log('User message: ${message.text}', name: 'ChatSession');
-
-    // Save user message to database
-    final userMessageId = await _saveMessageToDatabase(
-      content: message.text,
-      userId: 'user',
-      userName: 'You',
-    );
-
-    // Check if this is the first message to update session description
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId != null && _controller.messages.isEmpty) {
-      final sessionActions = ref.read(sessionActionsProvider);
-      // Use first 50 characters of message as description
-      final description = message.text.length > 50
-          ? '${message.text.substring(0, 50)}...'
-          : message.text;
-      await sessionActions.updateSession(
-        id: currentSessionId,
-        description: description,
-      );
-      developer.log(
-        'Updated session description: $description',
-        name: 'ChatSession',
-      );
-    }
-
-    // Add the user's message to the chat UI with the database ID
-    final userChatMessage = ChatMessage(
-      text: message.text,
-      user: _currentUser,
-      createdAt: DateTime.now(),
-      customProperties: {'id': userMessageId},
-    );
-    _controller.addMessage(userChatMessage);
-    developer.log('✅ User message added to controller', name: 'ChatSession');
-
-    setState(() => _isLoading = true);
-    developer.log('⏳ Loading state set to true', name: 'ChatSession');
-
-    try {
-      // Get the LLM service
-      final llmService = ref.read(llmServiceProvider);
-      developer.log('✅ LLM service obtained', name: 'ChatSession');
-
-      // Update current model identifier
-      final identifier = await llmService.getCurrentIdentifier();
-      developer.log('Model identifier: $identifier', name: 'ChatSession');
-
-      if (mounted) {
-        setState(() {
-          _currentModelIdentifier = identifier;
-        });
-      }
-
-      // Check if LLM is configured
-      final isConfigured = await llmService.isConfigured();
-      developer.log('Is configured: $isConfigured', name: 'ChatSession');
-
-      if (!isConfigured) {
-        developer.log('❌ LLM not configured', name: 'ChatSession');
-
-        final configMessage =
-            "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
-
-        // Save config warning to database
-        final configMessageId = await _saveMessageToDatabase(
-          content: configMessage,
-          userId: 'ai',
-          userName: 'Ops Agent',
-        );
-
-        _controller.addMessage(
-          ChatMessage(
-            text: configMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': configMessageId},
-          ),
-        );
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Build conversation history for context (excluding the current user message)
-      developer.log(
-        '📚 Building history from ${_controller.messages.length} messages',
-        name: 'ChatSession',
-      );
-
-      final history = _controller.messages
-          .where((msg) => msg.text.isNotEmpty) // Skip empty messages
-          .map(
-            (msg) => {
-              'role': msg.user.id == 'user' ? 'user' : 'assistant',
-              'content': msg.text,
-            },
-          )
-          .toList()
-          .reversed
-          .toList(); // Reverse to chronological order for LLM
-
-      developer.log(
-        '📚 History built: ${history.length} messages',
-        name: 'ChatSession',
-      );
-
-      // Get AI actions and convert to tools
-      developer.log('🔧 Getting AI actions config...', name: 'ChatSession');
-      final currentProject = ref.read(currentProjectProvider);
-      final aiActionsConfig = ref.read(
-        aiActionsConfigProvider(currentProject?.id),
-      );
-      final tools = llmService.convertActionsToTools(aiActionsConfig.actions);
-      developer.log(
-        '🔧 Converted ${tools.length} actions to tools',
-        name: 'ChatSession',
-      );
-
-      developer.log(
-        '🚀 Calling llmService.sendMessageWithTools...',
-        name: 'ChatSession',
-      );
-
-      // Collect the response and handle tool calls (following official pattern)
-      final buffer = StringBuffer();
-      var chunkCount = 0;
-      final collectedToolCalls = <llm.ToolCall>[];
-      final collectedToolCallMaps = <Map<String, dynamic>>[];
-
-      await for (final chunk in llmService.sendMessageWithTools(
-        message.text,
-        history: history,
-        tools: tools,
-      )) {
-        chunkCount++;
-        developer.log('📦 Chunk #$chunkCount: $chunk', name: 'ChatSession');
-
-        if (chunk is Map) {
-          final type = chunk['type'] as String?;
-
-          if (type == 'tool_call') {
-            developer.log(
-              '🔧 Tool call received: ${chunk['name']}',
-              name: 'ChatSession',
-            );
-
-            // Extract the ToolCall object
-            final toolCall = chunk['toolCall'] as llm.ToolCall?;
-            if (toolCall != null) {
-              collectedToolCalls.add(toolCall);
-              // Also store the map for creating CommandAction objects
-              collectedToolCallMaps.add(Map<String, dynamic>.from(chunk));
-            }
-
-            // Add the tool call to chat history so the LLM remembers it
-            final command = chunk['params']?['command'] ?? 'unknown';
-            final explanation = chunk['params']?['explanation'] ?? '';
-            final toolCallMessage =
-                '🔧 Requesting to execute: `$command`\n$explanation';
-
-            // Save tool call message to database
-            final toolCallMessageId = await _saveMessageToDatabase(
-              content: toolCallMessage,
-              userId: 'ai',
-              userName: 'Ops Agent',
-            );
-
-            _controller.addMessage(
-              ChatMessage(
-                text: toolCallMessage,
-                user: _aiUser,
-                createdAt: DateTime.now(),
-                customProperties: {'id': toolCallMessageId},
-              ),
-            );
-
-            // Don't return yet - collect all tool calls first
-          } else if (type == 'completion') {
-            developer.log(
-              '🏁 Completion event received with ${collectedToolCalls.length} tool calls',
-              name: 'ChatSession',
-            );
-
-            // Extract conversation state
-            final conversation =
-                chunk['conversation'] as List<llm.ChatMessage>?;
-
-            if (collectedToolCalls.isNotEmpty && conversation != null) {
-              // Save state for tool execution continuation
-              _conversationForToolCalls = conversation;
-              _pendingToolCalls = collectedToolCalls;
-              _assistantTextBeforeTools = buffer.toString();
-
-              developer.log(
-                '📦 Saved conversation state with ${conversation.length} messages',
-                name: 'ChatSession',
-              );
-
-              // Create CommandAction objects from collected tool calls
-              final actions = collectedToolCallMaps.map((chunk) {
-                return CommandAction(
-                  id: chunk['toolCall']?.id ?? DateTime.now().toString(),
-                  actionName: chunk['name'] as String,
-                  params: chunk['params'] as Map<String, dynamic>,
-                  isSelected: true, // All selected by default
-                );
-              }).toList();
-
-              // Show the multi-command approval overlay
-              setState(() {
-                _pendingActions = actions;
-                _isLoading =
-                    false; // Stop loading while waiting for user approval
-              });
-
-              // Return here and let the overlay handle execution
-              return;
-            }
-          }
-        } else if (chunk is String) {
-          // Regular text chunk
-          buffer.write(chunk);
-        }
-      }
-
-      developer.log(
-        '✅ Stream completed. Total chunks: $chunkCount',
-        name: 'ChatSession',
-      );
-      developer.log(
-        '📝 Complete response: "${buffer.toString()}"',
-        name: 'ChatSession',
-      );
-
-      // Add the complete response
-      developer.log('💬 Adding AI response to controller', name: 'ChatSession');
-
-      // Save AI message to database
-      final aiMessageId = await _saveMessageToDatabase(
-        content: buffer.toString(),
-        userId: 'ai',
-        userName: 'Ops Agent',
-      );
-
-      _controller.addMessage(
-        ChatMessage(
-          text: buffer.toString(),
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': aiMessageId},
-        ),
-      );
-      developer.log('✅ AI response added to controller', name: 'ChatSession');
-    } catch (e) {
-      // Handle errors
-      developer.log('❌ Error in _handleSendMessage: $e', name: 'ChatSession');
-
-      final errorMessage = "Sorry, I encountered an error: $e";
-
-      // Save error message to database
-      final errorMessageId = await _saveMessageToDatabase(
-        content: errorMessage,
-        userId: 'ai',
-        userName: 'Ops Agent',
-      );
-
-      _controller.addMessage(
-        ChatMessage(
-          text: errorMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': errorMessageId},
-        ),
-      );
-    } finally {
-      developer.log(
-        '🏁 Finally block - setting loading to false',
-        name: 'ChatSession',
-      );
-      setState(() => _isLoading = false);
-    }
-  }
+  //   }
 }
