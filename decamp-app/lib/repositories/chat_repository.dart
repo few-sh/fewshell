@@ -167,6 +167,9 @@ class ChatRepository {
   Future<MessageResult> sendMessageToAI({
     required String messageContent,
     required List<Map<String, String>> conversationHistory,
+    void Function(String messageId)? onStreamStart,
+    void Function(String messageId, String currentText)? onStreamChunk,
+    void Function(String messageId)? onStreamEnd,
   }) async {
     try {
       developer.log('🚀 Sending message to AI', name: 'ChatRepository');
@@ -187,6 +190,11 @@ class ChatRepository {
       final buffer = StringBuffer();
       final collectedToolCalls = <ToolCallRequest>[];
       List<llm.ChatMessage>? conversationState;
+
+      // Generate a temporary message ID for streaming
+      final streamingMessageId =
+          'streaming_${DateTime.now().millisecondsSinceEpoch}';
+      var hasStartedStreaming = false;
 
       await for (final chunk in _llmService.sendMessageWithTools(
         messageContent,
@@ -223,7 +231,22 @@ class ChatRepository {
           }
         } else if (chunk is String) {
           buffer.write(chunk);
+
+          // Notify streaming callbacks
+          if (!hasStartedStreaming && onStreamStart != null) {
+            onStreamStart(streamingMessageId);
+            hasStartedStreaming = true;
+          }
+
+          if (onStreamChunk != null) {
+            onStreamChunk(streamingMessageId, buffer.toString());
+          }
         }
+      }
+
+      // Stop streaming when complete
+      if (hasStartedStreaming && onStreamEnd != null) {
+        onStreamEnd(streamingMessageId);
       }
 
       developer.log('✅ AI response complete', name: 'ChatRepository');

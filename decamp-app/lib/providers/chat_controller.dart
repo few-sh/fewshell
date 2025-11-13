@@ -39,12 +39,21 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Send a message to the AI
   /// Handles saving to database, getting AI response, and managing tool calls
+  ///
+  /// Streaming Integration:
+  /// - startStreaming: Called when first text chunk arrives, creates empty message and marks it as streaming
+  /// - updateStreamingMessage: Called for each chunk, updates message text
+  /// - stopStreaming: Called when complete, stops animation to prevent re-animation on scroll
   Future<void> sendMessage({
     required String content,
     required String sessionId,
     required List<Map<String, String>> conversationHistory,
     required bool isFirstMessage,
     required void Function(ChatMessage) addMessageToUI,
+    required void Function(String messageId) startStreaming,
+    required void Function(String messageId, String text)
+    updateStreamingMessage,
+    required void Function(String messageId) stopStreaming,
   }) async {
     developer.log('🎯 sendMessage called', name: 'ChatController');
 
@@ -100,10 +109,19 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
-      // Send message to AI
+      // Send message to AI with streaming support
       final result = await _repository.sendMessageToAI(
         messageContent: content,
         conversationHistory: conversationHistory,
+        onStreamStart: (messageId) {
+          startStreaming(messageId);
+        },
+        onStreamChunk: (messageId, text) {
+          updateStreamingMessage(messageId, text);
+        },
+        onStreamEnd: (messageId) {
+          stopStreaming(messageId);
+        },
       );
 
       // Handle error

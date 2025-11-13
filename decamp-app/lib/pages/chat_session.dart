@@ -117,6 +117,38 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             _controller.addMessage(chatMessage);
           }
         },
+        startStreaming: (messageId) {
+          if (mounted) {
+            // Add an empty message that will be updated
+            final streamingMessage = ChatMessage(
+              text: '',
+              user: _aiUser,
+              createdAt: DateTime.now(),
+              customProperties: {'id': messageId},
+              isMarkdown: true,
+            );
+            _controller.addMessage(streamingMessage);
+            _controller.setStreamingMessage(messageId);
+          }
+        },
+        updateStreamingMessage: (messageId, text) {
+          if (mounted) {
+            // Update the message with new text
+            final updatedMessage = ChatMessage(
+              text: text,
+              user: _aiUser,
+              createdAt: DateTime.now(),
+              customProperties: {'id': messageId},
+              isMarkdown: true,
+            );
+            _controller.updateMessage(updatedMessage);
+          }
+        },
+        stopStreaming: (messageId) {
+          if (mounted) {
+            _controller.stopStreamingMessage(messageId);
+          }
+        },
       );
     } catch (e) {
       developer.log(
