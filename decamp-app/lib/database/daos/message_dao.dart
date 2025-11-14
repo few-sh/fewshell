@@ -27,18 +27,35 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
   }
 
   /// Insert a new message
-  Future<int> insertMessage(MessageEntityCompanion message) {
-    return into(messages).insert(message);
+  Future<int> insertMessage(MessageEntityCompanion message) async {
+    final result = await into(messages).insert(message);
+    // Touch the session to update its updatedAt timestamp
+    if (message.sessionId.present) {
+      await db.sessionDao.touchSession(message.sessionId.value);
+    }
+    return result;
   }
 
   /// Update an existing message
-  Future<bool> updateMessage(MessageEntityCompanion message) {
-    return update(messages).replace(message);
+  Future<bool> updateMessage(MessageEntityCompanion message) async {
+    final result = await update(messages).replace(message);
+    // Touch the session to update its updatedAt timestamp
+    if (message.sessionId.present) {
+      await db.sessionDao.touchSession(message.sessionId.value);
+    }
+    return result;
   }
 
   /// Delete a message by ID
-  Future<int> deleteMessage(String id) {
-    return (delete(messages)..where((m) => m.id.equals(id))).go();
+  Future<int> deleteMessage(String id) async {
+    // Get the message first to know which session to touch
+    final message = await getMessage(id);
+    final result = await (delete(messages)..where((m) => m.id.equals(id))).go();
+    // Touch the session to update its updatedAt timestamp
+    if (message != null) {
+      await db.sessionDao.touchSession(message.sessionId);
+    }
+    return result;
   }
 
   /// Delete all messages for a session

@@ -129,4 +129,11 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
       );
     return query.map((row) => row.read(count)!).getSingle();
   }
+
+  /// Update the updatedAt timestamp of a session to now
+  Future<int> touchSession(String id) {
+    return (update(sessions)..where((s) => s.id.equals(id))).write(
+      SessionEntityCompanion(updatedAt: Value(DateTime.now())),
+    );
+  }
 }
