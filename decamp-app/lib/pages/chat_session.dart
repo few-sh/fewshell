@@ -455,35 +455,83 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       ),
                       // Custom bubble builder for rich content
                       customBubbleBuilder: (context, message, isUser) {
+                        // Use theme's text colors directly
+                        final theme = Theme.of(context);
+                        // Use bodyLarge color for both user and AI messages
+                        final textColor =
+                            theme.textTheme.bodyLarge?.color ??
+                            theme.textTheme.bodyMedium?.color;
+
+                        final baseTextStyle = TextStyle(color: textColor);
+
                         return RichMessageContent(
                           message: message,
                           isUser: isUser,
-                          styleSheet:
-                              MarkdownStyleSheet.fromTheme(
-                                Theme.of(context),
-                              ).copyWith(
-                                p: TextStyle(
-                                  color: isUser
-                                      ? Theme.of(
-                                          context,
-                                        ).colorScheme.onPrimaryContainer
-                                      : Theme.of(context).colorScheme.onSurface,
-                                  fontSize: 14,
-                                ),
-                                code: TextStyle(
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontFamily: 'monospace',
-                                ),
-                                codeblockDecoration: BoxDecoration(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
+                          styleSheet: MarkdownStyleSheet(
+                            // Base text color for all elements
+                            p: baseTextStyle.copyWith(fontSize: 14),
+                            h1: baseTextStyle.copyWith(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h2: baseTextStyle.copyWith(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h3: baseTextStyle.copyWith(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h4: baseTextStyle.copyWith(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h5: baseTextStyle.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            h6: baseTextStyle.copyWith(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            strong: baseTextStyle.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            em: baseTextStyle.copyWith(
+                              fontStyle: FontStyle.italic,
+                            ),
+                            del: baseTextStyle.copyWith(
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                            blockquote: textColor != null
+                                ? baseTextStyle.copyWith(
+                                    color: textColor.withValues(alpha: 0.8),
+                                  )
+                                : baseTextStyle,
+                            listBullet: baseTextStyle,
+                            tableHead: baseTextStyle.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            tableBody: baseTextStyle,
+                            // Links
+                            a: TextStyle(
+                              color: theme.colorScheme.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                            // Code styling
+                            code: TextStyle(
+                              backgroundColor:
+                                  theme.colorScheme.surfaceContainerHighest,
+                              color: theme.colorScheme.primary,
+                              fontFamily: 'monospace',
+                              fontSize: 13,
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            codeblockPadding: const EdgeInsets.all(12),
+                          ),
                         );
                       },
                     ),
