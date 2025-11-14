@@ -6,6 +6,7 @@ import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/execution_progress_overlay.dart';
 import 'package:decamp/components/rich_message_content.dart';
+import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
@@ -457,6 +458,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       customBubbleBuilder: (context, message, isUser) {
                         // Use theme's text colors directly
                         final theme = Theme.of(context);
+                        final terminalTheme = theme.extension<TerminalTheme>();
                         // Use bodyLarge color for both user and AI messages
                         final textColor =
                             theme.textTheme.bodyLarge?.color ??
@@ -518,18 +520,23 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                               color: theme.colorScheme.primary,
                               decoration: TextDecoration.underline,
                             ),
-                            // Code styling
+                            // Code styling - use terminal theme
                             code: TextStyle(
-                              backgroundColor:
-                                  theme.colorScheme.surfaceContainerHighest,
-                              color: theme.colorScheme.primary,
+                              backgroundColor: terminalTheme?.backgroundColor,
+                              color: terminalTheme?.textColor,
                               fontFamily: 'monospace',
                               fontSize: 13,
                             ),
-                            codeblockDecoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            codeblockDecoration: terminalTheme != null
+                                ? BoxDecoration(
+                                    color: terminalTheme.backgroundColor,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: terminalTheme.borderColor,
+                                      width: 1,
+                                    ),
+                                  )
+                                : null,
                             codeblockPadding: const EdgeInsets.all(12),
                           ),
                         );
