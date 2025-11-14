@@ -31,7 +31,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
           )
           ..orderBy([
             (s) =>
-                OrderingTerm(expression: s.timestamp, mode: OrderingMode.desc),
+                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
           ]))
         .watch();
   }
@@ -44,7 +44,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
           )
           ..orderBy([
             (s) =>
-                OrderingTerm(expression: s.timestamp, mode: OrderingMode.desc),
+                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
           ]))
         .watch();
   }
