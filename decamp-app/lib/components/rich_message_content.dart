@@ -39,23 +39,28 @@ class RichMessageContent extends StatelessWidget {
   }
 
   Widget _buildMarkdownContent(BuildContext context, MessageMetadata metadata) {
+    final markdown = Markdown(
+      data: message.text,
+      selectable: false,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      styleSheet: styleSheet,
+      padding: EdgeInsets.zero,
+      onTapLink: (text, href, title) {
+        if (href != null) {
+          // TODO: Handle link taps (open in browser, etc.)
+          debugPrint('Link tapped: $href');
+        }
+      },
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Markdown(
-          data: message.text,
-          selectable: metadata.enableTextSelection,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          styleSheet: styleSheet,
-          padding: EdgeInsets.zero,
-          onTapLink: (text, href, title) {
-            if (href != null) {
-              // TODO: Handle link taps (open in browser, etc.)
-              debugPrint('Link tapped: $href');
-            }
-          },
-        ),
+        if (metadata.enableTextSelection)
+          SelectionArea(child: markdown)
+        else
+          markdown,
         if (metadata.showCopyButton) _buildCopyButton(context),
       ],
     );
@@ -77,17 +82,22 @@ class RichMessageContent extends StatelessWidget {
     BuildContext context,
     MessageMetadata metadata,
   ) {
+    final markdown = Markdown(
+      data: message.text,
+      selectable: false,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      styleSheet: styleSheet,
+      padding: EdgeInsets.zero,
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Markdown(
-          data: message.text,
-          selectable: metadata.enableTextSelection,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          styleSheet: styleSheet,
-          padding: EdgeInsets.zero,
-        ),
+        if (metadata.enableTextSelection)
+          SelectionArea(child: markdown)
+        else
+          markdown,
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -257,13 +267,15 @@ class _CollapsibleMessageSectionState extends State<CollapsibleMessageSection>
           sizeFactor: _expandAnimation,
           child: Padding(
             padding: const EdgeInsets.only(left: 28, top: 8),
-            child: Markdown(
-              data: widget.content,
-              selectable: true,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              styleSheet: widget.styleSheet,
-              padding: EdgeInsets.zero,
+            child: SelectionArea(
+              child: Markdown(
+                data: widget.content,
+                selectable: false,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                styleSheet: widget.styleSheet,
+                padding: EdgeInsets.zero,
+              ),
             ),
           ),
         ),
