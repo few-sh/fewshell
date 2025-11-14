@@ -41,3 +41,15 @@ Themes:
 - The app uses Riverpod. Data integration and state managemene code is located in models/, providers/, and database/
 - Full-screen pages are located in pages/
 - Reusable widgets are in components/
+
+## Rules to follow for implementing features:
+- NEVER hard-code any colors. Use themes (see themes/ folder).
+- In general avoid hard-coding. When in doubt, ASK me.
+- Think long-term. Avoid temporary hacky solutions. Avoid technical debt.
+- Avoid duplicating state, it leads to additional complexity of having to sychronize the redundant state and may lead to bugs when things go out of sync. Always examine the code base to see if existing state can already be queried.
+
+
+When it comes to state management and data model, make your design decisions assuming that we will have the following future features:
+- Real-time collaboration support (eg CRDT).
+- Replicated storage of state.
+- Real-time Client-server architecture where the app sends commands to the server and some of the state is on the server.
