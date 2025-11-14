@@ -73,7 +73,8 @@ class SessionsHistoryPage extends ConsumerWidget {
               final showDateRange = timeDifference.inMinutes >= 5;
 
               // Check if both dates are on the same day
-              final sameDay = session.createdAt.year == session.updatedAt.year &&
+              final sameDay =
+                  session.createdAt.year == session.updatedAt.year &&
                   session.createdAt.month == session.updatedAt.month &&
                   session.createdAt.day == session.updatedAt.day;
 
@@ -95,9 +96,15 @@ class SessionsHistoryPage extends ConsumerWidget {
                 dateDisplay = updatedTime;
               } else if (sameDay) {
                 // Same day and more than 5 minutes apart - show date with time range
-                final createdTimeOnly = DateFormat('h:mm a').format(session.createdAt);
-                final updatedTimeOnly = DateFormat('h:mm a').format(session.updatedAt);
-                final dateOnly = DateFormat('MMM d, yyyy').format(session.createdAt);
+                final createdTimeOnly = DateFormat(
+                  'h:mm a',
+                ).format(session.createdAt);
+                final updatedTimeOnly = DateFormat(
+                  'h:mm a',
+                ).format(session.updatedAt);
+                final dateOnly = DateFormat(
+                  'MMM d, yyyy',
+                ).format(session.createdAt);
                 dateDisplay = '$dateOnly • $createdTimeOnly - $updatedTimeOnly';
               } else {
                 // Different days - show full date range
@@ -156,9 +163,9 @@ class SessionsHistoryPage extends ConsumerWidget {
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.primary.withValues(alpha: 0.8),
+                            color: isCurrentSession
+                                ? Theme.of(context).colorScheme.secondary
+                                : Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         if (isCurrentSession)
@@ -169,7 +176,9 @@ class SessionsHistoryPage extends ConsumerWidget {
                                 Icon(
                                   Icons.check_circle,
                                   size: 14,
-                                  color: Theme.of(context).colorScheme.primary,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -179,7 +188,7 @@ class SessionsHistoryPage extends ConsumerWidget {
                                     fontWeight: FontWeight.bold,
                                     color: Theme.of(
                                       context,
-                                    ).colorScheme.primary,
+                                    ).colorScheme.secondary,
                                   ),
                                 ),
                               ],
