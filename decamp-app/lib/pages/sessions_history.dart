@@ -82,16 +82,12 @@ class SessionsHistoryPage extends ConsumerWidget {
                     horizontal: 16,
                     vertical: 12,
                   ),
-                  leading: CircleAvatar(
-                    backgroundColor: isCurrentSession
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context).colorScheme.primaryContainer,
-                    child: Icon(
-                      isCurrentSession ? Icons.chat : Icons.chat_outlined,
-                      color: isCurrentSession
-                          ? Theme.of(context).colorScheme.onPrimary
-                          : Theme.of(context).colorScheme.primary,
-                    ),
+                  leading: Icon(
+                    Icons.arrow_back_ios,
+                    size: 16,
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.4),
                   ),
                   title: Text(
                     session.description,
@@ -156,17 +152,11 @@ class SessionsHistoryPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  trailing: isCurrentSession
-                      ? null
-                      : Icon(
-                          Icons.arrow_forward_ios,
-                          size: 16,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.4),
-                        ),
                   onTap: isCurrentSession
-                      ? null
+                      ? () {
+                          // Just navigate back for current session
+                          Navigator.pop(context);
+                        }
                       : () {
                           // Switch to the selected session
                           ref.read(currentSessionIdProvider.notifier).state =
