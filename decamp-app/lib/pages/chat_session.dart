@@ -119,6 +119,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         },
         startStreaming: (messageId) {
           if (mounted) {
+            developer.log(
+              '🎬 START STREAMING: $messageId',
+              name: 'ChatSession.Streaming',
+            );
             // Add an empty message that will be updated with the same ID
             final streamingMessage = ChatMessage(
               text: '',
@@ -132,6 +136,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
             // Mark this ID as synced to prevent database sync from re-adding it
             _syncedMessageIds.add(messageId);
+            developer.log(
+              '✅ Message added to controller & synced IDs. Current streaming ID: ${_controller.currentlyStreamingMessageId}',
+              name: 'ChatSession.Streaming',
+            );
           }
         },
         updateStreamingMessage: (messageId, text) {
@@ -149,7 +157,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         },
         stopStreaming: (messageId) {
           if (mounted) {
+            developer.log(
+              '🛑 STOP STREAMING: $messageId (current: ${_controller.currentlyStreamingMessageId})',
+              name: 'ChatSession.Streaming',
+            );
             _controller.stopStreamingMessage(messageId);
+            developer.log(
+              '✅ After stop - current streaming ID: ${_controller.currentlyStreamingMessageId}',
+              name: 'ChatSession.Streaming',
+            );
           }
         },
       );
@@ -198,6 +214,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         // Use setMessages for bulk persistence loading (no animation per message)
         _controller.setMessages(chatMessages);
 
+        developer.log(
+          '📦 SET MESSAGES (bulk load): ${chatMessages.length} messages. Current streaming ID: ${_controller.currentlyStreamingMessageId}',
+          name: 'ChatSession.Sync',
+        );
+
         // Update synced IDs
         _syncedMessageIds.clear();
         _syncedMessageIds.addAll(messages.map((m) => m.id));
@@ -225,6 +246,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         // Use addMessage for real-time new messages (with animation)
         for (final message in newMessages) {
           _controller.addMessage(message);
+          developer.log(
+            '➕ ADD MESSAGE (incremental): ID=${message.customProperties?['id']}. Current streaming ID: ${_controller.currentlyStreamingMessageId}',
+            name: 'ChatSession.Sync',
+          );
         }
       }
     } catch (e) {
@@ -481,6 +506,23 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                           },
                           addMessageToUI: (message) {
                             _controller.addMessage(message);
+                            // Immediately stop any auto-streaming the library may have started
+                            final messageId =
+                                message.customProperties?['id'] as String?;
+                            if (messageId != null) {
+                              _controller.stopStreamingMessage(messageId);
+                              developer.log(
+                                '🛑 Auto-stopped streaming for: $messageId',
+                                name: 'ChatSession.Streaming',
+                              );
+                            }
+                          },
+                          markMessageAsSynced: (messageId) {
+                            _syncedMessageIds.add(messageId);
+                            developer.log(
+                              '✓ Marked as synced (follow-up): $messageId',
+                              name: 'ChatSession.Sync',
+                            );
                           },
                         );
                       },

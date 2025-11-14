@@ -229,6 +229,7 @@ class ChatController extends StateNotifier<ChatState> {
     required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
     executeAction,
     required void Function(ChatMessage) addMessageToUI,
+    required void Function(String) markMessageAsSynced,
   }) async {
     developer.log(
       '🚀 Executing ${selectedActions.length} actions',
@@ -279,11 +280,13 @@ class ChatController extends StateNotifier<ChatState> {
       for (final skippedAction in skippedActions) {
         final skippedMessage = '⏭️ **Skipped:** `${skippedAction.command}`';
 
-        final messageId = await _repository.saveAiMessage(
-          sessionId: sessionId,
-          content: skippedMessage,
-        );
+        // Generate message ID upfront
+        final messageId = _repository.generateMessageId();
 
+        // Mark as synced BEFORE saving
+        markMessageAsSynced(messageId);
+
+        // Add to UI first
         addMessageToUI(
           ChatMessage(
             text: skippedMessage,
@@ -292,6 +295,13 @@ class ChatController extends StateNotifier<ChatState> {
             customProperties: {'id': messageId},
             isMarkdown: true,
           ),
+        );
+
+        // Save to database
+        await _repository.saveAiMessage(
+          id: messageId,
+          sessionId: sessionId,
+          content: skippedMessage,
         );
       }
 
@@ -333,12 +343,13 @@ class ChatController extends StateNotifier<ChatState> {
         final toolCall = result.toolCalls[i];
         final formattedResult = result.chatMessages[i];
 
-        // Save the formatted message as an AI message for display
-        final messageId = await _repository.saveAiMessage(
-          sessionId: sessionId,
-          content: formattedResult,
-        );
+        // Generate message ID upfront
+        final messageId = _repository.generateMessageId();
 
+        // Mark as synced BEFORE saving to prevent DB sync from re-adding
+        markMessageAsSynced(messageId);
+
+        // Add to UI first
         addMessageToUI(
           ChatMessage(
             text: formattedResult,
@@ -347,6 +358,13 @@ class ChatController extends StateNotifier<ChatState> {
             customProperties: {'id': messageId},
             isMarkdown: true,
           ),
+        );
+
+        // Save the formatted message as an AI message for display
+        await _repository.saveAiMessage(
+          id: messageId,
+          sessionId: sessionId,
+          content: formattedResult,
         );
 
         // Also save raw result for LLM conversation (not displayed in UI)
@@ -388,11 +406,13 @@ class ChatController extends StateNotifier<ChatState> {
 
         // Save follow-up text response
         if (followUp.hasTextResponse) {
-          final messageId = await _repository.saveAiMessage(
-            sessionId: sessionId,
-            content: followUp.textResponse!,
-          );
+          // Generate message ID upfront
+          final messageId = _repository.generateMessageId();
 
+          // Mark as synced BEFORE saving to prevent DB sync from re-adding
+          markMessageAsSynced(messageId);
+
+          // Add to UI first (no streaming animation - text is already complete)
           addMessageToUI(
             ChatMessage(
               text: followUp.textResponse!,
@@ -401,6 +421,13 @@ class ChatController extends StateNotifier<ChatState> {
               customProperties: {'id': messageId},
               isMarkdown: true,
             ),
+          );
+
+          // Save to database with pre-generated ID (this will trigger sync but won't re-add)
+          await _repository.saveAiMessage(
+            id: messageId,
+            sessionId: sessionId,
+            content: followUp.textResponse!,
           );
         }
       }
