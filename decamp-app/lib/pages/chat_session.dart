@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/execution_progress_overlay.dart';
+import 'package:decamp/components/rich_message_content.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
@@ -451,6 +453,39 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         bottomRightRadius: 22,
                         enableShadow: true,
                       ),
+                      // Custom bubble builder for rich content
+                      customBubbleBuilder: (context, message, isUser) {
+                        return RichMessageContent(
+                          message: message,
+                          isUser: isUser,
+                          styleSheet:
+                              MarkdownStyleSheet.fromTheme(
+                                Theme.of(context),
+                              ).copyWith(
+                                p: TextStyle(
+                                  color: isUser
+                                      ? Theme.of(
+                                          context,
+                                        ).colorScheme.onPrimaryContainer
+                                      : Theme.of(context).colorScheme.onSurface,
+                                  fontSize: 14,
+                                ),
+                                code: TextStyle(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontFamily: 'monospace',
+                                ),
+                                codeblockDecoration: BoxDecoration(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                        );
+                      },
                     ),
 
                     // Scroll behavior
