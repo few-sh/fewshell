@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   late final SnippetDao snippetDao = SnippetDao(this);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -96,6 +96,17 @@ class AppDatabase extends _$AppDatabase {
           // Create index for position ordering
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
+          );
+        }
+
+        // Migration from version 2 to 3: Add isArchived column to sessions
+        if (from < 3) {
+          // Add isArchived column with default value false
+          await m.addColumn(sessions, sessions.isArchived);
+
+          // Create index for efficient filtering of archived sessions
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(project_id, is_archived, timestamp DESC)',
           );
         }
       },

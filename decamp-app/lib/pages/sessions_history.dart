@@ -5,259 +5,479 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/utils/date_formatter.dart';
 
+/// Enum for view mode in sessions history
+enum SessionsViewMode { active, archived }
+
 /// Sessions History Page
-/// Displays all sessions for the current project
-class SessionsHistoryPage extends ConsumerWidget {
+/// Displays all sessions for the current project with archive functionality
+class SessionsHistoryPage extends ConsumerStatefulWidget {
   const SessionsHistoryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SessionsHistoryPage> createState() =>
+      _SessionsHistoryPageState();
+}
+
+class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
+  SessionsViewMode _viewMode = SessionsViewMode.active;
+
+  @override
+  Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
-    final sessionsAsync = ref.watch(currentProjectSessionsProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
+    final archivedCountAsync = ref.watch(archivedSessionsCountProvider);
+
+    // Select appropriate provider based on view mode
+    final sessionsAsync = _viewMode == SessionsViewMode.active
+        ? ref.watch(currentProjectSessionsProvider)
+        : ref.watch(archivedSessionsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('${currentProject?.name ?? 'Project'} Sessions'),
+        title: Text(
+          _viewMode == SessionsViewMode.active
+              ? '${currentProject?.name ?? 'Project'} Sessions'
+              : 'Archived Sessions',
+        ),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          if (_viewMode == SessionsViewMode.active)
+            // Archive button with badge
+            archivedCountAsync.when(
+              data: (count) => count > 0
+                  ? Badge(
+                      label: Text('$count'),
+                      child: IconButton(
+                        icon: const Icon(Icons.archive),
+                        tooltip: 'View archived sessions',
+                        onPressed: () {
+                          setState(() {
+                            _viewMode = SessionsViewMode.archived;
+                          });
+                        },
+                      ),
+                    )
+                  : IconButton(
+                      icon: const Icon(Icons.archive),
+                      tooltip: 'View archived sessions',
+                      onPressed: () {
+                        setState(() {
+                          _viewMode = SessionsViewMode.archived;
+                        });
+                      },
+                    ),
+              loading: () => IconButton(
+                icon: const Icon(Icons.archive),
+                onPressed: () {
+                  setState(() {
+                    _viewMode = SessionsViewMode.archived;
+                  });
+                },
+              ),
+              error: (_, __) => IconButton(
+                icon: const Icon(Icons.archive),
+                onPressed: () {
+                  setState(() {
+                    _viewMode = SessionsViewMode.archived;
+                  });
+                },
+              ),
+            )
+          else
+            // Back to active sessions button
+            IconButton(
+              icon: const Icon(Icons.unarchive),
+              tooltip: 'View active sessions',
+              onPressed: () {
+                setState(() {
+                  _viewMode = SessionsViewMode.active;
+                });
+              },
+            ),
+        ],
       ),
-      body: sessionsAsync.when(
-        data: (sessions) {
-          if (sessions.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.chat_bubble_outline,
-                    size: 64,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No chat sessions yet',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Start a new conversation to see it here',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
+      body: Column(
+        children: [
+          // Delete all archived button (only in archive view)
+          if (_viewMode == SessionsViewMode.archived)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              child: sessionsAsync.when(
+                data: (sessions) => sessions.isNotEmpty
+                    ? ElevatedButton.icon(
+                        onPressed: () => _showDeleteAllArchivedDialog(
+                          context,
+                          sessions.length,
+                        ),
+                        icon: const Icon(Icons.delete_forever),
+                        label: Text('Delete All Archived (${sessions.length})'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.error,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onError,
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ),
+          // Sessions list
+          Expanded(
+            child: sessionsAsync.when(
+              data: (sessions) =>
+                  _buildSessionsList(context, sessions, currentSessionId),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stack) => _buildErrorView(context, error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSessionsList(
+    BuildContext context,
+    List<dynamic> sessions,
+    String? currentSessionId,
+  ) {
+    if (sessions.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _viewMode == SessionsViewMode.active
+                  ? Icons.chat_bubble_outline
+                  : Icons.archive_outlined,
+              size: 64,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _viewMode == SessionsViewMode.active
+                  ? 'No chat sessions yet'
+                  : 'No archived sessions',
+              style: TextStyle(
+                fontSize: 18,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _viewMode == SessionsViewMode.active
+                  ? 'Start a new conversation to see it here'
+                  : 'Archived sessions will appear here',
+              style: TextStyle(
+                fontSize: 14,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: sessions.length,
+      itemBuilder: (context, index) {
+        final session = sessions[index];
+        return _buildSessionCard(
+          context,
+          session,
+          session.id == currentSessionId,
+        );
+      },
+    );
+  }
+
+  Widget _buildSessionCard(
+    BuildContext context,
+    dynamic session,
+    bool isCurrentSession,
+  ) {
+    final theme = Theme.of(context);
+
+    // Calculate time difference between createdAt and updatedAt
+    final timeDifference = session.updatedAt.difference(session.createdAt);
+    final showDateRange = timeDifference.inMinutes >= 5;
+
+    // Check if both dates are on the same day
+    final sameDay =
+        session.createdAt.year == session.updatedAt.year &&
+        session.createdAt.month == session.updatedAt.month &&
+        session.createdAt.day == session.updatedAt.day;
+
+    // Format dates
+    final createdTime = DateFormatter.formatAbsoluteDateTime(session.createdAt);
+    final updatedTime = DateFormatter.formatAbsoluteDateTime(session.updatedAt);
+    final relativeTime = DateFormatter.formatRelativeTime(session.updatedAt);
+
+    // Create date display based on conditions
+    String dateDisplay;
+    if (!showDateRange) {
+      // Less than 5 minutes apart - show only updatedTime
+      dateDisplay = updatedTime;
+    } else if (sameDay) {
+      // Same day and more than 5 minutes apart - show date with time range
+      final createdTimeOnly = DateFormat('h:mm a').format(session.createdAt);
+      final updatedTimeOnly = DateFormat('h:mm a').format(session.updatedAt);
+      final dateOnly = DateFormat('MMM d, yyyy').format(session.createdAt);
+      dateDisplay = '$dateOnly • $createdTimeOnly - $updatedTimeOnly';
+    } else {
+      // Different days - show full date range
+      dateDisplay = '$createdTime - $updatedTime';
+    }
+
+    return Dismissible(
+      key: ValueKey(session.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: _viewMode == SessionsViewMode.active
+              ? theme.colorScheme.secondary
+              : theme.colorScheme.primary,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(
+          _viewMode == SessionsViewMode.active
+              ? Icons.archive
+              : Icons.unarchive,
+          color: theme.colorScheme.onSecondary,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (_viewMode == SessionsViewMode.active) {
+          // Archive the session
+          await ref.read(sessionActionsProvider).archiveSession(session.id);
+
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Archived: ${session.description}'),
+                action: SnackBarAction(
+                  label: 'Undo',
+                  onPressed: () {
+                    ref
+                        .read(sessionActionsProvider)
+                        .unarchiveSession(session.id);
+                  },
+                ),
+                duration: const Duration(seconds: 3),
               ),
             );
           }
+        } else {
+          // Unarchive the session
+          await ref.read(sessionActionsProvider).unarchiveSession(session.id);
 
-          return ListView.builder(
-            itemCount: sessions.length,
-            itemBuilder: (context, index) {
-              final session = sessions[index];
-              final isCurrentSession = session.id == currentSessionId;
-
-              // Calculate time difference between createdAt and updatedAt
-              final timeDifference = session.updatedAt.difference(
-                session.createdAt,
-              );
-              final showDateRange = timeDifference.inMinutes >= 5;
-
-              // Check if both dates are on the same day
-              final sameDay =
-                  session.createdAt.year == session.updatedAt.year &&
-                  session.createdAt.month == session.updatedAt.month &&
-                  session.createdAt.day == session.updatedAt.day;
-
-              // Format dates
-              final createdTime = DateFormatter.formatAbsoluteDateTime(
-                session.createdAt,
-              );
-              final updatedTime = DateFormatter.formatAbsoluteDateTime(
-                session.updatedAt,
-              );
-              final relativeTime = DateFormatter.formatRelativeTime(
-                session.updatedAt,
-              );
-
-              // Create date display based on conditions
-              String dateDisplay;
-              if (!showDateRange) {
-                // Less than 5 minutes apart - show only updatedTime
-                dateDisplay = updatedTime;
-              } else if (sameDay) {
-                // Same day and more than 5 minutes apart - show date with time range
-                final createdTimeOnly = DateFormat(
-                  'h:mm a',
-                ).format(session.createdAt);
-                final updatedTimeOnly = DateFormat(
-                  'h:mm a',
-                ).format(session.updatedAt);
-                final dateOnly = DateFormat(
-                  'MMM d, yyyy',
-                ).format(session.createdAt);
-                dateDisplay = '$dateOnly • $createdTimeOnly - $updatedTimeOnly';
-              } else {
-                // Different days - show full date range
-                dateDisplay = '$createdTime - $updatedTime';
-              }
-
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                elevation: isCurrentSession ? 4 : 2,
-                color: isCurrentSession
-                    ? Theme.of(context).colorScheme.primaryContainer
-                    : null,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    top: 12,
-                    bottom: 12,
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Restored: ${session.description}'),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+        return true;
+      },
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: isCurrentSession ? 4 : 2,
+        color: isCurrentSession ? theme.colorScheme.primaryContainer : null,
+        child: ListTile(
+          contentPadding: const EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: 12,
+          ),
+          horizontalTitleGap: 8,
+          leading: Icon(
+            Icons.arrow_back_ios,
+            size: 16,
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+          ),
+          title: Text(
+            session.description,
+            style: TextStyle(
+              fontWeight: isCurrentSession ? FontWeight.w600 : FontWeight.w500,
+              fontSize: 16,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dateDisplay,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
-                  horizontalTitleGap: 8,
-                  leading: Icon(
-                    Icons.arrow_back_ios,
-                    size: 16,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  relativeTime,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: isCurrentSession
+                        ? theme.colorScheme.secondary
+                        : theme.colorScheme.primary,
                   ),
-                  title: Text(
-                    session.description,
-                    style: TextStyle(
-                      fontWeight: isCurrentSession
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      fontSize: 16,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                if (isCurrentSession)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
                       children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 14,
+                          color: theme.colorScheme.secondary,
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          dateDisplay,
+                          'Active',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.6),
+                            fontWeight: FontWeight.bold,
+                            color: theme.colorScheme.secondary,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          relativeTime,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isCurrentSession
-                                ? Theme.of(context).colorScheme.secondary
-                                : Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        if (isCurrentSession)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  size: 14,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.secondary,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Active',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.secondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                       ],
                     ),
                   ),
-                  onTap: isCurrentSession
-                      ? () {
-                          // Just navigate back for current session
-                          Navigator.pop(context);
-                        }
-                      : () {
-                          // Switch to the selected session
-                          ref.read(currentSessionIdProvider.notifier).state =
-                              session.id;
-
-                          // Navigate back to chat
-                          Navigator.pop(context);
-
-                          // Show feedback
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Switched to: ${session.description}',
-                              ),
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        },
-                ),
-              );
-            },
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stack) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Theme.of(context).colorScheme.error,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Error loading sessions',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error.toString(),
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
+              ],
+            ),
           ),
+          onTap: _viewMode == SessionsViewMode.archived
+              ? null // Archived sessions can't be tapped to open
+              : isCurrentSession
+              ? () {
+                  // Just navigate back for current session
+                  Navigator.pop(context);
+                }
+              : () {
+                  // Switch to the selected session
+                  ref.read(currentSessionIdProvider.notifier).state =
+                      session.id;
+
+                  // Navigate back to chat
+                  Navigator.pop(context);
+
+                  // Show feedback
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Switched to: ${session.description}'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
         ),
       ),
+    );
+  }
+
+  Widget _buildErrorView(BuildContext context, Object error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error loading sessions',
+            style: TextStyle(
+              fontSize: 18,
+              color: Theme.of(context).colorScheme.error,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error.toString(),
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteAllArchivedDialog(BuildContext context, int count) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete All Archived Sessions?'),
+          content: Text(
+            'This will permanently delete $count archived ${count == 1 ? 'session' : 'sessions'}. This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(dialogContext).pop();
+
+                final projectId = ref.read(currentProjectIdProvider);
+                if (projectId != null) {
+                  final deletedCount = await ref
+                      .read(sessionActionsProvider)
+                      .deleteArchivedSessions(projectId);
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Deleted $deletedCount archived ${deletedCount == 1 ? 'session' : 'sessions'}',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+
+                    // Switch back to active view
+                    setState(() {
+                      _viewMode = SessionsViewMode.active;
+                    });
+                  }
+                }
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('Delete All'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

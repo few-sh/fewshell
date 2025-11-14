@@ -14,7 +14,7 @@ final sessionsStreamProvider =
     });
 
 /// Provider for sessions of the currently selected project
-final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>((
+final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>(((
   ref,
 ) {
   final projectId = ref.watch(currentProjectIdProvider);
@@ -22,7 +22,27 @@ final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>((
     return Stream.value([]);
   }
   final sessionDao = ref.watch(sessionDaoProvider);
-  return sessionDao.watchSessionsByProject(projectId);
+  return sessionDao.watchNonArchivedSessionsByProject(projectId);
+}));
+
+/// Provider for archived sessions of the currently selected project
+final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
+  final projectId = ref.watch(currentProjectIdProvider);
+  if (projectId == null) {
+    return Stream.value([]);
+  }
+  final sessionDao = ref.watch(sessionDaoProvider);
+  return sessionDao.watchArchivedSessionsByProject(projectId);
+});
+
+/// Provider for archived sessions count
+final archivedSessionsCountProvider = FutureProvider<int>((ref) async {
+  final projectId = ref.watch(currentProjectIdProvider);
+  if (projectId == null) {
+    return 0;
+  }
+  final sessionDao = ref.watch(sessionDaoProvider);
+  return sessionDao.getArchivedSessionCountByProject(projectId);
 });
 
 /// StateProvider for the currently selected session ID
@@ -230,6 +250,52 @@ class SessionActions {
   /// Get session count for a project
   Future<int> getSessionCount(String projectId) async {
     return await _sessionDao.getSessionCountByProject(projectId);
+  }
+
+  /// Archive a session
+  /// If the session is currently active, it will be switched to another session first
+  Future<void> archiveSession(String id) async {
+    // Check if this is the currently active session
+    final currentSessionId = _ref.read(currentSessionIdProvider);
+    if (currentSessionId == id) {
+      // Get all non-archived sessions for this project
+      final currentSession = await _sessionDao.getSession(id);
+      if (currentSession != null) {
+        final sessions = await _sessionDao.getSessionsByProject(
+          currentSession.projectId,
+        );
+
+        // Find another non-archived session to switch to
+        final otherSessions = sessions
+            .where((s) => s.id != id && !s.isArchived)
+            .toList();
+
+        if (otherSessions.isNotEmpty) {
+          // Switch to the most recent other session
+          _ref.read(currentSessionIdProvider.notifier).state =
+              otherSessions.first.id;
+        } else {
+          // No other sessions - create a new one
+          final newSessionId = await createSession(
+            projectId: currentSession.projectId,
+          );
+          _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+        }
+      }
+    }
+
+    // Now archive the session
+    await _sessionDao.archiveSession(id);
+  }
+
+  /// Unarchive a session
+  Future<void> unarchiveSession(String id) async {
+    await _sessionDao.unarchiveSession(id);
+  }
+
+  /// Delete all archived sessions for a project
+  Future<int> deleteArchivedSessions(String projectId) async {
+    return await _sessionDao.deleteArchivedSessionsByProject(projectId);
   }
 
   /// Generate a unique session ID

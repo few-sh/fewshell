@@ -22,6 +22,9 @@ class Sessions extends Table {
   /// Timestamp when the session was last updated
   DateTimeColumn get updatedAt => dateTime()();
 
+  /// Whether the session is archived
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

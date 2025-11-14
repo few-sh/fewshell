@@ -16,6 +16,7 @@ _$SessionImpl _$$SessionImplFromJson(
     timestamp: $checkedConvert('timestamp', (v) => DateTime.parse(v as String)),
     createdAt: $checkedConvert('createdAt', (v) => DateTime.parse(v as String)),
     updatedAt: $checkedConvert('updatedAt', (v) => DateTime.parse(v as String)),
+    isArchived: $checkedConvert('isArchived', (v) => v as bool? ?? false),
   );
   return val;
 });
@@ -28,4 +29,5 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'timestamp': instance.timestamp.toIso8601String(),
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
+      'isArchived': instance.isArchived,
     };

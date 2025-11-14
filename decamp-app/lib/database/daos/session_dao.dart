@@ -21,6 +21,34 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .watch();
   }
 
+  /// Watch non-archived sessions for a specific project, ordered by timestamp desc
+  Stream<List<SessionEntity>> watchNonArchivedSessionsByProject(
+    String projectId,
+  ) {
+    return (select(sessions)
+          ..where(
+            (s) => s.projectId.equals(projectId) & s.isArchived.equals(false),
+          )
+          ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.timestamp, mode: OrderingMode.desc),
+          ]))
+        .watch();
+  }
+
+  /// Watch archived sessions for a specific project, ordered by timestamp desc
+  Stream<List<SessionEntity>> watchArchivedSessionsByProject(String projectId) {
+    return (select(sessions)
+          ..where(
+            (s) => s.projectId.equals(projectId) & s.isArchived.equals(true),
+          )
+          ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.timestamp, mode: OrderingMode.desc),
+          ]))
+        .watch();
+  }
+
   /// Get a single session by ID
   Future<SessionEntity?> getSession(String id) {
     return (select(sessions)..where((s) => s.id.equals(id))).getSingleOrNull();
@@ -66,6 +94,39 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     final query = selectOnly(sessions)
       ..addColumns([count])
       ..where(sessions.projectId.equals(projectId));
+    return query.map((row) => row.read(count)!).getSingle();
+  }
+
+  /// Archive a session by setting isArchived to true
+  Future<int> archiveSession(String id) {
+    return (update(sessions)..where((s) => s.id.equals(id))).write(
+      SessionEntityCompanion(isArchived: const Value(true)),
+    );
+  }
+
+  /// Unarchive a session by setting isArchived to false
+  Future<int> unarchiveSession(String id) {
+    return (update(sessions)..where((s) => s.id.equals(id))).write(
+      SessionEntityCompanion(isArchived: const Value(false)),
+    );
+  }
+
+  /// Delete all archived sessions for a specific project
+  Future<int> deleteArchivedSessionsByProject(String projectId) {
+    return (delete(sessions)..where(
+          (s) => s.projectId.equals(projectId) & s.isArchived.equals(true),
+        ))
+        .go();
+  }
+
+  /// Get count of archived sessions for a project
+  Future<int> getArchivedSessionCountByProject(String projectId) {
+    final count = countAll();
+    final query = selectOnly(sessions)
+      ..addColumns([count])
+      ..where(
+        sessions.projectId.equals(projectId) & sessions.isArchived.equals(true),
+      );
     return query.map((row) => row.read(count)!).getSingle();
   }
 }

@@ -27,6 +27,7 @@ mixin _$Session {
   DateTime get timestamp => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
+  bool get isArchived => throw _privateConstructorUsedError;
 
   /// Serializes this Session to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -49,6 +50,7 @@ abstract class $SessionCopyWith<$Res> {
     DateTime timestamp,
     DateTime createdAt,
     DateTime updatedAt,
+    bool isArchived,
   });
 }
 
@@ -73,6 +75,7 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
     Object? timestamp = null,
     Object? createdAt = null,
     Object? updatedAt = null,
+    Object? isArchived = null,
   }) {
     return _then(
       _value.copyWith(
@@ -100,6 +103,10 @@ class _$SessionCopyWithImpl<$Res, $Val extends Session>
                 ? _value.updatedAt
                 : updatedAt // ignore: cast_nullable_to_non_nullable
                       as DateTime,
+            isArchived: null == isArchived
+                ? _value.isArchived
+                : isArchived // ignore: cast_nullable_to_non_nullable
+                      as bool,
           )
           as $Val,
     );
@@ -121,6 +128,7 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
     DateTime timestamp,
     DateTime createdAt,
     DateTime updatedAt,
+    bool isArchived,
   });
 }
 
@@ -144,6 +152,7 @@ class __$$SessionImplCopyWithImpl<$Res>
     Object? timestamp = null,
     Object? createdAt = null,
     Object? updatedAt = null,
+    Object? isArchived = null,
   }) {
     return _then(
       _$SessionImpl(
@@ -171,6 +180,10 @@ class __$$SessionImplCopyWithImpl<$Res>
             ? _value.updatedAt
             : updatedAt // ignore: cast_nullable_to_non_nullable
                   as DateTime,
+        isArchived: null == isArchived
+            ? _value.isArchived
+            : isArchived // ignore: cast_nullable_to_non_nullable
+                  as bool,
       ),
     );
   }
@@ -186,6 +199,7 @@ class _$SessionImpl implements _Session {
     required this.timestamp,
     required this.createdAt,
     required this.updatedAt,
+    this.isArchived = false,
   });
 
   factory _$SessionImpl.fromJson(Map<String, dynamic> json) =>
@@ -203,10 +217,13 @@ class _$SessionImpl implements _Session {
   final DateTime createdAt;
   @override
   final DateTime updatedAt;
+  @override
+  @JsonKey()
+  final bool isArchived;
 
   @override
   String toString() {
-    return 'Session(id: $id, projectId: $projectId, description: $description, timestamp: $timestamp, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'Session(id: $id, projectId: $projectId, description: $description, timestamp: $timestamp, createdAt: $createdAt, updatedAt: $updatedAt, isArchived: $isArchived)';
   }
 
   @override
@@ -224,7 +241,9 @@ class _$SessionImpl implements _Session {
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
-                other.updatedAt == updatedAt));
+                other.updatedAt == updatedAt) &&
+            (identical(other.isArchived, isArchived) ||
+                other.isArchived == isArchived));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -237,6 +256,7 @@ class _$SessionImpl implements _Session {
     timestamp,
     createdAt,
     updatedAt,
+    isArchived,
   );
 
   /// Create a copy of Session
@@ -261,6 +281,7 @@ abstract class _Session implements Session {
     required final DateTime timestamp,
     required final DateTime createdAt,
     required final DateTime updatedAt,
+    final bool isArchived,
   }) = _$SessionImpl;
 
   factory _Session.fromJson(Map<String, dynamic> json) = _$SessionImpl.fromJson;
@@ -277,6 +298,8 @@ abstract class _Session implements Session {
   DateTime get createdAt;
   @override
   DateTime get updatedAt;
+  @override
+  bool get isArchived;
 
   /// Create a copy of Session
   /// with the given fields replaced by the non-null parameter values.

@@ -14,6 +14,7 @@ class Session with _$Session {
     required DateTime timestamp,
     required DateTime createdAt,
     required DateTime updatedAt,
+    @Default(false) bool isArchived,
   }) = _Session;
 
   factory Session.fromJson(Map<String, dynamic> json) =>
