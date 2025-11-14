@@ -458,6 +458,7 @@ class ChatRepository {
         buffer.writeln('```');
         buffer.writeln(stdout);
         buffer.writeln('```');
+        buffer.writeln();
       }
 
       // Print stderr if available
