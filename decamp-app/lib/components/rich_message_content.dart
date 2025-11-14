@@ -24,18 +24,41 @@ class RichMessageContent extends StatelessWidget {
       message.customProperties ?? {},
     );
 
+    Widget content;
+
     // Check if this is a collapsible message
     if (metadata.isCollapsible) {
-      return _buildCollapsibleContent(context, metadata);
+      content = _buildCollapsibleContent(context, metadata);
     }
-
     // Check if this has action buttons
-    if (metadata.actions.isNotEmpty) {
-      return _buildInteractiveContent(context, metadata);
+    else if (metadata.actions.isNotEmpty) {
+      content = _buildInteractiveContent(context, metadata);
+    }
+    // Default: render markdown with selection support
+    else {
+      content = _buildMarkdownContent(context, metadata);
     }
 
-    // Default: render markdown with selection support
-    return _buildMarkdownContent(context, metadata);
+    // Wrap user messages in a bubble container
+    if (isUser) {
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(18),
+            topRight: Radius.circular(18),
+            bottomLeft: Radius.circular(18),
+            bottomRight: Radius.circular(0),
+          ),
+        ),
+        child: content,
+      );
+    }
+
+    // AI messages: no bubble wrapper (flat appearance)
+    return content;
   }
 
   Widget _buildMarkdownContent(BuildContext context, MessageMetadata metadata) {
