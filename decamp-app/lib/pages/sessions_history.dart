@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/utils/date_formatter.dart';
@@ -63,13 +64,45 @@ class SessionsHistoryPage extends ConsumerWidget {
             itemCount: sessions.length,
             itemBuilder: (context, index) {
               final session = sessions[index];
-              final absoluteTime = DateFormatter.formatAbsoluteDateTime(
-                session.timestamp,
+              final isCurrentSession = session.id == currentSessionId;
+
+              // Calculate time difference between createdAt and updatedAt
+              final timeDifference = session.updatedAt.difference(
+                session.createdAt,
+              );
+              final showDateRange = timeDifference.inMinutes >= 5;
+
+              // Check if both dates are on the same day
+              final sameDay = session.createdAt.year == session.updatedAt.year &&
+                  session.createdAt.month == session.updatedAt.month &&
+                  session.createdAt.day == session.updatedAt.day;
+
+              // Format dates
+              final createdTime = DateFormatter.formatAbsoluteDateTime(
+                session.createdAt,
+              );
+              final updatedTime = DateFormatter.formatAbsoluteDateTime(
+                session.updatedAt,
               );
               final relativeTime = DateFormatter.formatRelativeTime(
-                session.timestamp,
+                session.updatedAt,
               );
-              final isCurrentSession = session.id == currentSessionId;
+
+              // Create date display based on conditions
+              String dateDisplay;
+              if (!showDateRange) {
+                // Less than 5 minutes apart - show only updatedTime
+                dateDisplay = updatedTime;
+              } else if (sameDay) {
+                // Same day and more than 5 minutes apart - show date with time range
+                final createdTimeOnly = DateFormat('h:mm a').format(session.createdAt);
+                final updatedTimeOnly = DateFormat('h:mm a').format(session.updatedAt);
+                final dateOnly = DateFormat('MMM d, yyyy').format(session.createdAt);
+                dateDisplay = '$dateOnly • $createdTimeOnly - $updatedTimeOnly';
+              } else {
+                // Different days - show full date range
+                dateDisplay = '$createdTime - $updatedTime';
+              }
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -78,10 +111,13 @@ class SessionsHistoryPage extends ConsumerWidget {
                     ? Theme.of(context).colorScheme.primaryContainer
                     : null,
                 child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+                  contentPadding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 12,
+                    bottom: 12,
                   ),
+                  horizontalTitleGap: 8,
                   leading: Icon(
                     Icons.arrow_back_ios,
                     size: 16,
@@ -106,9 +142,9 @@ class SessionsHistoryPage extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          absoluteTime,
+                          dateDisplay,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: Theme.of(
                               context,
                             ).colorScheme.onSurface.withValues(alpha: 0.6),
