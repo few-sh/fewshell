@@ -294,7 +294,21 @@ class SessionActions {
   }
 
   /// Delete all archived sessions for a project
+  /// Also deletes all messages associated with those sessions
   Future<int> deleteArchivedSessions(String projectId) async {
+    // Get all archived sessions first
+    final archivedSessions = await _sessionDao.getSessionsByProject(projectId);
+    final archivedSessionsFiltered = archivedSessions
+        .where((s) => s.isArchived)
+        .toList();
+
+    // Delete messages for each archived session
+    final messageActions = _ref.read(messageActionsProvider);
+    for (final session in archivedSessionsFiltered) {
+      await messageActions.deleteMessagesBySession(session.id);
+    }
+
+    // Now delete the archived sessions themselves
     return await _sessionDao.deleteArchivedSessionsByProject(projectId);
   }
 

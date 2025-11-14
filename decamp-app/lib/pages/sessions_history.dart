@@ -250,11 +250,25 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
               : theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(
-          _viewMode == SessionsViewMode.active
-              ? Icons.archive
-              : Icons.unarchive,
-          color: theme.colorScheme.onSecondary,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              _viewMode == SessionsViewMode.active
+                  ? Icons.archive
+                  : Icons.unarchive,
+              color: theme.colorScheme.onSecondary,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _viewMode == SessionsViewMode.active ? 'Archive' : 'Unarchive',
+              style: TextStyle(
+                color: theme.colorScheme.onSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
       confirmDismiss: (direction) async {
@@ -305,11 +319,13 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
             bottom: 12,
           ),
           horizontalTitleGap: 8,
-          leading: Icon(
-            Icons.arrow_back_ios,
-            size: 16,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-          ),
+          leading: _viewMode == SessionsViewMode.active
+              ? Icon(
+                  Icons.arrow_back_ios,
+                  size: 16,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                )
+              : null,
           title: Text(
             session.description,
             style: TextStyle(
