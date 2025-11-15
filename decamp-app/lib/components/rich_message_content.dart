@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
+import 'package:intl/intl.dart';
 
 /// Rich message content widget with extensible features
 /// Supports: text selection, copy, collapsible sections, action buttons
@@ -39,6 +40,20 @@ class RichMessageContent extends StatelessWidget {
       content = _buildMarkdownContent(context, metadata);
     }
 
+    // Wrap content with timestamp at the bottom
+    final contentWithTimestamp = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        content,
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: _buildTimestamp(context),
+        ),
+      ],
+    );
+
     // Wrap user messages in a bubble container
     if (isUser) {
       return Container(
@@ -53,12 +68,49 @@ class RichMessageContent extends StatelessWidget {
             bottomRight: Radius.circular(0),
           ),
         ),
-        child: content,
+        child: contentWithTimestamp,
       );
     }
 
     // AI messages: no bubble wrapper (flat appearance)
-    return content;
+    return contentWithTimestamp;
+  }
+
+  Widget _buildTimestamp(BuildContext context) {
+    final timestamp = message.createdAt;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final messageDate = DateTime(
+      timestamp.year,
+      timestamp.month,
+      timestamp.day,
+    );
+
+    String formattedTime;
+    if (messageDate == today) {
+      // Today: show only time
+      formattedTime = DateFormat('h:mm:ss a').format(timestamp);
+    } else if (messageDate == today.subtract(const Duration(days: 1))) {
+      // Yesterday
+      formattedTime = 'Yesterday ${DateFormat('h:mm:ss a').format(timestamp)}';
+    } else if (now.difference(timestamp).inDays < 7) {
+      // Within a week: show day and time
+      formattedTime = DateFormat('EEE h:mm:ss a').format(timestamp);
+    } else {
+      // Older: show full date and time
+      formattedTime = DateFormat('MMM d, h:mm:ss a').format(timestamp);
+    }
+
+    return Text(
+      formattedTime,
+      style: TextStyle(
+        fontSize: 10,
+        color: Theme.of(
+          context,
+        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+        fontWeight: FontWeight.w400,
+      ),
+    );
   }
 
   Widget _buildMarkdownContent(BuildContext context, MessageMetadata metadata) {
