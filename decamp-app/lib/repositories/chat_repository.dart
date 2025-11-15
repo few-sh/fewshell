@@ -154,8 +154,8 @@ class ChatRepository {
   }) async {
     if (!isFirstMessage) return;
 
-    final description = messageContent.length > 50
-        ? '${messageContent.substring(0, 50)}...'
+    final description = messageContent.length > 495
+        ? '${messageContent.substring(0, 495)}...'
         : messageContent;
 
     await _sessionActions.updateSession(

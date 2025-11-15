@@ -315,7 +315,7 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
               fontWeight: isCurrentSession ? FontWeight.w600 : FontWeight.w500,
               fontSize: 16,
             ),
-            maxLines: 2,
+            maxLines: 4,
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Padding(
