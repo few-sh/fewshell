@@ -44,6 +44,10 @@ mixin _$SshSettings {
   /// Optional passphrase secret ID for encrypted private keys
   String? get passphraseSecretId => throw _privateConstructorUsedError;
 
+  /// Secret ID for sudo password (stored in secrets table)
+  /// Used when executing commands that require elevated privileges
+  String? get sudoPasswordSecretId => throw _privateConstructorUsedError;
+
   /// Whether this configuration is enabled
   bool get enabled => throw _privateConstructorUsedError;
   DateTime? get createdAt => throw _privateConstructorUsedError;
@@ -74,6 +78,7 @@ abstract class $SshSettingsCopyWith<$Res> {
     String? passwordSecretId,
     String? privateKeySecretId,
     String? passphraseSecretId,
+    String? sudoPasswordSecretId,
     bool enabled,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -102,6 +107,7 @@ class _$SshSettingsCopyWithImpl<$Res, $Val extends SshSettings>
     Object? passwordSecretId = freezed,
     Object? privateKeySecretId = freezed,
     Object? passphraseSecretId = freezed,
+    Object? sudoPasswordSecretId = freezed,
     Object? enabled = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
@@ -135,6 +141,10 @@ class _$SshSettingsCopyWithImpl<$Res, $Val extends SshSettings>
             passphraseSecretId: freezed == passphraseSecretId
                 ? _value.passphraseSecretId
                 : passphraseSecretId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            sudoPasswordSecretId: freezed == sudoPasswordSecretId
+                ? _value.sudoPasswordSecretId
+                : sudoPasswordSecretId // ignore: cast_nullable_to_non_nullable
                       as String?,
             enabled: null == enabled
                 ? _value.enabled
@@ -171,6 +181,7 @@ abstract class _$$SshSettingsImplCopyWith<$Res>
     String? passwordSecretId,
     String? privateKeySecretId,
     String? passphraseSecretId,
+    String? sudoPasswordSecretId,
     bool enabled,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -198,6 +209,7 @@ class __$$SshSettingsImplCopyWithImpl<$Res>
     Object? passwordSecretId = freezed,
     Object? privateKeySecretId = freezed,
     Object? passphraseSecretId = freezed,
+    Object? sudoPasswordSecretId = freezed,
     Object? enabled = null,
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
@@ -232,6 +244,10 @@ class __$$SshSettingsImplCopyWithImpl<$Res>
             ? _value.passphraseSecretId
             : passphraseSecretId // ignore: cast_nullable_to_non_nullable
                   as String?,
+        sudoPasswordSecretId: freezed == sudoPasswordSecretId
+            ? _value.sudoPasswordSecretId
+            : sudoPasswordSecretId // ignore: cast_nullable_to_non_nullable
+                  as String?,
         enabled: null == enabled
             ? _value.enabled
             : enabled // ignore: cast_nullable_to_non_nullable
@@ -260,6 +276,7 @@ class _$SshSettingsImpl implements _SshSettings {
     this.passwordSecretId,
     this.privateKeySecretId,
     this.passphraseSecretId,
+    this.sudoPasswordSecretId,
     this.enabled = true,
     this.createdAt,
     this.updatedAt,
@@ -300,6 +317,11 @@ class _$SshSettingsImpl implements _SshSettings {
   @override
   final String? passphraseSecretId;
 
+  /// Secret ID for sudo password (stored in secrets table)
+  /// Used when executing commands that require elevated privileges
+  @override
+  final String? sudoPasswordSecretId;
+
   /// Whether this configuration is enabled
   @override
   @JsonKey()
@@ -311,7 +333,7 @@ class _$SshSettingsImpl implements _SshSettings {
 
   @override
   String toString() {
-    return 'SshSettings(host: $host, port: $port, username: $username, authMethod: $authMethod, passwordSecretId: $passwordSecretId, privateKeySecretId: $privateKeySecretId, passphraseSecretId: $passphraseSecretId, enabled: $enabled, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'SshSettings(host: $host, port: $port, username: $username, authMethod: $authMethod, passwordSecretId: $passwordSecretId, privateKeySecretId: $privateKeySecretId, passphraseSecretId: $passphraseSecretId, sudoPasswordSecretId: $sudoPasswordSecretId, enabled: $enabled, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -331,6 +353,8 @@ class _$SshSettingsImpl implements _SshSettings {
                 other.privateKeySecretId == privateKeySecretId) &&
             (identical(other.passphraseSecretId, passphraseSecretId) ||
                 other.passphraseSecretId == passphraseSecretId) &&
+            (identical(other.sudoPasswordSecretId, sudoPasswordSecretId) ||
+                other.sudoPasswordSecretId == sudoPasswordSecretId) &&
             (identical(other.enabled, enabled) || other.enabled == enabled) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
@@ -349,6 +373,7 @@ class _$SshSettingsImpl implements _SshSettings {
     passwordSecretId,
     privateKeySecretId,
     passphraseSecretId,
+    sudoPasswordSecretId,
     enabled,
     createdAt,
     updatedAt,
@@ -377,6 +402,7 @@ abstract class _SshSettings implements SshSettings {
     final String? passwordSecretId,
     final String? privateKeySecretId,
     final String? passphraseSecretId,
+    final String? sudoPasswordSecretId,
     final bool enabled,
     final DateTime? createdAt,
     final DateTime? updatedAt,
@@ -414,6 +440,11 @@ abstract class _SshSettings implements SshSettings {
   /// Optional passphrase secret ID for encrypted private keys
   @override
   String? get passphraseSecretId;
+
+  /// Secret ID for sudo password (stored in secrets table)
+  /// Used when executing commands that require elevated privileges
+  @override
+  String? get sudoPasswordSecretId;
 
   /// Whether this configuration is enabled
   @override

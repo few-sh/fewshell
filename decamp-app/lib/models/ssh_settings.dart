@@ -33,6 +33,10 @@ class SshSettings with _$SshSettings {
     /// Optional passphrase secret ID for encrypted private keys
     String? passphraseSecretId,
 
+    /// Secret ID for sudo password (stored in secrets table)
+    /// Used when executing commands that require elevated privileges
+    String? sudoPasswordSecretId,
+
     /// Whether this configuration is enabled
     @Default(true) bool enabled,
 

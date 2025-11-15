@@ -50,11 +50,13 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
     String? password,
     String? privateKey,
     String? passphrase,
+    String? sudoPassword,
   }) async {
     // Generate secret IDs
     String? passwordSecretId;
     String? privateKeySecretId;
     String? passphraseSecretId;
+    String? sudoPasswordSecretId;
 
     // Store secrets in keychain
     if (authMethod == SshAuthMethod.password &&
@@ -73,6 +75,12 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       }
     }
 
+    // Store sudo password if provided
+    if (sudoPassword != null && sudoPassword.isNotEmpty) {
+      sudoPasswordSecretId = _generateSecretId('ssh_sudo_password');
+      await _secretsActions.saveSecret(sudoPasswordSecretId, sudoPassword);
+    }
+
     // Create SSH settings object
     final sshSettings = SshSettings(
       host: host,
@@ -82,6 +90,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       passwordSecretId: passwordSecretId,
       privateKeySecretId: privateKeySecretId,
       passphraseSecretId: passphraseSecretId,
+      sudoPasswordSecretId: sudoPasswordSecretId,
       enabled: true,
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
@@ -111,6 +120,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
     String? password,
     String? privateKey,
     String? passphrase,
+    String? sudoPassword,
     bool? enabled,
   }) async {
     final current = state;
@@ -121,6 +131,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
     String? passwordSecretId = current.passwordSecretId;
     String? privateKeySecretId = current.privateKeySecretId;
     String? passphraseSecretId = current.passphraseSecretId;
+    String? sudoPasswordSecretId = current.sudoPasswordSecretId;
 
     final effectiveAuthMethod = authMethod ?? current.authMethod;
 
@@ -184,6 +195,20 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       }
     }
 
+    // Handle sudo password updates (independent of auth method)
+    if (sudoPassword != null) {
+      if (sudoPassword.isNotEmpty) {
+        if (sudoPasswordSecretId == null) {
+          sudoPasswordSecretId = _generateSecretId('ssh_sudo_password');
+        }
+        await _secretsActions.saveSecret(sudoPasswordSecretId, sudoPassword);
+      } else if (sudoPasswordSecretId != null) {
+        // Clear sudo password if empty string provided
+        await _secretsActions.deleteSecret(sudoPasswordSecretId);
+        sudoPasswordSecretId = null;
+      }
+    }
+
     // Update SSH settings
     final updatedSettings = current.copyWith(
       host: host ?? current.host,
@@ -193,6 +218,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       passwordSecretId: passwordSecretId,
       privateKeySecretId: privateKeySecretId,
       passphraseSecretId: passphraseSecretId,
+      sudoPasswordSecretId: sudoPasswordSecretId,
       enabled: enabled ?? current.enabled,
       updatedAt: DateTime.now(),
     );

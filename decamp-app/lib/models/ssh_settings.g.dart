@@ -30,6 +30,10 @@ _$SshSettingsImpl _$$SshSettingsImplFromJson(Map<String, dynamic> json) =>
           'passphraseSecretId',
           (v) => v as String?,
         ),
+        sudoPasswordSecretId: $checkedConvert(
+          'sudoPasswordSecretId',
+          (v) => v as String?,
+        ),
         enabled: $checkedConvert('enabled', (v) => v as bool? ?? true),
         createdAt: $checkedConvert(
           'createdAt',
@@ -52,6 +56,7 @@ Map<String, dynamic> _$$SshSettingsImplToJson(_$SshSettingsImpl instance) =>
       'passwordSecretId': instance.passwordSecretId,
       'privateKeySecretId': instance.privateKeySecretId,
       'passphraseSecretId': instance.passphraseSecretId,
+      'sudoPasswordSecretId': instance.sudoPasswordSecretId,
       'enabled': instance.enabled,
       'createdAt': instance.createdAt?.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),

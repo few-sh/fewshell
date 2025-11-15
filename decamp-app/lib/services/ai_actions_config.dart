@@ -50,7 +50,9 @@ AiActionConfig createAiActionsConfig(
           ActionParameter.string(
             name: 'command',
             description:
-                'The shell command to execute (e.g., "ps aux | grep nginx")',
+                'The shell command to execute. Do NOT include "sudo" prefix in the command string - use the sudo_required parameter instead. '
+                'Examples: "systemctl restart nginx" (with sudo_required=true), "cat /var/log/syslog" (with sudo_required=true), '
+                '"ps aux | grep nginx" (with sudo_required=false).',
             required: true,
             validator: (value) {
               if (value == null || value.toString().isEmpty) {
@@ -59,6 +61,16 @@ AiActionConfig createAiActionsConfig(
               // Validate the command
               return shellService.validateCommand(value.toString());
             },
+          ),
+          ActionParameter.boolean(
+            name: 'sudo_required',
+            description:
+                'Set to true if the command requires elevated privileges (sudo). '
+                'IMPORTANT: Never include "sudo" in the command string itself - this parameter will handle privilege elevation securely. '
+                'Use true for system operations like: service management, file operations in protected directories, package installation, system configuration. '
+                'Use false for: reading logs accessible to the user, checking processes, network diagnostics available to all users.',
+            required: true,
+            defaultValue: false,
           ),
           ActionParameter.string(
             name: 'explanation',
@@ -467,10 +479,11 @@ AiActionConfig createAiActionsConfig(
         // Handler for executing the shell command
         handler: (params) async {
           final command = params['command'] as String;
+          final sudoRequired = params['sudo_required'] as bool? ?? false;
 
           try {
             developer.log(
-              'Executing shell command: $command',
+              'Executing shell command: $command (sudo: $sudoRequired)',
               name: 'AiActionsConfig',
             );
 
@@ -528,8 +541,18 @@ AiActionConfig createAiActionsConfig(
               );
             }
 
-            // Execute the command
-            final result = await shellService.executeCommand(command);
+            // Execute the command with or without sudo
+            final Map<String, dynamic> result;
+            if (sudoRequired) {
+              // Execute with sudo - requires sudo password in secrets
+              result = await shellService.executeWithSudo(
+                command: command,
+                sudoPasswordSecretId: currentSshSettings?.sudoPasswordSecretId,
+              );
+            } else {
+              // Execute without sudo
+              result = await shellService.executeCommand(command);
+            }
 
             if (result['executed'] == true) {
               return ActionResult.createSuccess(result);

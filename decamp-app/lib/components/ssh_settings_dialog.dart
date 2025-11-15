@@ -25,6 +25,7 @@ class SshSettingsDialog {
     String? password;
     String? privateKey;
     String? passphrase;
+    String? sudoPassword;
 
     if (isEditMode) {
       final notifier = ref.read(projectSshSettingsProvider(projectId).notifier);
@@ -40,6 +41,11 @@ class SshSettingsDialog {
       if (existingSettings.passphraseSecretId != null) {
         passphrase = await notifier.getSecret(
           existingSettings.passphraseSecretId!,
+        );
+      }
+      if (existingSettings.sudoPasswordSecretId != null) {
+        sudoPassword = await notifier.getSecret(
+          existingSettings.sudoPasswordSecretId!,
         );
       }
     }
@@ -58,6 +64,7 @@ class SshSettingsDialog {
         initialPassword: password,
         initialPrivateKey: privateKey,
         initialPassphrase: passphrase,
+        initialSudoPassword: sudoPassword,
         initialEnabled: existingSettings?.enabled,
         onSave:
             (
@@ -67,7 +74,8 @@ class SshSettingsDialog {
               authMethod,
               password,
               privateKey,
-              passphrase, {
+              passphrase,
+              sudoPassword, {
               enabled,
             }) async {
               await _saveSshSettings(
@@ -82,6 +90,7 @@ class SshSettingsDialog {
                 password: password,
                 privateKey: privateKey,
                 passphrase: passphrase,
+                sudoPassword: sudoPassword,
                 enabled: enabled,
               );
             },
@@ -102,6 +111,7 @@ class SshSettingsDialog {
     String? password,
     String? privateKey,
     String? passphrase,
+    String? sudoPassword,
     bool? enabled,
   }) async {
     try {
@@ -116,6 +126,7 @@ class SshSettingsDialog {
           password: password,
           privateKey: privateKey,
           passphrase: passphrase,
+          sudoPassword: sudoPassword,
           enabled: enabled,
         );
       } else {
@@ -127,6 +138,7 @@ class SshSettingsDialog {
           password: password,
           privateKey: privateKey,
           passphrase: passphrase,
+          sudoPassword: sudoPassword,
         );
       }
 
@@ -169,6 +181,7 @@ class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   final String? initialPassword;
   final String? initialPrivateKey;
   final String? initialPassphrase;
+  final String? initialSudoPassword;
   final bool? initialEnabled;
   final Function(
     String host,
@@ -177,7 +190,8 @@ class _SshSettingsDialogForm extends ConsumerStatefulWidget {
     SshAuthMethod authMethod,
     String? password,
     String? privateKey,
-    String? passphrase, {
+    String? passphrase,
+    String? sudoPassword, {
     bool? enabled,
   })
   onSave;
@@ -192,6 +206,7 @@ class _SshSettingsDialogForm extends ConsumerStatefulWidget {
     this.initialPassword,
     this.initialPrivateKey,
     this.initialPassphrase,
+    this.initialSudoPassword,
     this.initialEnabled,
     required this.onSave,
   });
@@ -209,11 +224,13 @@ class _SshSettingsDialogFormState
   late final TextEditingController _passwordController;
   late final TextEditingController _privateKeyController;
   late final TextEditingController _passphraseController;
+  late final TextEditingController _sudoPasswordController;
 
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
   bool _obscurePassword = true;
   bool _obscurePassphrase = true;
+  bool _obscureSudoPassword = true;
   bool _isTestingConnection = false;
   String? _testResultMessage;
   bool? _testResultSuccess;
@@ -237,6 +254,9 @@ class _SshSettingsDialogFormState
     _passphraseController = TextEditingController(
       text: widget.initialPassphrase,
     );
+    _sudoPasswordController = TextEditingController(
+      text: widget.initialSudoPassword,
+    );
     _enabled = widget.initialEnabled ?? true;
     _authMethod = widget.initialAuthMethod ?? SshAuthMethod.privateKey;
   }
@@ -249,6 +269,7 @@ class _SshSettingsDialogFormState
     _passwordController.dispose();
     _privateKeyController.dispose();
     _passphraseController.dispose();
+    _sudoPasswordController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -527,6 +548,48 @@ class _SshSettingsDialogFormState
                   obscureText: _obscurePassphrase,
                 ),
               ],
+
+              // Sudo password field (applies to all auth methods)
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _sudoPasswordController,
+                decoration: InputDecoration(
+                  labelText: 'Sudo Password (Optional)',
+                  hintText: _isEditMode
+                      ? 'Leave blank to keep current sudo password'
+                      : 'Enter password for sudo commands',
+                  helperText:
+                      'Required for commands needing elevated privileges',
+                  helperMaxLines: 2,
+                  isDense: true,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureSudoPassword
+                          ? Icons.visibility
+                          : Icons.visibility_off,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureSudoPassword = !_obscureSudoPassword;
+                      });
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ),
+                autocorrect: false,
+                enableSuggestions: false,
+                textCapitalization: TextCapitalization.none,
+                style: const TextStyle(
+                  fontFamily: 'Courier New',
+                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                  fontFeatures: [FontFeature.tabularFigures()],
+                ),
+                minLines: 1,
+                maxLines: _obscureSudoPassword ? 1 : 3,
+                obscureText: _obscureSudoPassword,
+              ),
 
               if (_isEditMode) ...[
                 const SizedBox(height: 12),
@@ -876,6 +939,9 @@ class _SshSettingsDialogFormState
         _authMethod == SshAuthMethod.privateKey &&
                 _passphraseController.text.isNotEmpty
             ? _passphraseController.text
+            : null,
+        _sudoPasswordController.text.isNotEmpty
+            ? _sudoPasswordController.text
             : null,
         enabled: _isEditMode ? _enabled : null,
       );
