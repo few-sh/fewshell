@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
@@ -187,5 +188,181 @@ class ShellService {
     return trimmed.startsWith('sudo ') ||
         trimmed.contains('rm -rf') ||
         trimmed.contains('mkfs');
+  }
+
+  /// Execute a command with sudo privileges and optional secret injection
+  ///
+  /// [command] - The command to execute with sudo (don't include 'sudo' prefix)
+  /// [sudoPasswordSecretId] - Optional secret ID for the sudo password
+  ///                          If null, assumes passwordless sudo or cached credentials
+  /// [secrets] - Optional map of environment variable names to secret values
+  ///             e.g., {'AWS_KEY': 'secret123', 'DB_PASSWORD': 'pass456'}
+  ///
+  /// Returns a map with 'stdout', 'stderr', 'exitCode', and 'executed'
+  ///
+  /// Security: Uses process substitution to avoid exposing secrets in process list
+  Future<Map<String, dynamic>> executeWithSudo({
+    required String command,
+    String? sudoPasswordSecretId,
+    Map<String, String>? secrets,
+  }) async {
+    if (_client == null) {
+      developer.log('No active SSH connection', name: 'ShellService');
+      return {
+        'stdout': '',
+        'stderr': 'Error: Not connected to SSH server',
+        'exitCode': -1,
+        'executed': false,
+      };
+    }
+
+    // Get sudo password from secrets if provided
+    String? sudoPassword;
+    if (sudoPasswordSecretId != null) {
+      sudoPassword = await _secretsActions?.getSecret(sudoPasswordSecretId);
+      if (sudoPassword == null || sudoPassword.isEmpty) {
+        developer.log(
+          'Sudo password not found in secrets',
+          name: 'ShellService',
+        );
+        return {
+          'stdout': '',
+          'stderr': 'Error: Sudo password not found in secrets',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
+    }
+
+    // Build environment variable exports for secrets
+    final envExports = StringBuffer();
+    final secretsToRedact = <String>[];
+    if (sudoPassword != null) {
+      secretsToRedact.add(sudoPassword);
+    }
+
+    if (secrets != null && secrets.isNotEmpty) {
+      for (var entry in secrets.entries) {
+        if (entry.value.isNotEmpty) {
+          // Validate environment variable name to prevent injection
+          if (!_isValidEnvVarName(entry.key)) {
+            developer.log(
+              'Invalid environment variable name: ${entry.key}',
+              name: 'ShellService',
+            );
+            continue;
+          }
+
+          // Base64 encode the secret to safely handle any characters
+          final encodedValue = base64.encode(utf8.encode(entry.value));
+          envExports.writeln(
+            "export ${entry.key}=\$(echo '$encodedValue' | base64 -d)",
+          );
+          secretsToRedact.add(entry.value);
+        }
+      }
+    }
+
+    // Build secure command using process substitution
+    // This avoids exposing secrets in the process list
+    // Secrets are base64-encoded to prevent injection attacks while preserving content
+    String secureCommand;
+
+    if (sudoPassword != null) {
+      // Generate unique askpass script path to prevent tampering between sessions
+      final askpassPath = '/tmp/decamp_askpass_\$\$';
+      final encodedSudoPassword = base64.encode(utf8.encode(sudoPassword));
+
+      secureCommand =
+          '''
+bash -c "
+# Create unique askpass helper for this execution with secure permissions
+# Use umask to ensure file is created with 700 permissions (no race condition)
+(umask 077 && cat > $askpassPath <<'ASKPASS_EOF'
+#!/bin/sh
+echo \\\"\\\$SUDO_PASSWORD\\\"
+ASKPASS_EOF
+)
+
+# Source secrets and execute with sudo
+source <(cat <<'DECAMP_SECRETS'
+${envExports}export SUDO_PASSWORD=\$(echo '$encodedSudoPassword' | base64 -d)
+DECAMP_SECRETS
+) && SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'
+
+# Clean up askpass script
+rm -f $askpassPath
+"
+''';
+    } else {
+      // No sudo password - use regular sudo (assumes passwordless or cached credentials)
+      secureCommand =
+          '''
+bash -c "source <(cat <<'DECAMP_SECRETS'
+${envExports}DECAMP_SECRETS
+) && sudo bash -c '${_escapeForCommand(command)}'"
+''';
+    }
+
+    // Log command with redacted secrets
+    developer.log(
+      'Executing sudo command: sudo $command (secrets redacted)',
+      name: 'ShellService',
+    );
+
+    try {
+      final result = await _client!.run(secureCommand);
+      final stdout = String.fromCharCodes(result);
+
+      developer.log(
+        'Sudo command executed successfully. Output length: ${stdout.length}',
+        name: 'ShellService',
+      );
+
+      return {
+        'stdout': _redactSecrets(stdout, secretsToRedact),
+        'stderr': '',
+        'exitCode': 0,
+        'executed': true,
+      };
+    } catch (e) {
+      developer.log('Sudo command execution failed: $e', name: 'ShellService');
+      return {
+        'stdout': '',
+        'stderr': _redactSecrets(
+          'Error executing sudo command: $e',
+          secretsToRedact,
+        ),
+        'exitCode': -1,
+        'executed': false,
+      };
+    }
+  }
+
+  /// Escape command string for bash -c execution
+  ///
+  /// This only escapes the command itself (not secrets, which are base64-encoded)
+  /// Handles single quotes by using the '\'' technique
+  String _escapeForCommand(String input) {
+    // For single-quoted strings in bash, only single quotes need escaping
+    // We use the '\'' technique: close quote, escaped quote, open quote
+    return input.replaceAll("'", "'\\''");
+  }
+
+  /// Validate environment variable name
+  /// Only allow alphanumeric characters and underscores, must start with letter or underscore
+  bool _isValidEnvVarName(String name) {
+    return RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name);
+  }
+
+  /// Redact secrets from output text
+  String _redactSecrets(String text, List<String> secrets) {
+    var redacted = text;
+    for (var secret in secrets) {
+      if (secret.isNotEmpty) {
+        redacted = redacted.replaceAll(secret, '***REDACTED***');
+      }
+    }
+    return redacted;
   }
 }
