@@ -328,12 +328,13 @@ ${envExports}DECAMP_SECRETS
           '''
 bash -c "
 # Create unique askpass helper for this execution with secure permissions
-# Use umask to ensure file is created with 700 permissions (no race condition)
+# Use umask to ensure file is created with 600 permissions, then add execute
 (umask 077 && cat > $askpassPath <<'ASKPASS_EOF'
 #!/bin/sh
 echo \\\"\\\$SUDO_PASSWORD\\\"
 ASKPASS_EOF
 )
+chmod 700 $askpassPath
 
 # Source secrets and execute with sudo
 source <(cat <<'DECAMP_SECRETS'

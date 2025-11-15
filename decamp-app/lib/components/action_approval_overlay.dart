@@ -27,6 +27,7 @@ class _ActionApprovalOverlayState extends State<ActionApprovalOverlay>
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
   bool _isExecuting = false;
+  bool _isApproved = false;
 
   @override
   void initState() {
@@ -89,6 +90,7 @@ class _ActionApprovalOverlayState extends State<ActionApprovalOverlay>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isSudoRequired = widget.params['sudo_required'] as bool? ?? false;
 
     return SlideTransition(
       position: Tween<Offset>(
@@ -118,11 +120,37 @@ class _ActionApprovalOverlayState extends State<ActionApprovalOverlay>
                   Icon(Icons.terminal, color: colorScheme.primary, size: 28),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      'Shell Command Request',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Shell Command Request',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (isSudoRequired) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.security,
+                                size: 16,
+                                color: colorScheme.error,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'REQUIRES SUDO',
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   if (_isExecuting)
@@ -153,25 +181,62 @@ class _ActionApprovalOverlayState extends State<ActionApprovalOverlay>
               const SizedBox(height: 12),
 
               // Command field (editable)
-              TextField(
-                controller: _commandController,
-                enabled: !_isExecuting,
-                decoration: InputDecoration(
-                  labelText: 'Shell Command',
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest,
-                  prefixText: '\$ ',
-                  prefixStyle: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 16,
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
+              Container(
+                decoration: isSudoRequired
+                    ? BoxDecoration(
+                        border: Border.all(
+                          color: colorScheme.error.withValues(alpha: 0.5),
+                          width: 2,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      )
+                    : null,
+                child: TextField(
+                  controller: _commandController,
+                  enabled: !_isExecuting,
+                  decoration: InputDecoration(
+                    labelText: isSudoRequired
+                        ? 'Shell Command (will run with sudo)'
+                        : 'Shell Command',
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: isSudoRequired
+                        ? colorScheme.error.withValues(alpha: 0.05)
+                        : colorScheme.surfaceContainerHighest,
+                    prefixText: isSudoRequired ? 'sudo \$ ' : '\$ ',
+                    prefixStyle: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 16,
+                      color: isSudoRequired
+                          ? colorScheme.error
+                          : colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 16),
+                  maxLines: 3,
+                  autofocus: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Approval checkbox
+              CheckboxListTile(
+                value: _isApproved,
+                onChanged: _isExecuting
+                    ? null
+                    : (value) => setState(() => _isApproved = value ?? false),
+                title: Text(
+                  isSudoRequired
+                      ? 'I approve this command to run with sudo privileges'
+                      : 'I approve this command',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 16),
-                maxLines: 3,
-                autofocus: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
               ),
               const SizedBox(height: 16),
 
@@ -185,7 +250,15 @@ class _ActionApprovalOverlayState extends State<ActionApprovalOverlay>
                   ),
                   const SizedBox(width: 12),
                   FilledButton.icon(
-                    onPressed: _isExecuting ? null : _handleExecute,
+                    onPressed: _isExecuting || !_isApproved
+                        ? null
+                        : _handleExecute,
+                    style: isSudoRequired
+                        ? FilledButton.styleFrom(
+                            backgroundColor: colorScheme.error,
+                            foregroundColor: colorScheme.onError,
+                          )
+                        : null,
                     icon: _isExecuting
                         ? const SizedBox(
                             width: 20,
@@ -195,14 +268,21 @@ class _ActionApprovalOverlayState extends State<ActionApprovalOverlay>
                               valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
                           )
-                        : const Icon(Icons.play_arrow, size: 24),
+                        : Icon(
+                            isSudoRequired ? Icons.security : Icons.play_arrow,
+                            size: 24,
+                          ),
                     label: Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
                         vertical: 12,
                       ),
                       child: Text(
-                        _isExecuting ? 'Executing...' : 'Run Command',
+                        _isExecuting
+                            ? 'Executing...'
+                            : (isSudoRequired
+                                  ? 'Run with Sudo'
+                                  : 'Run Command'),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,

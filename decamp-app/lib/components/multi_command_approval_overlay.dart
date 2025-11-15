@@ -11,11 +11,12 @@ class CommandAction {
     required this.id,
     required this.actionName,
     required this.params,
-    this.isSelected = true, // Selected by default
+    this.isSelected = false, // Deselected by default
   });
 
   String get command => params['command']?.toString() ?? 'unknown';
   String get explanation => params['explanation']?.toString() ?? '';
+  bool get isSudoRequired => params['sudo_required'] as bool? ?? false;
 }
 
 /// Overlay widget that shows multiple command approvals in a scrollable list
@@ -122,6 +123,7 @@ class _MultiCommandApprovalOverlayState
   }
 
   int get _selectedCount => widget.actions.where((a) => a.isSelected).length;
+  int get _sudoCount => widget.actions.where((a) => a.isSudoRequired).length;
 
   @override
   Widget build(BuildContext context) {
@@ -194,6 +196,26 @@ class _MultiCommandApprovalOverlayState
                         color: colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
+                    if (_sudoCount > 0) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.security,
+                            size: 16,
+                            color: colorScheme.error,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_sudoCount ${_sudoCount == 1 ? 'command requires' : 'commands require'} sudo',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -242,17 +264,37 @@ class _MultiCommandApprovalOverlayState
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
+                          color: action.isSudoRequired
+                              ? colorScheme.error.withValues(alpha: 0.05)
+                              : colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
+                          border: action.isSudoRequired
+                              ? Border.all(
+                                  color: colorScheme.error.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  width: 1.5,
+                                )
+                              : null,
                         ),
                         child: Row(
                           children: [
+                            if (action.isSudoRequired) ...[
+                              Icon(
+                                Icons.security,
+                                size: 16,
+                                color: colorScheme.error,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
                             Text(
-                              '\$ ',
+                              action.isSudoRequired ? 'sudo \$ ' : '\$ ',
                               style: TextStyle(
                                 fontFamily: 'monospace',
                                 fontSize: 14,
-                                color: colorScheme.primary,
+                                color: action.isSudoRequired
+                                    ? colorScheme.error
+                                    : colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),

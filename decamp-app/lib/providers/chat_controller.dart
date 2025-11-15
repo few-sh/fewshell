@@ -165,7 +165,6 @@ class ChatController extends StateNotifier<ChatState> {
             id: tc.id,
             actionName: tc.name,
             params: tc.params,
-            isSelected: true,
           );
         }).toList();
 
@@ -387,7 +386,6 @@ class ChatController extends StateNotifier<ChatState> {
               id: tc.id,
               actionName: tc.name,
               params: tc.params,
-              isSelected: true,
             );
           }).toList();
 

@@ -544,10 +544,13 @@ AiActionConfig createAiActionsConfig(
             // Execute the command with or without sudo
             final Map<String, dynamic> result;
             if (sudoRequired) {
+              final sudoPasswordSecretId =
+                  currentSshSettings?.sudoPasswordSecretId ??
+                  currentSshSettings?.passwordSecretId;
               // Execute with sudo - requires sudo password in secrets
               result = await shellService.executeWithSudo(
                 command: command,
-                sudoPasswordSecretId: currentSshSettings?.sudoPasswordSecretId,
+                sudoPasswordSecretId: sudoPasswordSecretId,
               );
             } else {
               // Execute without sudo
