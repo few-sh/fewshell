@@ -25,7 +25,7 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
   Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
-    final archivedCountAsync = ref.watch(archivedSessionsCountProvider);
+    final archivedCount = ref.watch(archivedSessionsCountProvider);
 
     // Select appropriate provider based on view mode
     final sessionsAsync = _viewMode == SessionsViewMode.active
@@ -43,21 +43,11 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
         actions: [
           if (_viewMode == SessionsViewMode.active)
             // Archive button with badge
-            archivedCountAsync.when(
-              data: (count) => count > 0
-                  ? Badge(
-                      label: Text('$count'),
-                      child: IconButton(
-                        icon: const Icon(Icons.archive),
-                        tooltip: 'View archived sessions',
-                        onPressed: () {
-                          setState(() {
-                            _viewMode = SessionsViewMode.archived;
-                          });
-                        },
-                      ),
-                    )
-                  : IconButton(
+            archivedCount > 0
+                ? Badge(
+                    label: Text('$archivedCount'),
+                    alignment: AlignmentDirectional.topStart,
+                    child: IconButton(
                       icon: const Icon(Icons.archive),
                       tooltip: 'View archived sessions',
                       onPressed: () {
@@ -66,23 +56,16 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
                         });
                       },
                     ),
-              loading: () => IconButton(
-                icon: const Icon(Icons.archive),
-                onPressed: () {
-                  setState(() {
-                    _viewMode = SessionsViewMode.archived;
-                  });
-                },
-              ),
-              error: (_, __) => IconButton(
-                icon: const Icon(Icons.archive),
-                onPressed: () {
-                  setState(() {
-                    _viewMode = SessionsViewMode.archived;
-                  });
-                },
-              ),
-            )
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.archive),
+                    tooltip: 'View archived sessions',
+                    onPressed: () {
+                      setState(() {
+                        _viewMode = SessionsViewMode.archived;
+                      });
+                    },
+                  )
           else
             // Back to active sessions button
             IconButton(

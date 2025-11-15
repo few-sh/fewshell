@@ -36,13 +36,13 @@ final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
 });
 
 /// Provider for archived sessions count
-final archivedSessionsCountProvider = FutureProvider<int>((ref) async {
-  final projectId = ref.watch(currentProjectIdProvider);
-  if (projectId == null) {
-    return 0;
-  }
-  final sessionDao = ref.watch(sessionDaoProvider);
-  return sessionDao.getArchivedSessionCountByProject(projectId);
+/// Watches the archived sessions stream and returns the count
+final archivedSessionsCountProvider = Provider<int>((ref) {
+  final archivedSessions = ref.watch(archivedSessionsProvider);
+  return archivedSessions.maybeWhen(
+    data: (sessions) => sessions.length,
+    orElse: () => 0,
+  );
 });
 
 /// StateProvider for the currently selected session ID
