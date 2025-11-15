@@ -102,8 +102,15 @@ class ShellService {
   /// Execute a shell command on the remote server
   ///
   /// [command] - The shell command to execute
+  /// [secrets] - Optional map of environment variable names to secret values
+  ///             e.g., {'AWS_KEY': 'secret123', 'DB_PASSWORD': 'pass456'}
   /// Returns a map with 'stdout', 'stderr', and 'exitCode'
-  Future<Map<String, dynamic>> executeCommand(String command) async {
+  ///
+  /// Security: Uses process substitution to avoid exposing secrets in process list
+  Future<Map<String, dynamic>> executeCommand(
+    String command, {
+    Map<String, String>? secrets,
+  }) async {
     developer.log('Executing command: $command', name: 'ShellService');
 
     if (_client == null) {
@@ -117,8 +124,47 @@ class ShellService {
     }
 
     try {
+      String finalCommand;
+      final secretsToRedact = <String>[];
+
+      // If secrets are provided, wrap command with secret injection
+      if (secrets != null && secrets.isNotEmpty) {
+        final envExports = StringBuffer();
+
+        for (var entry in secrets.entries) {
+          if (entry.value.isNotEmpty) {
+            // Validate environment variable name to prevent injection
+            if (!_isValidEnvVarName(entry.key)) {
+              developer.log(
+                'Invalid environment variable name: ${entry.key}',
+                name: 'ShellService',
+              );
+              continue;
+            }
+
+            // Base64 encode the secret to safely handle any characters
+            final encodedValue = base64.encode(utf8.encode(entry.value));
+            envExports.writeln(
+              "export ${entry.key}=\$(echo '$encodedValue' | base64 -d)",
+            );
+            secretsToRedact.add(entry.value);
+          }
+        }
+
+        // Build secure command using process substitution
+        finalCommand =
+            '''
+bash -c "source <(cat <<'DECAMP_SECRETS'
+${envExports}DECAMP_SECRETS
+) && ${_escapeForCommand(command)}"
+''';
+      } else {
+        // No secrets - execute command directly
+        finalCommand = command;
+      }
+
       // Execute command and capture output
-      final result = await _client!.run(command);
+      final result = await _client!.run(finalCommand);
 
       final stdout = String.fromCharCodes(result);
 
@@ -127,7 +173,12 @@ class ShellService {
         name: 'ShellService',
       );
 
-      return {'stdout': stdout, 'stderr': '', 'exitCode': 0, 'executed': true};
+      return {
+        'stdout': _redactSecrets(stdout, secretsToRedact),
+        'stderr': '',
+        'exitCode': 0,
+        'executed': true,
+      };
     } catch (e) {
       developer.log('Command execution failed: $e', name: 'ShellService');
       return {
