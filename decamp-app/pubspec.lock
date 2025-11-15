@@ -630,7 +630,7 @@ packages:
       path: "../llm_dart"
       relative: true
     source: path
-    version: "0.10.1"
+    version: "0.10.2"
   logging:
     dependency: transitive
     description:
