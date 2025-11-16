@@ -94,11 +94,6 @@ class ChatRepository {
     return await _llmService.isConfigured();
   }
 
-  /// Get the current model identifier
-  Future<String?> getCurrentModelIdentifier() async {
-    return await _llmService.getCurrentIdentifier();
-  }
-
   /// Generate a unique message ID
   String generateMessageId() {
     return _messageActions.generateMessageId();
@@ -158,20 +153,6 @@ class ChatRepository {
       userName: 'Ops Agent',
       content: displayContent,
       metadata: jsonEncode(chatMessage.toStorageJson()),
-    );
-  }
-
-  /// Save a tool result message to the database
-  /// Returns the message ID
-  Future<String> saveToolMessage({
-    required String sessionId,
-    required String content,
-  }) async {
-    return await _messageActions.insertMessage(
-      sessionId: sessionId,
-      userId: 'tool',
-      userName: 'Tool',
-      content: content,
     );
   }
 
