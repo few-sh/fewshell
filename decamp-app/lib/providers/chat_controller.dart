@@ -47,7 +47,8 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> sendMessage({
     required String content,
     required String sessionId,
-    required List<Map<String, String>> conversationHistory,
+    required List<dynamic>
+    dbMessages, // Database messages to build conversation from
     required bool isFirstMessage,
     required void Function(ChatMessage) addMessageToUI,
     required void Function(String messageId) startStreaming,
@@ -115,7 +116,7 @@ class ChatController extends StateNotifier<ChatState> {
       // Send message to AI with streaming support
       final result = await _repository.sendMessageToAI(
         messageContent: content,
-        conversationHistory: conversationHistory,
+        dbMessages: dbMessages,
         messageId: aiMessageId, // Use pre-generated ID
         onStreamStart: (messageId) {
           startStreaming(messageId);
@@ -235,6 +236,31 @@ class ChatController extends StateNotifier<ChatState> {
       name: 'ChatController',
     );
 
+    // First, save the assistant's message with tool calls to preserve conversation state
+    final pendingCalls = state.pendingToolCalls;
+    final assistantText = state.assistantTextBeforeTools;
+
+    if (pendingCalls != null && pendingCalls.isNotEmpty) {
+      // Generate message ID upfront
+      final assistantMessageId = _repository.generateMessageId();
+
+      // Mark as synced BEFORE saving to prevent duplicate
+      markMessageAsSynced(assistantMessageId);
+
+      // Save the assistant message with tool calls
+      await _repository.saveAssistantMessageWithToolCalls(
+        id: assistantMessageId,
+        sessionId: sessionId,
+        toolCalls: pendingCalls,
+        textContent: assistantText,
+      );
+
+      developer.log(
+        '💾 Saved assistant message with ${pendingCalls.length} tool calls',
+        name: 'ChatController',
+      );
+    }
+
     // Clear the approval overlay and set execution state
     state = state.copyWith(
       pendingActions: null,
@@ -275,7 +301,7 @@ class ChatController extends StateNotifier<ChatState> {
           .where((a) => !selectedIds.contains(a.id))
           .toList();
 
-      // Display "Skipped" messages for unselected actions
+      // Display "Skipped" messages for unselected actions (UI-only, not saved)
       for (final skippedAction in skippedActions) {
         final skippedMessage = '⏭️ **Skipped:** `${skippedAction.command}`';
 
@@ -285,7 +311,7 @@ class ChatController extends StateNotifier<ChatState> {
         // Mark as synced BEFORE saving
         markMessageAsSynced(messageId);
 
-        // Add to UI first
+        // Add to UI only (skipped messages are for display, not part of conversation)
         addMessageToUI(
           ChatMessage(
             text: skippedMessage,
@@ -296,12 +322,7 @@ class ChatController extends StateNotifier<ChatState> {
           ),
         );
 
-        // Save to database
-        await _repository.saveAiMessage(
-          id: messageId,
-          sessionId: sessionId,
-          content: skippedMessage,
-        );
+        // DON'T save skipped messages to database - they're UI-only
       }
 
       // Execute tool calls through repository
@@ -348,7 +369,7 @@ class ChatController extends StateNotifier<ChatState> {
         // Mark as synced BEFORE saving to prevent DB sync from re-adding
         markMessageAsSynced(messageId);
 
-        // Add to UI first
+        // Add to UI first (formatted message is for display only, not saved to DB)
         addMessageToUI(
           ChatMessage(
             text: formattedResult,
@@ -359,18 +380,15 @@ class ChatController extends StateNotifier<ChatState> {
           ),
         );
 
-        // Save the formatted message as an AI message for display
-        await _repository.saveAiMessage(
-          id: messageId,
-          sessionId: sessionId,
-          content: formattedResult,
-        );
+        // DON'T save the formatted message to database - it's UI-only
+        // We only save the raw tool result for LLM conversation
 
-        // Also save raw result for LLM conversation (not displayed in UI)
+        // Save raw result for LLM conversation with complete ToolCall structure
         final toolResult = result.toolResults[toolCall.id] ?? 'No result';
-        await _repository.saveToolMessage(
+        await _repository.saveToolResultMessage(
           sessionId: sessionId,
-          content: toolResult,
+          toolCalls: [toolCall.toolCall],
+          resultContent: toolResult,
         );
       }
 

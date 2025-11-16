@@ -399,7 +399,154 @@ class LlmService {
     return buffer.toString();
   }
 
+  /// Send a chat message with tool support using ChatMessage conversation
+  ///
+  /// This is the recommended method that preserves complete conversation context
+  /// including tool use and tool results.
+  ///
+  /// Yields either:
+  /// - String: text chunks from the LLM
+  /// - Map: {'type': 'tool_call', 'name': '...', 'params': {...}, 'toolCall': ToolCall}
+  Stream<dynamic> sendMessageWithConversation(
+    List<ChatMessage> conversation,
+    String newMessage, {
+    List<Tool>? tools,
+  }) async* {
+    final activeConfig = await _getActiveConfig();
+
+    if (activeConfig == null) {
+      yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
+      return;
+    }
+
+    try {
+      // Get agent instruction if configured
+      final agentInstruction = getAgentInstruction(
+        activeConfig.config.identifier,
+      );
+
+      // Create provider with system instruction
+      final provider = await _createProvider(
+        activeConfig.config,
+        activeConfig.apiKey,
+        systemInstruction: agentInstruction,
+      );
+
+      // Build conversation with the new message
+      final fullConversation = List<ChatMessage>.from(conversation);
+      fullConversation.add(ChatMessage.user(newMessage));
+
+      developer.log(
+        '📤 Calling provider.chatStream with ${fullConversation.length} messages and ${tools?.length ?? 0} tools',
+        name: 'LlmService',
+      );
+
+      // Debug: Log the conversation structure
+      for (var i = 0; i < fullConversation.length; i++) {
+        final msg = fullConversation[i];
+        developer.log(
+          '  [$i] ${msg.role.name} - ${msg.messageType.runtimeType}: ${msg.content.length} chars',
+          name: 'LlmService',
+        );
+      }
+
+      // Collect tool calls as they arrive
+      final toolCallsCollected = <ToolCall>[];
+      final textBuffer = StringBuffer();
+
+      // Stream the response with tools
+      final stream = provider.chatStream(fullConversation, tools: tools);
+
+      await for (final event in stream) {
+        developer.log(
+          '📥 Received event: ${event.runtimeType}',
+          name: 'LlmService',
+        );
+
+        switch (event) {
+          case TextDeltaEvent(delta: final delta):
+            developer.log('💬 Text delta: "$delta"', name: 'LlmService');
+            textBuffer.write(delta);
+            yield delta;
+
+          case ToolCallDeltaEvent(toolCall: final toolCall):
+            developer.log(
+              '🔧 Tool call detected: ${toolCall.function.name}',
+              name: 'LlmService',
+            );
+            developer.log(
+              '🔧 Tool arguments: ${toolCall.function.arguments}',
+              name: 'LlmService',
+            );
+
+            toolCallsCollected.add(toolCall);
+
+            // Parse tool call parameters
+            final toolName = toolCall.function.name;
+            final argumentsJson = toolCall.function.arguments;
+
+            // Parse arguments
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(json.decode(argumentsJson))
+                : <String, dynamic>{};
+
+            developer.log(
+              '🔧 Yielding tool call to UI layer: $toolName',
+              name: 'LlmService',
+            );
+
+            // Yield tool call information to the UI layer
+            yield {
+              'type': 'tool_call',
+              'name': toolName,
+              'params': params,
+              'toolCall': toolCall,
+            };
+
+          case CompletionEvent():
+            developer.log('🏁 Stream completed', name: 'LlmService');
+
+            // If tool calls were collected, yield completion info
+            if (toolCallsCollected.isNotEmpty) {
+              developer.log(
+                '📦 Collected ${toolCallsCollected.length} tool calls',
+                name: 'LlmService',
+              );
+
+              // Yield completion event with conversation and tool calls
+              yield {
+                'type': 'completion',
+                'toolCalls': toolCallsCollected,
+                'text': textBuffer.toString(),
+                'conversation': fullConversation,
+              };
+            }
+
+          case ErrorEvent(error: final error):
+            developer.log('❌ Error event: $error', name: 'LlmService');
+            yield 'Error: $error';
+            break;
+
+          case ThinkingDeltaEvent():
+            developer.log('💭 Thinking event', name: 'LlmService');
+        }
+      }
+
+      developer.log('✅ Stream completed', name: 'LlmService');
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ Exception in sendMessageWithConversation: $e',
+        name: 'LlmService',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      yield 'Error: ${e.toString()}';
+    }
+  }
+
   /// Send a chat message with tool support
+  ///
+  /// DEPRECATED: Use sendMessageWithConversation instead for proper tool support
   ///
   /// Follows the official llm_dart pattern for handling tool calls:
   /// 1. Collect tool calls during streaming
@@ -599,14 +746,27 @@ class LlmService {
       );
 
       // Build the continuation conversation
+      // NOTE: The conversation should already include the assistant's tool use message
+      // since we're receiving the updated conversation from the repository
       final updatedConversation = List<ChatMessage>.from(conversation);
 
-      // Add assistant message with tool calls
-      // Collect all text content that was yielded before tool calls
-      final assistantText = ''; // Tool calls typically don't have text content
-      updatedConversation.add(
-        ChatMessage.toolUse(toolCalls: toolCalls, content: assistantText),
+      developer.log(
+        '📋 Conversation before adding tool results: ${updatedConversation.length} messages',
+        name: 'LlmService',
       );
+
+      // Log the last few messages to verify structure
+      for (
+        var i = updatedConversation.length - 3;
+        i < updatedConversation.length && i >= 0;
+        i++
+      ) {
+        final msg = updatedConversation[i];
+        developer.log(
+          '  [$i] ${msg.role}: ${msg.messageType.runtimeType}',
+          name: 'LlmService',
+        );
+      }
 
       // Add tool results
       for (final toolCall in toolCalls) {

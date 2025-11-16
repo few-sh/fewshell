@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart' as llm;
+import '../extensions/chat_message_extensions.dart';
 import '../services/llm_service.dart';
 import '../services/ai_actions_config.dart';
 import '../providers/message_provider.dart';
@@ -132,6 +134,33 @@ class ChatRepository {
     );
   }
 
+  /// Save an assistant message with tool calls to the database
+  /// Stores the complete ChatMessage structure in metadata for proper conversation reconstruction
+  Future<String> saveAssistantMessageWithToolCalls({
+    String? id,
+    required String sessionId,
+    required List<llm.ToolCall> toolCalls,
+    String? textContent,
+  }) async {
+    // Create the ChatMessage with tool calls
+    final chatMessage = llm.ChatMessage.toolUse(
+      toolCalls: toolCalls,
+      content: textContent ?? '',
+    );
+
+    // Use text content for display, full structure in metadata
+    final displayContent = textContent ?? '[Tool calls: ${toolCalls.length}]';
+
+    return await _messageActions.insertMessage(
+      id: id,
+      sessionId: sessionId,
+      userId: 'ai',
+      userName: 'Ops Agent',
+      content: displayContent,
+      metadata: jsonEncode(chatMessage.toStorageJson()),
+    );
+  }
+
   /// Save a tool result message to the database
   /// Returns the message ID
   Future<String> saveToolMessage({
@@ -144,6 +173,83 @@ class ChatRepository {
       userName: 'Tool',
       content: content,
     );
+  }
+
+  /// Save tool results to the database with complete ChatMessage structure
+  /// This preserves the ToolCall information needed for conversation reconstruction
+  Future<String> saveToolResultMessage({
+    String? id,
+    required String sessionId,
+    required List<llm.ToolCall> toolCalls,
+    required String resultContent,
+  }) async {
+    // Create the ChatMessage with tool results
+    final chatMessage = llm.ChatMessage.toolResult(
+      results: toolCalls,
+      content: resultContent,
+    );
+
+    return await _messageActions.insertMessage(
+      id: id,
+      sessionId: sessionId,
+      userId: 'tool',
+      userName: 'Tool',
+      content: resultContent,
+      metadata: jsonEncode(chatMessage.toStorageJson()),
+    );
+  }
+
+  /// Build conversation history from database messages
+  /// Reconstructs proper ChatMessage objects including tool use and tool results
+  List<llm.ChatMessage> buildConversationHistory(List<dynamic> dbMessages) {
+    final conversation = <llm.ChatMessage>[];
+
+    for (final msg in dbMessages) {
+      final userId = msg.userId as String;
+      final content = msg.content as String;
+      final metadata = msg.metadata as String?;
+
+      // Try to reconstruct from metadata first if it exists
+      if (metadata != null && metadata.isNotEmpty) {
+        try {
+          final json = jsonDecode(metadata) as Map<String, dynamic>;
+          final chatMessage = ChatMessageStorage.fromStorageJson(json);
+          conversation.add(chatMessage);
+
+          developer.log(
+            '📦 Restored ${json['messageType']} message from metadata',
+            name: 'ChatRepository',
+          );
+          continue;
+        } catch (e) {
+          developer.log(
+            '⚠️ Failed to deserialize ChatMessage from metadata: $e',
+            name: 'ChatRepository',
+          );
+          // Fall through to simple text conversion
+        }
+      }
+
+      // Fallback: create simple text message based on userId
+      if (userId == 'user') {
+        conversation.add(llm.ChatMessage.user(content));
+      } else if (userId == 'ai' || userId == 'assistant') {
+        conversation.add(llm.ChatMessage.assistant(content));
+      } else if (userId == 'tool') {
+        // Tool messages without metadata - skip them as they can't be properly reconstructed
+        developer.log(
+          '⚠️ Tool message without metadata, skipping',
+          name: 'ChatRepository',
+        );
+      }
+    }
+
+    developer.log(
+      '✅ Built conversation with ${conversation.length} messages',
+      name: 'ChatRepository',
+    );
+
+    return conversation;
   }
 
   /// Update session description if this is the first message
@@ -173,7 +279,8 @@ class ChatRepository {
   /// Handles streaming, tool calls, and conversation state
   Future<MessageResult> sendMessageToAI({
     required String messageContent,
-    required List<Map<String, String>> conversationHistory,
+    required List<dynamic>
+    dbMessages, // Database messages to build conversation from
     required String
     messageId, // Pre-generated message ID to use for streaming and DB
     void Function(String messageId)? onStreamStart,
@@ -182,6 +289,14 @@ class ChatRepository {
   }) async {
     try {
       developer.log('🚀 Sending message to AI', name: 'ChatRepository');
+
+      // Build conversation from database messages
+      final conversation = buildConversationHistory(dbMessages);
+
+      developer.log(
+        '📚 Built conversation with ${conversation.length} messages',
+        name: 'ChatRepository',
+      );
 
       // Get current project and AI actions
       final currentProject = _ref.read(currentProjectProvider);
@@ -202,9 +317,9 @@ class ChatRepository {
 
       var hasStartedStreaming = false;
 
-      await for (final chunk in _llmService.sendMessageWithTools(
+      await for (final chunk in _llmService.sendMessageWithConversation(
+        conversation,
         messageContent,
-        history: conversationHistory,
         tools: tools,
       )) {
         if (chunk is Map) {
@@ -330,9 +445,25 @@ class ChatRepository {
       );
       final tools = _llmService.convertActionsToTools(aiActionsConfig.actions);
 
+      // Build updated conversation with tool use message already included
+      final updatedConversation = List<llm.ChatMessage>.from(conversationState);
+
+      // Add the assistant's tool use message
+      updatedConversation.add(
+        llm.ChatMessage.toolUse(
+          toolCalls: toolCalls.map((tc) => tc.toolCall).toList(),
+          content: '',
+        ),
+      );
+
+      developer.log(
+        '📋 Updated conversation has ${updatedConversation.length} messages (added tool use)',
+        name: 'ChatRepository',
+      );
+
       // Continue conversation with tool results
       final followUpResult = await _continueWithToolResults(
-        conversationState: conversationState,
+        conversationState: updatedConversation,
         toolCalls: toolCalls.map((tc) => tc.toolCall).toList(),
         toolResults: toolResults,
         tools: tools,

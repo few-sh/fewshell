@@ -80,31 +80,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Build conversation history from DATABASE, not from UI controller
     // The UI controller might not have the latest messages yet due to async sync
     final messages = await ref.read(currentSessionMessagesProvider.future);
-    final history = messages.map((msg) {
-      // Map database userId to LLM API role
-      final role = msg.userId == 'user'
-          ? 'user'
-          : msg.userId == 'tool'
-          ? 'tool'
-          : 'assistant';
-
-      return {'role': role, 'content': msg.content};
-    }).toList();
 
     developer.log(
-      '📚 History has ${history.length} messages (from database)',
+      '📚 History has ${messages.length} messages (from database)',
       name: 'ChatSession.New',
     );
-    for (var i = 0; i < history.length; i++) {
-      final content = history[i]['content'] ?? '';
-      final preview = content.length > 50
-          ? '${content.substring(0, 50)}...'
-          : content;
-      developer.log(
-        '  [$i] ${history[i]['role']}: $preview',
-        name: 'ChatSession.New',
-      );
-    }
 
     final isFirstMessage = messages.isEmpty;
 
@@ -113,7 +93,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       await controller.sendMessage(
         content: message.text,
         sessionId: currentSessionId,
-        conversationHistory: history,
+        dbMessages: messages, // Pass database messages directly
         isFirstMessage: isFirstMessage,
         addMessageToUI: (chatMessage) {
           if (mounted) {
