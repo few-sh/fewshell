@@ -13,7 +13,7 @@ import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
-import 'package:decamp/services/ai_actions_config.dart';
+import 'package:decamp/services/shell_service.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -31,9 +31,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   // Define users
   final _currentUser = ChatUser(id: 'user', firstName: 'You');
   final _aiUser = ChatUser(id: 'ai', firstName: 'Ops Agent');
-
-  // Context for AiActionProvider (captured from Builder)
-  BuildContext? _actionContext;
 
   // Track synced message IDs to avoid recreating existing messages (UI layer concern)
   final Set<String> _syncedMessageIds = {};
@@ -354,16 +351,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         body: Stack(
           children: [
             // Main chat widget
-            AiActionProvider(
-              key: ValueKey('actions_${currentProject?.id}'),
-              config: ref.watch(aiActionsConfigProvider(currentProject?.id)),
-              // Use a Builder to get the correct context inside AiActionProvider
-              child: Builder(
-                builder: (actionContext) {
-                  // Capture the action context for use in callbacks
-                  _actionContext = actionContext;
-
-                  return AiChatWidget(
+            AiChatWidget(
                     // Required parameters
                     currentUser: _currentUser,
                     aiUser: _aiUser,
@@ -535,10 +523,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       horizontal: 8,
                       vertical: 8,
                     ),
-                  );
-                },
-              ),
-            ),
+                  ),
 
             // Multi-command approval overlay
             if (chatState.hasPendingActions)
@@ -557,22 +542,29 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     child: MultiCommandApprovalOverlay(
                       actions: actions,
                       onExecute: (selectedActions) async {
-                        // Execute via controller
-                        final actionHook = AiActionHook.of(_actionContext!);
+                        // Execute via controller with shell service
+                        final shellService = ref.read(
+                          shellServiceProvider(currentProject?.id),
+                        );
                         await chatController.executeActions(
                           selectedActions: selectedActions,
                           allActions: actions,
                           sessionId: currentSessionId!,
                           executeAction: (actionName, params) async {
-                            final result = await actionHook.executeAction(
-                              actionName,
-                              params,
-                            );
-                            return {
-                              'success': result.success,
-                              'data': result.data,
-                              'error': result.error,
-                            };
+                            // Execute shell command directly
+                            if (actionName == 'execute_shell_command') {
+                              final command = params['command'] as String;
+                              
+                              final result = await shellService.executeCommand(command);
+                              
+                              return {
+                                'success': (result['exitCode'] as int? ?? -1) == 0,
+                                'data': result['stdout'] as String? ?? '',
+                                'error': result['stderr'] as String?,
+                              };
+                            }
+                            
+                            throw Exception('Unknown action: \$actionName');
                           },
                           addMessageToUI: (message) {
                             _controller.addMessage(message);

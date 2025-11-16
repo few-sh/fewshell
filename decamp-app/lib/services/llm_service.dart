@@ -2,9 +2,6 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
-import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart'
-    as chat_ui
-    show AiAction, ActionParameterType;
 import '../models/llm_api_settings.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
@@ -25,21 +22,18 @@ final llmServiceProvider = Provider<LlmService>((ref) {
 
 /// Service for interacting with LLM APIs using llm_dart
 ///
-/// This service provides integration between llm_dart and flutter_gen_ai_chat_ui,
+/// This service provides integration with various LLM providers,
 /// including native tool calling support through llm_dart's built-in Tool system.
 ///
 /// Tool Calling Example:
 /// ```dart
-/// // 1. Get AI actions from the AiActionProvider
-/// final aiActions = [...]; // Your AiAction definitions
+/// // 1. Define tools using llm_dart Tool
+/// final tools = [Tool.function(name: 'my_tool', ...)];
 ///
-/// // 2. Convert to llm_dart Tools
-/// final tools = llmService.convertActionsToTools(aiActions);
-///
-/// // 3. Build conversation with ChatMessage objects
+/// // 2. Build conversation with ChatMessage objects
 /// final conversation = [ChatMessage.user('Check disk space on the server')];
 ///
-/// // 4. Send message with conversation and tools
+/// // 3. Send message with conversation and tools
 /// await for (final chunk in llmService.sendMessageWithConversation(
 ///   conversation,
 ///   'Check disk space on the server',
@@ -600,56 +594,6 @@ class LlmService {
     final identifier = await getCurrentIdentifier();
     if (identifier == null) return null;
     return getAgentInstruction(identifier);
-  }
-
-  /// Convert AiActions to llm_dart Tool objects
-  /// This uses llm_dart's native tool support instead of manual conversion
-  List<Tool> convertActionsToTools(List<chat_ui.AiAction> actions) {
-    return actions.map((action) {
-      // Build parameters schema
-      final properties = <String, ParameterProperty>{};
-      final required = <String>[];
-
-      for (final param in action.parameters) {
-        properties[param.name] = ParameterProperty(
-          propertyType: _mapParameterTypeToString(param.type),
-          description: param.description,
-          enumList: param.enumValues,
-        );
-
-        if (param.required) {
-          required.add(param.name);
-        }
-      }
-
-      return Tool.function(
-        name: action.name,
-        description: action.description,
-        parameters: ParametersSchema(
-          schemaType: 'object',
-          properties: properties,
-          required: required,
-        ),
-      );
-    }).toList();
-  }
-
-  /// Map ActionParameterType to string type for llm_dart
-  String _mapParameterTypeToString(chat_ui.ActionParameterType type) {
-    switch (type) {
-      case chat_ui.ActionParameterType.string:
-        return 'string';
-      case chat_ui.ActionParameterType.number:
-        return 'number';
-      case chat_ui.ActionParameterType.boolean:
-        return 'boolean';
-      case chat_ui.ActionParameterType.object:
-        return 'object';
-      case chat_ui.ActionParameterType.array:
-        return 'array';
-      case chat_ui.ActionParameterType.objectArray:
-        return 'array';
-    }
   }
 
   /// Test API connection with the provided settings

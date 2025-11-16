@@ -4,10 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart' as llm;
 import '../extensions/chat_message_extensions.dart';
 import '../services/llm_service.dart';
-import '../services/ai_actions_config.dart';
+import '../services/shell_tools_provider.dart';
 import '../providers/message_provider.dart';
 import '../providers/session_provider.dart';
-import '../providers/project_provider.dart';
 
 /// Result of sending a message to the AI
 class MessageResult {
@@ -77,17 +76,14 @@ class ChatRepository {
   final MessageActions _messageActions;
   final SessionActions _sessionActions;
   final LlmService _llmService;
-  final Ref _ref;
 
   ChatRepository({
     required MessageActions messageActions,
     required SessionActions sessionActions,
     required LlmService llmService,
-    required Ref ref,
   }) : _messageActions = messageActions,
        _sessionActions = sessionActions,
-       _llmService = llmService,
-       _ref = ref;
+       _llmService = llmService;
 
   /// Check if LLM is configured and ready
   Future<bool> isConfigured() async {
@@ -279,15 +275,11 @@ class ChatRepository {
         name: 'ChatRepository',
       );
 
-      // Get current project and AI actions
-      final currentProject = _ref.read(currentProjectProvider);
-      final aiActionsConfig = _ref.read(
-        aiActionsConfigProvider(currentProject?.id),
-      );
-      final tools = _llmService.convertActionsToTools(aiActionsConfig.actions);
+      // Get shell tools for LLM
+      final tools = shellTools;
 
       developer.log(
-        '🔧 Converted ${tools.length} actions to tools',
+        '🔧 Using ${tools.length} shell tools',
         name: 'ChatRepository',
       );
 
@@ -420,11 +412,7 @@ class ChatRepository {
       );
 
       // Get tools for potential follow-up
-      final currentProject = _ref.read(currentProjectProvider);
-      final aiActionsConfig = _ref.read(
-        aiActionsConfigProvider(currentProject?.id),
-      );
-      final tools = _llmService.convertActionsToTools(aiActionsConfig.actions);
+      final tools = shellTools;
 
       // Build updated conversation with tool use message already included
       final updatedConversation = List<llm.ChatMessage>.from(conversationState);
@@ -608,6 +596,5 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
     messageActions: ref.watch(messageActionsProvider),
     sessionActions: ref.watch(sessionActionsProvider),
     llmService: ref.watch(llmServiceProvider),
-    ref: ref,
   );
 });
