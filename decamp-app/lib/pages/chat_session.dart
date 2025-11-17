@@ -12,7 +12,6 @@ import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/services/shell_service.dart';
-import 'package:decamp/repositories/chat_repository.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -66,14 +65,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     final isFirstMessage = messages.isEmpty;
 
-    // First save the user's message to database
-    final repository = ref.read(chatRepositoryProvider);
-    await repository.saveUserMessage(
-      sessionId: currentSessionId,
-      content: content,
-    );
-
-    // Then send to AI (controller will handle streaming and saving response)
+    // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,

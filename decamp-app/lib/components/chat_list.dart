@@ -21,10 +21,8 @@ class ChatList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Filter out tool messages (they're for LLM context only)
-    final displayMessages = messages
-        .where((msg) => msg.userId != 'tool')
-        .toList();
+    // Display all messages including tool results
+    final displayMessages = messages;
 
     return ListView.builder(
       reverse: true, // Newest messages at bottom
