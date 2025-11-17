@@ -25,11 +25,9 @@ class ChatList extends StatelessWidget {
     final displayMessages = messages;
 
     return ListView.builder(
-      reverse: true, // Newest messages at bottom
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       itemCount: displayMessages.length + (isLoading ? 1 : 0),
       itemBuilder: (context, index) {
-        // Show loading indicator at top (index 0 when reversed)
         if (isLoading && index == 0) {
           return const Padding(
             padding: EdgeInsets.all(16.0),
