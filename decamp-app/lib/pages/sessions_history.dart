@@ -26,7 +26,11 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
   Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
-    final archivedCount = ref.watch(archivedSessionsCountProvider);
+    final archivedSessionsAsync = ref.watch(archivedSessionsProvider);
+    final archivedCount = archivedSessionsAsync.maybeWhen(
+      data: (sessions) => sessions.length,
+      orElse: () => 0,
+    );
 
     // Select appropriate provider based on view mode
     final sessionsAsync = _viewMode == SessionsViewMode.active

@@ -9,7 +9,7 @@ const String _currentProjectIdKey = 'current_project_id';
 
 /// Provider for streaming all projects from the database
 final projectsStreamProvider = StreamProvider<List<ProjectEntity>>((ref) {
-  final projectDao = ref.watch(projectDaoProvider);
+  final projectDao = ref.watch(databaseProvider).projectDao;
   return projectDao.watchAllProjects();
 });
 
@@ -74,11 +74,13 @@ Future<void> updateProject(
   String? description,
 }) async {
   final projectDao = ref.read(databaseProvider).projectDao;
-  
+
   final companion = ProjectEntityCompanion(
     id: Value(id),
     name: name != null ? Value(name) : const Value.absent(),
-    description: description != null ? Value(description) : const Value.absent(),
+    description: description != null
+        ? Value(description)
+        : const Value.absent(),
     updatedAt: Value(DateTime.now()),
   );
 

@@ -3,8 +3,9 @@ import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
-import '../providers/secret_provider.dart';
+import '../services/keychain_service.dart';
 import '../providers/ssh_settings_provider.dart';
+import '../providers/secret_provider.dart';
 
 /// Provider for the shell service
 /// Now requires a project ID to access SSH settings
@@ -13,21 +14,22 @@ final shellServiceProvider = Provider.family<ShellService, String?>((
   projectId,
 ) {
   if (projectId == null) {
-    return ShellService(null, null);
+    return ShellService(null, null, null);
   }
 
   final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
-  final secretsActions = ref.watch(projectSecretsProvider(projectId));
-  return ShellService(sshSettings, secretsActions);
+  final keychain = ref.watch(keychainServiceProvider);
+  return ShellService(sshSettings, keychain, projectId);
 });
 
 /// Service for executing shell commands via SSH
 class ShellService {
   SSHClient? _client;
   final SshSettings? _sshSettings;
-  final ProjectSecretsActions? _secretsActions;
+  final KeychainService? _keychain;
+  final String? _projectId;
 
-  ShellService(this._sshSettings, this._secretsActions);
+  ShellService(this._sshSettings, this._keychain, this._projectId);
 
   /// Connect to SSH server using the provided settings
   /// Returns true if connection successful, false otherwise
@@ -43,19 +45,22 @@ class ShellService {
       String? privateKey;
       String? passphrase;
 
-      if (_secretsActions != null) {
+      if (_keychain != null && _projectId != null) {
         if (sshSettings.passwordSecretId != null) {
-          password = await _secretsActions.getSecret(
+          password = await _keychain.getProjectSecret(
+            _projectId,
             sshSettings.passwordSecretId!,
           );
         }
         if (sshSettings.privateKeySecretId != null) {
-          privateKey = await _secretsActions.getSecret(
+          privateKey = await _keychain.getProjectSecret(
+            _projectId,
             sshSettings.privateKeySecretId!,
           );
         }
         if (sshSettings.passphraseSecretId != null) {
-          passphrase = await _secretsActions.getSecret(
+          passphrase = await _keychain.getProjectSecret(
+            _projectId,
             sshSettings.passphraseSecretId!,
           );
         }
@@ -318,8 +323,13 @@ ${envExports}DECAMP_SECRETS
 
     // Get sudo password from secrets if provided
     String? sudoPassword;
-    if (sudoPasswordSecretId != null) {
-      sudoPassword = await _secretsActions?.getSecret(sudoPasswordSecretId);
+    if (sudoPasswordSecretId != null &&
+        _keychain != null &&
+        _projectId != null) {
+      sudoPassword = await _keychain.getProjectSecret(
+        _projectId,
+        sudoPasswordSecretId,
+      );
       if (sudoPassword == null || sudoPassword.isEmpty) {
         developer.log(
           'Sudo password not found in secrets',

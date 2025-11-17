@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ssh_settings.dart';
+import '../services/keychain_service.dart';
 import 'settings_provider.dart';
 import 'secret_provider.dart';
 
@@ -16,7 +17,7 @@ final projectSshSettingsProvider =
       String
     >((ref, projectId) {
       final projectSettings = ref.watch(projectSettingsProvider(projectId));
-      final secretsActions = ref.watch(projectSecretsProvider(projectId));
+      final keychain = ref.watch(keychainServiceProvider);
       final settingsNotifier = ref.watch(
         projectSettingsProvider(projectId).notifier,
       );
@@ -24,7 +25,7 @@ final projectSshSettingsProvider =
       return ProjectSshSettingsNotifier(
         projectSettings?.sshSettings,
         settingsNotifier,
-        secretsActions,
+        keychain,
         projectId,
       );
     });
@@ -32,13 +33,14 @@ final projectSshSettingsProvider =
 /// StateNotifier for managing SSH settings for a project
 class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
   final ProjectSettingsNotifier _settingsNotifier;
-  final ProjectSecretsActions _secretsActions;
+  final KeychainService _keychain;
+  final String _projectId;
 
   ProjectSshSettingsNotifier(
     SshSettings? initialSettings,
     this._settingsNotifier,
-    this._secretsActions,
-    String projectId,
+    this._keychain,
+    this._projectId,
   ) : super(initialSettings);
 
   /// Create new SSH settings for the project
@@ -63,22 +65,34 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         password != null &&
         password.isNotEmpty) {
       passwordSecretId = _generateSecretId('ssh_password');
-      await _secretsActions.saveSecret(passwordSecretId, password);
+      await _keychain.saveProjectSecret(_projectId, passwordSecretId, password);
     } else if (authMethod == SshAuthMethod.privateKey) {
       if (privateKey != null && privateKey.isNotEmpty) {
         privateKeySecretId = _generateSecretId('ssh_privatekey');
-        await _secretsActions.saveSecret(privateKeySecretId, privateKey);
+        await _keychain.saveProjectSecret(
+          _projectId,
+          privateKeySecretId,
+          privateKey,
+        );
       }
       if (passphrase != null && passphrase.isNotEmpty) {
         passphraseSecretId = _generateSecretId('ssh_passphrase');
-        await _secretsActions.saveSecret(passphraseSecretId, passphrase);
+        await _keychain.saveProjectSecret(
+          _projectId,
+          passphraseSecretId,
+          passphrase,
+        );
       }
     }
 
     // Store sudo password if provided
     if (sudoPassword != null && sudoPassword.isNotEmpty) {
       sudoPasswordSecretId = _generateSecretId('ssh_sudo_password');
-      await _secretsActions.saveSecret(sudoPasswordSecretId, sudoPassword);
+      await _keychain.saveProjectSecret(
+        _projectId,
+        sudoPasswordSecretId,
+        sudoPassword,
+      );
     }
 
     // Create SSH settings object
@@ -141,23 +155,36 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         // Delete old password secret if it exists and auth method changed
         if (current.authMethod != SshAuthMethod.password &&
             current.passwordSecretId != null) {
-          await _secretsActions.deleteSecret(current.passwordSecretId!);
+          await _keychain.deleteProjectSecret(
+            _projectId,
+            current.passwordSecretId!,
+          );
         }
 
         // Create new password secret or update existing
         if (passwordSecretId == null) {
           passwordSecretId = _generateSecretId('ssh_password');
         }
-        await _secretsActions.saveSecret(passwordSecretId, password);
+        await _keychain.saveProjectSecret(
+          _projectId,
+          passwordSecretId,
+          password,
+        );
       }
 
       // Clear private key secrets if switching from key auth
       if (current.authMethod == SshAuthMethod.privateKey) {
         if (current.privateKeySecretId != null) {
-          await _secretsActions.deleteSecret(current.privateKeySecretId!);
+          await _keychain.deleteProjectSecret(
+            _projectId,
+            current.privateKeySecretId!,
+          );
         }
         if (current.passphraseSecretId != null) {
-          await _secretsActions.deleteSecret(current.passphraseSecretId!);
+          await _keychain.deleteProjectSecret(
+            _projectId,
+            current.passphraseSecretId!,
+          );
         }
         privateKeySecretId = null;
         passphraseSecretId = null;
@@ -168,7 +195,10 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       // Delete old private key secrets if switching from password
       if (current.authMethod == SshAuthMethod.password &&
           current.passwordSecretId != null) {
-        await _secretsActions.deleteSecret(current.passwordSecretId!);
+        await _keychain.deleteProjectSecret(
+          _projectId,
+          current.passwordSecretId!,
+        );
         passwordSecretId = null;
       }
 
@@ -177,7 +207,11 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         if (privateKeySecretId == null) {
           privateKeySecretId = _generateSecretId('ssh_privatekey');
         }
-        await _secretsActions.saveSecret(privateKeySecretId, privateKey);
+        await _keychain.saveProjectSecret(
+          _projectId,
+          privateKeySecretId,
+          privateKey,
+        );
       }
 
       // Update passphrase
@@ -186,10 +220,14 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
           if (passphraseSecretId == null) {
             passphraseSecretId = _generateSecretId('ssh_passphrase');
           }
-          await _secretsActions.saveSecret(passphraseSecretId, passphrase);
+          await _keychain.saveProjectSecret(
+            _projectId,
+            passphraseSecretId,
+            passphrase,
+          );
         } else if (passphraseSecretId != null) {
           // Clear passphrase if empty string provided
-          await _secretsActions.deleteSecret(passphraseSecretId);
+          await _keychain.deleteProjectSecret(_projectId, passphraseSecretId);
           passphraseSecretId = null;
         }
       }
@@ -201,10 +239,14 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         if (sudoPasswordSecretId == null) {
           sudoPasswordSecretId = _generateSecretId('ssh_sudo_password');
         }
-        await _secretsActions.saveSecret(sudoPasswordSecretId, sudoPassword);
+        await _keychain.saveProjectSecret(
+          _projectId,
+          sudoPasswordSecretId,
+          sudoPassword,
+        );
       } else if (sudoPasswordSecretId != null) {
         // Clear sudo password if empty string provided
-        await _secretsActions.deleteSecret(sudoPasswordSecretId);
+        await _keychain.deleteProjectSecret(_projectId, sudoPasswordSecretId);
         sudoPasswordSecretId = null;
       }
     }
@@ -245,13 +287,22 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
 
     // Delete all secrets
     if (current.passwordSecretId != null) {
-      await _secretsActions.deleteSecret(current.passwordSecretId!);
+      await _keychain.deleteProjectSecret(
+        _projectId,
+        current.passwordSecretId!,
+      );
     }
     if (current.privateKeySecretId != null) {
-      await _secretsActions.deleteSecret(current.privateKeySecretId!);
+      await _keychain.deleteProjectSecret(
+        _projectId,
+        current.privateKeySecretId!,
+      );
     }
     if (current.passphraseSecretId != null) {
-      await _secretsActions.deleteSecret(current.passphraseSecretId!);
+      await _keychain.deleteProjectSecret(
+        _projectId,
+        current.passphraseSecretId!,
+      );
     }
 
     // Update state
@@ -268,7 +319,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
 
   /// Get a secret value (for display in edit mode)
   Future<String?> getSecret(String secretId) async {
-    return await _secretsActions.getSecret(secretId);
+    return await _keychain.getProjectSecret(_projectId, secretId);
   }
 
   /// Test SSH connection with current settings

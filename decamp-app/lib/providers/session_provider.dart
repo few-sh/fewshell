@@ -3,13 +3,6 @@ import '../database/database.dart';
 import 'database_provider.dart';
 import 'project_provider.dart';
 
-/// Provider for streaming sessions for a specific project (family provider)
-final sessionsStreamProvider =
-    StreamProvider.family<List<SessionEntity>, String>((ref, projectId) {
-      final sessionDao = ref.watch(sessionDaoProvider);
-      return sessionDao.watchSessionsByProject(projectId);
-    });
-
 /// Provider for sessions of the currently selected project
 final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>(((
   ref,
@@ -18,7 +11,7 @@ final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>(((
   if (projectId == null) {
     return Stream.value([]);
   }
-  final sessionDao = ref.watch(sessionDaoProvider);
+  final sessionDao = ref.watch(databaseProvider).sessionDao;
   return sessionDao.watchNonArchivedSessionsByProject(projectId);
 }));
 
@@ -28,18 +21,8 @@ final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
   if (projectId == null) {
     return Stream.value([]);
   }
-  final sessionDao = ref.watch(sessionDaoProvider);
+  final sessionDao = ref.watch(databaseProvider).sessionDao;
   return sessionDao.watchArchivedSessionsByProject(projectId);
-});
-
-/// Provider for archived sessions count
-/// Watches the archived sessions stream and returns the count
-final archivedSessionsCountProvider = Provider<int>((ref) {
-  final archivedSessions = ref.watch(archivedSessionsProvider);
-  return archivedSessions.maybeWhen(
-    data: (sessions) => sessions.length,
-    orElse: () => 0,
-  );
 });
 
 /// StateProvider for the currently selected session ID
@@ -94,8 +77,10 @@ class SessionManager extends StateNotifier<void> {
         // Create new session
         final sessionDao = _ref.read(databaseProvider).sessionDao;
         final projectDao = _ref.read(databaseProvider).projectDao;
-        
-        sessionDao.createSessionWithId(projectId: projectId).then((newSessionId) {
+
+        sessionDao.createSessionWithId(projectId: projectId).then((
+          newSessionId,
+        ) {
           _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
           // Update project's last session date
           projectDao.updateLastSessionDate(projectId, DateTime.now());
