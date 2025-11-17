@@ -1,5 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:llm_dart/llm_dart.dart' show ChatMessage, ToolCall;
+import 'package:llm_dart/llm_dart.dart';
 import '../components/multi_command_approval_overlay.dart';
 
 part 'chat_state.freezed.dart';

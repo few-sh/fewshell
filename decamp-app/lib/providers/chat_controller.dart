@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_dart/llm_dart.dart' as llm;
+import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
-import '../models/llm_event.dart' as llm_event;
 import '../services/llm_service.dart';
 import '../services/shell_tools_provider.dart';
 import '../providers/database_provider.dart';
@@ -40,8 +39,8 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Build conversation history from database messages
   /// Reconstructs proper ChatMessage objects including tool use and tool results
-  List<llm.ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
-    final conversation = <llm.ChatMessage>[];
+  List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
+    final conversation = <ChatMessage>[];
 
     for (final msg in dbMessages) {
       final userId = msg.userId as String;
@@ -62,9 +61,9 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Fallback: create simple text message based on userId
       if (userId == 'user') {
-        conversation.add(llm.ChatMessage.user(content));
+        conversation.add(ChatMessage.user(content));
       } else if (userId == 'ai' || userId == 'assistant') {
-        conversation.add(llm.ChatMessage.assistant(content));
+        conversation.add(ChatMessage.assistant(content));
       } else if (userId == 'tool') {
         // Tool messages without metadata - skip them as they can't be properly reconstructed
       }
@@ -219,14 +218,14 @@ class ChatController extends StateNotifier<ChatState> {
       final conversation = _buildConversationHistory(dbMessages);
 
       // Add the new user message
-      conversation.add(llm.ChatMessage.user(messageContent));
+      conversation.add(ChatMessage.user(messageContent));
 
       // Get shell tools
       final tools = shellTools;
 
       // Stream from service
       final buffer = StringBuffer();
-      final collectedToolCalls = <llm.ToolCall>[];
+      final collectedToolCalls = <ToolCall>[];
       var hasStartedStreaming = false;
 
       await for (final event in _llmService.streamChat(
@@ -234,25 +233,25 @@ class ChatController extends StateNotifier<ChatState> {
         tools: tools,
       )) {
         switch (event) {
-          case llm_event.TextChunk(text: final text):
-            buffer.write(text);
+          case TextDeltaEvent(delta: final delta):
+            buffer.write(delta);
             if (!hasStartedStreaming) {
               startStreaming(messageId);
               hasStartedStreaming = true;
             }
             updateStreamingText(buffer.toString());
 
-          case llm_event.ToolCallEvent(toolCall: final toolCall):
+          case ToolCallDeltaEvent(toolCall: final toolCall):
             collectedToolCalls.add(toolCall);
 
-          case llm_event.CompletionEvent():
+          case CompletionEvent():
             break;
 
-          case llm_event.ErrorEvent(error: final error):
+          case ErrorEvent(error: final error):
             if (hasStartedStreaming) stopStreaming();
-            return _MessageResult(error: error);
+            return _MessageResult(error: error.message);
 
-          case llm_event.ThinkingEvent():
+          case ThinkingDeltaEvent():
             break;
         }
       }
@@ -263,7 +262,7 @@ class ChatController extends StateNotifier<ChatState> {
       if (collectedToolCalls.isNotEmpty) {
         // Add assistant's tool use message to conversation
         conversation.add(
-          llm.ChatMessage.toolUse(
+          ChatMessage.toolUse(
             toolCalls: collectedToolCalls,
             content: buffer.toString(),
           ),
@@ -305,7 +304,7 @@ class ChatController extends StateNotifier<ChatState> {
       final assistantMessageId = _messageDao.generateMessageId();
 
       // Create the ChatMessage with tool calls
-      final chatMessage = llm.ChatMessage.toolUse(
+      final chatMessage = ChatMessage.toolUse(
         toolCalls: pendingCalls,
         content: assistantText ?? '',
       );
@@ -381,7 +380,7 @@ class ChatController extends StateNotifier<ChatState> {
         final toolResult = result.toolResults[toolCall.id] ?? 'No result';
 
         // Create the ChatMessage with tool results
-        final chatMessage = llm.ChatMessage.toolResult(
+        final chatMessage = ChatMessage.toolResult(
           results: [toolCall],
           content: toolResult,
         );
@@ -467,8 +466,8 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Execute tool calls and handle follow-up responses
   Future<_ToolExecutionResult> _executeToolCalls({
-    required List<llm.ToolCall> toolCalls,
-    required List<llm.ChatMessage> conversationState,
+    required List<ToolCall> toolCalls,
+    required List<ChatMessage> conversationState,
     required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
     executeAction,
   }) async {
@@ -514,7 +513,7 @@ class ChatController extends StateNotifier<ChatState> {
       for (final toolCall in toolCalls) {
         final result = toolResults[toolCall.id] ?? 'No result';
         conversationState.add(
-          llm.ChatMessage.toolResult(results: [toolCall], content: result),
+          ChatMessage.toolResult(results: [toolCall], content: result),
         );
       }
 
@@ -542,31 +541,31 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Continue conversation with tool results
   Future<_MessageResult?> _continueWithToolResults({
-    required List<llm.ChatMessage> conversationState,
-    required List<llm.Tool> tools,
+    required List<ChatMessage> conversationState,
+    required List<Tool> tools,
   }) async {
     try {
       final buffer = StringBuffer();
-      final followUpToolCalls = <llm.ToolCall>[];
+      final followUpToolCalls = <ToolCall>[];
 
       await for (final event in _llmService.streamChat(
         conversationState,
         tools: tools,
       )) {
         switch (event) {
-          case llm_event.TextChunk(text: final text):
-            buffer.write(text);
+          case TextDeltaEvent(delta: final delta):
+            buffer.write(delta);
 
-          case llm_event.ToolCallEvent(toolCall: final toolCall):
+          case ToolCallDeltaEvent(toolCall: final toolCall):
             followUpToolCalls.add(toolCall);
 
-          case llm_event.CompletionEvent():
+          case CompletionEvent():
             break;
 
-          case llm_event.ErrorEvent(error: final error):
-            return _MessageResult(error: error);
+          case ErrorEvent(error: final error):
+            return _MessageResult(error: error.message);
 
-          case llm_event.ThinkingEvent():
+          case ThinkingDeltaEvent():
             break;
         }
       }
@@ -575,7 +574,7 @@ class ChatController extends StateNotifier<ChatState> {
       if (followUpToolCalls.isNotEmpty) {
         // Add assistant's tool use message to conversation
         conversationState.add(
-          llm.ChatMessage.toolUse(
+          ChatMessage.toolUse(
             toolCalls: followUpToolCalls,
             content: buffer.toString(),
           ),
@@ -710,8 +709,8 @@ final chatControllerProvider =
 /// Result of sending a message to the AI
 class _MessageResult {
   final String? textResponse;
-  final List<llm.ToolCall>? toolCalls;
-  final List<llm.ChatMessage>? conversationState;
+  final List<ToolCall>? toolCalls;
+  final List<ChatMessage>? conversationState;
   final String? error;
 
   const _MessageResult({
@@ -730,7 +729,7 @@ class _MessageResult {
 class _ToolExecutionResult {
   final Map<String, String> toolResults;
   final List<String> chatMessages;
-  final List<llm.ToolCall> toolCalls;
+  final List<ToolCall> toolCalls;
   final _MessageResult? followUpResult;
   final String? error;
 

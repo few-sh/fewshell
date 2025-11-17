@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import '../models/llm_api_settings.dart';
-import '../models/llm_event.dart' as llm_event;
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/settings_provider.dart';
@@ -251,15 +250,17 @@ class LlmService {
   ///
   /// Takes a complete conversation and streams back events.
   /// The caller is responsible for building the conversation state.
-  Stream<llm_event.LlmEvent> streamChat(
+  Stream<ChatStreamEvent> streamChat(
     List<ChatMessage> conversation, {
     List<Tool>? tools,
   }) async* {
     final activeConfig = await _getActiveConfig();
 
     if (activeConfig == null) {
-      yield llm_event.ErrorEvent(
-        'No LLM configuration found. Please configure an LLM in Settings.',
+      yield ErrorEvent(
+        ProviderError(
+          'No LLM configuration found. Please configure an LLM in Settings.',
+        ),
       );
       return;
     }
@@ -275,27 +276,9 @@ class LlmService {
       );
 
       final stream = provider.chatStream(conversation, tools: tools);
-
-      await for (final event in stream) {
-        switch (event) {
-          case TextDeltaEvent(delta: final delta):
-            yield llm_event.TextChunk(delta);
-
-          case ToolCallDeltaEvent(toolCall: final toolCall):
-            yield llm_event.ToolCallEvent(toolCall);
-
-          case CompletionEvent():
-            yield llm_event.CompletionEvent();
-
-          case ErrorEvent(error: final error):
-            yield llm_event.ErrorEvent(error.toString());
-
-          case ThinkingDeltaEvent():
-            yield llm_event.ThinkingEvent();
-        }
-      }
+      yield* stream;
     } catch (e) {
-      yield llm_event.ErrorEvent(e.toString());
+      yield ErrorEvent(ProviderError(e.toString()));
     }
   }
 
