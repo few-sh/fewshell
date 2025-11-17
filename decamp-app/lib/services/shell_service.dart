@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
 import '../providers/secret_provider.dart';
+import '../providers/ssh_settings_provider.dart';
 
 /// Provider for the shell service
 /// Now requires a project ID to access SSH settings
@@ -15,16 +16,18 @@ final shellServiceProvider = Provider.family<ShellService, String?>((
     return ShellService(null, null);
   }
 
+  final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
   final secretsActions = ref.watch(projectSecretsProvider(projectId));
-  return ShellService(null, secretsActions);
+  return ShellService(sshSettings, secretsActions);
 });
 
 /// Service for executing shell commands via SSH
 class ShellService {
   SSHClient? _client;
+  final SshSettings? _sshSettings;
   final ProjectSecretsActions? _secretsActions;
 
-  ShellService(SshSettings? sshSettings, this._secretsActions);
+  ShellService(this._sshSettings, this._secretsActions);
 
   /// Connect to SSH server using the provided settings
   /// Returns true if connection successful, false otherwise
@@ -113,14 +116,31 @@ class ShellService {
   }) async {
     developer.log('Executing command: $command', name: 'ShellService');
 
+    // Auto-connect if not connected
     if (_client == null) {
-      developer.log('No active SSH connection', name: 'ShellService');
-      return {
-        'stdout': '',
-        'stderr': 'Error: Not connected to SSH server',
-        'exitCode': -1,
-        'executed': false,
-      };
+      if (_sshSettings == null) {
+        developer.log(
+          'No SSH settings configured for this project',
+          name: 'ShellService',
+        );
+        return {
+          'stdout': '',
+          'stderr': 'Error: SSH settings not configured for this project',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
+
+      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      final connected = await connect(_sshSettings);
+      if (!connected) {
+        return {
+          'stdout': '',
+          'stderr': 'Error: Failed to connect to SSH server',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
     }
 
     try {
@@ -193,9 +213,21 @@ ${envExports}DECAMP_SECRETS
   /// Execute a shell command with full control over stdin/stdout/stderr
   /// Returns a session that can be used for interactive commands
   Future<SSHSession?> createSession() async {
+    // Auto-connect if not connected
     if (_client == null) {
-      developer.log('No active SSH connection', name: 'ShellService');
-      return null;
+      if (_sshSettings == null) {
+        developer.log(
+          'No SSH settings configured for this project',
+          name: 'ShellService',
+        );
+        return null;
+      }
+
+      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      final connected = await connect(_sshSettings);
+      if (!connected) {
+        return null;
+      }
     }
 
     try {
@@ -257,14 +289,31 @@ ${envExports}DECAMP_SECRETS
     String? sudoPasswordSecretId,
     Map<String, String>? secrets,
   }) async {
+    // Auto-connect if not connected
     if (_client == null) {
-      developer.log('No active SSH connection', name: 'ShellService');
-      return {
-        'stdout': '',
-        'stderr': 'Error: Not connected to SSH server',
-        'exitCode': -1,
-        'executed': false,
-      };
+      if (_sshSettings == null) {
+        developer.log(
+          'No SSH settings configured for this project',
+          name: 'ShellService',
+        );
+        return {
+          'stdout': '',
+          'stderr': 'Error: SSH settings not configured for this project',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
+
+      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      final connected = await connect(_sshSettings);
+      if (!connected) {
+        return {
+          'stdout': '',
+          'stderr': 'Error: Failed to connect to SSH server',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
     }
 
     // Get sudo password from secrets if provided

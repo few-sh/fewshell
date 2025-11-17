@@ -9,6 +9,7 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
+import 'package:decamp/providers/ssh_settings_provider.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/services/shell_service.dart';
@@ -82,6 +83,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
+    final sshSettings = currentProject != null
+        ? ref.watch(projectSshSettingsProvider(currentProject.id))
+        : null;
 
     // Watch chat state and messages
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
@@ -191,13 +195,26 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         // Execute shell command directly
                         if (actionName == 'execute_shell_command') {
                           final command = params['command'] as String;
-                          final result = await shellService.executeCommand(
-                            command,
-                          );
+                          final sudoRequired =
+                              params['sudo_required'] as bool? ?? false;
+
+                          final Map<String, dynamic> result;
+
+                          if (sudoRequired) {
+                            // Use executeWithSudo for commands requiring elevated privileges
+                            result = await shellService.executeWithSudo(
+                              command: command,
+                              sudoPasswordSecretId:
+                                  sshSettings?.sudoPasswordSecretId,
+                            );
+                          } else {
+                            // Use regular executeCommand
+                            result = await shellService.executeCommand(command);
+                          }
 
                           return {
                             'success': (result['exitCode'] as int? ?? -1) == 0,
-                            'data': result['stdout'] as String? ?? '',
+                            'data': result,
                             'error': result['stderr'] as String?,
                           };
                         }
