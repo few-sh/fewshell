@@ -39,8 +39,14 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Build conversation history from database messages
   /// Reconstructs proper ChatMessage objects including tool use and tool results
+  /// Merges consecutive user messages (required for Anthropic API)
   List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
     final conversation = <ChatMessage>[];
+
+    developer.log(
+      '🔄 Building conversation history from ${dbMessages.length} messages',
+      name: 'ChatController',
+    );
 
     for (final msg in dbMessages) {
       final userId = msg.userId as String;
@@ -52,9 +58,34 @@ class ChatController extends StateNotifier<ChatState> {
         try {
           final json = jsonDecode(metadata) as Map<String, dynamic>;
           final chatMessage = ChatMessageStorage.fromStorageJson(json);
+
+          developer.log(
+            '✅ Reconstructed ${chatMessage.role.name} message with type: ${chatMessage.messageType.runtimeType}',
+            name: 'ChatController',
+          );
+
+          // Log tool calls and results for debugging
+          if (chatMessage.messageType is ToolUseMessage) {
+            final toolUse = chatMessage.messageType as ToolUseMessage;
+            developer.log(
+              '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
+              name: 'ChatController',
+            );
+          } else if (chatMessage.messageType is ToolResultMessage) {
+            final toolResult = chatMessage.messageType as ToolResultMessage;
+            developer.log(
+              '  📊 Tool results: ${toolResult.results.length} result(s)',
+              name: 'ChatController',
+            );
+          }
+
           conversation.add(chatMessage);
           continue;
         } catch (e) {
+          developer.log(
+            '⚠️ Failed to reconstruct from metadata: $e',
+            name: 'ChatController',
+          );
           // Fall through to simple text conversion
         }
       }
@@ -62,12 +93,26 @@ class ChatController extends StateNotifier<ChatState> {
       // Fallback: create simple text message based on userId
       if (userId == 'user') {
         conversation.add(ChatMessage.user(content));
+        developer.log('📝 Added user text message', name: 'ChatController');
       } else if (userId == 'ai' || userId == 'assistant') {
         conversation.add(ChatMessage.assistant(content));
+        developer.log(
+          '🤖 Added assistant text message',
+          name: 'ChatController',
+        );
       } else if (userId == 'tool') {
+        developer.log(
+          '⚠️ Skipping tool message without metadata',
+          name: 'ChatController',
+        );
         // Tool messages without metadata - skip them as they can't be properly reconstructed
       }
     }
+
+    developer.log(
+      '✅ Built conversation with ${conversation.length} messages',
+      name: 'ChatController',
+    );
 
     return conversation;
   }
@@ -220,6 +265,36 @@ class ChatController extends StateNotifier<ChatState> {
       // Add the new user message
       conversation.add(ChatMessage.user(messageContent));
 
+      developer.log(
+        '📤 Sending to LLM with ${conversation.length} messages in conversation',
+        name: 'ChatController',
+      );
+
+      // Log conversation summary for debugging
+      for (var i = 0; i < conversation.length; i++) {
+        final msg = conversation[i];
+        final messageType = msg.messageType;
+        if (messageType is ToolUseMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool calls (${messageType.toolCalls.length})',
+            name: 'ChatController',
+          );
+        } else if (messageType is ToolResultMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool results (${messageType.results.length})',
+            name: 'ChatController',
+          );
+        } else {
+          final preview = msg.content.length > 50
+              ? '${msg.content.substring(0, 50)}...'
+              : msg.content;
+          developer.log(
+            '  [$i] ${msg.role.name}: $preview',
+            name: 'ChatController',
+          );
+        }
+      }
+
       // Get shell tools
       final tools = shellTools;
 
@@ -313,13 +388,24 @@ class ChatController extends StateNotifier<ChatState> {
       final displayContent =
           assistantText ?? '[Tool calls: ${pendingCalls.length}]';
 
+      final metadata = jsonEncode(chatMessage.toStorageJson());
+
+      developer.log(
+        '💾 Saving assistant message with ${pendingCalls.length} tool calls',
+        name: 'ChatController',
+      );
+      developer.log(
+        '  Tool calls: ${pendingCalls.map((tc) => tc.function.name).join(", ")}',
+        name: 'ChatController',
+      );
+
       await _messageDao.insertMessageWithId(
         id: assistantMessageId,
         sessionId: sessionId,
         userId: 'ai',
         userName: 'Ops Agent',
         content: displayContent,
-        metadata: jsonEncode(chatMessage.toStorageJson()),
+        metadata: metadata,
       );
     }
 
@@ -383,6 +469,11 @@ class ChatController extends StateNotifier<ChatState> {
         final chatMessage = ChatMessage.toolResult(
           results: [toolCall],
           content: toolResult,
+        );
+
+        developer.log(
+          '💾 Saving tool result for ${toolCall.function.name}',
+          name: 'ChatController',
         );
 
         await _messageDao.insertMessageWithId(
@@ -509,17 +600,48 @@ class ChatController extends StateNotifier<ChatState> {
       // Get tools for potential follow-up
       final tools = shellTools;
 
-      // Add tool results to conversation
+      // Create a mutable copy of conversation and add tool results
+      // (conversationState may be unmodifiable)
+      final conversationWithResults = List<ChatMessage>.from(conversationState);
+
       for (final toolCall in toolCalls) {
         final result = toolResults[toolCall.id] ?? 'No result';
-        conversationState.add(
+        conversationWithResults.add(
           ChatMessage.toolResult(results: [toolCall], content: result),
         );
       }
 
+      developer.log(
+        '📋 Conversation state before follow-up (${conversationWithResults.length} messages):',
+        name: 'ChatController',
+      );
+      for (var i = 0; i < conversationWithResults.length; i++) {
+        final msg = conversationWithResults[i];
+        final messageType = msg.messageType;
+        if (messageType is ToolUseMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool calls',
+            name: 'ChatController',
+          );
+        } else if (messageType is ToolResultMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool results',
+            name: 'ChatController',
+          );
+        } else {
+          final preview = msg.content.length > 50
+              ? '${msg.content.substring(0, 50)}...'
+              : msg.content;
+          developer.log(
+            '  [$i] ${msg.role.name}: $preview',
+            name: 'ChatController',
+          );
+        }
+      }
+
       // Continue conversation with tool results
       final followUpResult = await _continueWithToolResults(
-        conversationState: conversationState,
+        conversationState: conversationWithResults,
         tools: tools,
       );
 
