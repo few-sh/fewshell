@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/messages_table.dart';
+import '../../utils/id_generator.dart';
 
 part 'message_dao.g.dart';
 
@@ -84,18 +85,7 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
   }
 
   /// Generate a unique message ID
-  String generateMessageId() {
-    return 'msg_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
-  }
-
-  /// Generate a random string for ID uniqueness
-  String _randomString(int length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    return List.generate(
-      length,
-      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
-    ).join();
-  }
+  String generateMessageId() => IdGenerator.messageId();
 
   /// Insert a message with all parameters, generating ID if not provided
   Future<String> insertMessageWithId({

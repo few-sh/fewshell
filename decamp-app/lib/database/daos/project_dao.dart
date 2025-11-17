@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/projects_table.dart';
+import '../../utils/id_generator.dart';
 
 part 'project_dao.g.dart';
 
@@ -80,18 +81,7 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
   }
 
   /// Generate a unique project ID
-  String generateProjectId() {
-    return 'proj_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
-  }
-
-  /// Generate a random string for ID uniqueness
-  String _randomString(int length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    return List.generate(
-      length,
-      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
-    ).join();
-  }
+  String generateProjectId() => IdGenerator.projectId();
 
   /// Create a new project with all parameters
   Future<String> createProjectWithId({

@@ -87,69 +87,51 @@ class LlmService {
     return (config: config, apiKey: apiKey);
   }
 
-  /// Get the final agent instruction based on settings hierarchy
-  /// Returns the appropriate instruction considering:
-  /// 1. Project-specific model override (if project exists and override defined)
-  /// 2. Project-specific default instruction (if project exists and defined)
-  /// 3. User-level model override (if override defined)
-  /// 4. User-level default instruction (if defined)
-  /// 5. null (if no instructions configured)
-  ///
-  /// If project settings have includeUserInstructions=true, user instructions
-  /// are prepended to project instructions.
+  /// Get the final agent instruction for a model
+  /// Simplified hierarchy: project override > project default > global override > global default
   String? getAgentInstruction(String modelIdentifier) {
-    final userSettings = ref.read(globalSettingsProvider);
-    final userInstruction = userSettings.agentInstruction;
-
-    String? projectInstructionText;
-    bool includeUserInstructions = false;
-
-    // Get project-specific instructions if we have a project
+    // Get project instruction if we have a project
     if (currentProjectId != null) {
       final projectSettings = ref.read(
         projectSettingsProvider(currentProjectId!),
       );
       final projectInstruction = projectSettings?.agentInstruction;
-      includeUserInstructions =
-          projectSettings?.includeUserInstructions ?? false;
 
       if (projectInstruction != null) {
-        // Check for model-specific override first
-        if (projectInstruction.modelOverrides.containsKey(modelIdentifier)) {
-          projectInstructionText =
-              projectInstruction.modelOverrides[modelIdentifier];
-        } else if (projectInstruction.defaultInstruction.isNotEmpty) {
-          // Use project default instruction
-          projectInstructionText = projectInstruction.defaultInstruction;
+        // Check model override first, then default
+        final instruction =
+            projectInstruction.modelOverrides[modelIdentifier] ??
+            (projectInstruction.defaultInstruction.isNotEmpty
+                ? projectInstruction.defaultInstruction
+                : null);
+
+        if (instruction != null) {
+          // Optionally prepend global instruction
+          if (projectSettings?.includeUserInstructions ?? false) {
+            final globalInstruction = _getGlobalInstruction(modelIdentifier);
+            if (globalInstruction != null) {
+              return '$globalInstruction\n\n$instruction';
+            }
+          }
+          return instruction;
         }
       }
     }
 
-    // Get user-level instructions
-    String? userInstructionText;
-    if (userInstruction != null) {
-      // Check for model-specific override first
-      if (userInstruction.modelOverrides.containsKey(modelIdentifier)) {
-        userInstructionText = userInstruction.modelOverrides[modelIdentifier];
-      } else if (userInstruction.defaultInstruction.isNotEmpty) {
-        // Use user default instruction
-        userInstructionText = userInstruction.defaultInstruction;
-      }
-    }
+    // Fall back to global instruction
+    return _getGlobalInstruction(modelIdentifier);
+  }
 
-    // Combine instructions based on settings
-    if (projectInstructionText != null && projectInstructionText.isNotEmpty) {
-      if (includeUserInstructions &&
-          userInstructionText != null &&
-          userInstructionText.isNotEmpty) {
-        // Prepend user instructions to project instructions
-        return '$userInstructionText\n\n$projectInstructionText';
-      }
-      return projectInstructionText;
-    }
+  /// Get global instruction for a model
+  String? _getGlobalInstruction(String modelIdentifier) {
+    final userInstruction = ref.read(globalSettingsProvider).agentInstruction;
+    if (userInstruction == null) return null;
 
-    // Fall back to user instructions if no project instructions
-    return userInstructionText;
+    // Check model override first, then default
+    return userInstruction.modelOverrides[modelIdentifier] ??
+        (userInstruction.defaultInstruction.isNotEmpty
+            ? userInstruction.defaultInstruction
+            : null);
   }
 
   /// Create an LLM provider based on the API type

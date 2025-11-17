@@ -28,76 +28,50 @@ final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
 /// StateProvider for the currently selected session ID
 final currentSessionIdProvider = StateProvider<String?>((ref) => null);
 
-/// Session manager that auto-creates/selects sessions
-/// Watches project changes and sessions list to ensure a session is always selected
-class SessionManager extends StateNotifier<void> {
-  final Ref _ref;
-  String? _lastProjectId;
+/// Session auto-selector that runs after build
+/// Watches project and sessions to ensure a valid session is always selected
+final sessionAutoSelectorProvider = Provider<void>((ref) {
+  final projectId = ref.watch(currentProjectIdProvider);
+  final sessionsAsync = ref.watch(currentProjectSessionsProvider);
 
-  SessionManager(this._ref) : super(null) {
-    // Listen to project ID changes
-    _ref.listen(currentProjectIdProvider, (previous, next) {
-      if (_lastProjectId != next) {
-        _lastProjectId = next;
-        _handleProjectChange(next);
-      }
-    });
-
-    // Listen to sessions list changes
-    _ref.listen(currentProjectSessionsProvider, (previous, next) {
-      next.whenData((sessions) => _ensureSessionSelected(sessions));
-    });
-  }
-
-  void _handleProjectChange(String? projectId) {
+  // Schedule session selection for after the current build
+  ref.listenSelf((_, __) {
     if (projectId == null) {
-      // Clear session when no project
-      _ref.read(currentSessionIdProvider.notifier).state = null;
+      ref.read(currentSessionIdProvider.notifier).state = null;
       return;
     }
 
-    // Project changed - ensure we have a session
-    final sessionsAsync = _ref.read(currentProjectSessionsProvider);
-    sessionsAsync.whenData(_ensureSessionSelected);
-  }
+    final sessions = sessionsAsync.when(
+      data: (sessions) => sessions,
+      loading: () => null,
+      error: (_, __) => null,
+    );
 
-  void _ensureSessionSelected(List<SessionEntity> sessions) {
-    final projectId = _ref.read(currentProjectIdProvider);
-    final currentSessionId = _ref.read(currentSessionIdProvider);
+    if (sessions == null) return;
 
-    if (projectId == null) return;
+    final currentSessionId = ref.read(currentSessionIdProvider);
 
-    // Check if current session belongs to this project
+    // Check if we need to select a session
     final needsSession =
         currentSessionId == null ||
         !sessions.any((s) => s.id == currentSessionId);
 
-    if (needsSession) {
-      if (sessions.isEmpty) {
-        // Create new session
-        final sessionDao = _ref.read(databaseProvider).sessionDao;
-        final projectDao = _ref.read(databaseProvider).projectDao;
+    if (!needsSession) return;
 
-        sessionDao.createSessionWithId(projectId: projectId).then((
-          newSessionId,
-        ) {
-          _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
-          // Update project's last session date
-          projectDao.updateLastSessionDate(projectId, DateTime.now());
-        });
-      } else {
-        // Select most recent session
-        _ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
-      }
+    if (sessions.isEmpty) {
+      // Create new session
+      final sessionDao = ref.read(databaseProvider).sessionDao;
+      final projectDao = ref.read(databaseProvider).projectDao;
+
+      sessionDao.createSessionWithId(projectId: projectId).then((newSessionId) {
+        ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+        projectDao.updateLastSessionDate(projectId, DateTime.now());
+      });
+    } else {
+      // Select most recent session
+      ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
     }
-  }
-}
-
-/// Provider for the session manager
-final sessionManagerProvider = StateNotifierProvider<SessionManager, void>((
-  ref,
-) {
-  return SessionManager(ref);
+  });
 });
 
 /// Provider for the currently selected session

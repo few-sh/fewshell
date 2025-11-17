@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/sessions_table.dart';
+import '../../utils/id_generator.dart';
 
 part 'session_dao.g.dart';
 
@@ -138,18 +139,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
   }
 
   /// Generate a unique session ID
-  String generateSessionId() {
-    return 'sess_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
-  }
-
-  /// Generate a random string for ID uniqueness
-  String _randomString(int length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    return List.generate(
-      length,
-      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
-    ).join();
-  }
+  String generateSessionId() => IdGenerator.sessionId();
 
   /// Create a new session with all parameters
   Future<String> createSessionWithId({

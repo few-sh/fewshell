@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import '../database/database.dart';
+import '../utils/id_generator.dart';
 import '../providers/database_provider.dart';
 
 /// Stream provider for global snippets
@@ -107,15 +108,4 @@ Future<void> reorderSnippets(
 }
 
 /// Generate a unique snippet ID
-String _generateSnippetId() {
-  return 'snip_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
-}
-
-/// Generate a random string for ID uniqueness
-String _randomString(int length) {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  return List.generate(
-    length,
-    (index) => chars[(DateTime.now().microsecond + index) % chars.length],
-  ).join();
-}
+String _generateSnippetId() => IdGenerator.snippetId();
