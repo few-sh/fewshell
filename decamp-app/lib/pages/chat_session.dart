@@ -28,9 +28,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProject = ref.read(currentProjectProvider);
     if (currentProject == null) return;
 
-    await ref.read(sessionActionsProvider).createSession(
-      projectId: currentProject.id,
-    );
+    await ref
+        .read(sessionActionsProvider)
+        .createNewSessionAndSwitch(projectId: currentProject.id);
   }
 
   /// Show session history page
@@ -164,10 +164,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       streamingMessageId: chatState.streamingMessageId,
                       streamingText: chatState.streamingText,
                     ),
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (error, stack) => Center(
-                      child: Text('Error loading messages: $error'),
-                    ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (error, stack) =>
+                        Center(child: Text('Error loading messages: $error')),
                   ),
                 ),
                 // Input field
@@ -199,21 +199,26 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         // Execute shell command directly
                         if (actionName == 'execute_shell_command') {
                           final command = params['command'] as String;
-                          final result = await shellService.executeCommand(command);
-                          
+                          final result = await shellService.executeCommand(
+                            command,
+                          );
+
                           return {
                             'success': (result['exitCode'] as int? ?? -1) == 0,
                             'data': result['stdout'] as String? ?? '',
                             'error': result['stderr'] as String?,
                           };
                         }
-                        
+
                         throw Exception('Unknown action: $actionName');
                       },
                     );
                   },
                   onDismiss: () {
-                    developer.log('🧹 Dismissing approval overlay', name: 'ChatSession');
+                    developer.log(
+                      '🧹 Dismissing approval overlay',
+                      name: 'ChatSession',
+                    );
                     chatController.cancelActions();
                   },
                 ),
