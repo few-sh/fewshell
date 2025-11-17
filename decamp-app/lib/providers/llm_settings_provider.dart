@@ -3,11 +3,7 @@ import '../models/llm_api_settings.dart';
 import '../models/settings.dart';
 import '../services/keychain_service.dart';
 import 'settings_provider.dart';
-
-/// Provider for keychain service instance
-final keychainServiceProvider = Provider<KeychainService>((ref) {
-  return KeychainService();
-});
+import 'secret_provider.dart';
 
 /// Provider for managing global LLM settings
 final globalLlmSettingsProvider =

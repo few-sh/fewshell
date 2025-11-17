@@ -28,39 +28,22 @@ final allSecretsProvider = FutureProvider.family<Map<String, String>, String?>((
   }
 });
 
-/// Provider to check if a specific secret exists (global or project)
-final secretExistsProvider = FutureProvider.family<bool, SecretLookup>((
+/// Provider to get a specific global secret
+final globalSecretProvider = FutureProvider.family<String?, String>((
   ref,
-  lookup,
+  secretName,
 ) async {
   final keychain = ref.watch(keychainServiceProvider);
-  if (lookup.projectId != null) {
-    final value = await keychain.getProjectSecret(
-      lookup.projectId!,
-      lookup.secretName,
-    );
-    return value != null;
-  } else {
-    final value = await keychain.getGlobalSecret(lookup.secretName);
-    return value != null;
-  }
+  return keychain.getGlobalSecret(secretName);
 });
 
-/// Helper class for secret lookup parameters
-class SecretLookup {
-  final String secretName;
-  final String? projectId;
-
-  const SecretLookup({required this.secretName, this.projectId});
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is SecretLookup &&
-          runtimeType == other.runtimeType &&
-          secretName == other.secretName &&
-          projectId == other.projectId;
-
-  @override
-  int get hashCode => secretName.hashCode ^ projectId.hashCode;
-}
+/// Provider to get a specific project secret
+/// Parameter is a record with projectId and secretName
+final projectSecretProvider =
+    FutureProvider.family<String?, ({String projectId, String secretName})>((
+      ref,
+      params,
+    ) async {
+      final keychain = ref.watch(keychainServiceProvider);
+      return keychain.getProjectSecret(params.projectId, params.secretName);
+    });

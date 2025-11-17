@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
-import '../models/snippet.dart';
+import '../database/database.dart';
 import '../themes/terminal_theme.dart';
 
 /// Snippets page with User and Project snippets tabs
@@ -93,7 +93,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   }
 
   Widget _buildUserSnippets() {
-    final snippetsAsync = ref.watch(globalSnippetsStreamProvider);
+    final snippetsAsync = ref.watch(globalSnippetsProvider);
 
     return snippetsAsync.when(
       data: (snippets) => _buildSnippetsList(snippets, isGlobal: true),
@@ -141,9 +141,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
       );
     }
 
-    final snippetsAsync = ref.watch(
-      projectSnippetsStreamProvider(currentProjectId),
-    );
+    final snippetsAsync = ref.watch(projectSnippetsProvider(currentProjectId));
 
     return snippetsAsync.when(
       data: (snippets) => _buildSnippetsList(snippets, isGlobal: false),
@@ -153,13 +151,11 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     );
   }
 
-  Widget _buildSnippetsList(List<Snippet> snippets, {required bool isGlobal}) {
+  Widget _buildSnippetsList(
+    List<SnippetEntity> snippets, {
+    required bool isGlobal,
+  }) {
     final currentProjectId = ref.watch(currentProjectIdProvider);
-    final notifier = isGlobal
-        ? ref.read(globalSnippetsProvider.notifier)
-        : (currentProjectId != null
-              ? ref.read(projectSnippetsProvider(currentProjectId).notifier)
-              : null);
 
     // Show empty state only if no snippets AND not adding a new one
     if (snippets.isEmpty && _newSnippetId == null) {
@@ -204,26 +200,25 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           key: ValueKey(_newSnippetId),
           isGlobal: isGlobal,
           onSave: (description, content) async {
-            if (notifier != null) {
-              try {
-                await notifier.addSnippet(
-                  name:
-                      description, // Use description as name for backwards compatibility
-                  content: content,
-                  description: description,
+            try {
+              await addSnippet(
+                ref,
+                name: description,
+                content: content,
+                description: description,
+                projectId: isGlobal ? null : currentProjectId,
+              );
+              setState(() {
+                _newSnippetId = null;
+              });
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error adding snippet: $e'),
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                  ),
                 );
-                setState(() {
-                  _newSnippetId = null;
-                });
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error adding snippet: $e'),
-                      backgroundColor: Theme.of(context).colorScheme.error,
-                    ),
-                  );
-                }
               }
             }
           },
@@ -242,9 +237,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           snippet: snippet,
           isGlobal: isGlobal,
           onDelete: () async {
-            if (notifier != null) {
-              await notifier.deleteSnippet(snippet.id);
-            }
+            await deleteSnippet(ref, snippet.id);
           },
         );
       }).toList(),
@@ -267,9 +260,12 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
             : newIndex;
 
         // Update the order in the database
-        if (notifier != null) {
-          await notifier.reorderSnippets(adjustedOldIndex, adjustedNewIndex);
-        }
+        await reorderSnippets(
+          ref,
+          snippets,
+          adjustedOldIndex,
+          adjustedNewIndex,
+        );
       },
       children: listItems,
     );
@@ -278,7 +274,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   Widget _buildSnippetCard({
     required Key key,
     required int index,
-    required Snippet snippet,
+    required SnippetEntity snippet,
     required bool isGlobal,
     required VoidCallback onDelete,
   }) {
@@ -498,7 +494,7 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
 /// Widget for displaying and editing a snippet inline
 class _SnippetCardContent extends ConsumerStatefulWidget {
   final int index;
-  final Snippet snippet;
+  final SnippetEntity snippet;
   final bool isGlobal;
 
   const _SnippetCardContent({
@@ -554,14 +550,10 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
     setState(() => _isSaving = true);
 
     try {
-      final currentProjectId = ref.read(currentProjectIdProvider);
-      final notifier = widget.isGlobal
-          ? ref.read(globalSnippetsProvider.notifier)
-          : ref.read(projectSnippetsProvider(currentProjectId!).notifier);
-
-      await notifier.updateSnippet(
+      await updateSnippet(
+        ref,
         id: widget.snippet.id,
-        name: _descriptionController.text.trim(), // Use description as name
+        name: _descriptionController.text.trim(),
         content: _contentController.text.trim(),
         description: _descriptionController.text.trim(),
       );

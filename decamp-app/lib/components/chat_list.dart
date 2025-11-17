@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:decamp/database/database.dart';
 import 'package:decamp/components/rich_message_content.dart';
-import 'package:decamp/models/message.dart';
 
 /// Simple chat message list widget
 /// Displays messages from database with streaming support
@@ -21,12 +20,9 @@ class ChatList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Display all messages including tool results
-    final displayMessages = messages;
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      itemCount: displayMessages.length + (isLoading ? 1 : 0),
+      itemCount: messages.length + (isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (isLoading && index == 0) {
           return const Padding(
@@ -37,22 +33,7 @@ class ChatList extends StatelessWidget {
 
         // Get message (adjust index if loading indicator is shown)
         final messageIndex = isLoading ? index - 1 : index;
-        final msgEntity = displayMessages[messageIndex];
-
-        // Convert to Message model for RichMessageContent
-        final message = Message(
-          id: msgEntity.id,
-          sessionId: msgEntity.sessionId,
-          userId: msgEntity.userId,
-          userName: msgEntity.userName,
-          content: msgEntity.content,
-          timestamp: msgEntity.timestamp,
-          createdAt: msgEntity.createdAt,
-          imageUrl: msgEntity.imageUrl,
-          metadata: msgEntity.metadata != null
-              ? Map<String, dynamic>.from({}) // TODO: parse JSON
-              : null,
-        );
+        final message = messages[messageIndex];
 
         // Check if this message is currently streaming
         final isStreaming = message.id == streamingMessageId;

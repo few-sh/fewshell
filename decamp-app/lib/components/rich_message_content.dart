@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:intl/intl.dart';
-import 'package:decamp/models/message.dart';
+import 'package:decamp/database/database.dart';
 
 /// Rich message content widget with extensible features
 /// Supports: text selection, copy, collapsible sections, action buttons
 class RichMessageContent extends StatelessWidget {
-  final Message message;
+  final MessageEntity message;
   final String? displayText; // Override for streaming
   final bool isUser;
   final MarkdownStyleSheet? styleSheet;
@@ -25,9 +25,9 @@ class RichMessageContent extends StatelessWidget {
     // Use displayText override if provided (for streaming), otherwise use message content
     final text = displayText ?? message.content;
 
-    // Extract metadata from message metadata field
+    // Extract metadata from message metadata field (parse JSON if needed)
     final metadata = MessageMetadata.fromCustomProperties(
-      message.metadata ?? {},
+      message.metadata != null ? {} : {}, // TODO: parse JSON metadata if needed
     );
 
     Widget content;
