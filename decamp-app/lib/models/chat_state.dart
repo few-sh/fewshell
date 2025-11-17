@@ -34,6 +34,10 @@ class ChatState with _$ChatState {
     List<ToolCall>? pendingToolCalls,
     String? assistantTextBeforeTools,
 
+    // Streaming state
+    String? streamingMessageId,
+    @Default('') String streamingText,
+
     // Error state
     String? error,
   }) = _ChatState;

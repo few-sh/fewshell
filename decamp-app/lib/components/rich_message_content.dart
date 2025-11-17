@@ -1,43 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:intl/intl.dart';
+import 'package:decamp/models/message.dart';
 
 /// Rich message content widget with extensible features
 /// Supports: text selection, copy, collapsible sections, action buttons
 class RichMessageContent extends StatelessWidget {
-  final ChatMessage message;
+  final Message message;
+  final String? displayText; // Override for streaming
   final bool isUser;
   final MarkdownStyleSheet? styleSheet;
 
   const RichMessageContent({
     super.key,
     required this.message,
+    this.displayText,
     required this.isUser,
     this.styleSheet,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Extract metadata from customProperties
+    // Use displayText override if provided (for streaming), otherwise use message content
+    final text = displayText ?? message.content;
+
+    // Extract metadata from message metadata field
     final metadata = MessageMetadata.fromCustomProperties(
-      message.customProperties ?? {},
+      message.metadata ?? {},
     );
 
     Widget content;
 
     // Check if this is a collapsible message
     if (metadata.isCollapsible) {
-      content = _buildCollapsibleContent(context, metadata);
+      content = _buildCollapsibleContent(context, metadata, text);
     }
     // Check if this has action buttons
     else if (metadata.actions.isNotEmpty) {
-      content = _buildInteractiveContent(context, metadata);
+      content = _buildInteractiveContent(context, metadata, text);
     }
     // Default: render markdown with selection support
     else {
-      content = _buildMarkdownContent(context, metadata);
+      content = _buildMarkdownContent(context, metadata, text);
     }
 
     // Wrap content with timestamp at the bottom
@@ -113,7 +118,11 @@ class RichMessageContent extends StatelessWidget {
     );
   }
 
-  Widget _buildMarkdownContent(BuildContext context, MessageMetadata metadata) {
+  Widget _buildMarkdownContent(
+    BuildContext context,
+    MessageMetadata metadata,
+    String text,
+  ) {
     // Extract base text color from stylesheet
     final textColor =
         styleSheet?.p?.color ??
@@ -121,7 +130,7 @@ class RichMessageContent extends StatelessWidget {
         Colors.white;
 
     final markdown = Markdown(
-      data: message.text,
+      data: text,
       selectable: false,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -152,10 +161,11 @@ class RichMessageContent extends StatelessWidget {
   Widget _buildCollapsibleContent(
     BuildContext context,
     MessageMetadata metadata,
+    String text,
   ) {
     return CollapsibleMessageSection(
       title: metadata.collapsibleTitle ?? 'Details',
-      content: message.text,
+      content: text,
       initiallyExpanded: metadata.initiallyExpanded,
       styleSheet: styleSheet,
     );
@@ -164,6 +174,7 @@ class RichMessageContent extends StatelessWidget {
   Widget _buildInteractiveContent(
     BuildContext context,
     MessageMetadata metadata,
+    String text,
   ) {
     // Extract base text color from stylesheet
     final textColor =
@@ -172,7 +183,7 @@ class RichMessageContent extends StatelessWidget {
         Colors.white;
 
     final markdown = Markdown(
-      data: message.text,
+      data: text,
       selectable: false,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -253,7 +264,8 @@ class RichMessageContent extends StatelessWidget {
   }
 
   void _copyToClipboard(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: message.text));
+    final text = displayText ?? message.content;
+    Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Copied to clipboard'),

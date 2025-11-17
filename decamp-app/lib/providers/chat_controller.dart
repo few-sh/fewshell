@@ -1,6 +1,5 @@
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:llm_dart/llm_dart.dart' as llm;
 import '../models/chat_state.dart';
 import '../repositories/chat_repository.dart';
@@ -11,10 +10,6 @@ import '../components/multi_command_approval_overlay.dart';
 class ChatController extends StateNotifier<ChatState> {
   final ChatRepository _repository;
   final String? sessionId;
-
-  // Define users
-  final _currentUser = ChatUser(id: 'user', firstName: 'You');
-  final _aiUser = ChatUser(id: 'ai', firstName: 'Ops Agent');
 
   ChatController(this._repository, this.sessionId) : super(const ChatState()) {
     _initialize();
@@ -31,30 +26,19 @@ class ChatController extends StateNotifier<ChatState> {
     state = const ChatState();
   }
 
-  /// Get current user
-  ChatUser get currentUser => _currentUser;
-
-  /// Get AI user
-  ChatUser get aiUser => _aiUser;
-
   /// Send a message to the AI
   /// Handles saving to database, getting AI response, and managing tool calls
   ///
-  /// Streaming Integration:
-  /// - startStreaming: Called when first text chunk arrives, creates empty message and marks it as streaming
-  /// - updateStreamingMessage: Called for each chunk, updates message text
-  /// - stopStreaming: Called when complete, stops animation to prevent re-animation on scroll
+  /// Streaming is managed internally through ChatState:
+  /// - startStreaming: Sets streamingMessageId in state
+  /// - updateStreamingText: Updates streamingText in state
+  /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
     required String content,
     required String sessionId,
     required List<dynamic>
     dbMessages, // Database messages to build conversation from
     required bool isFirstMessage,
-    required void Function(ChatMessage) addMessageToUI,
-    required void Function(String messageId) startStreaming,
-    required void Function(String messageId, String text)
-    updateStreamingMessage,
-    required void Function(String messageId) stopStreaming,
   }) async {
     developer.log('🎯 sendMessage called', name: 'ChatController');
 
@@ -90,20 +74,10 @@ class ChatController extends StateNotifier<ChatState> {
         const configMessage =
             "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
 
-        // Save and display warning
-        final messageId = await _repository.saveAiMessage(
+        // Save warning message
+        await _repository.saveAiMessage(
           sessionId: sessionId,
           content: configMessage,
-        );
-
-        addMessageToUI(
-          ChatMessage(
-            text: configMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
         );
 
         state = state.copyWith(isLoading: false);
@@ -122,10 +96,10 @@ class ChatController extends StateNotifier<ChatState> {
           startStreaming(messageId);
         },
         onStreamChunk: (messageId, text) {
-          updateStreamingMessage(messageId, text);
+          updateStreamingText(text);
         },
         onStreamEnd: (messageId) {
-          stopStreaming(messageId);
+          stopStreaming();
         },
       );
 
@@ -134,19 +108,9 @@ class ChatController extends StateNotifier<ChatState> {
         developer.log('❌ Error: ${result.error}', name: 'ChatController');
 
         final errorMessage = 'Sorry, I encountered an error: ${result.error}';
-        final messageId = await _repository.saveAiMessage(
+        await _repository.saveAiMessage(
           sessionId: sessionId,
           content: errorMessage,
-        );
-
-        addMessageToUI(
-          ChatMessage(
-            text: errorMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
         );
 
         state = state.copyWith(isLoading: false, error: result.error);
@@ -202,19 +166,9 @@ class ChatController extends StateNotifier<ChatState> {
       );
 
       final errorMessage = 'Sorry, I encountered an error: $e';
-      final messageId = await _repository.saveAiMessage(
+      await _repository.saveAiMessage(
         sessionId: sessionId,
         content: errorMessage,
-      );
-
-      addMessageToUI(
-        ChatMessage(
-          text: errorMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': messageId},
-          isMarkdown: true,
-        ),
       );
 
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -228,8 +182,6 @@ class ChatController extends StateNotifier<ChatState> {
     required String sessionId,
     required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
     executeAction,
-    required void Function(ChatMessage) addMessageToUI,
-    required void Function(String) markMessageAsSynced,
   }) async {
     developer.log(
       '🚀 Executing ${selectedActions.length} actions',
@@ -243,9 +195,6 @@ class ChatController extends StateNotifier<ChatState> {
     if (pendingCalls != null && pendingCalls.isNotEmpty) {
       // Generate message ID upfront
       final assistantMessageId = _repository.generateMessageId();
-
-      // Mark as synced BEFORE saving to prevent duplicate
-      markMessageAsSynced(assistantMessageId);
 
       // Save the assistant message with tool calls
       await _repository.saveAssistantMessageWithToolCalls(
@@ -295,35 +244,8 @@ class ChatController extends StateNotifier<ChatState> {
       // Clear execution progress, show loading for LLM response
       state = state.copyWith(executionProgress: null, isLoading: true);
 
-      // Determine which actions were skipped
-      final selectedIds = selectedActions.map((a) => a.id).toSet();
-      final skippedActions = allActions
-          .where((a) => !selectedIds.contains(a.id))
-          .toList();
-
-      // Display "Skipped" messages for unselected actions (UI-only, not saved)
-      for (final skippedAction in skippedActions) {
-        final skippedMessage = '⏭️ **Skipped:** `${skippedAction.command}`';
-
-        // Generate message ID upfront
-        final messageId = _repository.generateMessageId();
-
-        // Mark as synced BEFORE saving
-        markMessageAsSynced(messageId);
-
-        // Add to UI only (skipped messages are for display, not part of conversation)
-        addMessageToUI(
-          ChatMessage(
-            text: skippedMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
-        );
-
-        // DON'T save skipped messages to database - they're UI-only
-      }
+      // Note: Skipped messages are not displayed in new UI (database-driven)
+      // The UI will only show messages that were actually executed
 
       // Execute tool calls through repository
       final result = await _repository.executeToolCalls(
@@ -361,27 +283,9 @@ class ChatController extends StateNotifier<ChatState> {
       // Save formatted tool result messages (these are now nicely formatted and user-visible)
       for (var i = 0; i < result.toolCalls.length; i++) {
         final toolCall = result.toolCalls[i];
-        final formattedResult = result.chatMessages[i];
 
-        // Generate message ID upfront
-        final messageId = _repository.generateMessageId();
-
-        // Mark as synced BEFORE saving to prevent DB sync from re-adding
-        markMessageAsSynced(messageId);
-
-        // Add to UI first (formatted message is for display only, not saved to DB)
-        addMessageToUI(
-          ChatMessage(
-            text: formattedResult,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
-        );
-
-        // DON'T save the formatted message to database - it's UI-only
-        // We only save the raw tool result for LLM conversation
+        // Note: Formatted result messages are not displayed in new UI
+        // Only raw tool results are saved for LLM conversation
 
         // Save raw result for LLM conversation with complete ToolCall structure
         final toolResult = result.toolResults[toolCall.id] ?? 'No result';
@@ -422,26 +326,8 @@ class ChatController extends StateNotifier<ChatState> {
 
         // Save follow-up text response
         if (followUp.hasTextResponse) {
-          // Generate message ID upfront
-          final messageId = _repository.generateMessageId();
-
-          // Mark as synced BEFORE saving to prevent DB sync from re-adding
-          markMessageAsSynced(messageId);
-
-          // Add to UI first (no streaming animation - text is already complete)
-          addMessageToUI(
-            ChatMessage(
-              text: followUp.textResponse!,
-              user: _aiUser,
-              createdAt: DateTime.now(),
-              customProperties: {'id': messageId},
-              isMarkdown: true,
-            ),
-          );
-
-          // Save to database with pre-generated ID (this will trigger sync but won't re-add)
+          // Save follow-up response to database (will automatically display via stream)
           await _repository.saveAiMessage(
-            id: messageId,
             sessionId: sessionId,
             content: followUp.textResponse!,
           );
@@ -464,19 +350,9 @@ class ChatController extends StateNotifier<ChatState> {
       );
 
       final errorMessage = '❌ Error executing commands: $e';
-      final messageId = await _repository.saveAiMessage(
+      await _repository.saveAiMessage(
         sessionId: sessionId,
         content: errorMessage,
-      );
-
-      addMessageToUI(
-        ChatMessage(
-          text: errorMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': messageId},
-          isMarkdown: true,
-        ),
       );
 
       // Clear all state on error
@@ -501,6 +377,21 @@ class ChatController extends StateNotifier<ChatState> {
       pendingToolCalls: null,
       assistantTextBeforeTools: null,
     );
+  }
+
+  /// Start streaming for a message
+  void startStreaming(String messageId) {
+    state = state.copyWith(streamingMessageId: messageId, streamingText: '');
+  }
+
+  /// Update streaming text for a message
+  void updateStreamingText(String text) {
+    state = state.copyWith(streamingText: text);
+  }
+
+  /// Stop streaming
+  void stopStreaming() {
+    state = state.copyWith(streamingMessageId: null, streamingText: '');
   }
 
   /// Clear error state
