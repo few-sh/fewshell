@@ -5,6 +5,7 @@ import 'package:llm_dart/llm_dart.dart' as llm;
 import 'package:drift/drift.dart';
 import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
+import '../models/llm_event.dart' as llm_event;
 import '../services/llm_service.dart';
 import '../services/shell_tools_provider.dart';
 import '../providers/database_provider.dart';
@@ -27,10 +28,10 @@ class ChatController extends StateNotifier<ChatState> {
     required SessionDao sessionDao,
     required LlmService llmService,
     this.sessionId,
-  })  : _messageDao = messageDao,
-        _sessionDao = sessionDao,
-        _llmService = llmService,
-        super(const ChatState());
+  }) : _messageDao = messageDao,
+       _sessionDao = sessionDao,
+       _llmService = llmService,
+       super(const ChatState());
 
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
@@ -53,17 +54,8 @@ class ChatController extends StateNotifier<ChatState> {
           final json = jsonDecode(metadata) as Map<String, dynamic>;
           final chatMessage = ChatMessageStorage.fromStorageJson(json);
           conversation.add(chatMessage);
-
-          developer.log(
-            '📦 Restored ${json['messageType']} message from metadata',
-            name: 'ChatController',
-          );
           continue;
         } catch (e) {
-          developer.log(
-            '⚠️ Failed to deserialize ChatMessage from metadata: $e',
-            name: 'ChatController',
-          );
           // Fall through to simple text conversion
         }
       }
@@ -75,17 +67,8 @@ class ChatController extends StateNotifier<ChatState> {
         conversation.add(llm.ChatMessage.assistant(content));
       } else if (userId == 'tool') {
         // Tool messages without metadata - skip them as they can't be properly reconstructed
-        developer.log(
-          '⚠️ Tool message without metadata, skipping',
-          name: 'ChatController',
-        );
       }
     }
-
-    developer.log(
-      '✅ Built conversation with ${conversation.length} messages',
-      name: 'ChatController',
-    );
 
     return conversation;
   }
@@ -103,19 +86,12 @@ class ChatController extends StateNotifier<ChatState> {
     required List<dynamic> dbMessages,
     required bool isFirstMessage,
   }) async {
-    developer.log('🎯 sendMessage called', name: 'ChatController');
-
     // Save user's message to database
-    final userMessageId = await _messageDao.insertMessageWithId(
+    await _messageDao.insertMessageWithId(
       sessionId: sessionId,
       userId: 'user',
       userName: 'You',
       content: content,
-    );
-
-    developer.log(
-      'User message saved with ID: $userMessageId',
-      name: 'ChatController',
     );
 
     // Update session description if first message
@@ -130,11 +106,6 @@ class ChatController extends StateNotifier<ChatState> {
           description: Value(description),
         ),
       );
-
-      developer.log(
-        'Updated session description: $description',
-        name: 'ChatController',
-      );
     }
 
     // Set loading state
@@ -145,8 +116,6 @@ class ChatController extends StateNotifier<ChatState> {
       final isConfigured = await _llmService.isConfigured();
 
       if (!isConfigured) {
-        developer.log('❌ LLM not configured', name: 'ChatController');
-
         const configMessage =
             "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
 
@@ -173,8 +142,6 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Handle error
       if (result.hasError) {
-        developer.log('❌ Error: ${result.error}', name: 'ChatController');
-
         final errorMessage = 'Sorry, I encountered an error: ${result.error}';
         await _messageDao.insertMessageWithId(
           sessionId: sessionId,
@@ -189,24 +156,25 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Handle tool calls by showing approval overlay
       if (result.hasToolCalls && result.conversationState != null) {
-        developer.log(
-          '🔧 Showing approval overlay for ${result.toolCalls!.length} tool calls',
-          name: 'ChatController',
-        );
-
         // Save conversation state for later continuation
         final actions = result.toolCalls!.map((tc) {
+          // Parse params from tool call
+          final argumentsJson = tc.function.arguments;
+          final params = argumentsJson.isNotEmpty
+              ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+              : <String, dynamic>{};
+
           return CommandAction(
             id: tc.id,
-            actionName: tc.name,
-            params: tc.params,
+            actionName: tc.function.name,
+            params: params,
           );
         }).toList();
 
         state = state.copyWith(
           pendingActions: actions,
           conversationForToolCalls: result.conversationState,
-          pendingToolCalls: result.toolCalls!.map((tc) => tc.toolCall).toList(),
+          pendingToolCalls: result.toolCalls,
           assistantTextBeforeTools: result.textResponse,
           isLoading: false,
         );
@@ -226,14 +194,7 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       state = state.copyWith(isLoading: false);
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error in sendMessage: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
+    } catch (e) {
       final errorMessage = 'Sorry, I encountered an error: $e';
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
@@ -254,89 +215,68 @@ class ChatController extends StateNotifier<ChatState> {
     required String messageId,
   }) async {
     try {
-      developer.log('🚀 Sending message to AI', name: 'ChatController');
-
       // Build conversation from database messages
       final conversation = _buildConversationHistory(dbMessages);
 
-      developer.log(
-        '📚 Built conversation with ${conversation.length} messages',
-        name: 'ChatController',
-      );
+      // Add the new user message
+      conversation.add(llm.ChatMessage.user(messageContent));
 
-      // Get shell tools for LLM
+      // Get shell tools
       final tools = shellTools;
 
-      developer.log(
-        '🔧 Using ${tools.length} shell tools',
-        name: 'ChatController',
-      );
-
-      // Collect response
+      // Stream from service
       final buffer = StringBuffer();
-      final collectedToolCalls = <_ToolCallRequest>[];
-      List<llm.ChatMessage>? conversationState;
-
+      final collectedToolCalls = <llm.ToolCall>[];
       var hasStartedStreaming = false;
 
-      await for (final chunk in _llmService.sendMessageWithConversation(
+      await for (final event in _llmService.streamChat(
         conversation,
-        messageContent,
         tools: tools,
       )) {
-        if (chunk is Map) {
-          final type = chunk['type'] as String?;
-
-          if (type == 'tool_call') {
-            developer.log(
-              '🔧 Tool call received: ${chunk['name']}',
-              name: 'ChatController',
-            );
-
-            final toolCall = chunk['toolCall'] as llm.ToolCall?;
-            if (toolCall != null) {
-              collectedToolCalls.add(
-                _ToolCallRequest(
-                  id: toolCall.id,
-                  name: chunk['name'] as String,
-                  params: chunk['params'] as Map<String, dynamic>,
-                  toolCall: toolCall,
-                ),
-              );
+        switch (event) {
+          case llm_event.TextChunk(text: final text):
+            buffer.write(text);
+            if (!hasStartedStreaming) {
+              startStreaming(messageId);
+              hasStartedStreaming = true;
             }
-          } else if (type == 'completion') {
-            developer.log(
-              '🏁 Completion event received',
-              name: 'ChatController',
-            );
+            updateStreamingText(buffer.toString());
 
-            conversationState = chunk['conversation'] as List<llm.ChatMessage>?;
-          }
-        } else if (chunk is String) {
-          buffer.write(chunk);
+          case llm_event.ToolCallEvent(toolCall: final toolCall):
+            collectedToolCalls.add(toolCall);
 
-          // Notify streaming callbacks with the pre-generated message ID
-          if (!hasStartedStreaming) {
-            startStreaming(messageId);
-            hasStartedStreaming = true;
-          }
+          case llm_event.CompletionEvent():
+            break;
 
-          updateStreamingText(buffer.toString());
+          case llm_event.ErrorEvent(error: final error):
+            if (hasStartedStreaming) stopStreaming();
+            return _MessageResult(error: error);
+
+          case llm_event.ThinkingEvent():
+            break;
         }
       }
 
-      // Stop streaming when complete
-      if (hasStartedStreaming) {
-        stopStreaming();
+      if (hasStartedStreaming) stopStreaming();
+
+      // Build result
+      if (collectedToolCalls.isNotEmpty) {
+        // Add assistant's tool use message to conversation
+        conversation.add(
+          llm.ChatMessage.toolUse(
+            toolCalls: collectedToolCalls,
+            content: buffer.toString(),
+          ),
+        );
+
+        return _MessageResult(
+          textResponse: buffer.toString(),
+          toolCalls: collectedToolCalls,
+          conversationState: conversation,
+        );
       }
 
-      developer.log('✅ AI response complete', name: 'ChatController');
-
-      return _MessageResult(
-        textResponse: buffer.toString(),
-        toolCalls: collectedToolCalls.isEmpty ? null : collectedToolCalls,
-        conversationState: conversationState,
-      );
+      return _MessageResult(textResponse: buffer.toString());
     } catch (e, stackTrace) {
       developer.log(
         '❌ Error sending message to AI: $e',
@@ -354,13 +294,8 @@ class ChatController extends StateNotifier<ChatState> {
     required List<CommandAction> selectedActions,
     required String sessionId,
     required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
-        executeAction,
+    executeAction,
   }) async {
-    developer.log(
-      '🚀 Executing ${selectedActions.length} actions',
-      name: 'ChatController',
-    );
-
     // First, save the assistant's message with tool calls to preserve conversation state
     final pendingCalls = state.pendingToolCalls;
     final assistantText = state.assistantTextBeforeTools;
@@ -376,7 +311,8 @@ class ChatController extends StateNotifier<ChatState> {
       );
 
       // Use text content for display, full structure in metadata
-      final displayContent = assistantText ?? '[Tool calls: ${pendingCalls.length}]';
+      final displayContent =
+          assistantText ?? '[Tool calls: ${pendingCalls.length}]';
 
       await _messageDao.insertMessageWithId(
         id: assistantMessageId,
@@ -385,11 +321,6 @@ class ChatController extends StateNotifier<ChatState> {
         userName: 'Ops Agent',
         content: displayContent,
         metadata: jsonEncode(chatMessage.toStorageJson()),
-      );
-
-      developer.log(
-        '💾 Saved assistant message with ${pendingCalls.length} tool calls',
-        name: 'ChatController',
       );
     }
 
@@ -417,45 +348,29 @@ class ChatController extends StateNotifier<ChatState> {
             commandName: command,
           ),
         );
-
-        developer.log(
-          '🔄 Executing action ${i + 1}/${selectedActions.length}',
-          name: 'ChatController',
-        );
       }
 
       // Clear execution progress, show loading for LLM response
       state = state.copyWith(executionProgress: null, isLoading: true);
 
+      // Get the tool calls that match the selected actions
+      final pendingCalls = state.pendingToolCalls;
+      if (pendingCalls == null) {
+        throw Exception('No pending tool calls in state');
+      }
+
+      final selectedToolCalls = selectedActions.map((action) {
+        // Find matching tool call by ID
+        final matchingToolCall = pendingCalls.firstWhere(
+          (tc) => tc.id == action.id,
+          orElse: () => throw Exception('Tool call not found: ${action.id}'),
+        );
+        return matchingToolCall;
+      }).toList();
+
       // Execute tool calls
       final result = await _executeToolCalls(
-        toolCalls: selectedActions.map((action) {
-          // Find the matching tool call from our state
-          final pendingCalls = state.pendingToolCalls;
-          if (pendingCalls == null) {
-            throw Exception('No pending tool calls in state');
-          }
-
-          // Find matching tool call by ID
-          llm.ToolCall? matchingToolCall;
-          for (final tc in pendingCalls) {
-            if (tc.id == action.id) {
-              matchingToolCall = tc;
-              break;
-            }
-          }
-
-          if (matchingToolCall == null) {
-            throw Exception('Tool call not found: ${action.id}');
-          }
-
-          return _ToolCallRequest(
-            id: action.id,
-            name: action.actionName,
-            params: action.params,
-            toolCall: matchingToolCall,
-          );
-        }).toList(),
+        toolCalls: selectedToolCalls,
         conversationState: state.conversationForToolCalls!,
         executeAction: executeAction,
       );
@@ -467,7 +382,7 @@ class ChatController extends StateNotifier<ChatState> {
 
         // Create the ChatMessage with tool results
         final chatMessage = llm.ChatMessage.toolResult(
-          results: [toolCall.toolCall],
+          results: [toolCall],
           content: toolResult,
         );
 
@@ -480,24 +395,30 @@ class ChatController extends StateNotifier<ChatState> {
         );
       }
 
-      // Handle follow-up tool calls
-      if (result.hasFollowUp) {
+      // Handle LLM's follow-up response after tool execution
+      if (result.followUpResult != null) {
         final followUp = result.followUpResult!;
 
-        // Show approval overlay for follow-up
-        if (followUp.toolCalls != null) {
+        // If LLM wants to make more tool calls, show approval overlay
+        if (followUp.hasToolCalls) {
           final actions = followUp.toolCalls!.map((tc) {
+            // Parse params from tool call
+            final argumentsJson = tc.function.arguments;
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+                : <String, dynamic>{};
+
             return CommandAction(
               id: tc.id,
-              actionName: tc.name,
-              params: tc.params,
+              actionName: tc.function.name,
+              params: params,
             );
           }).toList();
 
           state = state.copyWith(
             pendingActions: actions,
             conversationForToolCalls: followUp.conversationState,
-            pendingToolCalls: followUp.toolCalls!.map((tc) => tc.toolCall).toList(),
+            pendingToolCalls: followUp.toolCalls,
             assistantTextBeforeTools: followUp.textResponse,
             isLoading: false,
           );
@@ -505,7 +426,7 @@ class ChatController extends StateNotifier<ChatState> {
           return;
         }
 
-        // Save follow-up text response
+        // Save follow-up text response (LLM explaining results, asking follow-up, etc.)
         if (followUp.hasTextResponse) {
           await _messageDao.insertMessageWithId(
             sessionId: sessionId,
@@ -523,14 +444,7 @@ class ChatController extends StateNotifier<ChatState> {
         assistantTextBeforeTools: null,
         isLoading: false,
       );
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error executing actions: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
+    } catch (e) {
       final errorMessage = '❌ Error executing commands: $e';
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
@@ -553,16 +467,11 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Execute tool calls and handle follow-up responses
   Future<_ToolExecutionResult> _executeToolCalls({
-    required List<_ToolCallRequest> toolCalls,
+    required List<llm.ToolCall> toolCalls,
     required List<llm.ChatMessage> conversationState,
     required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
-        executeAction,
+    executeAction,
   }) async {
-    developer.log(
-      '🚀 Executing ${toolCalls.length} tool calls',
-      name: 'ChatController',
-    );
-
     final toolResults = <String, String>{};
     final chatMessages = <String>[];
 
@@ -571,17 +480,20 @@ class ChatController extends StateNotifier<ChatState> {
       for (var i = 0; i < toolCalls.length; i++) {
         final toolCall = toolCalls[i];
 
-        developer.log(
-          '🔄 Executing tool ${i + 1}/${toolCalls.length}: ${toolCall.name}',
-          name: 'ChatController',
-        );
+        // Parse params from tool call
+        final argumentsJson = toolCall.function.arguments;
+        final params = argumentsJson.isNotEmpty
+            ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+            : <String, dynamic>{};
+
+        final command = params['command'] as String? ?? 'unknown';
 
         // Execute the action
-        final result = await executeAction(toolCall.name, toolCall.params);
+        final result = await executeAction(toolCall.function.name, params);
 
         // Build result message
         final resultMessage = _formatExecutionResult(
-          toolCall.command,
+          command,
           result['success'] as bool,
           result['data'],
           result['error'],
@@ -595,35 +507,20 @@ class ChatController extends StateNotifier<ChatState> {
             : 'Error: ${result['error']}';
       }
 
-      developer.log(
-        '🔄 Continuing conversation with ${toolResults.length} tool results',
-        name: 'ChatController',
-      );
-
       // Get tools for potential follow-up
       final tools = shellTools;
 
-      // Build updated conversation with tool use message already included
-      final updatedConversation = List<llm.ChatMessage>.from(conversationState);
-
-      // Add the assistant's tool use message
-      updatedConversation.add(
-        llm.ChatMessage.toolUse(
-          toolCalls: toolCalls.map((tc) => tc.toolCall).toList(),
-          content: '',
-        ),
-      );
-
-      developer.log(
-        '📋 Updated conversation has ${updatedConversation.length} messages (added tool use)',
-        name: 'ChatController',
-      );
+      // Add tool results to conversation
+      for (final toolCall in toolCalls) {
+        final result = toolResults[toolCall.id] ?? 'No result';
+        conversationState.add(
+          llm.ChatMessage.toolResult(results: [toolCall], content: result),
+        );
+      }
 
       // Continue conversation with tool results
       final followUpResult = await _continueWithToolResults(
-        conversationState: updatedConversation,
-        toolCalls: toolCalls.map((tc) => tc.toolCall).toList(),
-        toolResults: toolResults,
+        conversationState: conversationState,
         tools: tools,
       );
 
@@ -633,14 +530,7 @@ class ChatController extends StateNotifier<ChatState> {
         toolCalls: toolCalls,
         followUpResult: followUpResult,
       );
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error executing tool calls: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
+    } catch (e) {
       return _ToolExecutionResult(
         toolResults: toolResults,
         chatMessages: chatMessages,
@@ -653,61 +543,53 @@ class ChatController extends StateNotifier<ChatState> {
   /// Continue conversation with tool results
   Future<_MessageResult?> _continueWithToolResults({
     required List<llm.ChatMessage> conversationState,
-    required List<llm.ToolCall> toolCalls,
-    required Map<String, String> toolResults,
     required List<llm.Tool> tools,
   }) async {
     try {
       final buffer = StringBuffer();
-      final followUpToolCalls = <_ToolCallRequest>[];
-      List<llm.ChatMessage>? newConversationState;
+      final followUpToolCalls = <llm.ToolCall>[];
 
-      await for (final chunk in _llmService.continueWithToolResults(
+      await for (final event in _llmService.streamChat(
         conversationState,
-        toolCalls,
-        toolResults,
         tools: tools,
       )) {
-        if (chunk is Map) {
-          final type = chunk['type'] as String?;
+        switch (event) {
+          case llm_event.TextChunk(text: final text):
+            buffer.write(text);
 
-          if (type == 'tool_call') {
-            developer.log(
-              '🔧 Follow-up tool call received: ${chunk['name']}',
-              name: 'ChatController',
-            );
+          case llm_event.ToolCallEvent(toolCall: final toolCall):
+            followUpToolCalls.add(toolCall);
 
-            final toolCall = chunk['toolCall'] as llm.ToolCall?;
-            if (toolCall != null) {
-              followUpToolCalls.add(
-                _ToolCallRequest(
-                  id: toolCall.id,
-                  name: chunk['name'] as String,
-                  params: chunk['params'] as Map<String, dynamic>,
-                  toolCall: toolCall,
-                ),
-              );
-            }
-          } else if (type == 'completion') {
-            developer.log(
-              '🏁 Follow-up completion event',
-              name: 'ChatController',
-            );
+          case llm_event.CompletionEvent():
+            break;
 
-            newConversationState = chunk['conversation'] as List<llm.ChatMessage>?;
-          }
-        } else if (chunk is String) {
-          buffer.write(chunk);
+          case llm_event.ErrorEvent(error: final error):
+            return _MessageResult(error: error);
+
+          case llm_event.ThinkingEvent():
+            break;
         }
       }
 
       // Return result if we have follow-up tool calls or text
-      if (followUpToolCalls.isNotEmpty || buffer.isNotEmpty) {
+      if (followUpToolCalls.isNotEmpty) {
+        // Add assistant's tool use message to conversation
+        conversationState.add(
+          llm.ChatMessage.toolUse(
+            toolCalls: followUpToolCalls,
+            content: buffer.toString(),
+          ),
+        );
+
         return _MessageResult(
           textResponse: buffer.toString(),
-          toolCalls: followUpToolCalls.isEmpty ? null : followUpToolCalls,
-          conversationState: newConversationState,
+          toolCalls: followUpToolCalls,
+          conversationState: conversationState,
         );
+      }
+
+      if (buffer.isNotEmpty) {
+        return _MessageResult(textResponse: buffer.toString());
       }
 
       return null;
@@ -779,8 +661,6 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Cancel pending actions
   void cancelActions() {
-    developer.log('🧹 Cancelling pending actions', name: 'ChatController');
-
     state = state.copyWith(
       pendingActions: null,
       conversationForToolCalls: null,
@@ -813,21 +693,24 @@ class ChatController extends StateNotifier<ChatState> {
 /// Provider for ChatController
 /// Uses family provider to scope controller to specific session
 final chatControllerProvider =
-    StateNotifierProvider.family<ChatController, ChatState, String?>((ref, sessionId) {
-  return ChatController(
-    messageDao: ref.watch(databaseProvider).messageDao,
-    sessionDao: ref.watch(databaseProvider).sessionDao,
-    llmService: ref.watch(llmServiceProvider),
-    sessionId: sessionId,
-  );
-});
+    StateNotifierProvider.family<ChatController, ChatState, String?>((
+      ref,
+      sessionId,
+    ) {
+      return ChatController(
+        messageDao: ref.watch(databaseProvider).messageDao,
+        sessionDao: ref.watch(databaseProvider).sessionDao,
+        llmService: ref.watch(llmServiceProvider),
+        sessionId: sessionId,
+      );
+    });
 
 // Internal helper classes
 
 /// Result of sending a message to the AI
 class _MessageResult {
   final String? textResponse;
-  final List<_ToolCallRequest>? toolCalls;
+  final List<llm.ToolCall>? toolCalls;
   final List<llm.ChatMessage>? conversationState;
   final String? error;
 
@@ -843,32 +726,11 @@ class _MessageResult {
   bool get hasTextResponse => textResponse != null && textResponse!.isNotEmpty;
 }
 
-/// A tool call request from the AI
-class _ToolCallRequest {
-  final String id;
-  final String name;
-  final Map<String, dynamic> params;
-  final llm.ToolCall toolCall;
-
-  const _ToolCallRequest({
-    required this.id,
-    required this.name,
-    required this.params,
-    required this.toolCall,
-  });
-
-  /// Get the command from params (if applicable)
-  String get command => params['command'] as String? ?? 'unknown';
-
-  /// Get the explanation from params (if applicable)
-  String get explanation => params['explanation'] as String? ?? '';
-}
-
 /// Result of executing tool calls
 class _ToolExecutionResult {
   final Map<String, String> toolResults;
   final List<String> chatMessages;
-  final List<_ToolCallRequest> toolCalls;
+  final List<llm.ToolCall> toolCalls;
   final _MessageResult? followUpResult;
   final String? error;
 
@@ -881,5 +743,6 @@ class _ToolExecutionResult {
   });
 
   bool get hasError => error != null;
-  bool get hasFollowUp => followUpResult != null && followUpResult!.hasToolCalls;
+  bool get hasFollowUp =>
+      followUpResult != null && followUpResult!.hasToolCalls;
 }

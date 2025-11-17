@@ -1,8 +1,7 @@
-import 'dart:convert';
-import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import '../models/llm_api_settings.dart';
+import '../models/llm_event.dart' as llm_event;
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/settings_provider.dart';
@@ -23,26 +22,9 @@ final llmServiceProvider = Provider<LlmService>((ref) {
 
 /// Service for interacting with LLM APIs using llm_dart
 ///
-/// This service provides integration with various LLM providers,
-/// including native tool calling support through llm_dart's built-in Tool system.
-///
-/// Tool Calling Example:
-/// ```dart
-/// // 1. Define tools using llm_dart Tool
-/// final tools = [Tool.function(name: 'my_tool', ...)];
-///
-/// // 2. Build conversation with ChatMessage objects
-/// final conversation = [ChatMessage.user('Check disk space on the server')];
-///
-/// // 3. Send message with conversation and tools
-/// await for (final chunk in llmService.sendMessageWithConversation(
-///   conversation,
-///   'Check disk space on the server',
-///   tools: tools,
-/// )) {
-///   print(chunk);
-/// }
-/// ```
+/// This service is a stateless wrapper around the llm_dart library.
+/// It provides a simple streaming interface for chat interactions.
+/// Conversation state management is handled by the ChatController.
 class LlmService {
   final Ref ref;
   final KeychainService keychainService;
@@ -265,315 +247,55 @@ class LlmService {
     }
   }
 
-  /// Send a chat message with tool support using ChatMessage conversation
+  /// Stream chat events from the LLM
   ///
-  /// This is the recommended method that preserves complete conversation context
-  /// including tool use and tool results.
-  ///
-  /// Yields either:
-  /// - String: text chunks from the LLM
-  /// - Map: {'type': 'tool_call', 'name': '...', 'params': {...}, 'toolCall': ToolCall}
-  Stream<dynamic> sendMessageWithConversation(
-    List<ChatMessage> conversation,
-    String newMessage, {
+  /// Takes a complete conversation and streams back events.
+  /// The caller is responsible for building the conversation state.
+  Stream<llm_event.LlmEvent> streamChat(
+    List<ChatMessage> conversation, {
     List<Tool>? tools,
   }) async* {
     final activeConfig = await _getActiveConfig();
 
     if (activeConfig == null) {
-      yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
+      yield llm_event.ErrorEvent(
+        'No LLM configuration found. Please configure an LLM in Settings.',
+      );
       return;
     }
 
     try {
-      // Get agent instruction if configured
       final agentInstruction = getAgentInstruction(
         activeConfig.config.identifier,
       );
-
-      // Create provider with system instruction
       final provider = await _createProvider(
         activeConfig.config,
         activeConfig.apiKey,
         systemInstruction: agentInstruction,
       );
 
-      // Build conversation with the new message
-      final fullConversation = List<ChatMessage>.from(conversation);
-      fullConversation.add(ChatMessage.user(newMessage));
-
-      developer.log(
-        '📤 Calling provider.chatStream with ${fullConversation.length} messages and ${tools?.length ?? 0} tools',
-        name: 'LlmService',
-      );
-
-      // Debug: Log the conversation structure
-      for (var i = 0; i < fullConversation.length; i++) {
-        final msg = fullConversation[i];
-        developer.log(
-          '  [$i] ${msg.role.name} - ${msg.messageType.runtimeType}: ${msg.content.length} chars',
-          name: 'LlmService',
-        );
-      }
-
-      // Collect tool calls as they arrive
-      final toolCallsCollected = <ToolCall>[];
-      final textBuffer = StringBuffer();
-
-      // Stream the response with tools
-      final stream = provider.chatStream(fullConversation, tools: tools);
-
-      await for (final event in stream) {
-        developer.log(
-          '📥 Received event: ${event.runtimeType}',
-          name: 'LlmService',
-        );
-
-        switch (event) {
-          case TextDeltaEvent(delta: final delta):
-            developer.log('💬 Text delta: "$delta"', name: 'LlmService');
-            textBuffer.write(delta);
-            yield delta;
-
-          case ToolCallDeltaEvent(toolCall: final toolCall):
-            developer.log(
-              '🔧 Tool call detected: ${toolCall.function.name}',
-              name: 'LlmService',
-            );
-            developer.log(
-              '🔧 Tool arguments: ${toolCall.function.arguments}',
-              name: 'LlmService',
-            );
-
-            toolCallsCollected.add(toolCall);
-
-            // Parse tool call parameters
-            final toolName = toolCall.function.name;
-            final argumentsJson = toolCall.function.arguments;
-
-            // Parse arguments
-            final params = argumentsJson.isNotEmpty
-                ? Map<String, dynamic>.from(json.decode(argumentsJson))
-                : <String, dynamic>{};
-
-            developer.log(
-              '🔧 Yielding tool call to UI layer: $toolName',
-              name: 'LlmService',
-            );
-
-            // Yield tool call information to the UI layer
-            yield {
-              'type': 'tool_call',
-              'name': toolName,
-              'params': params,
-              'toolCall': toolCall,
-            };
-
-          case CompletionEvent():
-            developer.log('🏁 Stream completed', name: 'LlmService');
-
-            // If tool calls were collected, yield completion info
-            if (toolCallsCollected.isNotEmpty) {
-              developer.log(
-                '📦 Collected ${toolCallsCollected.length} tool calls',
-                name: 'LlmService',
-              );
-
-              // Yield completion event with conversation and tool calls
-              yield {
-                'type': 'completion',
-                'toolCalls': toolCallsCollected,
-                'text': textBuffer.toString(),
-                'conversation': fullConversation,
-              };
-            }
-
-          case ErrorEvent(error: final error):
-            developer.log('❌ Error event: $error', name: 'LlmService');
-            yield 'Error: $error';
-            break;
-
-          case ThinkingDeltaEvent():
-            developer.log('💭 Thinking event', name: 'LlmService');
-        }
-      }
-
-      developer.log('✅ Stream completed', name: 'LlmService');
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Exception in sendMessageWithConversation: $e',
-        name: 'LlmService',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      yield 'Error: ${e.toString()}';
-    }
-  }
-
-  /// Continue conversation after tool execution (following official pattern)
-  ///
-  /// Takes the conversation state, tool calls, and results, then continues
-  /// the conversation with the LLM to get the final response.
-  ///
-  /// Parameters:
-  /// - conversation: The conversation up to the point of tool calls
-  /// - toolCalls: The ToolCall objects collected from the stream
-  /// - toolResults: Map of tool call ID to result content
-  /// - tools: Available tools for potential follow-up calls
-  ///
-  /// Yields:
-  /// - String: Text delta for streaming response
-  /// - Map: Tool call or completion events (same format as sendMessageWithTools)
-  Stream<dynamic> continueWithToolResults(
-    List<ChatMessage> conversation,
-    List<ToolCall> toolCalls,
-    Map<String, String> toolResults, {
-    List<Tool>? tools,
-  }) async* {
-    final activeConfig = await _getActiveConfig();
-
-    if (activeConfig == null) {
-      yield 'Error: No LLM configuration found. Please configure an LLM in Settings.';
-      return;
-    }
-
-    try {
-      developer.log(
-        '🔄 Continuing with ${toolCalls.length} tool results',
-        name: 'LlmService',
-      );
-
-      // Get agent instruction if configured
-      final agentInstruction = getAgentInstruction(
-        activeConfig.config.identifier,
-      );
-
-      // Create provider with system instruction
-      final provider = await _createProvider(
-        activeConfig.config,
-        activeConfig.apiKey,
-        systemInstruction: agentInstruction,
-      );
-
-      // Build the continuation conversation
-      // NOTE: The conversation should already include the assistant's tool use message
-      // since we're receiving the updated conversation from the repository
-      final updatedConversation = List<ChatMessage>.from(conversation);
-
-      developer.log(
-        '📋 Conversation before adding tool results: ${updatedConversation.length} messages',
-        name: 'LlmService',
-      );
-
-      // Log the last few messages to verify structure
-      for (
-        var i = updatedConversation.length - 3;
-        i < updatedConversation.length && i >= 0;
-        i++
-      ) {
-        final msg = updatedConversation[i];
-        developer.log(
-          '  [$i] ${msg.role}: ${msg.messageType.runtimeType}',
-          name: 'LlmService',
-        );
-      }
-
-      // Add tool results
-      for (final toolCall in toolCalls) {
-        final result = toolResults[toolCall.id] ?? 'No result provided';
-        developer.log(
-          '📄 Adding result for ${toolCall.function.name}: ${result.length} chars',
-          name: 'LlmService',
-        );
-
-        updatedConversation.add(
-          ChatMessage.toolResult(results: [toolCall], content: result),
-        );
-      }
-
-      developer.log(
-        '📤 Getting final response with ${updatedConversation.length} messages',
-        name: 'LlmService',
-      );
-
-      // Get final response
-      final stream = provider.chatStream(updatedConversation, tools: tools);
-
-      // Collect follow-up tool calls
-      final followUpToolCalls = <ToolCall>[];
-      final followUpTextBuffer = StringBuffer();
+      final stream = provider.chatStream(conversation, tools: tools);
 
       await for (final event in stream) {
         switch (event) {
           case TextDeltaEvent(delta: final delta):
-            followUpTextBuffer.write(delta);
-            yield delta;
+            yield llm_event.TextChunk(delta);
 
           case ToolCallDeltaEvent(toolCall: final toolCall):
-            // Handle follow-up tool calls
-            developer.log(
-              '🔧 Follow-up tool call detected: ${toolCall.function.name}',
-              name: 'LlmService',
-            );
-
-            followUpToolCalls.add(toolCall);
-
-            // Parse and yield tool call info to UI
-            final toolName = toolCall.function.name;
-            final argumentsJson = toolCall.function.arguments;
-            final params = argumentsJson.isNotEmpty
-                ? Map<String, dynamic>.from(json.decode(argumentsJson))
-                : <String, dynamic>{};
-
-            developer.log(
-              '🔧 Yielding follow-up tool call: $toolName',
-              name: 'LlmService',
-            );
-
-            yield {
-              'type': 'tool_call',
-              'name': toolName,
-              'params': params,
-              'toolCall': toolCall,
-            };
-
-          case ErrorEvent(error: final error):
-            developer.log('❌ Error event: $error', name: 'LlmService');
-            yield 'Error: $error';
-            break;
+            yield llm_event.ToolCallEvent(toolCall);
 
           case CompletionEvent():
-            developer.log('🏁 Final response completed', name: 'LlmService');
+            yield llm_event.CompletionEvent();
 
-            // If follow-up tool calls were collected, yield completion info
-            if (followUpToolCalls.isNotEmpty) {
-              developer.log(
-                '📦 Collected ${followUpToolCalls.length} follow-up tool calls',
-                name: 'LlmService',
-              );
-
-              yield {
-                'type': 'completion',
-                'toolCalls': followUpToolCalls,
-                'text': followUpTextBuffer.toString(),
-                'conversation': updatedConversation,
-              };
-            }
+          case ErrorEvent(error: final error):
+            yield llm_event.ErrorEvent(error.toString());
 
           case ThinkingDeltaEvent():
-            developer.log('💭 Thinking event', name: 'LlmService');
+            yield llm_event.ThinkingEvent();
         }
       }
-
-      developer.log('✅ Continuation completed', name: 'LlmService');
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Exception in continueWithToolResults: $e',
-        name: 'LlmService',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      yield 'Error: ${e.toString()}';
+    } catch (e) {
+      yield llm_event.ErrorEvent(e.toString());
     }
   }
 
@@ -604,20 +326,8 @@ class LlmService {
     required String apiKey,
   }) async {
     try {
-      developer.log(
-        '🧪 Testing connection for ${config.identifier}',
-        name: 'LlmService',
-      );
-
-      // Create provider without system instruction for testing
       final provider = await _createProvider(config, apiKey);
-
-      // Send a minimal test message
       final messages = [ChatMessage.user('Hi')];
-
-      developer.log('📤 Sending test message...', name: 'LlmService');
-
-      // Try to get a response with a short timeout
       final stream = provider.chatStream(messages);
       bool receivedResponse = false;
 
@@ -628,17 +338,10 @@ class LlmService {
           sink.close();
         },
       )) {
-        developer.log(
-          '📨 Test event: ${event.runtimeType}',
-          name: 'LlmService',
-        );
-
         if (event is TextDeltaEvent) {
-          developer.log('✅ Received text response', name: 'LlmService');
           receivedResponse = true;
-          break; // Got a response, test successful
+          break;
         } else if (event is ErrorEvent) {
-          developer.log('❌ Error event: ${event.error}', name: 'LlmService');
           return 'API Error: ${event.error}';
         }
       }
@@ -647,17 +350,8 @@ class LlmService {
         return 'No response received from API';
       }
 
-      developer.log('✅ Connection test successful', name: 'LlmService');
-      return null; // Success
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Connection test failed: $e',
-        name: 'LlmService',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
-      // Return the actual error message
+      return null;
+    } catch (e) {
       return e.toString();
     }
   }
