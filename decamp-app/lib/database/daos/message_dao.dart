@@ -16,7 +16,7 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
           ..where((m) => m.sessionId.equals(sessionId))
           ..orderBy([
             (m) =>
-                OrderingTerm(expression: m.createdAt, mode: OrderingMode.asc),
+                OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc),
           ]))
         .watch();
   }
