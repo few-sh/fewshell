@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' as drift;
+import 'package:drift/drift.dart';
 import '../database/database.dart';
-import '../database/daos/project_dao.dart';
 import 'database_provider.dart';
 import 'theme_provider.dart';
 
@@ -39,115 +38,49 @@ final currentProjectProvider = Provider<ProjectEntity?>((ref) {
   }).value;
 });
 
-/// Provider for project actions (CRUD operations)
-final projectActionsProvider = Provider<ProjectActions>((ref) {
-  final projectDao = ref.watch(projectDaoProvider);
-  return ProjectActions(projectDao, ref);
-});
+/// Helper functions for project operations with side effects
 
-/// Class containing all project-related actions
-class ProjectActions {
-  final ProjectDao _projectDao;
-  final Ref _ref;
+/// Select a project as the current project
+/// Persists the selection to SharedPreferences
+Future<void> selectProject(WidgetRef ref, String? id) async {
+  ref.read(currentProjectIdProvider.notifier).state = id;
 
-  ProjectActions(this._projectDao, this._ref);
-
-  /// Create a new project
-  Future<String> createProject({
-    required String name,
-    String? description,
-  }) async {
-    final now = DateTime.now();
-    final id = _generateProjectId();
-
-    final companion = ProjectEntityCompanion(
-      id: drift.Value(id),
-      name: drift.Value(name),
-      description: drift.Value(description),
-      lastSessionDate: drift.Value(now),
-      createdAt: drift.Value(now),
-      updatedAt: drift.Value(now),
-    );
-
-    await _projectDao.insertProject(companion);
-    return id;
+  // Persist to SharedPreferences
+  final prefs = ref.read(sharedPreferencesProvider);
+  if (id != null) {
+    await prefs.setString(_currentProjectIdKey, id);
+  } else {
+    await prefs.remove(_currentProjectIdKey);
   }
+}
 
-  /// Update an existing project
-  Future<void> updateProject({
-    required String id,
-    String? name,
-    String? description,
-  }) async {
-    final companion = ProjectEntityCompanion(
-      id: drift.Value(id),
-      name: name != null ? drift.Value(name) : const drift.Value.absent(),
-      description: description != null
-          ? drift.Value(description)
-          : const drift.Value.absent(),
-      updatedAt: drift.Value(DateTime.now()),
-    );
+/// Delete a project and clear selection if it was selected
+Future<void> deleteProject(WidgetRef ref, String id) async {
+  final projectDao = ref.read(databaseProvider).projectDao;
+  await projectDao.deleteProject(id);
 
-    await _projectDao.updateProject(companion);
+  // Clear selection if deleted project was selected
+  final currentId = ref.read(currentProjectIdProvider);
+  if (currentId == id) {
+    await selectProject(ref, null);
   }
+}
 
-  /// Delete a project
-  /// Also clears it from currentProjectIdProvider if it was selected
-  Future<void> deleteProject(String id) async {
-    await _projectDao.deleteProject(id);
+/// Update an existing project
+Future<void> updateProject(
+  WidgetRef ref, {
+  required String id,
+  String? name,
+  String? description,
+}) async {
+  final projectDao = ref.read(databaseProvider).projectDao;
+  
+  final companion = ProjectEntityCompanion(
+    id: Value(id),
+    name: name != null ? Value(name) : const Value.absent(),
+    description: description != null ? Value(description) : const Value.absent(),
+    updatedAt: Value(DateTime.now()),
+  );
 
-    // Clear selection if deleted project was selected
-    final currentId = _ref.read(currentProjectIdProvider);
-    if (currentId == id) {
-      _ref.read(currentProjectIdProvider.notifier).state = null;
-    }
-  }
-
-  /// Select a project as the current project
-  /// Persists the selection to SharedPreferences
-  Future<void> selectProject(String? id) async {
-    _ref.read(currentProjectIdProvider.notifier).state = id;
-
-    // Persist to SharedPreferences
-    final prefs = _ref.read(sharedPreferencesProvider);
-    if (id != null) {
-      await prefs.setString(_currentProjectIdKey, id);
-    } else {
-      await prefs.remove(_currentProjectIdKey);
-    }
-  }
-
-  /// Update the last session date for a project
-  Future<void> updateLastSessionDate(String id, DateTime date) async {
-    await _projectDao.updateLastSessionDate(id, date);
-  }
-
-  /// Search projects by name
-  Future<List<ProjectEntity>> searchByName(String query) async {
-    return await _projectDao.searchProjectsByName(query);
-  }
-
-  /// Get a specific project by ID
-  Future<ProjectEntity?> getProject(String id) async {
-    return await _projectDao.getProject(id);
-  }
-
-  /// Get all projects (non-reactive)
-  Future<List<ProjectEntity>> getAllProjects() async {
-    return await _projectDao.getAllProjects();
-  }
-
-  /// Generate a unique project ID
-  String _generateProjectId() {
-    return 'proj_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
-  }
-
-  /// Generate a random string for ID uniqueness
-  String _randomString(int length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    return List.generate(
-      length,
-      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
-    ).join();
-  }
+  await projectDao.updateProject(companion);
 }

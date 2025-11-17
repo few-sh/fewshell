@@ -78,4 +78,39 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
           ..orderBy([(p) => OrderingTerm(expression: p.name)]))
         .get();
   }
+
+  /// Generate a unique project ID
+  String generateProjectId() {
+    return 'proj_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
+  }
+
+  /// Generate a random string for ID uniqueness
+  String _randomString(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    return List.generate(
+      length,
+      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
+    ).join();
+  }
+
+  /// Create a new project with all parameters
+  Future<String> createProjectWithId({
+    required String name,
+    String? description,
+  }) async {
+    final now = DateTime.now();
+    final id = generateProjectId();
+
+    final companion = ProjectEntityCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: Value(description),
+      lastSessionDate: Value(now),
+      createdAt: Value(now),
+      updatedAt: Value(now),
+    );
+
+    await insertProject(companion);
+    return id;
+  }
 }

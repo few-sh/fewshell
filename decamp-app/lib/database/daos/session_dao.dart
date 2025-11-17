@@ -136,4 +136,39 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
       SessionEntityCompanion(updatedAt: Value(DateTime.now())),
     );
   }
+
+  /// Generate a unique session ID
+  String generateSessionId() {
+    return 'sess_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
+  }
+
+  /// Generate a random string for ID uniqueness
+  String _randomString(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    return List.generate(
+      length,
+      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
+    ).join();
+  }
+
+  /// Create a new session with all parameters
+  Future<String> createSessionWithId({
+    required String projectId,
+    String? description,
+  }) async {
+    final now = DateTime.now();
+    final id = generateSessionId();
+
+    final companion = SessionEntityCompanion(
+      id: Value(id),
+      projectId: Value(projectId),
+      description: Value(description ?? 'New conversation'),
+      timestamp: Value(now),
+      createdAt: Value(now),
+      updatedAt: Value(now),
+    );
+
+    await insertSession(companion);
+    return id;
+  }
 }

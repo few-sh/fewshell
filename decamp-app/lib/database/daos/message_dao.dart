@@ -82,4 +82,47 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
       ..where(messages.sessionId.equals(sessionId));
     return query.map((row) => row.read(count)!).getSingle();
   }
+
+  /// Generate a unique message ID
+  String generateMessageId() {
+    return 'msg_${DateTime.now().millisecondsSinceEpoch}_${_randomString(8)}';
+  }
+
+  /// Generate a random string for ID uniqueness
+  String _randomString(int length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    return List.generate(
+      length,
+      (index) => chars[(DateTime.now().microsecond + index) % chars.length],
+    ).join();
+  }
+
+  /// Insert a message with all parameters, generating ID if not provided
+  Future<String> insertMessageWithId({
+    String? id,
+    required String sessionId,
+    required String userId,
+    required String userName,
+    required String content,
+    String? imageUrl,
+    String? metadata,
+  }) async {
+    final now = DateTime.now();
+    final messageId = id ?? generateMessageId();
+
+    final companion = MessageEntityCompanion(
+      id: Value(messageId),
+      sessionId: Value(sessionId),
+      userId: Value(userId),
+      userName: Value(userName),
+      content: Value(content),
+      timestamp: Value(now),
+      createdAt: Value(now),
+      imageUrl: Value(imageUrl),
+      metadata: Value(metadata),
+    );
+
+    await insertMessage(companion);
+    return messageId;
+  }
 }

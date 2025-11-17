@@ -10,6 +10,7 @@ import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/providers/ssh_settings_provider.dart';
+import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/services/shell_service.dart';
@@ -28,9 +29,31 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProject = ref.read(currentProjectProvider);
     if (currentProject == null) return;
 
-    await ref
-        .read(sessionActionsProvider)
-        .createNewSessionAndSwitch(projectId: currentProject.id);
+    // Check if current session has messages
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId != null) {
+      final messageDao = ref.read(databaseProvider).messageDao;
+      final messages = await messageDao.getMessagesBySession(currentSessionId);
+
+      // If current session is empty, don't create a new one
+      if (messages.isEmpty) {
+        return;
+      }
+    }
+
+    // Create new session
+    final sessionDao = ref.read(databaseProvider).sessionDao;
+    final projectDao = ref.read(databaseProvider).projectDao;
+
+    final newSessionId = await sessionDao.createSessionWithId(
+      projectId: currentProject.id,
+    );
+
+    // Update project's last session date
+    await projectDao.updateLastSessionDate(currentProject.id, DateTime.now());
+
+    // Switch to the new session
+    ref.read(currentSessionIdProvider.notifier).state = newSessionId;
   }
 
   /// Show session history page
@@ -189,7 +212,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     );
                     await chatController.executeActions(
                       selectedActions: selectedActions,
-                      allActions: chatState.pendingActions!,
                       sessionId: currentSessionId!,
                       executeAction: (actionName, params) async {
                         // Execute shell command directly

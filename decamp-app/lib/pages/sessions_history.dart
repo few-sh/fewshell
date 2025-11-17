@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
+import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/utils/date_formatter.dart';
 
 /// Enum for view mode in sessions history
@@ -257,7 +258,33 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
       confirmDismiss: (direction) async {
         if (_viewMode == SessionsViewMode.active) {
           // Archive the session
-          await ref.read(sessionActionsProvider).archiveSession(session.id);
+          final sessionDao = ref.read(databaseProvider).sessionDao;
+
+          // Check if this is the currently active session
+          final currentSessionId = ref.read(currentSessionIdProvider);
+          if (currentSessionId == session.id) {
+            // Get all non-archived sessions for this project
+            final sessions = await sessionDao.getSessionsByProject(
+              session.projectId,
+            );
+            final otherSessions = sessions
+                .where((s) => s.id != session.id && !s.isArchived)
+                .toList();
+
+            if (otherSessions.isNotEmpty) {
+              // Switch to the most recent other session
+              ref.read(currentSessionIdProvider.notifier).state =
+                  otherSessions.first.id;
+            } else {
+              // No other sessions - create a new one
+              final newSessionId = await sessionDao.createSessionWithId(
+                projectId: session.projectId,
+              );
+              ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+            }
+          }
+
+          await sessionDao.archiveSession(session.id);
 
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -266,9 +293,8 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
                 action: SnackBarAction(
                   label: 'Undo',
                   onPressed: () {
-                    ref
-                        .read(sessionActionsProvider)
-                        .unarchiveSession(session.id);
+                    final sessionDao = ref.read(databaseProvider).sessionDao;
+                    sessionDao.unarchiveSession(session.id);
                   },
                 ),
                 duration: const Duration(seconds: 3),
@@ -277,7 +303,8 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
           }
         } else {
           // Unarchive the session
-          await ref.read(sessionActionsProvider).unarchiveSession(session.id);
+          final sessionDao = ref.read(databaseProvider).sessionDao;
+          await sessionDao.unarchiveSession(session.id);
 
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -448,9 +475,24 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
 
                 final projectId = ref.read(currentProjectIdProvider);
                 if (projectId != null) {
-                  final deletedCount = await ref
-                      .read(sessionActionsProvider)
-                      .deleteArchivedSessions(projectId);
+                  final sessionDao = ref.read(databaseProvider).sessionDao;
+                  final messageDao = ref.read(databaseProvider).messageDao;
+
+                  // Get all archived sessions first
+                  final archivedSessions = await sessionDao
+                      .getSessionsByProject(projectId);
+                  final archivedSessionsFiltered = archivedSessions
+                      .where((s) => s.isArchived)
+                      .toList();
+
+                  // Delete messages for each archived session
+                  for (final session in archivedSessionsFiltered) {
+                    await messageDao.deleteMessagesBySession(session.id);
+                  }
+
+                  // Now delete the archived sessions themselves
+                  final deletedCount = await sessionDao
+                      .deleteArchivedSessionsByProject(projectId);
 
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
