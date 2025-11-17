@@ -205,7 +205,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             result = await shellService.executeWithSudo(
                               command: command,
                               sudoPasswordSecretId:
-                                  sshSettings?.sudoPasswordSecretId,
+                                  sshSettings?.sudoPasswordSecretId ??
+                                  sshSettings?.passwordSecretId,
                             );
                           } else {
                             // Use regular executeCommand
