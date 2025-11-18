@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import '../converters/tool_call_converter.dart';
 
 /// Message kind discriminator for sum type representation
 enum MessageKind { text, imageUrl, toolUse, toolResult }
@@ -36,11 +37,14 @@ class Messages extends Table {
   /// Image URL (only populated when messageKind = imageUrl)
   TextColumn get imageUrl => text().nullable()();
 
-  /// Tool calls as JSON (only populated when messageKind = toolUse)
-  TextColumn get toolCallsJson => text().nullable()();
+  // Discriminated union fields - only one of these sets should be populated
+  // For MessageKind.toolUse
+  TextColumn get toolCallsJson =>
+      text().map(const ToolCallListConverter()).nullable()();
 
-  /// Tool results as JSON (only populated when messageKind = toolResult)
-  TextColumn get toolResultsJson => text().nullable()();
+  // For MessageKind.toolResult
+  TextColumn get toolResultsJson =>
+      text().map(const ToolCallListConverter()).nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -49,10 +53,10 @@ class Messages extends Table {
   List<String> get customConstraints => [
     // Ensure only the appropriate column is populated for each message kind
     'CHECK ('
-        '(message_kind = 0 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // text
-        '(message_kind = 1 AND image_url IS NOT NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // imageUrl
-        '(message_kind = 2 AND image_url IS NULL AND tool_calls_json IS NOT NULL AND tool_results_json IS NULL) OR ' // toolUse
-        '(message_kind = 3 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NOT NULL)' // toolResult
+        '(message_kind = 0 AND image_url IS NULL AND tool_calls IS NULL AND tool_results IS NULL) OR ' // text
+        '(message_kind = 1 AND image_url IS NOT NULL AND tool_calls IS NULL AND tool_results IS NULL) OR ' // imageUrl
+        '(message_kind = 2 AND image_url IS NULL AND tool_calls IS NOT NULL AND tool_results IS NULL) OR ' // toolUse
+        '(message_kind = 3 AND image_url IS NULL AND tool_calls IS NULL AND tool_results IS NOT NULL)' // toolResult
         ')',
   ];
 }

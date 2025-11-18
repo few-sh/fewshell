@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
 import '../database/database.dart';
@@ -18,45 +17,41 @@ extension ChatMessageToDB on ChatMessage {
     // Determine message kind and type-specific data
     final MessageKind kind;
     final String? imageUrlValue;
-    final String? toolCallsJsonValue;
-    final String? toolResultsJsonValue;
+    final List<ToolCall>? toolCallsValue;
+    final List<ToolCall>? toolResultsValue;
 
     switch (messageType) {
       case TextMessage():
         kind = MessageKind.text;
         imageUrlValue = null;
-        toolCallsJsonValue = null;
-        toolResultsJsonValue = null;
+        toolCallsValue = null;
+        toolResultsValue = null;
 
       case ImageUrlMessage(:final url):
         kind = MessageKind.imageUrl;
         imageUrlValue = url;
-        toolCallsJsonValue = null;
-        toolResultsJsonValue = null;
+        toolCallsValue = null;
+        toolResultsValue = null;
 
       case ToolUseMessage(:final toolCalls):
         kind = MessageKind.toolUse;
         imageUrlValue = null;
-        toolCallsJsonValue = jsonEncode(
-          toolCalls.map((tc) => tc.toJson()).toList(),
-        );
-        toolResultsJsonValue = null;
+        toolCallsValue = toolCalls;
+        toolResultsValue = null;
 
       case ToolResultMessage(:final results):
         kind = MessageKind.toolResult;
         imageUrlValue = null;
-        toolCallsJsonValue = null;
-        toolResultsJsonValue = jsonEncode(
-          results.map((tc) => tc.toJson()).toList(),
-        );
+        toolCallsValue = null;
+        toolResultsValue = results;
 
       default:
         // ImageMessage and FileMessage would need special handling
         // For now, treat as text
         kind = MessageKind.text;
         imageUrlValue = null;
-        toolCallsJsonValue = null;
-        toolResultsJsonValue = null;
+        toolCallsValue = null;
+        toolResultsValue = null;
     }
 
     return MessageEntityCompanion(
@@ -69,8 +64,8 @@ extension ChatMessageToDB on ChatMessage {
       createdAt: Value(now),
       messageKind: Value(kind),
       imageUrl: Value(imageUrlValue),
-      toolCallsJson: Value(toolCallsJsonValue),
-      toolResultsJson: Value(toolResultsJsonValue),
+      toolCallsJson: Value(toolCallsValue),
+      toolResultsJson: Value(toolResultsValue),
     );
   }
 
@@ -93,37 +88,17 @@ extension ChatMessageToDB on ChatMessage {
 
 /// Extensions for MessageEntity to support conversion to ChatMessage
 extension MessageEntityToChat on MessageEntity {
-  /// Helper to get tool calls from JSON
-  List<ToolCall>? get toolCalls {
-    if (messageKind != MessageKind.toolUse || toolCallsJson == null)
-      return null;
-    final json = jsonDecode(toolCallsJson!) as List;
-    return json
-        .map((e) => ToolCall.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  /// Helper to get tool results from JSON
-  List<ToolCall>? get toolResults {
-    if (messageKind != MessageKind.toolResult || toolResultsJson == null)
-      return null;
-    final json = jsonDecode(toolResultsJson!) as List;
-    return json
-        .map((e) => ToolCall.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
   /// Convert MessageEntity to ChatMessage
   ChatMessage toChatMessage() {
     final role = _roleFromUserId(userId);
 
     return switch (messageKind) {
       MessageKind.toolUse => ChatMessage.toolUse(
-        toolCalls: toolCalls!,
+        toolCalls: toolCallsJson ?? [],
         content: content,
       ),
       MessageKind.toolResult => ChatMessage.toolResult(
-        results: toolResults!,
+        results: toolResultsJson ?? [],
         content: content,
       ),
       MessageKind.imageUrl => ChatMessage.imageUrl(

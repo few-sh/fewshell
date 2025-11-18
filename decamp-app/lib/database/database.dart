@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:llm_dart/llm_dart.dart';
 
 import 'tables/projects_table.dart';
 import 'tables/sessions_table.dart';
@@ -12,6 +13,7 @@ import 'daos/project_dao.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/snippet_dao.dart';
+import 'converters/tool_call_converter.dart';
 
 part 'database.g.dart';
 
@@ -110,42 +112,22 @@ class AppDatabase extends _$AppDatabase {
           );
         }
 
-        // Migration from version 3 to 4: Add message kind discriminator and structured tool data
         if (from < 4) {
-          // Add new columns with defaults
-          await m.addColumn(messages, messages.messageKind);
-          await m.addColumn(messages, messages.toolCallsJson);
-          await m.addColumn(messages, messages.toolResultsJson);
-
-          // Migrate messages with metadata containing tool information
+          // Add discriminated union columns for tool calls and results
           await customStatement('''
-            UPDATE messages
-            SET message_kind = 2,
-                tool_calls_json = json_extract(metadata, '\$.toolCalls')
-            WHERE metadata IS NOT NULL 
-              AND json_extract(metadata, '\$.messageType') = 'toolUse'
-          ''');
+        ALTER TABLE messages
+        ADD COLUMN message_kind INTEGER NOT NULL DEFAULT 0
+      ''');
 
           await customStatement('''
-            UPDATE messages
-            SET message_kind = 3,
-                tool_results_json = json_extract(metadata, '\$.toolResults')
-            WHERE metadata IS NOT NULL 
-              AND json_extract(metadata, '\$.messageType') = 'toolResult'
-          ''');
+        ALTER TABLE messages
+        ADD COLUMN tool_calls_json TEXT
+      ''');
 
           await customStatement('''
-            UPDATE messages
-            SET message_kind = 1
-            WHERE image_url IS NOT NULL
-              AND message_kind = 0
-          ''');
-
-          // All other messages default to text (messageKind = 0) via column default
-
-          // Optional: Drop old metadata column after migration
-          // Commented out for safety - can be removed manually after verifying migration
-          // await customStatement('ALTER TABLE messages DROP COLUMN metadata');
+        ALTER TABLE messages
+        ADD COLUMN tool_results_json TEXT
+      ''');
         }
       },
       beforeOpen: (details) async {
