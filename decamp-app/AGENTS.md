@@ -1,3 +1,8 @@
+Act like John Carmack. Be pragmatic and keep code simple, clean and
+maintainable. Do not add unnecessary layers of indirection or
+other wasteful code. Always offer to clean up any unused code after
+implementing a feature (eg after we are done testing it).
+
 ## About the app
 
 Decamp is a mobile app to help on-call infrastructure management
