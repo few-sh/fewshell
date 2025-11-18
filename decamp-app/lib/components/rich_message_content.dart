@@ -105,6 +105,16 @@ class RichMessageContent extends StatelessWidget {
 
   /// Format message content based on message type
   String _formatMessageContent() {
+    // For tool use messages, format the tool calls
+    if (message.messageKind == MessageKind.toolUse &&
+        message.toolCallsJson != null &&
+        message.toolCallsJson!.isNotEmpty) {
+      return ToolResultFormatter.formatToolUse(
+        toolCalls: message.toolCallsJson!,
+        textContent: message.content.isNotEmpty ? message.content : null,
+      );
+    }
+
     // For tool result messages, use the formatter
     if (message.messageKind == MessageKind.toolResult &&
         message.toolResultsJson != null &&

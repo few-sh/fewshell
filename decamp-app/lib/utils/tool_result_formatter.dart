@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:llm_dart/llm_dart.dart';
 
 /// Formats tool execution results with pretty markdown templates
 ///
@@ -23,6 +24,78 @@ import 'dart:convert';
 /// );
 /// ```
 class ToolResultFormatter {
+  /// Format tool use message (tool calls)
+  static String formatToolUse({
+    required List<ToolCall> toolCalls,
+    String? textContent,
+  }) {
+    final buffer = StringBuffer();
+
+    // Add any text content if present
+    if (textContent != null && textContent.isNotEmpty) {
+      buffer.writeln(textContent);
+      buffer.writeln();
+    }
+
+    for (final toolCall in toolCalls) {
+      // Special handling for execute_shell_command
+      if (toolCall.function.name == 'execute_shell_command') {
+        try {
+          final args =
+              jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
+          final explanation = args['explanation'] as String? ?? '';
+          final command = args['command'] as String? ?? 'unknown';
+          final sudoRequired = args['sudo_required'] as bool? ?? false;
+
+          // Show explanation if present
+          if (explanation.isNotEmpty) {
+            buffer.writeln('*$explanation*\n');
+          }
+
+          // Command with sudo warning if required
+          if (sudoRequired) {
+            buffer.writeln('> ⚠️ **This command requires sudo privileges**\n');
+            buffer.writeln('```bash');
+            buffer.writeln('sudo \$ $command');
+            buffer.writeln('```');
+          } else {
+            buffer.writeln('```bash');
+            buffer.writeln('\$ $command');
+            buffer.writeln('```');
+          }
+          buffer.writeln();
+          continue;
+        } catch (e) {
+          // Fall through to generic handling
+        }
+      }
+
+      // Generic tool call formatting
+      buffer.writeln('🔧 **${toolCall.function.name}**');
+
+      // Try to parse arguments as JSON for pretty display
+      try {
+        final args =
+            jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
+        if (args.isNotEmpty) {
+          buffer.writeln('```json');
+          buffer.writeln(JsonEncoder.withIndent('  ').convert(args));
+          buffer.writeln('```');
+        }
+      } catch (e) {
+        // If not JSON, display as-is
+        if (toolCall.function.arguments.isNotEmpty) {
+          buffer.writeln('```');
+          buffer.writeln(toolCall.function.arguments);
+          buffer.writeln('```');
+        }
+      }
+      buffer.writeln();
+    }
+
+    return buffer.toString().trim();
+  }
+
   /// Format a tool result based on the tool name
   static String format({required String toolName, required String result}) {
     // Parse the result JSON
@@ -52,7 +125,6 @@ class ToolResultFormatter {
   static String _formatShellCommand(Map<String, dynamic> data) {
     final buffer = StringBuffer();
 
-    final command = data['command'] as String? ?? 'unknown';
     final exitCode = data['exitCode'] as int? ?? -1;
     final stdout = (data['stdout']?.toString() ?? '').trim();
     final stderr = (data['stderr']?.toString() ?? '').trim();
@@ -60,7 +132,7 @@ class ToolResultFormatter {
 
     // Header with status
     if (success) {
-      buffer.writeln('✅ Command Executed Successfully\n');
+      buffer.writeln('✅ Command Executed Successfully:\n');
     } else {
       buffer.writeln('❌ **Command Failed**\n');
     }
@@ -72,8 +144,6 @@ class ToolResultFormatter {
 
     // Stdout section (if available)
     if (stdout.isNotEmpty) {
-      buffer.writeln('**Output:**');
-
       // Try to detect if output looks like it should have syntax highlighting
       final language = _detectLanguage(stdout);
       buffer.writeln('```$language');
