@@ -128,20 +128,26 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
 
+    // Listen for pending actions and show overlay
+    ref.listen(chatControllerProvider(currentSessionId), (previous, next) {
+      // Only show if we transitioned from no pending actions to having pending actions
+      final hadPendingActions = previous?.hasPendingActions ?? false;
+      final hasPendingActions = next.hasPendingActions;
+
+      if (hasPendingActions && !hadPendingActions && currentSessionId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _handlePendingActions(
+            context,
+            next.pendingActions!,
+            currentSessionId,
+          );
+        });
+      }
+    });
+
     // Watch chat state and messages
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
-
-    // Show approval overlay when pending actions appear
-    if (chatState.hasPendingActions && currentSessionId != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handlePendingActions(
-          context,
-          chatState.pendingActions!,
-          currentSessionId,
-        );
-      });
-    }
 
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
