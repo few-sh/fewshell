@@ -592,9 +592,7 @@ class ChatController extends StateNotifier<ChatState> {
         chatMessages.add(resultMessage);
 
         // Map result for LLM
-        toolResults[toolCall.id] = result['success'] as bool
-            ? result['data']?.toString() ?? 'Success'
-            : 'Error: ${result['error']}';
+        toolResults[toolCall.id] = jsonEncode(result['data']);
       }
 
       // Get tools for potential follow-up
