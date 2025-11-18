@@ -6,6 +6,7 @@ import '../providers/project_provider.dart';
 import '../pages/ocr_scanner_page.dart';
 import '../utils/text_pattern_matcher.dart';
 import '../services/llm_service.dart';
+import '../utils/constants.dart';
 
 /// Reusable dialog for adding or editing AI model configurations
 class AIModelDialog {
@@ -233,16 +234,42 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
 
   bool get _isEditMode => widget.initialIdentifier != null;
 
+  /// Get supported models for the currently selected API type
+  List<String> get _supportedModels {
+    switch (_selectedApiType) {
+      case LlmApiType.openai:
+        return kOpenAIModels;
+      case LlmApiType.anthropic:
+        return kAnthropicModels;
+      case LlmApiType.google:
+        return kGoogleModels;
+      case LlmApiType.deepseek:
+        return kDeepSeekModels;
+      case LlmApiType.groq:
+        return kGroqModels;
+      case LlmApiType.xai:
+        return kXAIModels;
+      case LlmApiType.ollama:
+        return kOllamaModels;
+      case LlmApiType.openaiCompatible:
+        return kOpenAICompatibleModels;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _identifierController = TextEditingController(
-      text: widget.initialIdentifier,
-    );
+    _selectedApiType = widget.initialApiType ?? LlmApiType.openai;
+
+    // Pre-fill model identifier with first supported model if creating new model
+    final initialIdentifier =
+        widget.initialIdentifier ??
+        (_supportedModels.isNotEmpty ? _supportedModels.first : '');
+
+    _identifierController = TextEditingController(text: initialIdentifier);
     _urlController = TextEditingController(text: widget.initialUrl);
     _apiKeyController = TextEditingController(text: widget.initialApiKey);
     _enabled = widget.initialEnabled ?? true;
-    _selectedApiType = widget.initialApiType ?? LlmApiType.openai;
   }
 
   @override
@@ -269,25 +296,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                controller: _identifierController,
-                decoration: const InputDecoration(
-                  labelText: 'Model Identifier',
-                  hintText: 'e.g., gpt-4-turbo, claude-3-5-sonnet',
-                  isDense: true,
-                ),
-                enabled: !_isEditMode,
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.none,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a model identifier';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
+              // API Type dropdown (moved to top)
               DropdownButtonFormField<LlmApiType>(
                 value: _selectedApiType,
                 decoration: const InputDecoration(
@@ -304,15 +313,77 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   if (value != null) {
                     setState(() {
                       _selectedApiType = value;
-                      // Update URL to default for selected API type if it's empty or unchanged
-                      if (_urlController.text.isEmpty ||
-                          _urlController.text ==
-                              _selectedApiType.defaultBaseUrl) {
-                        _urlController.text = value.defaultBaseUrl;
+                      // Update URL to default for selected API type
+                      _urlController.text = value.defaultBaseUrl;
+                      // Auto-populate model identifier with first supported model
+                      // (unless in edit mode)
+                      if (!_isEditMode && _supportedModels.isNotEmpty) {
+                        _identifierController.text = _supportedModels.first;
                       }
                     });
                   }
                 },
+              ),
+              const SizedBox(height: 12),
+              // Model Identifier dropdown (searchable)
+              Autocomplete<String>(
+                initialValue: TextEditingValue(
+                  text: _identifierController.text,
+                ),
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  if (textEditingValue.text.isEmpty) {
+                    return _supportedModels;
+                  }
+                  return _supportedModels.where((String option) {
+                    return option.toLowerCase().contains(
+                      textEditingValue.text.toLowerCase(),
+                    );
+                  });
+                },
+                onSelected: (String selection) {
+                  _identifierController.text = selection;
+                },
+                fieldViewBuilder:
+                    (
+                      BuildContext context,
+                      TextEditingController fieldTextEditingController,
+                      FocusNode fieldFocusNode,
+                      VoidCallback onFieldSubmitted,
+                    ) {
+                      // Sync our controller with the autocomplete's controller
+                      if (_identifierController.text !=
+                          fieldTextEditingController.text) {
+                        fieldTextEditingController.text =
+                            _identifierController.text;
+                      }
+                      // Listen to changes in the autocomplete field
+                      fieldTextEditingController.addListener(() {
+                        if (_identifierController.text !=
+                            fieldTextEditingController.text) {
+                          _identifierController.text =
+                              fieldTextEditingController.text;
+                        }
+                      });
+
+                      return TextFormField(
+                        controller: fieldTextEditingController,
+                        focusNode: fieldFocusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Model Identifier',
+                          hintText: 'Start typing to search...',
+                          isDense: true,
+                        ),
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        textCapitalization: TextCapitalization.none,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a model identifier';
+                          }
+                          return null;
+                        },
+                      );
+                    },
               ),
               const SizedBox(height: 12),
               TextFormField(
