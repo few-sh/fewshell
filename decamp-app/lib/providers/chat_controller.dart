@@ -434,8 +434,18 @@ class ChatController extends StateNotifier<ChatState> {
         final toolResult = result.toolResults[toolCall.id] ?? 'No result';
 
         // Create the ChatMessage with tool results
+        // Following MCP example pattern: create a new ToolCall with result in arguments
+        final resultToolCall = ToolCall(
+          id: toolCall.id,
+          callType: toolCall.callType,
+          function: FunctionCall(
+            name: toolCall.function.name,
+            arguments: toolResult,
+          ),
+        );
+
         final chatMessage = ChatMessage.toolResult(
-          results: [toolCall],
+          results: [resultToolCall],
           content: toolResult,
         );
 
@@ -567,8 +577,19 @@ class ChatController extends StateNotifier<ChatState> {
 
       for (final toolCall in toolCalls) {
         final result = toolResults[toolCall.id] ?? 'No result';
+
+        // Following MCP example pattern: create a new ToolCall with result in arguments
+        final resultToolCall = ToolCall(
+          id: toolCall.id,
+          callType: toolCall.callType,
+          function: FunctionCall(
+            name: toolCall.function.name,
+            arguments: result,
+          ),
+        );
+
         conversationWithResults.add(
-          ChatMessage.toolResult(results: [toolCall], content: result),
+          ChatMessage.toolResult(results: [resultToolCall], content: result),
         );
       }
 
