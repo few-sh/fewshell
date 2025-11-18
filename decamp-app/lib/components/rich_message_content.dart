@@ -5,6 +5,8 @@ import 'package:decamp/database/database.dart';
 import 'package:decamp/database/tables/messages_table.dart';
 import 'package:decamp/utils/tool_result_formatter.dart';
 import 'package:decamp/themes/terminal_theme.dart';
+import 'package:decamp/components/expandable_code_block.dart';
+import 'package:markdown/markdown.dart' as md;
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
@@ -150,6 +152,9 @@ class RichMessageContent extends StatelessWidget {
         Theme.of(context).textTheme.bodyLarge?.color ??
         Colors.white;
 
+    // Track code block index for unique hero tags
+    int codeBlockIndex = 0;
+
     // Create enhanced stylesheet with terminal theme for code blocks
     final enhancedStyleSheet =
         (styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
@@ -175,6 +180,13 @@ class RichMessageContent extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       styleSheet: enhancedStyleSheet,
       padding: EdgeInsets.zero,
+      builders: {
+        'code': ExpandableCodeBlockBuilder(
+          terminalTheme: terminalTheme,
+          messageId: message.id,
+          getCodeBlockIndex: () => codeBlockIndex++,
+        ),
+      },
       onTapLink: (text, href, title) {
         if (href != null) {
           // TODO: Handle link taps (open in browser, etc.)
@@ -188,6 +200,35 @@ class RichMessageContent extends StatelessWidget {
         style: TextStyle(color: textColor),
         child: markdown,
       ),
+    );
+  }
+}
+
+/// Custom markdown builder for expandable code blocks
+class ExpandableCodeBlockBuilder extends MarkdownElementBuilder {
+  final TerminalTheme terminalTheme;
+  final String messageId;
+  final int Function() getCodeBlockIndex;
+
+  ExpandableCodeBlockBuilder({
+    required this.terminalTheme,
+    required this.messageId,
+    required this.getCodeBlockIndex,
+  });
+
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final code = element.textContent;
+    final language =
+        element.attributes['class']?.replaceFirst('language-', '') ?? '';
+    final index = getCodeBlockIndex();
+    final heroTag = 'code_block_${messageId}_$index';
+
+    return ExpandableCodeBlock(
+      code: code,
+      language: language,
+      heroTag: heroTag,
+      terminalTheme: terminalTheme,
     );
   }
 }
