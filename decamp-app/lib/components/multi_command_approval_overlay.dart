@@ -20,17 +20,25 @@ class CommandAction {
 }
 
 /// Overlay widget that shows multiple command approvals in a scrollable list
+/// Returns selected actions when approved, null when cancelled
 class MultiCommandApprovalOverlay extends StatefulWidget {
   final List<CommandAction> actions;
-  final Future<void> Function(List<CommandAction> selectedActions) onExecute;
-  final VoidCallback onDismiss;
 
-  const MultiCommandApprovalOverlay({
-    super.key,
-    required this.actions,
-    required this.onExecute,
-    required this.onDismiss,
-  });
+  const MultiCommandApprovalOverlay({super.key, required this.actions});
+
+  /// Show the overlay and await user selection
+  static Future<List<CommandAction>?> show(
+    BuildContext context,
+    List<CommandAction> actions,
+  ) async {
+    return await showModalBottomSheet<List<CommandAction>>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (context) => MultiCommandApprovalOverlay(actions: actions),
+    );
+  }
 
   @override
   State<MultiCommandApprovalOverlay> createState() =>
@@ -42,7 +50,6 @@ class _MultiCommandApprovalOverlayState
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _slideAnimation;
-  bool _isExecuting = false;
 
   @override
   void initState() {
@@ -64,7 +71,7 @@ class _MultiCommandApprovalOverlayState
     super.dispose();
   }
 
-  Future<void> _handleExecute() async {
+  void _handleApprove() {
     final selectedActions = widget.actions
         .where((action) => action.isSelected)
         .toList();
@@ -78,39 +85,11 @@ class _MultiCommandApprovalOverlayState
       return;
     }
 
-    if (mounted) {
-      setState(() => _isExecuting = true);
-    }
-
-    try {
-      // Execute and check if we should dismiss
-      // onExecute may set new pending actions for follow-up commands
-      await widget.onExecute(selectedActions);
-
-      // Only dismiss if the callback is provided
-      // The parent will handle dismissal logic
-      if (mounted) {
-        await _animationController.reverse();
-      }
-
-      // Note: We don't call onDismiss here anymore
-      // The parent (_executeMultipleActions) will clear _pendingActions
-      // at the start of execution, and will set it again if there are follow-ups
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isExecuting = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    }
+    Navigator.of(context).pop(selectedActions);
   }
 
-  Future<void> _handleCancel() async {
-    if (mounted) {
-      await _animationController.reverse();
-    }
-    widget.onDismiss();
+  void _handleCancel() {
+    Navigator.of(context).pop(null);
   }
 
   void _toggleSelectAll(bool? value) {
@@ -178,15 +157,6 @@ class _MultiCommandApprovalOverlayState
                             ),
                           ),
                         ),
-                        if (_isExecuting)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 8),
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -226,7 +196,7 @@ class _MultiCommandApprovalOverlayState
                 child: CheckboxListTile(
                   value: allSelected,
                   tristate: !allSelected && !noneSelected,
-                  onChanged: _isExecuting ? null : _toggleSelectAll,
+                  onChanged: _toggleSelectAll,
                   title: Text(
                     allSelected ? 'Deselect All' : 'Select All',
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -250,13 +220,11 @@ class _MultiCommandApprovalOverlayState
                     final action = widget.actions[index];
                     return CheckboxListTile(
                       value: action.isSelected,
-                      onChanged: _isExecuting
-                          ? null
-                          : (value) {
-                              setState(() {
-                                action.isSelected = value ?? false;
-                              });
-                            },
+                      onChanged: (value) {
+                        setState(() {
+                          action.isSelected = value ?? false;
+                        });
+                      },
                       controlAffinity: ListTileControlAffinity.leading,
                       title: Container(
                         padding: const EdgeInsets.symmetric(
@@ -341,33 +309,20 @@ class _MultiCommandApprovalOverlayState
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton(
-                      onPressed: _isExecuting ? null : _handleCancel,
+                      onPressed: _handleCancel,
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 12),
                     FilledButton.icon(
-                      onPressed: _isExecuting ? null : _handleExecute,
-                      icon: _isExecuting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Icon(Icons.play_arrow, size: 24),
+                      onPressed: _handleApprove,
+                      icon: const Icon(Icons.play_arrow, size: 24),
                       label: Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 12,
                         ),
                         child: Text(
-                          _isExecuting
-                              ? 'Executing...'
-                              : 'Run ${_selectedCount > 1 ? '$_selectedCount Commands' : 'Command'}',
+                          'Run ${_selectedCount > 1 ? '$_selectedCount Commands' : 'Command'}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

@@ -9,11 +9,9 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
-import 'package:decamp/providers/ssh_settings_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
-import 'package:decamp/services/shell_service.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -98,6 +96,29 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
   }
 
+  /// Show command approval overlay and handle result
+  Future<void> _handlePendingActions(
+    BuildContext context,
+    List<CommandAction> actions,
+    String sessionId,
+  ) async {
+    final selectedActions = await MultiCommandApprovalOverlay.show(
+      context,
+      actions,
+    );
+
+    if (selectedActions != null) {
+      final controller = ref.read(chatControllerProvider(sessionId).notifier);
+      await controller.executeActions(
+        selectedActions: selectedActions,
+        sessionId: sessionId,
+      );
+    } else {
+      developer.log('🧹 User cancelled actions', name: 'ChatSession');
+      ref.read(chatControllerProvider(sessionId).notifier).cancelActions();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Activate auto-session selection
@@ -106,16 +127,21 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
-    final sshSettings = currentProject != null
-        ? ref.watch(projectSshSettingsProvider(currentProject.id))
-        : null;
 
     // Watch chat state and messages
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
-    final chatController = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
+
+    // Show approval overlay when pending actions appear
+    if (chatState.hasPendingActions && currentSessionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handlePendingActions(
+          context,
+          chatState.pendingActions!,
+          currentSessionId,
+        );
+      });
+    }
 
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
@@ -196,65 +222,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 ),
               ],
             ),
-
-            // Multi-command approval overlay
-            if (chatState.hasPendingActions)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: MultiCommandApprovalOverlay(
-                  actions: chatState.pendingActions!,
-                  onExecute: (selectedActions) async {
-                    // Execute via controller with shell service
-                    final shellService = ref.read(
-                      shellServiceProvider(currentProject?.id),
-                    );
-                    await chatController.executeActions(
-                      selectedActions: selectedActions,
-                      sessionId: currentSessionId!,
-                      executeAction: (actionName, params) async {
-                        // Execute shell command directly
-                        if (actionName == 'execute_shell_command') {
-                          final command = params['command'] as String;
-                          final sudoRequired =
-                              params['sudo_required'] as bool? ?? false;
-
-                          final Map<String, dynamic> result;
-
-                          if (sudoRequired) {
-                            // Use executeWithSudo for commands requiring elevated privileges
-                            result = await shellService.executeWithSudo(
-                              command: command,
-                              sudoPasswordSecretId:
-                                  sshSettings?.sudoPasswordSecretId ??
-                                  sshSettings?.passwordSecretId,
-                            );
-                          } else {
-                            // Use regular executeCommand
-                            result = await shellService.executeCommand(command);
-                          }
-
-                          return {
-                            'success': (result['exitCode'] as int? ?? -1) == 0,
-                            'data': result,
-                            'error': result['stderr'] as String?,
-                          };
-                        }
-
-                        throw Exception('Unknown action: $actionName');
-                      },
-                    );
-                  },
-                  onDismiss: () {
-                    developer.log(
-                      '🧹 Dismissing approval overlay',
-                      name: 'ChatSession',
-                    );
-                    chatController.cancelActions();
-                  },
-                ),
-              ),
 
             // Execution progress overlay
             if (chatState.isExecuting)

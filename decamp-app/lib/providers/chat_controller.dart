@@ -5,9 +5,13 @@ import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
+import '../models/ssh_settings.dart';
 import '../services/llm_service.dart';
+import '../services/shell_service.dart';
 import '../services/shell_tools_provider.dart';
 import '../providers/database_provider.dart';
+import '../providers/project_provider.dart';
+import '../providers/ssh_settings_provider.dart';
 import '../database/daos/message_dao.dart';
 import '../database/daos/session_dao.dart';
 import '../database/database.dart';
@@ -20,16 +24,22 @@ class ChatController extends StateNotifier<ChatState> {
   final MessageDao _messageDao;
   final SessionDao _sessionDao;
   final LlmService _llmService;
+  final ShellService _shellService;
+  final SshSettings? _sshSettings;
   final String? sessionId;
 
   ChatController({
     required MessageDao messageDao,
     required SessionDao sessionDao,
     required LlmService llmService,
+    required ShellService shellService,
+    SshSettings? sshSettings,
     this.sessionId,
   }) : _messageDao = messageDao,
        _sessionDao = sessionDao,
        _llmService = llmService,
+       _shellService = shellService,
+       _sshSettings = sshSettings,
        super(const ChatState());
 
   /// Reset state when session changes (called by provider when session changes)
@@ -367,8 +377,6 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> executeActions({
     required List<CommandAction> selectedActions,
     required String sessionId,
-    required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
-    executeAction,
   }) async {
     // First, save the assistant's message with tool calls to preserve conversation state
     final pendingCalls = state.pendingToolCalls;
@@ -457,7 +465,6 @@ class ChatController extends StateNotifier<ChatState> {
       final result = await _executeToolCalls(
         toolCalls: selectedToolCalls,
         conversationState: state.conversationForToolCalls!,
-        executeAction: executeAction,
       );
 
       // Save tool result messages
@@ -559,8 +566,6 @@ class ChatController extends StateNotifier<ChatState> {
   Future<_ToolExecutionResult> _executeToolCalls({
     required List<ToolCall> toolCalls,
     required List<ChatMessage> conversationState,
-    required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
-    executeAction,
   }) async {
     final toolResults = <String, String>{};
     final chatMessages = <String>[];
@@ -578,8 +583,8 @@ class ChatController extends StateNotifier<ChatState> {
 
         final command = params['command'] as String? ?? 'unknown';
 
-        // Execute the action
-        final result = await executeAction(toolCall.function.name, params);
+        // Execute the action directly
+        final result = await _executeAction(toolCall.function.name, params);
 
         // Build result message
         final resultMessage = _formatExecutionResult(
@@ -778,6 +783,38 @@ class ChatController extends StateNotifier<ChatState> {
     return buffer.toString().trim();
   }
 
+  /// Execute a single action (shell command)
+  Future<Map<String, dynamic>> _executeAction(
+    String actionName,
+    Map<String, dynamic> params,
+  ) async {
+    if (actionName == 'execute_shell_command') {
+      final command = params['command'] as String;
+      final sudoRequired = params['sudo_required'] as bool? ?? false;
+
+      final Map<String, dynamic> result;
+
+      if (sudoRequired) {
+        result = await _shellService.executeWithSudo(
+          command: command,
+          sudoPasswordSecretId:
+              _sshSettings?.sudoPasswordSecretId ??
+              _sshSettings?.passwordSecretId,
+        );
+      } else {
+        result = await _shellService.executeCommand(command);
+      }
+
+      return {
+        'success': (result['exitCode'] as int? ?? -1) == 0,
+        'data': result,
+        'error': result['stderr'] as String?,
+      };
+    }
+
+    throw Exception('Unknown action: $actionName');
+  }
+
   /// Cancel pending actions
   void cancelActions() {
     state = state.copyWith(
@@ -816,10 +853,20 @@ final chatControllerProvider =
       ref,
       sessionId,
     ) {
+      // Get current project to access shell service and SSH settings
+      final currentProject = ref.watch(currentProjectProvider);
+      final projectId = currentProject?.id;
+
+      final sshSettings = projectId != null
+          ? ref.watch(projectSshSettingsProvider(projectId))
+          : null;
+
       return ChatController(
         messageDao: ref.watch(databaseProvider).messageDao,
         sessionDao: ref.watch(databaseProvider).sessionDao,
         llmService: ref.watch(llmServiceProvider),
+        shellService: ref.watch(shellServiceProvider(projectId)),
+        sshSettings: sshSettings,
         sessionId: sessionId,
       );
     });
