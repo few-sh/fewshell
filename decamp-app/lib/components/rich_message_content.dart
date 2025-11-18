@@ -44,7 +44,8 @@ class RichMessageContent extends StatelessWidget {
     );
 
     // Wrap user messages in a bubble container
-    if (isUser) {
+    if (isUser &&
+        (message.toolResultsJson == null || message.toolResultsJson!.isEmpty)) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

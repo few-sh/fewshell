@@ -60,16 +60,10 @@ class ToolResultFormatter {
 
     // Header with status
     if (success) {
-      buffer.writeln('## ✅ Command Executed Successfully\n');
+      buffer.writeln('✅ Command Executed Successfully\n');
     } else {
-      buffer.writeln('## ❌ Command Failed\n');
+      buffer.writeln('❌ **Command Failed**\n');
     }
-
-    // Command section
-    buffer.writeln('**Command:**');
-    buffer.writeln('```bash');
-    buffer.writeln(command);
-    buffer.writeln('```\n');
 
     // Exit code (show if not 0 or if command failed)
     if (!success || exitCode != 0) {
