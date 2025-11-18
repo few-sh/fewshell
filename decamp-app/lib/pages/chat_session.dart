@@ -22,6 +22,15 @@ class ChatSession extends ConsumerStatefulWidget {
 }
 
 class _ChatSessionState extends ConsumerState<ChatSession> {
+  bool _previousKeyboardVisible = false;
+  final FocusNode _inputFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _inputFocusNode.dispose();
+    super.dispose();
+  }
+
   /// Create a new chat session
   Future<void> _createNewSession() async {
     final currentProject = ref.read(currentProjectProvider);
@@ -128,6 +137,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
 
+    // Unfocus when session or project changes
+    ref.listen(currentSessionIdProvider, (previous, next) {
+      if (previous != next) _inputFocusNode.unfocus();
+    });
+
+    ref.listen(currentProjectProvider, (previous, next) {
+      if (previous?.id != next?.id) _inputFocusNode.unfocus();
+    });
+
     // Listen for pending actions and show overlay
     ref.listen(chatControllerProvider(currentSessionId), (previous, next) {
       // Only show if we transitioned from no pending actions to having pending actions
@@ -152,91 +170,119 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
 
+    // Detect keyboard visibility
+    final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    // Track keyboard state changes
+    if (keyboardVisible != _previousKeyboardVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _previousKeyboardVisible = keyboardVisible;
+          });
+        }
+      });
+    }
+
     return GestureDetector(
       onTap: () {
         // Dismiss keyboard when tapping outside
         FocusScope.of(context).unfocus();
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: GestureDetector(
-            onTap: hasProject
-                ? null
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProjectsPage(),
-                      ),
-                    );
-                  },
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(currentProjectName),
-                if (!hasProject) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.add_circle_outline,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.onSurface,
+      child: SafeArea(
+        top: !keyboardVisible,
+        child: Scaffold(
+          appBar: PreferredSize(
+            preferredSize: Size.fromHeight(
+              keyboardVisible ? 0 : kToolbarHeight,
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              height: keyboardVisible ? 0 : kToolbarHeight,
+              child: AppBar(
+                title: GestureDetector(
+                  onTap: hasProject
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ProjectsPage(),
+                            ),
+                          );
+                        },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(currentProjectName),
+                      if (!hasProject) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          Icons.add_circle_outline,
+                          size: 20,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                centerTitle: false,
+                backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    tooltip: 'New Session',
+                    onPressed: hasProject ? _createNewSession : null,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.history),
+                    tooltip: 'Session History',
+                    onPressed: _showSessionHistory,
                   ),
                 ],
-              ],
+              ),
             ),
           ),
-          centerTitle: false,
-          backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'New Session',
-              onPressed: hasProject ? _createNewSession : null,
-            ),
-            IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: 'Session History',
-              onPressed: _showSessionHistory,
-            ),
-          ],
-        ),
-        drawer: const MainDrawer(),
-        body: Stack(
-          children: [
-            // Main chat UI
-            Column(
-              children: [
-                // Message list
-                Expanded(
-                  child: messagesAsync.when(
-                    data: (messages) => ChatList(
-                      messages: messages,
-                      isLoading: chatState.isLoading,
-                      streamingMessageId: chatState.streamingMessageId,
-                      streamingText: chatState.streamingText,
+          drawer: const MainDrawer(),
+          body: Stack(
+            children: [
+              // Main chat UI
+              Column(
+                children: [
+                  // Message list
+                  Expanded(
+                    child: messagesAsync.when(
+                      data: (messages) => ChatList(
+                        messages: messages,
+                        isLoading: chatState.isLoading,
+                        streamingMessageId: chatState.streamingMessageId,
+                        streamingText: chatState.streamingText,
+                      ),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (error, stack) =>
+                          Center(child: Text('Error loading messages: $error')),
                     ),
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (error, stack) =>
-                        Center(child: Text('Error loading messages: $error')),
                   ),
-                ),
-                // Input field
-                ChatInput(
-                  onSend: _handleSendMessage,
-                  enabled: !chatState.isLoading && hasProject,
-                ),
-              ],
-            ),
-
-            // Execution progress overlay
-            if (chatState.isExecuting)
-              ExecutionProgressOverlay(
-                currentCommand: chatState.executionProgress!.currentCommand,
-                totalCommands: chatState.executionProgress!.totalCommands,
-                commandName: chatState.executionProgress!.commandName,
+                  // Input field
+                  ChatInput(
+                    onSend: _handleSendMessage,
+                    enabled: !chatState.isLoading && hasProject,
+                    focusNode: _inputFocusNode,
+                  ),
+                ],
               ),
-          ],
+
+              // Execution progress overlay
+              if (chatState.isExecuting)
+                ExecutionProgressOverlay(
+                  currentCommand: chatState.executionProgress!.currentCommand,
+                  totalCommands: chatState.executionProgress!.totalCommands,
+                  commandName: chatState.executionProgress!.commandName,
+                ),
+            ],
+          ),
         ),
       ),
     );

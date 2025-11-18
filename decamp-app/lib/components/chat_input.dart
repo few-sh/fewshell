@@ -5,12 +5,14 @@ class ChatInput extends StatefulWidget {
   final Function(String) onSend;
   final bool enabled;
   final String hintText;
+  final FocusNode? focusNode;
 
   const ChatInput({
     super.key,
     required this.onSend,
     this.enabled = true,
     this.hintText = 'Type your message...',
+    this.focusNode,
   });
 
   @override
@@ -19,12 +21,26 @@ class ChatInput extends StatefulWidget {
 
 class _ChatInputState extends State<ChatInput> {
   final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
+  late final FocusNode _focusNode;
+  bool _isLocalFocusNode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.focusNode == null) {
+      _focusNode = FocusNode();
+      _isLocalFocusNode = true;
+    } else {
+      _focusNode = widget.focusNode!;
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
-    _focusNode.dispose();
+    if (_isLocalFocusNode) {
+      _focusNode.dispose();
+    }
     super.dispose();
   }
 
@@ -34,9 +50,6 @@ class _ChatInputState extends State<ChatInput> {
 
     widget.onSend(text);
     _controller.clear();
-
-    // Keep focus on the input field
-    _focusNode.requestFocus();
   }
 
   @override
@@ -61,7 +74,8 @@ class _ChatInputState extends State<ChatInput> {
               controller: _controller,
               focusNode: _focusNode,
               enabled: widget.enabled,
-              autofocus: true,
+              autofocus: false,
+              scribbleEnabled: false,
               maxLines: null, // Allow multiple lines
               textInputAction: TextInputAction.send,
               onSubmitted: widget.enabled ? (_) => _handleSend() : null,
