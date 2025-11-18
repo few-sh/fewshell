@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   late final SnippetDao snippetDao = SnippetDao(this);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -108,6 +108,44 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(project_id, is_archived, timestamp DESC)',
           );
+        }
+
+        // Migration from version 3 to 4: Add message kind discriminator and structured tool data
+        if (from < 4) {
+          // Add new columns with defaults
+          await m.addColumn(messages, messages.messageKind);
+          await m.addColumn(messages, messages.toolCallsJson);
+          await m.addColumn(messages, messages.toolResultsJson);
+
+          // Migrate messages with metadata containing tool information
+          await customStatement('''
+            UPDATE messages
+            SET message_kind = 2,
+                tool_calls_json = json_extract(metadata, '\$.toolCalls')
+            WHERE metadata IS NOT NULL 
+              AND json_extract(metadata, '\$.messageType') = 'toolUse'
+          ''');
+
+          await customStatement('''
+            UPDATE messages
+            SET message_kind = 3,
+                tool_results_json = json_extract(metadata, '\$.toolResults')
+            WHERE metadata IS NOT NULL 
+              AND json_extract(metadata, '\$.messageType') = 'toolResult'
+          ''');
+
+          await customStatement('''
+            UPDATE messages
+            SET message_kind = 1
+            WHERE image_url IS NOT NULL
+              AND message_kind = 0
+          ''');
+
+          // All other messages default to text (messageKind = 0) via column default
+
+          // Optional: Drop old metadata column after migration
+          // Commented out for safety - can be removed manually after verifying migration
+          // await customStatement('ALTER TABLE messages DROP COLUMN metadata');
         }
       },
       beforeOpen: (details) async {

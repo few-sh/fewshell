@@ -88,6 +88,7 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
   String generateMessageId() => IdGenerator.messageId();
 
   /// Insert a message with all parameters, generating ID if not provided
+  /// This is a convenience method for simple text messages
   Future<String> insertMessageWithId({
     String? id,
     required String sessionId,
@@ -95,7 +96,6 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
     required String userName,
     required String content,
     String? imageUrl,
-    String? metadata,
   }) async {
     final now = DateTime.now();
     final messageId = id ?? generateMessageId();
@@ -108,8 +108,12 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
       content: Value(content),
       timestamp: Value(now),
       createdAt: Value(now),
+      messageKind: Value(
+        imageUrl != null ? MessageKind.imageUrl : MessageKind.text,
+      ),
       imageUrl: Value(imageUrl),
-      metadata: Value(metadata),
+      toolCallsJson: const Value(null),
+      toolResultsJson: const Value(null),
     );
 
     await insertMessage(companion);

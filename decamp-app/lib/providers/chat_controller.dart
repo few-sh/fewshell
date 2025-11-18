@@ -49,7 +49,6 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Build conversation history from database messages
   /// Reconstructs proper ChatMessage objects including tool use and tool results
-  /// Merges consecutive user messages (required for Anthropic API)
   List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
     final conversation = <ChatMessage>[];
 
@@ -59,64 +58,33 @@ class ChatController extends StateNotifier<ChatState> {
     );
 
     for (final msg in dbMessages) {
-      final userId = msg.userId as String;
-      final content = msg.content as String;
-      final metadata = msg.metadata as String?;
+      // Cast to MessageEntity for type-safe access
+      final messageEntity = msg as MessageEntity;
 
-      // Try to reconstruct from metadata first if it exists
-      if (metadata != null && metadata.isNotEmpty) {
-        try {
-          final json = jsonDecode(metadata) as Map<String, dynamic>;
-          final chatMessage = ChatMessageStorage.fromStorageJson(json);
+      // Use the extension method to convert to ChatMessage
+      final chatMessage = messageEntity.toChatMessage();
 
-          developer.log(
-            '✅ Reconstructed ${chatMessage.role.name} message with type: ${chatMessage.messageType.runtimeType}',
-            name: 'ChatController',
-          );
+      developer.log(
+        '✅ Reconstructed ${chatMessage.role.name} message with kind: ${messageEntity.messageKind.name}',
+        name: 'ChatController',
+      );
 
-          // Log tool calls and results for debugging
-          if (chatMessage.messageType is ToolUseMessage) {
-            final toolUse = chatMessage.messageType as ToolUseMessage;
-            developer.log(
-              '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
-              name: 'ChatController',
-            );
-          } else if (chatMessage.messageType is ToolResultMessage) {
-            final toolResult = chatMessage.messageType as ToolResultMessage;
-            developer.log(
-              '  📊 Tool results: ${toolResult.results.length} result(s)',
-              name: 'ChatController',
-            );
-          }
-
-          conversation.add(chatMessage);
-          continue;
-        } catch (e) {
-          developer.log(
-            '⚠️ Failed to reconstruct from metadata: $e',
-            name: 'ChatController',
-          );
-          // Fall through to simple text conversion
-        }
-      }
-
-      // Fallback: create simple text message based on userId
-      if (userId == 'user') {
-        conversation.add(ChatMessage.user(content));
-        developer.log('📝 Added user text message', name: 'ChatController');
-      } else if (userId == 'ai' || userId == 'assistant') {
-        conversation.add(ChatMessage.assistant(content));
+      // Log tool calls and results for debugging
+      if (chatMessage.messageType is ToolUseMessage) {
+        final toolUse = chatMessage.messageType as ToolUseMessage;
         developer.log(
-          '🤖 Added assistant text message',
+          '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
           name: 'ChatController',
         );
-      } else if (userId == 'tool') {
+      } else if (chatMessage.messageType is ToolResultMessage) {
+        final toolResult = chatMessage.messageType as ToolResultMessage;
         developer.log(
-          '⚠️ Skipping tool message without metadata',
+          '  📊 Tool results: ${toolResult.results.length} result(s)',
           name: 'ChatController',
         );
-        // Tool messages without metadata - skip them as they can't be properly reconstructed
       }
+
+      conversation.add(chatMessage);
     }
 
     developer.log(
@@ -392,12 +360,6 @@ class ChatController extends StateNotifier<ChatState> {
         content: assistantText ?? '',
       );
 
-      // Use text content for display, full structure in metadata
-      final displayContent =
-          assistantText ?? '[Tool calls: ${pendingCalls.length}]';
-
-      final metadata = jsonEncode(chatMessage.toStorageJson());
-
       developer.log(
         '💾 Saving assistant message with ${pendingCalls.length} tool calls',
         name: 'ChatController',
@@ -407,14 +369,13 @@ class ChatController extends StateNotifier<ChatState> {
         name: 'ChatController',
       );
 
-      await _messageDao.insertMessageWithId(
-        id: assistantMessageId,
+      // Convert to companion and insert
+      final companion = chatMessage.toMessageCompanion(
         sessionId: sessionId,
-        userId: 'ai',
-        userName: 'Ops Agent',
-        content: displayContent,
-        metadata: metadata,
+        id: assistantMessageId,
       );
+
+      await _messageDao.insertMessage(companion);
     }
 
     // Clear the approval overlay and set execution state
@@ -483,13 +444,10 @@ class ChatController extends StateNotifier<ChatState> {
           name: 'ChatController',
         );
 
-        await _messageDao.insertMessageWithId(
-          sessionId: sessionId,
-          userId: 'tool',
-          userName: 'Tool',
-          content: toolResult,
-          metadata: jsonEncode(chatMessage.toStorageJson()),
-        );
+        // Convert to companion and insert
+        final companion = chatMessage.toMessageCompanion(sessionId: sessionId);
+
+        await _messageDao.insertMessage(companion);
       }
 
       // Handle LLM's follow-up response after tool execution
