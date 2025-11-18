@@ -428,14 +428,12 @@ class ChatController extends StateNotifier<ChatState> {
         conversationState: state.conversationForToolCalls!,
       );
 
-      // Save tool result messages
-      for (var i = 0; i < result.toolCalls.length; i++) {
-        final toolCall = result.toolCalls[i];
+      // Save ONE consolidated tool result message with ALL results
+      // Anthropic API requires all tool results in a single message immediately after tool_use
+      final allResultToolCalls = result.toolCalls.map((toolCall) {
         final toolResult = result.toolResults[toolCall.id] ?? 'No result';
-
-        // Create the ChatMessage with tool results
-        // Following MCP example pattern: create a new ToolCall with result in arguments
-        final resultToolCall = ToolCall(
+        
+        return ToolCall(
           id: toolCall.id,
           callType: toolCall.callType,
           function: FunctionCall(
@@ -443,22 +441,26 @@ class ChatController extends StateNotifier<ChatState> {
             arguments: toolResult,
           ),
         );
+      }).toList();
 
-        final chatMessage = ChatMessage.toolResult(
-          results: [resultToolCall],
-          content: toolResult,
-        );
+      // Combine all tool results into one content string
+      final combinedContent = result.toolCalls.map((toolCall) {
+        return result.toolResults[toolCall.id] ?? 'No result';
+      }).join('\n---\n');
 
-        developer.log(
-          '💾 Saving tool result for ${toolCall.function.name}',
-          name: 'ChatController',
-        );
+      final chatMessage = ChatMessage.toolResult(
+        results: allResultToolCalls,  // ALL results in one message
+        content: combinedContent,
+      );
 
-        // Convert to companion and insert
-        final companion = chatMessage.toMessageCompanion(sessionId: sessionId);
+      developer.log(
+        '💾 Saving consolidated tool results for ${result.toolCalls.length} tools',
+        name: 'ChatController',
+      );
 
-        await _messageDao.insertMessage(companion);
-      }
+      // Save ONE message with all results
+      final companion = chatMessage.toMessageCompanion(sessionId: sessionId);
+      await _messageDao.insertMessage(companion);
 
       // Handle LLM's follow-up response after tool execution
       if (result.followUpResult != null) {
@@ -575,11 +577,11 @@ class ChatController extends StateNotifier<ChatState> {
       // (conversationState may be unmodifiable)
       final conversationWithResults = List<ChatMessage>.from(conversationState);
 
-      for (final toolCall in toolCalls) {
+      // Consolidate ALL tool results into a single message
+      // Anthropic API requires all tool results in one message immediately after tool_use
+      final allResults = toolCalls.map((toolCall) {
         final result = toolResults[toolCall.id] ?? 'No result';
-
-        // Following MCP example pattern: create a new ToolCall with result in arguments
-        final resultToolCall = ToolCall(
+        return ToolCall(
           id: toolCall.id,
           callType: toolCall.callType,
           function: FunctionCall(
@@ -587,11 +589,18 @@ class ChatController extends StateNotifier<ChatState> {
             arguments: result,
           ),
         );
+      }).toList();
 
-        conversationWithResults.add(
-          ChatMessage.toolResult(results: [resultToolCall], content: result),
-        );
-      }
+      final combinedContent = toolCalls.map((toolCall) {
+        return toolResults[toolCall.id] ?? 'No result';
+      }).join('\n---\n');
+
+      conversationWithResults.add(
+        ChatMessage.toolResult(
+          results: allResults,  // ALL results in one message
+          content: combinedContent,
+        ),
+      );
 
       developer.log(
         '📋 Conversation state before follow-up (${conversationWithResults.length} messages):',
