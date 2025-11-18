@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
@@ -189,19 +191,46 @@ ${envExports}DECAMP_SECRETS
       }
 
       // Execute command and capture output
-      final result = await _client!.run(finalCommand);
+      final session = await _client!.execute(finalCommand);
 
-      final stdout = String.fromCharCodes(result);
+      // Collect stdout and stderr
+      final stdoutBuffer = BytesBuilder(copy: false);
+      final stderrBuffer = BytesBuilder(copy: false);
+      final stdoutDone = Completer<void>();
+      final stderrDone = Completer<void>();
+
+      session.stdout.listen(
+        stdoutBuffer.add,
+        onDone: stdoutDone.complete,
+        onError: stdoutDone.completeError,
+      );
+
+      session.stderr.listen(
+        stderrBuffer.add,
+        onDone: stderrDone.complete,
+        onError: stderrDone.completeError,
+      );
+
+      // Wait for both streams to complete
+      await stdoutDone.future;
+      await stderrDone.future;
+
+      // Wait for session to complete to get exit code
+      await session.done;
+
+      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
+      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      final exitCode = session.exitCode ?? -1;
 
       developer.log(
-        'Command executed successfully. Output length: ${stdout.length}',
+        'Command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
         name: 'ShellService',
       );
 
       return {
         'stdout': _redactSecrets(stdout, secretsToRedact),
-        'stderr': '',
-        'exitCode': 0,
+        'stderr': _redactSecrets(stderr, secretsToRedact),
+        'exitCode': exitCode,
         'executed': true,
       };
     } catch (e) {
@@ -422,18 +451,46 @@ ${envExports}DECAMP_SECRETS
     );
 
     try {
-      final result = await _client!.run(secureCommand);
-      final stdout = String.fromCharCodes(result);
+      final session = await _client!.execute(secureCommand);
+
+      // Collect stdout and stderr
+      final stdoutBuffer = BytesBuilder(copy: false);
+      final stderrBuffer = BytesBuilder(copy: false);
+      final stdoutDone = Completer<void>();
+      final stderrDone = Completer<void>();
+
+      session.stdout.listen(
+        stdoutBuffer.add,
+        onDone: stdoutDone.complete,
+        onError: stdoutDone.completeError,
+      );
+
+      session.stderr.listen(
+        stderrBuffer.add,
+        onDone: stderrDone.complete,
+        onError: stderrDone.completeError,
+      );
+
+      // Wait for both streams to complete
+      await stdoutDone.future;
+      await stderrDone.future;
+
+      // Wait for session to complete to get exit code
+      await session.done;
+
+      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
+      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      final exitCode = session.exitCode ?? -1;
 
       developer.log(
-        'Sudo command executed successfully. Output length: ${stdout.length}',
+        'Sudo command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
         name: 'ShellService',
       );
 
       return {
         'stdout': _redactSecrets(stdout, secretsToRedact),
-        'stderr': '',
-        'exitCode': 0,
+        'stderr': _redactSecrets(stderr, secretsToRedact),
+        'exitCode': exitCode,
         'executed': true,
       };
     } catch (e) {
