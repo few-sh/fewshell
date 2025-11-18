@@ -1,44 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
 import 'package:intl/intl.dart';
+import 'package:decamp/database/database.dart';
+import 'package:decamp/database/tables/messages_table.dart';
+import 'package:decamp/utils/tool_result_formatter.dart';
+import 'package:decamp/themes/terminal_theme.dart';
+import 'package:decamp/components/expandable_code_block.dart';
+import 'package:markdown/markdown.dart' as md;
 
-/// Rich message content widget with extensible features
-/// Supports: text selection, copy, collapsible sections, action buttons
+/// Rich message content widget
+/// Renders message content as markdown with text selection support
 class RichMessageContent extends StatelessWidget {
-  final ChatMessage message;
+  final MessageEntity message;
+  final String? displayText; // Override for streaming
   final bool isUser;
   final MarkdownStyleSheet? styleSheet;
 
   const RichMessageContent({
     super.key,
     required this.message,
+    this.displayText,
     required this.isUser,
     this.styleSheet,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Extract metadata from customProperties
-    final metadata = MessageMetadata.fromCustomProperties(
-      message.customProperties ?? {},
-    );
+    // Use displayText override if provided (for streaming), otherwise format message content
+    final text = displayText ?? _formatMessageContent();
 
-    Widget content;
-
-    // Check if this is a collapsible message
-    if (metadata.isCollapsible) {
-      content = _buildCollapsibleContent(context, metadata);
-    }
-    // Check if this has action buttons
-    else if (metadata.actions.isNotEmpty) {
-      content = _buildInteractiveContent(context, metadata);
-    }
-    // Default: render markdown with selection support
-    else {
-      content = _buildMarkdownContent(context, metadata);
-    }
+    // Build markdown content
+    final content = _buildMarkdownContent(context, text);
 
     // Wrap content with timestamp at the bottom
     final contentWithTimestamp = Column(
@@ -55,7 +47,8 @@ class RichMessageContent extends StatelessWidget {
     );
 
     // Wrap user messages in a bubble container
-    if (isUser) {
+    if (isUser &&
+        (message.toolResultsJson == null || message.toolResultsJson!.isEmpty)) {
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -113,20 +106,87 @@ class RichMessageContent extends StatelessWidget {
     );
   }
 
-  Widget _buildMarkdownContent(BuildContext context, MessageMetadata metadata) {
+  /// Format message content based on message type
+  String _formatMessageContent() {
+    // For tool use messages, format the tool calls
+    if (message.messageKind == MessageKind.toolUse &&
+        message.toolCallsJson != null &&
+        message.toolCallsJson!.isNotEmpty) {
+      return ToolResultFormatter.formatToolUse(
+        toolCalls: message.toolCallsJson!,
+        textContent: message.content.isNotEmpty ? message.content : null,
+      );
+    }
+
+    // For tool result messages, use the formatter
+    if (message.messageKind == MessageKind.toolResult &&
+        message.toolResultsJson != null &&
+        message.toolResultsJson!.isNotEmpty) {
+      // Get the first tool result
+      final toolResult = message.toolResultsJson!.first;
+      final toolName = toolResult.function.name;
+      final resultContent = toolResult.function.arguments;
+
+      // Format using the tool result formatter
+      return ToolResultFormatter.format(
+        toolName: toolName,
+        result: resultContent,
+      );
+    }
+
+    // For all other messages, use the content as-is
+    return message.content;
+  }
+
+  Widget _buildMarkdownContent(BuildContext context, String text) {
+    // Get terminal theme for code blocks
+    final terminalTheme =
+        Theme.of(context).extension<TerminalTheme>() ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? TerminalTheme.dark
+            : TerminalTheme.light);
+
     // Extract base text color from stylesheet
     final textColor =
         styleSheet?.p?.color ??
         Theme.of(context).textTheme.bodyLarge?.color ??
         Colors.white;
 
+    // Track code block index for unique hero tags
+    int codeBlockIndex = 0;
+
+    // Create enhanced stylesheet with terminal theme for code blocks
+    final enhancedStyleSheet =
+        (styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
+            .copyWith(
+              code: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                color: terminalTheme.textColor,
+                backgroundColor: terminalTheme.backgroundColor,
+              ),
+              codeblockDecoration: BoxDecoration(
+                color: terminalTheme.backgroundColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: terminalTheme.borderColor, width: 1),
+              ),
+              codeblockPadding: const EdgeInsets.all(12),
+            );
+
     final markdown = Markdown(
-      data: message.text,
+      data: text,
       selectable: false,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      styleSheet: styleSheet,
+      styleSheet: enhancedStyleSheet,
       padding: EdgeInsets.zero,
+      builders: {
+        'code': ExpandableCodeBlockBuilder(
+          terminalTheme: terminalTheme,
+          messageId: message.id,
+          getCodeBlockIndex: () => codeBlockIndex++,
+        ),
+      },
       onTapLink: (text, href, title) {
         if (href != null) {
           // TODO: Handle link taps (open in browser, etc.)
@@ -135,298 +195,40 @@ class RichMessageContent extends StatelessWidget {
       },
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DefaultTextStyle(
-          style: TextStyle(color: textColor),
-          child: metadata.enableTextSelection
-              ? SelectionArea(child: markdown)
-              : markdown,
-        ),
-        if (metadata.showCopyButton) _buildCopyButton(context),
-      ],
-    );
-  }
-
-  Widget _buildCollapsibleContent(
-    BuildContext context,
-    MessageMetadata metadata,
-  ) {
-    return CollapsibleMessageSection(
-      title: metadata.collapsibleTitle ?? 'Details',
-      content: message.text,
-      initiallyExpanded: metadata.initiallyExpanded,
-      styleSheet: styleSheet,
-    );
-  }
-
-  Widget _buildInteractiveContent(
-    BuildContext context,
-    MessageMetadata metadata,
-  ) {
-    // Extract base text color from stylesheet
-    final textColor =
-        styleSheet?.p?.color ??
-        Theme.of(context).textTheme.bodyLarge?.color ??
-        Colors.white;
-
-    final markdown = Markdown(
-      data: message.text,
-      selectable: false,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      styleSheet: styleSheet,
-      padding: EdgeInsets.zero,
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DefaultTextStyle(
-          style: TextStyle(color: textColor),
-          child: metadata.enableTextSelection
-              ? SelectionArea(child: markdown)
-              : markdown,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: metadata.actions
-              .map((action) => _buildActionButton(context, action))
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionButton(BuildContext context, MessageAction action) {
-    return FilledButton.tonal(
-      onPressed: action.onPressed,
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        minimumSize: const Size(0, 32),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (action.icon != null) ...[
-            Icon(action.icon, size: 16),
-            const SizedBox(width: 6),
-          ],
-          Text(action.label, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCopyButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: InkWell(
-        onTap: () => _copyToClipboard(context),
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.copy,
-                size: 14,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Copy',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _copyToClipboard(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: message.text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied to clipboard'),
-        duration: Duration(seconds: 2),
+    return SelectionArea(
+      child: DefaultTextStyle(
+        style: TextStyle(color: textColor),
+        child: markdown,
       ),
     );
   }
 }
 
-/// Collapsible message section
-class CollapsibleMessageSection extends StatefulWidget {
-  final String title;
-  final String content;
-  final bool initiallyExpanded;
-  final MarkdownStyleSheet? styleSheet;
+/// Custom markdown builder for expandable code blocks
+class ExpandableCodeBlockBuilder extends MarkdownElementBuilder {
+  final TerminalTheme terminalTheme;
+  final String messageId;
+  final int Function() getCodeBlockIndex;
 
-  const CollapsibleMessageSection({
-    super.key,
-    required this.title,
-    required this.content,
-    this.initiallyExpanded = false,
-    this.styleSheet,
+  ExpandableCodeBlockBuilder({
+    required this.terminalTheme,
+    required this.messageId,
+    required this.getCodeBlockIndex,
   });
 
   @override
-  State<CollapsibleMessageSection> createState() =>
-      _CollapsibleMessageSectionState();
-}
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final code = element.textContent;
+    final language =
+        element.attributes['class']?.replaceFirst('language-', '') ?? '';
+    final index = getCodeBlockIndex();
+    final heroTag = 'code_block_${messageId}_$index';
 
-class _CollapsibleMessageSectionState extends State<CollapsibleMessageSection>
-    with SingleTickerProviderStateMixin {
-  late bool _isExpanded;
-  late AnimationController _animationController;
-  late Animation<double> _expandAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _isExpanded = widget.initiallyExpanded;
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _expandAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-
-    if (_isExpanded) {
-      _animationController.value = 1.0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _toggleExpansion() {
-    setState(() {
-      _isExpanded = !_isExpanded;
-      if (_isExpanded) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: _toggleExpansion,
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                AnimatedRotation(
-                  turns: _isExpanded ? 0.25 : 0,
-                  duration: const Duration(milliseconds: 300),
-                  child: const Icon(Icons.chevron_right, size: 20),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        SizeTransition(
-          sizeFactor: _expandAnimation,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 28, top: 8),
-            child: DefaultTextStyle(
-              style: TextStyle(
-                color: widget.styleSheet?.p?.color ?? Colors.white,
-              ),
-              child: SelectionArea(
-                child: Markdown(
-                  data: widget.content,
-                  selectable: false,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  styleSheet: widget.styleSheet,
-                  padding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Message metadata extracted from customProperties
-class MessageMetadata {
-  final bool enableTextSelection;
-  final bool showCopyButton;
-  final bool isCollapsible;
-  final String? collapsibleTitle;
-  final bool initiallyExpanded;
-  final List<MessageAction> actions;
-
-  MessageMetadata({
-    this.enableTextSelection = true,
-    this.showCopyButton = false,
-    this.isCollapsible = false,
-    this.collapsibleTitle,
-    this.initiallyExpanded = false,
-    this.actions = const [],
-  });
-
-  factory MessageMetadata.fromCustomProperties(Map<String, dynamic> props) {
-    return MessageMetadata(
-      enableTextSelection: props['enableTextSelection'] as bool? ?? true,
-      showCopyButton: props['showCopyButton'] as bool? ?? false,
-      isCollapsible: props['isCollapsible'] as bool? ?? false,
-      collapsibleTitle: props['collapsibleTitle'] as String?,
-      initiallyExpanded: props['initiallyExpanded'] as bool? ?? false,
-      actions:
-          (props['actions'] as List?)
-              ?.map((a) => MessageAction.fromMap(a as Map<String, dynamic>))
-              .toList() ??
-          [],
-    );
-  }
-}
-
-/// Action button configuration
-class MessageAction {
-  final String label;
-  final IconData? icon;
-  final VoidCallback onPressed;
-
-  MessageAction({required this.label, this.icon, required this.onPressed});
-
-  factory MessageAction.fromMap(Map<String, dynamic> map) {
-    return MessageAction(
-      label: map['label'] as String,
-      icon: map['icon'] as IconData?,
-      onPressed: map['onPressed'] as VoidCallback,
+    return ExpandableCodeBlock(
+      code: code,
+      language: language,
+      heroTag: heroTag,
+      terminalTheme: terminalTheme,
     );
   }
 }

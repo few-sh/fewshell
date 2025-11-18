@@ -1006,6 +1006,16 @@ class $MessagesTable extends Messages
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  @override
+  late final GeneratedColumnWithTypeConverter<MessageKind, int> messageKind =
+      GeneratedColumn<int>(
+        'message_kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0),
+      ).withConverter<MessageKind>($MessagesTable.$convertermessageKind);
   static const VerificationMeta _imageUrlMeta = const VerificationMeta(
     'imageUrl',
   );
@@ -1017,17 +1027,24 @@ class $MessagesTable extends Messages
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _metadataMeta = const VerificationMeta(
-    'metadata',
-  );
   @override
-  late final GeneratedColumn<String> metadata = GeneratedColumn<String>(
-    'metadata',
+  late final GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
+  toolCallsJson = GeneratedColumn<String>(
+    'tool_calls_json',
     aliasedName,
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-  );
+  ).withConverter<List<ToolCall>?>($MessagesTable.$convertertoolCallsJson);
+  @override
+  late final GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
+  toolResultsJson = GeneratedColumn<String>(
+    'tool_results_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<List<ToolCall>?>($MessagesTable.$convertertoolResultsJson);
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1037,8 +1054,10 @@ class $MessagesTable extends Messages
     content,
     timestamp,
     createdAt,
+    messageKind,
     imageUrl,
-    metadata,
+    toolCallsJson,
+    toolResultsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1111,12 +1130,6 @@ class $MessagesTable extends Messages
         imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
       );
     }
-    if (data.containsKey('metadata')) {
-      context.handle(
-        _metadataMeta,
-        metadata.isAcceptableOrUnknown(data['metadata']!, _metadataMeta),
-      );
-    }
     return context;
   }
 
@@ -1154,13 +1167,27 @@ class $MessagesTable extends Messages
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      messageKind: $MessagesTable.$convertermessageKind.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}message_kind'],
+        )!,
+      ),
       imageUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}image_url'],
       ),
-      metadata: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}metadata'],
+      toolCallsJson: $MessagesTable.$convertertoolCallsJson.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}tool_calls_json'],
+        ),
+      ),
+      toolResultsJson: $MessagesTable.$convertertoolResultsJson.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}tool_results_json'],
+        ),
       ),
     );
   }
@@ -1169,6 +1196,13 @@ class $MessagesTable extends Messages
   $MessagesTable createAlias(String alias) {
     return $MessagesTable(attachedDatabase, alias);
   }
+
+  static JsonTypeConverter2<MessageKind, int, int> $convertermessageKind =
+      const EnumIndexConverter<MessageKind>(MessageKind.values);
+  static TypeConverter<List<ToolCall>?, String?> $convertertoolCallsJson =
+      const ToolCallListConverter();
+  static TypeConverter<List<ToolCall>?, String?> $convertertoolResultsJson =
+      const ToolCallListConverter();
 }
 
 class MessageEntity extends DataClass implements Insertable<MessageEntity> {
@@ -1193,11 +1227,13 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
   /// Timestamp when the message was created
   final DateTime createdAt;
 
-  /// Optional image URL
-  final String? imageUrl;
+  /// Discriminator: what kind of message is this?
+  final MessageKind messageKind;
 
-  /// Optional metadata as JSON string
-  final String? metadata;
+  /// Image URL (only populated when messageKind = imageUrl)
+  final String? imageUrl;
+  final List<ToolCall>? toolCallsJson;
+  final List<ToolCall>? toolResultsJson;
   const MessageEntity({
     required this.id,
     required this.sessionId,
@@ -1206,8 +1242,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     required this.content,
     required this.timestamp,
     required this.createdAt,
+    required this.messageKind,
     this.imageUrl,
-    this.metadata,
+    this.toolCallsJson,
+    this.toolResultsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1219,11 +1257,23 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     map['content'] = Variable<String>(content);
     map['timestamp'] = Variable<DateTime>(timestamp);
     map['created_at'] = Variable<DateTime>(createdAt);
+    {
+      map['message_kind'] = Variable<int>(
+        $MessagesTable.$convertermessageKind.toSql(messageKind),
+      );
+    }
     if (!nullToAbsent || imageUrl != null) {
       map['image_url'] = Variable<String>(imageUrl);
     }
-    if (!nullToAbsent || metadata != null) {
-      map['metadata'] = Variable<String>(metadata);
+    if (!nullToAbsent || toolCallsJson != null) {
+      map['tool_calls_json'] = Variable<String>(
+        $MessagesTable.$convertertoolCallsJson.toSql(toolCallsJson),
+      );
+    }
+    if (!nullToAbsent || toolResultsJson != null) {
+      map['tool_results_json'] = Variable<String>(
+        $MessagesTable.$convertertoolResultsJson.toSql(toolResultsJson),
+      );
     }
     return map;
   }
@@ -1237,12 +1287,16 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       content: Value(content),
       timestamp: Value(timestamp),
       createdAt: Value(createdAt),
+      messageKind: Value(messageKind),
       imageUrl: imageUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(imageUrl),
-      metadata: metadata == null && nullToAbsent
+      toolCallsJson: toolCallsJson == null && nullToAbsent
           ? const Value.absent()
-          : Value(metadata),
+          : Value(toolCallsJson),
+      toolResultsJson: toolResultsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(toolResultsJson),
     );
   }
 
@@ -1259,8 +1313,16 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       content: serializer.fromJson<String>(json['content']),
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      messageKind: $MessagesTable.$convertermessageKind.fromJson(
+        serializer.fromJson<int>(json['messageKind']),
+      ),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
-      metadata: serializer.fromJson<String?>(json['metadata']),
+      toolCallsJson: serializer.fromJson<List<ToolCall>?>(
+        json['toolCallsJson'],
+      ),
+      toolResultsJson: serializer.fromJson<List<ToolCall>?>(
+        json['toolResultsJson'],
+      ),
     );
   }
   @override
@@ -1274,8 +1336,12 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       'content': serializer.toJson<String>(content),
       'timestamp': serializer.toJson<DateTime>(timestamp),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'messageKind': serializer.toJson<int>(
+        $MessagesTable.$convertermessageKind.toJson(messageKind),
+      ),
       'imageUrl': serializer.toJson<String?>(imageUrl),
-      'metadata': serializer.toJson<String?>(metadata),
+      'toolCallsJson': serializer.toJson<List<ToolCall>?>(toolCallsJson),
+      'toolResultsJson': serializer.toJson<List<ToolCall>?>(toolResultsJson),
     };
   }
 
@@ -1287,8 +1353,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     String? content,
     DateTime? timestamp,
     DateTime? createdAt,
+    MessageKind? messageKind,
     Value<String?> imageUrl = const Value.absent(),
-    Value<String?> metadata = const Value.absent(),
+    Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
+    Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
   }) => MessageEntity(
     id: id ?? this.id,
     sessionId: sessionId ?? this.sessionId,
@@ -1297,8 +1365,14 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     content: content ?? this.content,
     timestamp: timestamp ?? this.timestamp,
     createdAt: createdAt ?? this.createdAt,
+    messageKind: messageKind ?? this.messageKind,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
-    metadata: metadata.present ? metadata.value : this.metadata,
+    toolCallsJson: toolCallsJson.present
+        ? toolCallsJson.value
+        : this.toolCallsJson,
+    toolResultsJson: toolResultsJson.present
+        ? toolResultsJson.value
+        : this.toolResultsJson,
   );
   MessageEntity copyWithCompanion(MessageEntityCompanion data) {
     return MessageEntity(
@@ -1309,8 +1383,16 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       content: data.content.present ? data.content.value : this.content,
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      messageKind: data.messageKind.present
+          ? data.messageKind.value
+          : this.messageKind,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
-      metadata: data.metadata.present ? data.metadata.value : this.metadata,
+      toolCallsJson: data.toolCallsJson.present
+          ? data.toolCallsJson.value
+          : this.toolCallsJson,
+      toolResultsJson: data.toolResultsJson.present
+          ? data.toolResultsJson.value
+          : this.toolResultsJson,
     );
   }
 
@@ -1324,8 +1406,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ..write('content: $content, ')
           ..write('timestamp: $timestamp, ')
           ..write('createdAt: $createdAt, ')
+          ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
-          ..write('metadata: $metadata')
+          ..write('toolCallsJson: $toolCallsJson, ')
+          ..write('toolResultsJson: $toolResultsJson')
           ..write(')'))
         .toString();
   }
@@ -1339,8 +1423,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     content,
     timestamp,
     createdAt,
+    messageKind,
     imageUrl,
-    metadata,
+    toolCallsJson,
+    toolResultsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -1353,8 +1439,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           other.content == this.content &&
           other.timestamp == this.timestamp &&
           other.createdAt == this.createdAt &&
+          other.messageKind == this.messageKind &&
           other.imageUrl == this.imageUrl &&
-          other.metadata == this.metadata);
+          other.toolCallsJson == this.toolCallsJson &&
+          other.toolResultsJson == this.toolResultsJson);
 }
 
 class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
@@ -1365,8 +1453,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
   final Value<String> content;
   final Value<DateTime> timestamp;
   final Value<DateTime> createdAt;
+  final Value<MessageKind> messageKind;
   final Value<String?> imageUrl;
-  final Value<String?> metadata;
+  final Value<List<ToolCall>?> toolCallsJson;
+  final Value<List<ToolCall>?> toolResultsJson;
   final Value<int> rowid;
   const MessageEntityCompanion({
     this.id = const Value.absent(),
@@ -1376,8 +1466,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.content = const Value.absent(),
     this.timestamp = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
-    this.metadata = const Value.absent(),
+    this.toolCallsJson = const Value.absent(),
+    this.toolResultsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessageEntityCompanion.insert({
@@ -1388,8 +1480,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     required String content,
     required DateTime timestamp,
     required DateTime createdAt,
+    this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
-    this.metadata = const Value.absent(),
+    this.toolCallsJson = const Value.absent(),
+    this.toolResultsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        sessionId = Value(sessionId),
@@ -1406,8 +1500,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     Expression<String>? content,
     Expression<DateTime>? timestamp,
     Expression<DateTime>? createdAt,
+    Expression<int>? messageKind,
     Expression<String>? imageUrl,
-    Expression<String>? metadata,
+    Expression<String>? toolCallsJson,
+    Expression<String>? toolResultsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1418,8 +1514,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       if (content != null) 'content': content,
       if (timestamp != null) 'timestamp': timestamp,
       if (createdAt != null) 'created_at': createdAt,
+      if (messageKind != null) 'message_kind': messageKind,
       if (imageUrl != null) 'image_url': imageUrl,
-      if (metadata != null) 'metadata': metadata,
+      if (toolCallsJson != null) 'tool_calls_json': toolCallsJson,
+      if (toolResultsJson != null) 'tool_results_json': toolResultsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1432,8 +1530,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     Value<String>? content,
     Value<DateTime>? timestamp,
     Value<DateTime>? createdAt,
+    Value<MessageKind>? messageKind,
     Value<String?>? imageUrl,
-    Value<String?>? metadata,
+    Value<List<ToolCall>?>? toolCallsJson,
+    Value<List<ToolCall>?>? toolResultsJson,
     Value<int>? rowid,
   }) {
     return MessageEntityCompanion(
@@ -1444,8 +1544,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       content: content ?? this.content,
       timestamp: timestamp ?? this.timestamp,
       createdAt: createdAt ?? this.createdAt,
+      messageKind: messageKind ?? this.messageKind,
       imageUrl: imageUrl ?? this.imageUrl,
-      metadata: metadata ?? this.metadata,
+      toolCallsJson: toolCallsJson ?? this.toolCallsJson,
+      toolResultsJson: toolResultsJson ?? this.toolResultsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1474,11 +1576,23 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (messageKind.present) {
+      map['message_kind'] = Variable<int>(
+        $MessagesTable.$convertermessageKind.toSql(messageKind.value),
+      );
+    }
     if (imageUrl.present) {
       map['image_url'] = Variable<String>(imageUrl.value);
     }
-    if (metadata.present) {
-      map['metadata'] = Variable<String>(metadata.value);
+    if (toolCallsJson.present) {
+      map['tool_calls_json'] = Variable<String>(
+        $MessagesTable.$convertertoolCallsJson.toSql(toolCallsJson.value),
+      );
+    }
+    if (toolResultsJson.present) {
+      map['tool_results_json'] = Variable<String>(
+        $MessagesTable.$convertertoolResultsJson.toSql(toolResultsJson.value),
+      );
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1496,8 +1610,10 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
           ..write('content: $content, ')
           ..write('timestamp: $timestamp, ')
           ..write('createdAt: $createdAt, ')
+          ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
-          ..write('metadata: $metadata, ')
+          ..write('toolCallsJson: $toolCallsJson, ')
+          ..write('toolResultsJson: $toolResultsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2577,8 +2693,10 @@ typedef $$MessagesTableCreateCompanionBuilder =
       required String content,
       required DateTime timestamp,
       required DateTime createdAt,
+      Value<MessageKind> messageKind,
       Value<String?> imageUrl,
-      Value<String?> metadata,
+      Value<List<ToolCall>?> toolCallsJson,
+      Value<List<ToolCall>?> toolResultsJson,
       Value<int> rowid,
     });
 typedef $$MessagesTableUpdateCompanionBuilder =
@@ -2590,8 +2708,10 @@ typedef $$MessagesTableUpdateCompanionBuilder =
       Value<String> content,
       Value<DateTime> timestamp,
       Value<DateTime> createdAt,
+      Value<MessageKind> messageKind,
       Value<String?> imageUrl,
-      Value<String?> metadata,
+      Value<List<ToolCall>?> toolCallsJson,
+      Value<List<ToolCall>?> toolResultsJson,
       Value<int> rowid,
     });
 
@@ -2639,14 +2759,27 @@ class $$MessagesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnWithTypeConverterFilters<MessageKind, MessageKind, int>
+  get messageKind => $composableBuilder(
+    column: $table.messageKind,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
   ColumnFilters<String> get imageUrl => $composableBuilder(
     column: $table.imageUrl,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get metadata => $composableBuilder(
-    column: $table.metadata,
-    builder: (column) => ColumnFilters(column),
+  ColumnWithTypeConverterFilters<List<ToolCall>?, List<ToolCall>, String>
+  get toolCallsJson => $composableBuilder(
+    column: $table.toolCallsJson,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<List<ToolCall>?, List<ToolCall>, String>
+  get toolResultsJson => $composableBuilder(
+    column: $table.toolResultsJson,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 }
 
@@ -2694,13 +2827,23 @@ class $$MessagesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get messageKind => $composableBuilder(
+    column: $table.messageKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get imageUrl => $composableBuilder(
     column: $table.imageUrl,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get metadata => $composableBuilder(
-    column: $table.metadata,
+  ColumnOrderings<String> get toolCallsJson => $composableBuilder(
+    column: $table.toolCallsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get toolResultsJson => $composableBuilder(
+    column: $table.toolResultsJson,
     builder: (column) => ColumnOrderings(column),
   );
 }
@@ -2735,11 +2878,26 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
+  GeneratedColumnWithTypeConverter<MessageKind, int> get messageKind =>
+      $composableBuilder(
+        column: $table.messageKind,
+        builder: (column) => column,
+      );
+
   GeneratedColumn<String> get imageUrl =>
       $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
-  GeneratedColumn<String> get metadata =>
-      $composableBuilder(column: $table.metadata, builder: (column) => column);
+  GeneratedColumnWithTypeConverter<List<ToolCall>?, String> get toolCallsJson =>
+      $composableBuilder(
+        column: $table.toolCallsJson,
+        builder: (column) => column,
+      );
+
+  GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
+  get toolResultsJson => $composableBuilder(
+    column: $table.toolResultsJson,
+    builder: (column) => column,
+  );
 }
 
 class $$MessagesTableTableManager
@@ -2780,8 +2938,10 @@ class $$MessagesTableTableManager
                 Value<String> content = const Value.absent(),
                 Value<DateTime> timestamp = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<MessageKind> messageKind = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
-                Value<String?> metadata = const Value.absent(),
+                Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
+                Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageEntityCompanion(
                 id: id,
@@ -2791,8 +2951,10 @@ class $$MessagesTableTableManager
                 content: content,
                 timestamp: timestamp,
                 createdAt: createdAt,
+                messageKind: messageKind,
                 imageUrl: imageUrl,
-                metadata: metadata,
+                toolCallsJson: toolCallsJson,
+                toolResultsJson: toolResultsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2804,8 +2966,10 @@ class $$MessagesTableTableManager
                 required String content,
                 required DateTime timestamp,
                 required DateTime createdAt,
+                Value<MessageKind> messageKind = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
-                Value<String?> metadata = const Value.absent(),
+                Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
+                Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MessageEntityCompanion.insert(
                 id: id,
@@ -2815,8 +2979,10 @@ class $$MessagesTableTableManager
                 content: content,
                 timestamp: timestamp,
                 createdAt: createdAt,
+                messageKind: messageKind,
                 imageUrl: imageUrl,
-                metadata: metadata,
+                toolCallsJson: toolCallsJson,
+                toolResultsJson: toolResultsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

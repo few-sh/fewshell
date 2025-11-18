@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
+import '../services/keychain_service.dart';
+import '../providers/ssh_settings_provider.dart';
 import '../providers/secret_provider.dart';
 
 /// Provider for the shell service
@@ -12,19 +16,22 @@ final shellServiceProvider = Provider.family<ShellService, String?>((
   projectId,
 ) {
   if (projectId == null) {
-    return ShellService(null, null);
+    return ShellService(null, null, null);
   }
 
-  final secretsActions = ref.watch(projectSecretsProvider(projectId));
-  return ShellService(null, secretsActions);
+  final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
+  final keychain = ref.watch(keychainServiceProvider);
+  return ShellService(sshSettings, keychain, projectId);
 });
 
 /// Service for executing shell commands via SSH
 class ShellService {
   SSHClient? _client;
-  final ProjectSecretsActions? _secretsActions;
+  final SshSettings? _sshSettings;
+  final KeychainService? _keychain;
+  final String? _projectId;
 
-  ShellService(SshSettings? sshSettings, this._secretsActions);
+  ShellService(this._sshSettings, this._keychain, this._projectId);
 
   /// Connect to SSH server using the provided settings
   /// Returns true if connection successful, false otherwise
@@ -40,19 +47,22 @@ class ShellService {
       String? privateKey;
       String? passphrase;
 
-      if (_secretsActions != null) {
+      if (_keychain != null && _projectId != null) {
         if (sshSettings.passwordSecretId != null) {
-          password = await _secretsActions.getSecret(
+          password = await _keychain.getProjectSecret(
+            _projectId,
             sshSettings.passwordSecretId!,
           );
         }
         if (sshSettings.privateKeySecretId != null) {
-          privateKey = await _secretsActions.getSecret(
+          privateKey = await _keychain.getProjectSecret(
+            _projectId,
             sshSettings.privateKeySecretId!,
           );
         }
         if (sshSettings.passphraseSecretId != null) {
-          passphrase = await _secretsActions.getSecret(
+          passphrase = await _keychain.getProjectSecret(
+            _projectId,
             sshSettings.passphraseSecretId!,
           );
         }
@@ -113,14 +123,31 @@ class ShellService {
   }) async {
     developer.log('Executing command: $command', name: 'ShellService');
 
+    // Auto-connect if not connected
     if (_client == null) {
-      developer.log('No active SSH connection', name: 'ShellService');
-      return {
-        'stdout': '',
-        'stderr': 'Error: Not connected to SSH server',
-        'exitCode': -1,
-        'executed': false,
-      };
+      if (_sshSettings == null) {
+        developer.log(
+          'No SSH settings configured for this project',
+          name: 'ShellService',
+        );
+        return {
+          'stdout': '',
+          'stderr': 'Error: SSH settings not configured for this project',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
+
+      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      final connected = await connect(_sshSettings);
+      if (!connected) {
+        return {
+          'stdout': '',
+          'stderr': 'Error: Failed to connect to SSH server',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
     }
 
     try {
@@ -164,19 +191,46 @@ ${envExports}DECAMP_SECRETS
       }
 
       // Execute command and capture output
-      final result = await _client!.run(finalCommand);
+      final session = await _client!.execute(finalCommand);
 
-      final stdout = String.fromCharCodes(result);
+      // Collect stdout and stderr
+      final stdoutBuffer = BytesBuilder(copy: false);
+      final stderrBuffer = BytesBuilder(copy: false);
+      final stdoutDone = Completer<void>();
+      final stderrDone = Completer<void>();
+
+      session.stdout.listen(
+        stdoutBuffer.add,
+        onDone: stdoutDone.complete,
+        onError: stdoutDone.completeError,
+      );
+
+      session.stderr.listen(
+        stderrBuffer.add,
+        onDone: stderrDone.complete,
+        onError: stderrDone.completeError,
+      );
+
+      // Wait for both streams to complete
+      await stdoutDone.future;
+      await stderrDone.future;
+
+      // Wait for session to complete to get exit code
+      await session.done;
+
+      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
+      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      final exitCode = session.exitCode ?? -1;
 
       developer.log(
-        'Command executed successfully. Output length: ${stdout.length}',
+        'Command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
         name: 'ShellService',
       );
 
       return {
         'stdout': _redactSecrets(stdout, secretsToRedact),
-        'stderr': '',
-        'exitCode': 0,
+        'stderr': _redactSecrets(stderr, secretsToRedact),
+        'exitCode': exitCode,
         'executed': true,
       };
     } catch (e) {
@@ -193,9 +247,21 @@ ${envExports}DECAMP_SECRETS
   /// Execute a shell command with full control over stdin/stdout/stderr
   /// Returns a session that can be used for interactive commands
   Future<SSHSession?> createSession() async {
+    // Auto-connect if not connected
     if (_client == null) {
-      developer.log('No active SSH connection', name: 'ShellService');
-      return null;
+      if (_sshSettings == null) {
+        developer.log(
+          'No SSH settings configured for this project',
+          name: 'ShellService',
+        );
+        return null;
+      }
+
+      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      final connected = await connect(_sshSettings);
+      if (!connected) {
+        return null;
+      }
     }
 
     try {
@@ -257,20 +323,42 @@ ${envExports}DECAMP_SECRETS
     String? sudoPasswordSecretId,
     Map<String, String>? secrets,
   }) async {
+    // Auto-connect if not connected
     if (_client == null) {
-      developer.log('No active SSH connection', name: 'ShellService');
-      return {
-        'stdout': '',
-        'stderr': 'Error: Not connected to SSH server',
-        'exitCode': -1,
-        'executed': false,
-      };
+      if (_sshSettings == null) {
+        developer.log(
+          'No SSH settings configured for this project',
+          name: 'ShellService',
+        );
+        return {
+          'stdout': '',
+          'stderr': 'Error: SSH settings not configured for this project',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
+
+      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      final connected = await connect(_sshSettings);
+      if (!connected) {
+        return {
+          'stdout': '',
+          'stderr': 'Error: Failed to connect to SSH server',
+          'exitCode': -1,
+          'executed': false,
+        };
+      }
     }
 
     // Get sudo password from secrets if provided
     String? sudoPassword;
-    if (sudoPasswordSecretId != null) {
-      sudoPassword = await _secretsActions?.getSecret(sudoPasswordSecretId);
+    if (sudoPasswordSecretId != null &&
+        _keychain != null &&
+        _projectId != null) {
+      sudoPassword = await _keychain.getProjectSecret(
+        _projectId,
+        sudoPasswordSecretId,
+      );
       if (sudoPassword == null || sudoPassword.isEmpty) {
         developer.log(
           'Sudo password not found in secrets',
@@ -363,18 +451,46 @@ ${envExports}DECAMP_SECRETS
     );
 
     try {
-      final result = await _client!.run(secureCommand);
-      final stdout = String.fromCharCodes(result);
+      final session = await _client!.execute(secureCommand);
+
+      // Collect stdout and stderr
+      final stdoutBuffer = BytesBuilder(copy: false);
+      final stderrBuffer = BytesBuilder(copy: false);
+      final stdoutDone = Completer<void>();
+      final stderrDone = Completer<void>();
+
+      session.stdout.listen(
+        stdoutBuffer.add,
+        onDone: stdoutDone.complete,
+        onError: stdoutDone.completeError,
+      );
+
+      session.stderr.listen(
+        stderrBuffer.add,
+        onDone: stderrDone.complete,
+        onError: stderrDone.completeError,
+      );
+
+      // Wait for both streams to complete
+      await stdoutDone.future;
+      await stderrDone.future;
+
+      // Wait for session to complete to get exit code
+      await session.done;
+
+      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
+      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      final exitCode = session.exitCode ?? -1;
 
       developer.log(
-        'Sudo command executed successfully. Output length: ${stdout.length}',
+        'Sudo command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
         name: 'ShellService',
       );
 
       return {
         'stdout': _redactSecrets(stdout, secretsToRedact),
-        'stderr': '',
-        'exitCode': 0,
+        'stderr': _redactSecrets(stderr, secretsToRedact),
+        'exitCode': exitCode,
         'executed': true,
       };
     } catch (e) {

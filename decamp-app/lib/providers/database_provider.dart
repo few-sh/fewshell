@@ -3,7 +3,7 @@ import '../database/database.dart';
 
 /// Provider for the AppDatabase instance.
 /// This is the single source of truth for database access.
-/// All DAOs should be accessed through this provider.
+/// Access DAOs directly: ref.watch(databaseProvider).projectDao
 final databaseProvider = Provider<AppDatabase>((ref) {
   final database = AppDatabase();
 
@@ -13,22 +13,4 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   });
 
   return database;
-});
-
-/// Provider for ProjectDao
-final projectDaoProvider = Provider((ref) {
-  final database = ref.watch(databaseProvider);
-  return database.projectDao;
-});
-
-/// Provider for SessionDao
-final sessionDaoProvider = Provider((ref) {
-  final database = ref.watch(databaseProvider);
-  return database.sessionDao;
-});
-
-/// Provider for MessageDao
-final messageDaoProvider = Provider((ref) {
-  final database = ref.watch(databaseProvider);
-  return database.messageDao;
 });

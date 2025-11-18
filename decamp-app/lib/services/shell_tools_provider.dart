@@ -6,9 +6,11 @@ final shellTools = [
   Tool.function(
     name: 'execute_shell_command',
     description:
-        'Execute a shell command on the server or infrastructure. '
+        'Executes a shell command on the server or infrastructure returns its resulting output of stdout, stderr and exitCode'
         'Use this to run commands like checking logs, restarting services, '
-        'checking disk space, process status, etc.',
+        'checking disk space, process status, etc. '
+        'Returns JSON with the fields: stdout, stderr and exitCode that contain the standard output, error message and exit code respectively and '
+        'an additional executed field. The executed field simply indicates that the command executed regardless of whether the command itself has an error.',
     parameters: ParametersSchema(
       schemaType: 'object',
       properties: {

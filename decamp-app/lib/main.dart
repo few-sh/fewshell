@@ -12,7 +12,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Configure logging for AnthropicClient
-  Logger.root.level = Level.ALL;
+  // Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     print(
       '${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}',

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/messages_table.dart';
+import '../../utils/id_generator.dart';
 
 part 'message_dao.g.dart';
 
@@ -81,5 +82,41 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
       ..addColumns([count])
       ..where(messages.sessionId.equals(sessionId));
     return query.map((row) => row.read(count)!).getSingle();
+  }
+
+  /// Generate a unique message ID
+  String generateMessageId() => IdGenerator.messageId();
+
+  /// Insert a message with all parameters, generating ID if not provided
+  /// This is a convenience method for simple text messages
+  Future<String> insertMessageWithId({
+    String? id,
+    required String sessionId,
+    required String userId,
+    required String userName,
+    required String content,
+    String? imageUrl,
+  }) async {
+    final now = DateTime.now();
+    final messageId = id ?? generateMessageId();
+
+    final companion = MessageEntityCompanion(
+      id: Value(messageId),
+      sessionId: Value(sessionId),
+      userId: Value(userId),
+      userName: Value(userName),
+      content: Value(content),
+      timestamp: Value(now),
+      createdAt: Value(now),
+      messageKind: Value(
+        imageUrl != null ? MessageKind.imageUrl : MessageKind.text,
+      ),
+      imageUrl: Value(imageUrl),
+      toolCallsJson: const Value(null),
+      toolResultsJson: const Value(null),
+    );
+
+    await insertMessage(companion);
+    return messageId;
   }
 }

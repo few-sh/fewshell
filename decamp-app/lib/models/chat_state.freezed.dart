@@ -211,7 +211,9 @@ mixin _$ChatState {
       throw _privateConstructorUsedError;
   List<ToolCall>? get pendingToolCalls => throw _privateConstructorUsedError;
   String? get assistantTextBeforeTools =>
-      throw _privateConstructorUsedError; // Error state
+      throw _privateConstructorUsedError; // Streaming state
+  String? get streamingMessageId => throw _privateConstructorUsedError;
+  String get streamingText => throw _privateConstructorUsedError; // Error state
   String? get error => throw _privateConstructorUsedError;
 
   /// Create a copy of ChatState
@@ -233,6 +235,8 @@ abstract class $ChatStateCopyWith<$Res> {
     List<ChatMessage>? conversationForToolCalls,
     List<ToolCall>? pendingToolCalls,
     String? assistantTextBeforeTools,
+    String? streamingMessageId,
+    String streamingText,
     String? error,
   });
 
@@ -260,6 +264,8 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
     Object? conversationForToolCalls = freezed,
     Object? pendingToolCalls = freezed,
     Object? assistantTextBeforeTools = freezed,
+    Object? streamingMessageId = freezed,
+    Object? streamingText = null,
     Object? error = freezed,
   }) {
     return _then(
@@ -288,6 +294,14 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
                 ? _value.assistantTextBeforeTools
                 : assistantTextBeforeTools // ignore: cast_nullable_to_non_nullable
                       as String?,
+            streamingMessageId: freezed == streamingMessageId
+                ? _value.streamingMessageId
+                : streamingMessageId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            streamingText: null == streamingText
+                ? _value.streamingText
+                : streamingText // ignore: cast_nullable_to_non_nullable
+                      as String,
             error: freezed == error
                 ? _value.error
                 : error // ignore: cast_nullable_to_non_nullable
@@ -328,6 +342,8 @@ abstract class _$$ChatStateImplCopyWith<$Res>
     List<ChatMessage>? conversationForToolCalls,
     List<ToolCall>? pendingToolCalls,
     String? assistantTextBeforeTools,
+    String? streamingMessageId,
+    String streamingText,
     String? error,
   });
 
@@ -355,6 +371,8 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     Object? conversationForToolCalls = freezed,
     Object? pendingToolCalls = freezed,
     Object? assistantTextBeforeTools = freezed,
+    Object? streamingMessageId = freezed,
+    Object? streamingText = null,
     Object? error = freezed,
   }) {
     return _then(
@@ -383,6 +401,14 @@ class __$$ChatStateImplCopyWithImpl<$Res>
             ? _value.assistantTextBeforeTools
             : assistantTextBeforeTools // ignore: cast_nullable_to_non_nullable
                   as String?,
+        streamingMessageId: freezed == streamingMessageId
+            ? _value.streamingMessageId
+            : streamingMessageId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        streamingText: null == streamingText
+            ? _value.streamingText
+            : streamingText // ignore: cast_nullable_to_non_nullable
+                  as String,
         error: freezed == error
             ? _value.error
             : error // ignore: cast_nullable_to_non_nullable
@@ -402,6 +428,8 @@ class _$ChatStateImpl extends _ChatState {
     final List<ChatMessage>? conversationForToolCalls,
     final List<ToolCall>? pendingToolCalls,
     this.assistantTextBeforeTools,
+    this.streamingMessageId,
+    this.streamingText = '',
     this.error,
   }) : _pendingActions = pendingActions,
        _conversationForToolCalls = conversationForToolCalls,
@@ -453,13 +481,19 @@ class _$ChatStateImpl extends _ChatState {
 
   @override
   final String? assistantTextBeforeTools;
+  // Streaming state
+  @override
+  final String? streamingMessageId;
+  @override
+  @JsonKey()
+  final String streamingText;
   // Error state
   @override
   final String? error;
 
   @override
   String toString() {
-    return 'ChatState(isLoading: $isLoading, pendingActions: $pendingActions, executionProgress: $executionProgress, conversationForToolCalls: $conversationForToolCalls, pendingToolCalls: $pendingToolCalls, assistantTextBeforeTools: $assistantTextBeforeTools, error: $error)';
+    return 'ChatState(isLoading: $isLoading, pendingActions: $pendingActions, executionProgress: $executionProgress, conversationForToolCalls: $conversationForToolCalls, pendingToolCalls: $pendingToolCalls, assistantTextBeforeTools: $assistantTextBeforeTools, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
   }
 
   @override
@@ -488,6 +522,10 @@ class _$ChatStateImpl extends _ChatState {
                   assistantTextBeforeTools,
                 ) ||
                 other.assistantTextBeforeTools == assistantTextBeforeTools) &&
+            (identical(other.streamingMessageId, streamingMessageId) ||
+                other.streamingMessageId == streamingMessageId) &&
+            (identical(other.streamingText, streamingText) ||
+                other.streamingText == streamingText) &&
             (identical(other.error, error) || other.error == error));
   }
 
@@ -500,6 +538,8 @@ class _$ChatStateImpl extends _ChatState {
     const DeepCollectionEquality().hash(_conversationForToolCalls),
     const DeepCollectionEquality().hash(_pendingToolCalls),
     assistantTextBeforeTools,
+    streamingMessageId,
+    streamingText,
     error,
   );
 
@@ -520,6 +560,8 @@ abstract class _ChatState extends ChatState {
     final List<ChatMessage>? conversationForToolCalls,
     final List<ToolCall>? pendingToolCalls,
     final String? assistantTextBeforeTools,
+    final String? streamingMessageId,
+    final String streamingText,
     final String? error,
   }) = _$ChatStateImpl;
   const _ChatState._() : super._();
@@ -536,7 +578,11 @@ abstract class _ChatState extends ChatState {
   @override
   List<ToolCall>? get pendingToolCalls;
   @override
-  String? get assistantTextBeforeTools; // Error state
+  String? get assistantTextBeforeTools; // Streaming state
+  @override
+  String? get streamingMessageId;
+  @override
+  String get streamingText; // Error state
   @override
   String? get error;
 

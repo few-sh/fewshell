@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/projects_table.dart';
+import '../../utils/id_generator.dart';
 
 part 'project_dao.g.dart';
 
@@ -77,5 +78,29 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
           ..where((p) => p.name.like('%$query%'))
           ..orderBy([(p) => OrderingTerm(expression: p.name)]))
         .get();
+  }
+
+  /// Generate a unique project ID
+  String generateProjectId() => IdGenerator.projectId();
+
+  /// Create a new project with all parameters
+  Future<String> createProjectWithId({
+    required String name,
+    String? description,
+  }) async {
+    final now = DateTime.now();
+    final id = generateProjectId();
+
+    final companion = ProjectEntityCompanion(
+      id: Value(id),
+      name: Value(name),
+      description: Value(description),
+      lastSessionDate: Value(now),
+      createdAt: Value(now),
+      updatedAt: Value(now),
+    );
+
+    await insertProject(companion);
+    return id;
   }
 }

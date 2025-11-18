@@ -1,109 +1,151 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_gen_ai_chat_ui/flutter_gen_ai_chat_ui.dart';
-import 'package:llm_dart/llm_dart.dart' as llm;
+import 'package:llm_dart/llm_dart.dart';
+import 'package:drift/drift.dart';
+import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
-import '../repositories/chat_repository.dart';
+import '../models/ssh_settings.dart';
+import '../services/llm_service.dart';
+import '../services/shell_service.dart';
+import '../services/shell_tools_provider.dart';
+import '../providers/database_provider.dart';
+import '../providers/project_provider.dart';
+import '../providers/ssh_settings_provider.dart';
+import '../database/daos/message_dao.dart';
+import '../database/daos/session_dao.dart';
+import '../database/database.dart';
 import '../components/multi_command_approval_overlay.dart';
 
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
+/// Directly calls DAOs and services without unnecessary repository layer
 class ChatController extends StateNotifier<ChatState> {
-  final ChatRepository _repository;
+  final MessageDao _messageDao;
+  final SessionDao _sessionDao;
+  final LlmService _llmService;
+  final ShellService _shellService;
+  final SshSettings? _sshSettings;
   final String? sessionId;
 
-  // Define users
-  final _currentUser = ChatUser(id: 'user', firstName: 'You');
-  final _aiUser = ChatUser(id: 'ai', firstName: 'Ops Agent');
-
-  ChatController(this._repository, this.sessionId) : super(const ChatState()) {
-    _initialize();
-  }
-
-  /// Initialize controller
-  Future<void> _initialize() async {
-    // Controller is ready - no need to cache model identifier
-    // UI can fetch it directly from providers when needed
-  }
+  ChatController({
+    required MessageDao messageDao,
+    required SessionDao sessionDao,
+    required LlmService llmService,
+    required ShellService shellService,
+    SshSettings? sshSettings,
+    this.sessionId,
+  }) : _messageDao = messageDao,
+       _sessionDao = sessionDao,
+       _llmService = llmService,
+       _shellService = shellService,
+       _sshSettings = sshSettings,
+       super(const ChatState());
 
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
     state = const ChatState();
   }
 
-  /// Get current user
-  ChatUser get currentUser => _currentUser;
+  /// Build conversation history from database messages
+  /// Reconstructs proper ChatMessage objects including tool use and tool results
+  List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
+    final conversation = <ChatMessage>[];
 
-  /// Get AI user
-  ChatUser get aiUser => _aiUser;
+    developer.log(
+      '🔄 Building conversation history from ${dbMessages.length} messages',
+      name: 'ChatController',
+    );
+
+    for (final msg in dbMessages) {
+      // Cast to MessageEntity for type-safe access
+      final messageEntity = msg as MessageEntity;
+
+      // Use the extension method to convert to ChatMessage
+      final chatMessage = messageEntity.toChatMessage();
+
+      developer.log(
+        '✅ Reconstructed ${chatMessage.role.name} message with kind: ${messageEntity.messageKind.name}',
+        name: 'ChatController',
+      );
+
+      // Log tool calls and results for debugging
+      if (chatMessage.messageType is ToolUseMessage) {
+        final toolUse = chatMessage.messageType as ToolUseMessage;
+        developer.log(
+          '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
+          name: 'ChatController',
+        );
+      } else if (chatMessage.messageType is ToolResultMessage) {
+        final toolResult = chatMessage.messageType as ToolResultMessage;
+        developer.log(
+          '  📊 Tool results: ${toolResult.results.length} result(s)',
+          name: 'ChatController',
+        );
+      }
+
+      conversation.add(chatMessage);
+    }
+
+    developer.log(
+      '✅ Built conversation with ${conversation.length} messages',
+      name: 'ChatController',
+    );
+
+    return conversation;
+  }
 
   /// Send a message to the AI
   /// Handles saving to database, getting AI response, and managing tool calls
   ///
-  /// Streaming Integration:
-  /// - startStreaming: Called when first text chunk arrives, creates empty message and marks it as streaming
-  /// - updateStreamingMessage: Called for each chunk, updates message text
-  /// - stopStreaming: Called when complete, stops animation to prevent re-animation on scroll
+  /// Streaming is managed internally through ChatState:
+  /// - startStreaming: Sets streamingMessageId in state
+  /// - updateStreamingText: Updates streamingText in state
+  /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
     required String content,
     required String sessionId,
-    required List<dynamic>
-    dbMessages, // Database messages to build conversation from
+    required List<dynamic> dbMessages,
     required bool isFirstMessage,
-    required void Function(ChatMessage) addMessageToUI,
-    required void Function(String messageId) startStreaming,
-    required void Function(String messageId, String text)
-    updateStreamingMessage,
-    required void Function(String messageId) stopStreaming,
   }) async {
-    developer.log('🎯 sendMessage called', name: 'ChatController');
-
     // Save user's message to database
-    // Note: The UI already has the message (added by AiChatWidget), we just save it
-    final userMessageId = await _repository.saveUserMessage(
+    await _messageDao.insertMessageWithId(
       sessionId: sessionId,
+      userId: 'user',
+      userName: 'You',
       content: content,
     );
 
-    developer.log(
-      'User message saved with ID: $userMessageId',
-      name: 'ChatController',
-    );
-
     // Update session description if first message
-    await _repository.updateSessionDescriptionIfNeeded(
-      sessionId: sessionId,
-      messageContent: content,
-      isFirstMessage: isFirstMessage,
-    );
+    if (isFirstMessage) {
+      final description = content.length > 495
+          ? '${content.substring(0, 495)}...'
+          : content;
+
+      await _sessionDao.updateSession(
+        SessionEntityCompanion(
+          id: Value(sessionId),
+          description: Value(description),
+        ),
+      );
+    }
 
     // Set loading state
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Check if LLM is configured (no need to cache identifier)
-      final isConfigured = await _repository.isConfigured();
+      // Check if LLM is configured
+      final isConfigured = await _llmService.isConfigured();
 
       if (!isConfigured) {
-        developer.log('❌ LLM not configured', name: 'ChatController');
-
         const configMessage =
             "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
 
-        // Save and display warning
-        final messageId = await _repository.saveAiMessage(
+        await _messageDao.insertMessageWithId(
           sessionId: sessionId,
+          userId: 'ai',
+          userName: 'Ops Agent',
           content: configMessage,
-        );
-
-        addMessageToUI(
-          ChatMessage(
-            text: configMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
         );
 
         state = state.copyWith(isLoading: false);
@@ -111,42 +153,23 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       // Generate message ID upfront for consistent tracking across streaming and DB
-      final aiMessageId = _repository.generateMessageId();
+      final aiMessageId = _messageDao.generateMessageId();
 
       // Send message to AI with streaming support
-      final result = await _repository.sendMessageToAI(
+      final result = await _sendMessageToAI(
         messageContent: content,
         dbMessages: dbMessages,
-        messageId: aiMessageId, // Use pre-generated ID
-        onStreamStart: (messageId) {
-          startStreaming(messageId);
-        },
-        onStreamChunk: (messageId, text) {
-          updateStreamingMessage(messageId, text);
-        },
-        onStreamEnd: (messageId) {
-          stopStreaming(messageId);
-        },
+        messageId: aiMessageId,
       );
 
       // Handle error
       if (result.hasError) {
-        developer.log('❌ Error: ${result.error}', name: 'ChatController');
-
         final errorMessage = 'Sorry, I encountered an error: ${result.error}';
-        final messageId = await _repository.saveAiMessage(
+        await _messageDao.insertMessageWithId(
           sessionId: sessionId,
+          userId: 'ai',
+          userName: 'Ops Agent',
           content: errorMessage,
-        );
-
-        addMessageToUI(
-          ChatMessage(
-            text: errorMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
         );
 
         state = state.copyWith(isLoading: false, error: result.error);
@@ -155,24 +178,25 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Handle tool calls by showing approval overlay
       if (result.hasToolCalls && result.conversationState != null) {
-        developer.log(
-          '🔧 Showing approval overlay for ${result.toolCalls!.length} tool calls',
-          name: 'ChatController',
-        );
-
         // Save conversation state for later continuation
         final actions = result.toolCalls!.map((tc) {
+          // Parse params from tool call
+          final argumentsJson = tc.function.arguments;
+          final params = argumentsJson.isNotEmpty
+              ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+              : <String, dynamic>{};
+
           return CommandAction(
             id: tc.id,
-            actionName: tc.name,
-            params: tc.params,
+            actionName: tc.function.name,
+            params: params,
           );
         }).toList();
 
         state = state.copyWith(
           pendingActions: actions,
           conversationForToolCalls: result.conversationState,
-          pendingToolCalls: result.toolCalls!.map((tc) => tc.toolCall).toList(),
+          pendingToolCalls: result.toolCalls,
           assistantTextBeforeTools: result.textResponse,
           isLoading: false,
         );
@@ -182,83 +206,176 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Save text response if any
       if (result.hasTextResponse) {
-        // Save with the pre-generated ID that was used during streaming
-        await _repository.saveAiMessage(
+        await _messageDao.insertMessageWithId(
           id: aiMessageId,
           sessionId: sessionId,
+          userId: 'ai',
+          userName: 'Ops Agent',
           content: result.textResponse!,
         );
-
-        // Message is already in UI from streaming, no need to add it again
       }
 
       state = state.copyWith(isLoading: false);
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error in sendMessage: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
+    } catch (e) {
       final errorMessage = 'Sorry, I encountered an error: $e';
-      final messageId = await _repository.saveAiMessage(
+      await _messageDao.insertMessageWithId(
         sessionId: sessionId,
+        userId: 'ai',
+        userName: 'Ops Agent',
         content: errorMessage,
-      );
-
-      addMessageToUI(
-        ChatMessage(
-          text: errorMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': messageId},
-          isMarkdown: true,
-        ),
       );
 
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
+  /// Send a message to the AI and get response
+  /// Handles streaming, tool calls, and conversation state
+  Future<_MessageResult> _sendMessageToAI({
+    required String messageContent,
+    required List<dynamic> dbMessages,
+    required String messageId,
+  }) async {
+    try {
+      // Build conversation from database messages
+      final conversation = _buildConversationHistory(dbMessages);
+
+      // Add the new user message
+      conversation.add(ChatMessage.user(messageContent));
+
+      developer.log(
+        '📤 Sending to LLM with ${conversation.length} messages in conversation',
+        name: 'ChatController',
+      );
+
+      // Log conversation summary for debugging
+      for (var i = 0; i < conversation.length; i++) {
+        final msg = conversation[i];
+        final messageType = msg.messageType;
+        if (messageType is ToolUseMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool calls (${messageType.toolCalls.length})',
+            name: 'ChatController',
+          );
+        } else if (messageType is ToolResultMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool results (${messageType.results.length})',
+            name: 'ChatController',
+          );
+        } else {
+          final preview = msg.content.length > 50
+              ? '${msg.content.substring(0, 50)}...'
+              : msg.content;
+          developer.log(
+            '  [$i] ${msg.role.name}: $preview',
+            name: 'ChatController',
+          );
+        }
+      }
+
+      // Get shell tools
+      final tools = shellTools;
+
+      // Stream from service
+      final buffer = StringBuffer();
+      final collectedToolCalls = <ToolCall>[];
+      var hasStartedStreaming = false;
+
+      await for (final event in _llmService.streamChat(
+        conversation,
+        tools: tools,
+      )) {
+        switch (event) {
+          case TextDeltaEvent(delta: final delta):
+            buffer.write(delta);
+            if (!hasStartedStreaming) {
+              startStreaming(messageId);
+              hasStartedStreaming = true;
+            }
+            updateStreamingText(buffer.toString());
+
+          case ToolCallDeltaEvent(toolCall: final toolCall):
+            collectedToolCalls.add(toolCall);
+
+          case CompletionEvent():
+            break;
+
+          case ErrorEvent(error: final error):
+            if (hasStartedStreaming) stopStreaming();
+            return _MessageResult(error: error.message);
+
+          case ThinkingDeltaEvent():
+            break;
+        }
+      }
+
+      if (hasStartedStreaming) stopStreaming();
+
+      // Build result
+      if (collectedToolCalls.isNotEmpty) {
+        // Add assistant's tool use message to conversation
+        conversation.add(
+          ChatMessage.toolUse(
+            toolCalls: collectedToolCalls,
+            content: buffer.toString(),
+          ),
+        );
+
+        return _MessageResult(
+          textResponse: buffer.toString(),
+          toolCalls: collectedToolCalls,
+          conversationState: conversation,
+        );
+      }
+
+      return _MessageResult(textResponse: buffer.toString());
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ Error sending message to AI: $e',
+        name: 'ChatController',
+        error: e,
+        stackTrace: stackTrace,
+      );
+
+      return _MessageResult(error: e.toString());
+    }
+  }
+
   /// Execute multiple approved actions
   Future<void> executeActions({
     required List<CommandAction> selectedActions,
-    required List<CommandAction> allActions,
     required String sessionId,
-    required Future<Map<String, dynamic>> Function(String, Map<String, dynamic>)
-    executeAction,
-    required void Function(ChatMessage) addMessageToUI,
-    required void Function(String) markMessageAsSynced,
   }) async {
-    developer.log(
-      '🚀 Executing ${selectedActions.length} actions',
-      name: 'ChatController',
-    );
-
     // First, save the assistant's message with tool calls to preserve conversation state
     final pendingCalls = state.pendingToolCalls;
     final assistantText = state.assistantTextBeforeTools;
 
     if (pendingCalls != null && pendingCalls.isNotEmpty) {
       // Generate message ID upfront
-      final assistantMessageId = _repository.generateMessageId();
+      final assistantMessageId = _messageDao.generateMessageId();
 
-      // Mark as synced BEFORE saving to prevent duplicate
-      markMessageAsSynced(assistantMessageId);
-
-      // Save the assistant message with tool calls
-      await _repository.saveAssistantMessageWithToolCalls(
-        id: assistantMessageId,
-        sessionId: sessionId,
+      // Create the ChatMessage with tool calls
+      final chatMessage = ChatMessage.toolUse(
         toolCalls: pendingCalls,
-        textContent: assistantText,
+        content: assistantText ?? '',
       );
 
       developer.log(
-        '💾 Saved assistant message with ${pendingCalls.length} tool calls',
+        '💾 Saving assistant message with ${pendingCalls.length} tool calls',
         name: 'ChatController',
       );
+      developer.log(
+        '  Tool calls: ${pendingCalls.map((tc) => tc.function.name).join(", ")}',
+        name: 'ChatController',
+      );
+
+      // Convert to companion and insert
+      final companion = chatMessage.toMessageCompanion(
+        sessionId: sessionId,
+        id: assistantMessageId,
+      );
+
+      await _messageDao.insertMessage(companion);
     }
 
     // Clear the approval overlay and set execution state
@@ -285,134 +402,88 @@ class ChatController extends StateNotifier<ChatState> {
             commandName: command,
           ),
         );
-
-        developer.log(
-          '🔄 Executing action ${i + 1}/${selectedActions.length}',
-          name: 'ChatController',
-        );
       }
 
       // Clear execution progress, show loading for LLM response
       state = state.copyWith(executionProgress: null, isLoading: true);
 
-      // Determine which actions were skipped
-      final selectedIds = selectedActions.map((a) => a.id).toSet();
-      final skippedActions = allActions
-          .where((a) => !selectedIds.contains(a.id))
-          .toList();
-
-      // Display "Skipped" messages for unselected actions (UI-only, not saved)
-      for (final skippedAction in skippedActions) {
-        final skippedMessage = '⏭️ **Skipped:** `${skippedAction.command}`';
-
-        // Generate message ID upfront
-        final messageId = _repository.generateMessageId();
-
-        // Mark as synced BEFORE saving
-        markMessageAsSynced(messageId);
-
-        // Add to UI only (skipped messages are for display, not part of conversation)
-        addMessageToUI(
-          ChatMessage(
-            text: skippedMessage,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
-          ),
-        );
-
-        // DON'T save skipped messages to database - they're UI-only
+      // Get the tool calls that match the selected actions
+      final pendingCalls = state.pendingToolCalls;
+      if (pendingCalls == null) {
+        throw Exception('No pending tool calls in state');
       }
 
-      // Execute tool calls through repository
-      final result = await _repository.executeToolCalls(
-        toolCalls: selectedActions.map((action) {
-          // Find the matching tool call from our state
-          final pendingCalls = state.pendingToolCalls;
-          if (pendingCalls == null) {
-            throw Exception('No pending tool calls in state');
-          }
+      final selectedToolCalls = selectedActions.map((action) {
+        // Find matching tool call by ID
+        final matchingToolCall = pendingCalls.firstWhere(
+          (tc) => tc.id == action.id,
+          orElse: () => throw Exception('Tool call not found: ${action.id}'),
+        );
+        return matchingToolCall;
+      }).toList();
 
-          // Find matching tool call by ID
-          llm.ToolCall? matchingToolCall;
-          for (final tc in pendingCalls) {
-            if (tc.id == action.id) {
-              matchingToolCall = tc;
-              break;
-            }
-          }
-
-          if (matchingToolCall == null) {
-            throw Exception('Tool call not found: ${action.id}');
-          }
-
-          return ToolCallRequest(
-            id: action.id,
-            name: action.actionName,
-            params: action.params,
-            toolCall: matchingToolCall,
-          );
-        }).toList(),
+      // Execute tool calls
+      final result = await _executeToolCalls(
+        toolCalls: selectedToolCalls,
         conversationState: state.conversationForToolCalls!,
-        executeAction: executeAction,
       );
 
-      // Save formatted tool result messages (these are now nicely formatted and user-visible)
+      // Save tool result messages
       for (var i = 0; i < result.toolCalls.length; i++) {
         final toolCall = result.toolCalls[i];
-        final formattedResult = result.chatMessages[i];
+        final toolResult = result.toolResults[toolCall.id] ?? 'No result';
 
-        // Generate message ID upfront
-        final messageId = _repository.generateMessageId();
-
-        // Mark as synced BEFORE saving to prevent DB sync from re-adding
-        markMessageAsSynced(messageId);
-
-        // Add to UI first (formatted message is for display only, not saved to DB)
-        addMessageToUI(
-          ChatMessage(
-            text: formattedResult,
-            user: _aiUser,
-            createdAt: DateTime.now(),
-            customProperties: {'id': messageId},
-            isMarkdown: true,
+        // Create the ChatMessage with tool results
+        // Following MCP example pattern: create a new ToolCall with result in arguments
+        final resultToolCall = ToolCall(
+          id: toolCall.id,
+          callType: toolCall.callType,
+          function: FunctionCall(
+            name: toolCall.function.name,
+            arguments: toolResult,
           ),
         );
 
-        // DON'T save the formatted message to database - it's UI-only
-        // We only save the raw tool result for LLM conversation
-
-        // Save raw result for LLM conversation with complete ToolCall structure
-        final toolResult = result.toolResults[toolCall.id] ?? 'No result';
-        await _repository.saveToolResultMessage(
-          sessionId: sessionId,
-          toolCalls: [toolCall.toolCall],
-          resultContent: toolResult,
+        final chatMessage = ChatMessage.toolResult(
+          results: [resultToolCall],
+          content: toolResult,
         );
+
+        developer.log(
+          '💾 Saving tool result for ${toolCall.function.name}',
+          name: 'ChatController',
+        );
+
+        // Convert to companion and insert
+        final companion = chatMessage.toMessageCompanion(sessionId: sessionId);
+
+        await _messageDao.insertMessage(companion);
       }
 
-      // Handle follow-up tool calls
-      if (result.hasFollowUp) {
+      // Handle LLM's follow-up response after tool execution
+      if (result.followUpResult != null) {
         final followUp = result.followUpResult!;
 
-        // Show approval overlay for follow-up (don't display messages yet)
-        if (followUp.toolCalls != null) {
-          // Show approval overlay for follow-up
+        // If LLM wants to make more tool calls, show approval overlay
+        if (followUp.hasToolCalls) {
           final actions = followUp.toolCalls!.map((tc) {
+            // Parse params from tool call
+            final argumentsJson = tc.function.arguments;
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+                : <String, dynamic>{};
+
             return CommandAction(
               id: tc.id,
-              actionName: tc.name,
-              params: tc.params,
+              actionName: tc.function.name,
+              params: params,
             );
           }).toList();
 
           state = state.copyWith(
             pendingActions: actions,
             conversationForToolCalls: followUp.conversationState,
-            pendingToolCalls: followUp.toolCalls!
-                .map((tc) => tc.toolCall)
-                .toList(),
+            pendingToolCalls: followUp.toolCalls,
             assistantTextBeforeTools: followUp.textResponse,
             isLoading: false,
           );
@@ -420,29 +491,12 @@ class ChatController extends StateNotifier<ChatState> {
           return;
         }
 
-        // Save follow-up text response
+        // Save follow-up text response (LLM explaining results, asking follow-up, etc.)
         if (followUp.hasTextResponse) {
-          // Generate message ID upfront
-          final messageId = _repository.generateMessageId();
-
-          // Mark as synced BEFORE saving to prevent DB sync from re-adding
-          markMessageAsSynced(messageId);
-
-          // Add to UI first (no streaming animation - text is already complete)
-          addMessageToUI(
-            ChatMessage(
-              text: followUp.textResponse!,
-              user: _aiUser,
-              createdAt: DateTime.now(),
-              customProperties: {'id': messageId},
-              isMarkdown: true,
-            ),
-          );
-
-          // Save to database with pre-generated ID (this will trigger sync but won't re-add)
-          await _repository.saveAiMessage(
-            id: messageId,
+          await _messageDao.insertMessageWithId(
             sessionId: sessionId,
+            userId: 'ai',
+            userName: 'Ops Agent',
             content: followUp.textResponse!,
           );
         }
@@ -455,28 +509,13 @@ class ChatController extends StateNotifier<ChatState> {
         assistantTextBeforeTools: null,
         isLoading: false,
       );
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error executing actions: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
+    } catch (e) {
       final errorMessage = '❌ Error executing commands: $e';
-      final messageId = await _repository.saveAiMessage(
+      await _messageDao.insertMessageWithId(
         sessionId: sessionId,
+        userId: 'ai',
+        userName: 'Ops Agent',
         content: errorMessage,
-      );
-
-      addMessageToUI(
-        ChatMessage(
-          text: errorMessage,
-          user: _aiUser,
-          createdAt: DateTime.now(),
-          customProperties: {'id': messageId},
-          isMarkdown: true,
-        ),
       );
 
       // Clear all state on error
@@ -491,16 +530,293 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
+  /// Execute tool calls and handle follow-up responses
+  Future<_ToolExecutionResult> _executeToolCalls({
+    required List<ToolCall> toolCalls,
+    required List<ChatMessage> conversationState,
+  }) async {
+    final toolResults = <String, String>{};
+    final chatMessages = <String>[];
+
+    try {
+      // Execute each tool call
+      for (var i = 0; i < toolCalls.length; i++) {
+        final toolCall = toolCalls[i];
+
+        // Parse params from tool call
+        final argumentsJson = toolCall.function.arguments;
+        final params = argumentsJson.isNotEmpty
+            ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+            : <String, dynamic>{};
+
+        final command = params['command'] as String? ?? 'unknown';
+
+        // Execute the action directly
+        final result = await _executeAction(toolCall.function.name, params);
+
+        // Build result message
+        final resultMessage = _formatExecutionResult(
+          command,
+          result['success'] as bool,
+          result['data'],
+          result['error'],
+        );
+
+        chatMessages.add(resultMessage);
+
+        // Map result for LLM
+        toolResults[toolCall.id] = jsonEncode(result['data']);
+      }
+
+      // Get tools for potential follow-up
+      final tools = shellTools;
+
+      // Create a mutable copy of conversation and add tool results
+      // (conversationState may be unmodifiable)
+      final conversationWithResults = List<ChatMessage>.from(conversationState);
+
+      for (final toolCall in toolCalls) {
+        final result = toolResults[toolCall.id] ?? 'No result';
+
+        // Following MCP example pattern: create a new ToolCall with result in arguments
+        final resultToolCall = ToolCall(
+          id: toolCall.id,
+          callType: toolCall.callType,
+          function: FunctionCall(
+            name: toolCall.function.name,
+            arguments: result,
+          ),
+        );
+
+        conversationWithResults.add(
+          ChatMessage.toolResult(results: [resultToolCall], content: result),
+        );
+      }
+
+      developer.log(
+        '📋 Conversation state before follow-up (${conversationWithResults.length} messages):',
+        name: 'ChatController',
+      );
+      for (var i = 0; i < conversationWithResults.length; i++) {
+        final msg = conversationWithResults[i];
+        final messageType = msg.messageType;
+        if (messageType is ToolUseMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool calls',
+            name: 'ChatController',
+          );
+        } else if (messageType is ToolResultMessage) {
+          developer.log(
+            '  [$i] ${msg.role.name}: Tool results',
+            name: 'ChatController',
+          );
+        } else {
+          final preview = msg.content.length > 50
+              ? '${msg.content.substring(0, 50)}...'
+              : msg.content;
+          developer.log(
+            '  [$i] ${msg.role.name}: $preview',
+            name: 'ChatController',
+          );
+        }
+      }
+
+      // Continue conversation with tool results
+      final followUpResult = await _continueWithToolResults(
+        conversationState: conversationWithResults,
+        tools: tools,
+      );
+
+      return _ToolExecutionResult(
+        toolResults: toolResults,
+        chatMessages: chatMessages,
+        toolCalls: toolCalls,
+        followUpResult: followUpResult,
+      );
+    } catch (e) {
+      return _ToolExecutionResult(
+        toolResults: toolResults,
+        chatMessages: chatMessages,
+        toolCalls: toolCalls,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Continue conversation with tool results
+  Future<_MessageResult?> _continueWithToolResults({
+    required List<ChatMessage> conversationState,
+    required List<Tool> tools,
+  }) async {
+    try {
+      final buffer = StringBuffer();
+      final followUpToolCalls = <ToolCall>[];
+
+      await for (final event in _llmService.streamChat(
+        conversationState,
+        tools: tools,
+      )) {
+        switch (event) {
+          case TextDeltaEvent(delta: final delta):
+            buffer.write(delta);
+
+          case ToolCallDeltaEvent(toolCall: final toolCall):
+            followUpToolCalls.add(toolCall);
+
+          case CompletionEvent():
+            break;
+
+          case ErrorEvent(error: final error):
+            return _MessageResult(error: error.message);
+
+          case ThinkingDeltaEvent():
+            break;
+        }
+      }
+
+      // Return result if we have follow-up tool calls or text
+      if (followUpToolCalls.isNotEmpty) {
+        // Add assistant's tool use message to conversation
+        conversationState.add(
+          ChatMessage.toolUse(
+            toolCalls: followUpToolCalls,
+            content: buffer.toString(),
+          ),
+        );
+
+        return _MessageResult(
+          textResponse: buffer.toString(),
+          toolCalls: followUpToolCalls,
+          conversationState: conversationState,
+        );
+      }
+
+      if (buffer.isNotEmpty) {
+        return _MessageResult(textResponse: buffer.toString());
+      }
+
+      return null;
+    } catch (e, stackTrace) {
+      developer.log(
+        '❌ Error continuing with tool results: $e',
+        name: 'ChatController',
+        error: e,
+        stackTrace: stackTrace,
+      );
+
+      return _MessageResult(error: e.toString());
+    }
+  }
+
+  /// Format execution result as a chat message
+  String _formatExecutionResult(
+    String command,
+    bool success,
+    dynamic data,
+    dynamic error,
+  ) {
+    final buffer = StringBuffer();
+
+    if (success) {
+      buffer.writeln('✅ **Executed:**');
+      buffer.writeln('```');
+      buffer.writeln(command);
+      buffer.writeln('```');
+      buffer.writeln();
+
+      // Print stdout if available
+      final stdout = data?['stdout']?.toString().trim() ?? '';
+      if (stdout.isNotEmpty) {
+        buffer.writeln('**Result:**');
+        buffer.writeln('```');
+        buffer.writeln(stdout);
+        buffer.writeln('```');
+        buffer.writeln();
+      }
+
+      // Print stderr if available
+      final stderr = data?['stderr']?.toString().trim() ?? '';
+      if (stderr.isNotEmpty) {
+        buffer.writeln();
+        buffer.writeln('**⚠️ Warning (stderr):**');
+        buffer.writeln('```');
+        buffer.writeln(stderr);
+        buffer.writeln('```');
+      }
+
+      // Print exit code only if non-zero
+      final exitCode = data?['exitCode'] as int?;
+      if (exitCode != null && exitCode != 0) {
+        buffer.writeln();
+        buffer.writeln('**Exit Code:** $exitCode');
+      }
+    } else {
+      buffer.writeln('❌ **Failed:** `$command`');
+      buffer.writeln();
+      buffer.writeln('**Error:**');
+      buffer.writeln('```');
+      buffer.writeln(error?.toString() ?? 'Unknown error');
+      buffer.writeln('```');
+    }
+
+    return buffer.toString().trim();
+  }
+
+  /// Execute a single action (shell command)
+  Future<Map<String, dynamic>> _executeAction(
+    String actionName,
+    Map<String, dynamic> params,
+  ) async {
+    if (actionName == 'execute_shell_command') {
+      final command = params['command'] as String;
+      final sudoRequired = params['sudo_required'] as bool? ?? false;
+
+      final Map<String, dynamic> result;
+
+      if (sudoRequired) {
+        result = await _shellService.executeWithSudo(
+          command: command,
+          sudoPasswordSecretId:
+              _sshSettings?.sudoPasswordSecretId ??
+              _sshSettings?.passwordSecretId,
+        );
+      } else {
+        result = await _shellService.executeCommand(command);
+      }
+
+      return {
+        'success': (result['exitCode'] as int? ?? -1) == 0,
+        'data': result,
+        'error': result['stderr'] as String?,
+      };
+    }
+
+    throw Exception('Unknown action: $actionName');
+  }
+
   /// Cancel pending actions
   void cancelActions() {
-    developer.log('🧹 Cancelling pending actions', name: 'ChatController');
-
     state = state.copyWith(
       pendingActions: null,
       conversationForToolCalls: null,
       pendingToolCalls: null,
       assistantTextBeforeTools: null,
     );
+  }
+
+  /// Start streaming for a message
+  void startStreaming(String messageId) {
+    state = state.copyWith(streamingMessageId: messageId, streamingText: '');
+  }
+
+  /// Update streaming text for a message
+  void updateStreamingText(String text) {
+    state = state.copyWith(streamingText: text);
+  }
+
+  /// Stop streaming
+  void stopStreaming() {
+    state = state.copyWith(streamingMessageId: null, streamingText: '');
   }
 
   /// Clear error state
@@ -511,11 +827,67 @@ class ChatController extends StateNotifier<ChatState> {
 
 /// Provider for ChatController
 /// Uses family provider to scope controller to specific session
-/// Controller automatically resets when sessionId parameter changes (Riverpod creates new instance)
 final chatControllerProvider =
     StateNotifierProvider.family<ChatController, ChatState, String?>((
       ref,
       sessionId,
     ) {
-      return ChatController(ref.watch(chatRepositoryProvider), sessionId);
+      // Get current project to access shell service and SSH settings
+      final currentProject = ref.watch(currentProjectProvider);
+      final projectId = currentProject?.id;
+
+      final sshSettings = projectId != null
+          ? ref.watch(projectSshSettingsProvider(projectId))
+          : null;
+
+      return ChatController(
+        messageDao: ref.watch(databaseProvider).messageDao,
+        sessionDao: ref.watch(databaseProvider).sessionDao,
+        llmService: ref.watch(llmServiceProvider),
+        shellService: ref.watch(shellServiceProvider(projectId)),
+        sshSettings: sshSettings,
+        sessionId: sessionId,
+      );
     });
+
+// Internal helper classes
+
+/// Result of sending a message to the AI
+class _MessageResult {
+  final String? textResponse;
+  final List<ToolCall>? toolCalls;
+  final List<ChatMessage>? conversationState;
+  final String? error;
+
+  const _MessageResult({
+    this.textResponse,
+    this.toolCalls,
+    this.conversationState,
+    this.error,
+  });
+
+  bool get hasError => error != null;
+  bool get hasToolCalls => toolCalls != null && toolCalls!.isNotEmpty;
+  bool get hasTextResponse => textResponse != null && textResponse!.isNotEmpty;
+}
+
+/// Result of executing tool calls
+class _ToolExecutionResult {
+  final Map<String, String> toolResults;
+  final List<String> chatMessages;
+  final List<ToolCall> toolCalls;
+  final _MessageResult? followUpResult;
+  final String? error;
+
+  const _ToolExecutionResult({
+    required this.toolResults,
+    required this.chatMessages,
+    required this.toolCalls,
+    this.followUpResult,
+    this.error,
+  });
+
+  bool get hasError => error != null;
+  bool get hasFollowUp =>
+      followUpResult != null && followUpResult!.hasToolCalls;
+}

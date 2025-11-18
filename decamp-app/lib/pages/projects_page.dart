@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/project_provider.dart';
+import 'package:decamp/providers/project_provider.dart';
+import 'package:decamp/providers/database_provider.dart';
 import '../utils/date_formatter.dart';
 
 class ProjectsPage extends ConsumerWidget {
@@ -62,10 +63,10 @@ class ProjectsPage extends ConsumerWidget {
                 }
 
                 final description = descriptionController.text.trim();
-                final projectActions = ref.read(projectActionsProvider);
+                final projectDao = ref.read(databaseProvider).projectDao;
 
                 try {
-                  await projectActions.createProject(
+                  await projectDao.createProjectWithId(
                     name: name,
                     description: description.isEmpty ? null : description,
                   );
@@ -122,10 +123,8 @@ class ProjectsPage extends ConsumerWidget {
             ),
             TextButton(
               onPressed: () async {
-                final projectActions = ref.read(projectActionsProvider);
-
                 try {
-                  await projectActions.deleteProject(projectId);
+                  await deleteProject(ref, projectId);
 
                   if (dialogContext.mounted) {
                     Navigator.of(dialogContext).pop();
@@ -221,10 +220,10 @@ class ProjectsPage extends ConsumerWidget {
                 }
 
                 final description = descriptionController.text.trim();
-                final projectActions = ref.read(projectActionsProvider);
 
                 try {
-                  await projectActions.updateProject(
+                  await updateProject(
+                    ref,
                     id: projectId,
                     name: name,
                     description: description.isEmpty ? null : description,
@@ -443,9 +442,9 @@ class ProjectsPage extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  onTap: () {
+                  onTap: () async {
                     // Select this project and navigate back
-                    ref.read(projectActionsProvider).selectProject(project.id);
+                    await selectProject(ref, project.id);
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(

@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:llm_dart/llm_dart.dart';
 
 import 'tables/projects_table.dart';
 import 'tables/sessions_table.dart';
@@ -12,6 +13,7 @@ import 'daos/project_dao.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/snippet_dao.dart';
+import 'converters/tool_call_converter.dart';
 
 part 'database.g.dart';
 
@@ -28,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   late final SnippetDao snippetDao = SnippetDao(this);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -108,6 +110,24 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(project_id, is_archived, timestamp DESC)',
           );
+        }
+
+        if (from < 4) {
+          // Add discriminated union columns for tool calls and results
+          await customStatement('''
+        ALTER TABLE messages
+        ADD COLUMN message_kind INTEGER NOT NULL DEFAULT 0
+      ''');
+
+          await customStatement('''
+        ALTER TABLE messages
+        ADD COLUMN tool_calls_json TEXT
+      ''');
+
+          await customStatement('''
+        ALTER TABLE messages
+        ADD COLUMN tool_results_json TEXT
+      ''');
         }
       },
       beforeOpen: (details) async {
