@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:decamp/database/database.dart';
+import 'package:decamp/database/tables/messages_table.dart';
+import 'package:decamp/utils/tool_result_formatter.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
@@ -21,8 +23,8 @@ class RichMessageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use displayText override if provided (for streaming), otherwise use message content
-    final text = displayText ?? message.content;
+    // Use displayText override if provided (for streaming), otherwise format message content
+    final text = displayText ?? _formatMessageContent();
 
     // Build markdown content
     final content = _buildMarkdownContent(context, text);
@@ -98,6 +100,28 @@ class RichMessageContent extends StatelessWidget {
         fontWeight: FontWeight.w400,
       ),
     );
+  }
+
+  /// Format message content based on message type
+  String _formatMessageContent() {
+    // For tool result messages, use the formatter
+    if (message.messageKind == MessageKind.toolResult &&
+        message.toolResultsJson != null &&
+        message.toolResultsJson!.isNotEmpty) {
+      // Get the first tool result
+      final toolResult = message.toolResultsJson!.first;
+      final toolName = toolResult.function.name;
+      final resultContent = toolResult.function.arguments;
+
+      // Format using the tool result formatter
+      return ToolResultFormatter.format(
+        toolName: toolName,
+        result: resultContent,
+      );
+    }
+
+    // For all other messages, use the content as-is
+    return message.content;
   }
 
   Widget _buildMarkdownContent(BuildContext context, String text) {

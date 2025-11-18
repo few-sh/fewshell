@@ -37,7 +37,8 @@ class ChatList extends StatelessWidget {
 
         // Check if this message is currently streaming
         final isStreaming = message.id == streamingMessageId;
-        final displayText = isStreaming ? streamingText : message.content;
+        // Only provide displayText when actually streaming
+        final displayText = isStreaming ? streamingText : null;
         final isUser = message.userId == 'user';
 
         return Padding(
