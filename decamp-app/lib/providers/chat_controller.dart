@@ -432,7 +432,7 @@ class ChatController extends StateNotifier<ChatState> {
       // Anthropic API requires all tool results in a single message immediately after tool_use
       final allResultToolCalls = result.toolCalls.map((toolCall) {
         final toolResult = result.toolResults[toolCall.id] ?? 'No result';
-        
+
         return ToolCall(
           id: toolCall.id,
           callType: toolCall.callType,
@@ -444,12 +444,14 @@ class ChatController extends StateNotifier<ChatState> {
       }).toList();
 
       // Combine all tool results into one content string
-      final combinedContent = result.toolCalls.map((toolCall) {
-        return result.toolResults[toolCall.id] ?? 'No result';
-      }).join('\n---\n');
+      final combinedContent = result.toolCalls
+          .map((toolCall) {
+            return result.toolResults[toolCall.id] ?? 'No result';
+          })
+          .join('\n---\n');
 
       final chatMessage = ChatMessage.toolResult(
-        results: allResultToolCalls,  // ALL results in one message
+        results: allResultToolCalls, // ALL results in one message
         content: combinedContent,
       );
 
@@ -591,13 +593,15 @@ class ChatController extends StateNotifier<ChatState> {
         );
       }).toList();
 
-      final combinedContent = toolCalls.map((toolCall) {
-        return toolResults[toolCall.id] ?? 'No result';
-      }).join('\n---\n');
+      final combinedContent = toolCalls
+          .map((toolCall) {
+            return toolResults[toolCall.id] ?? 'No result';
+          })
+          .join('\n---\n');
 
       conversationWithResults.add(
         ChatMessage.toolResult(
-          results: allResults,  // ALL results in one message
+          results: allResults, // ALL results in one message
           content: combinedContent,
         ),
       );
