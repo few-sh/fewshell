@@ -8,8 +8,6 @@ import 'dart:convert';
 ///
 /// Currently supported tools:
 /// - `execute_shell_command`: Formats command, exit code, stdout, stderr
-/// - `read_file`: Formats file path, line count, and content
-/// - `write_file`: Formats file path and write confirmation
 ///
 /// Example usage:
 /// ```dart
@@ -39,8 +37,6 @@ class ToolResultFormatter {
     // Route to specific formatter based on tool name
     return switch (toolName) {
       'execute_shell_command' => _formatShellCommand(data),
-      'read_file' => _formatReadFile(data),
-      'write_file' => _formatWriteFile(data),
       _ => _formatUnknownTool(toolName, result),
     };
   }
@@ -127,60 +123,6 @@ class ToolResultFormatter {
       return 'python';
     }
     return ''; // No highlighting
-  }
-
-  /// Format read file results
-  static String _formatReadFile(Map<String, dynamic> data) {
-    final buffer = StringBuffer();
-
-    final filePath = data['filePath'] as String? ?? 'unknown';
-    final content = data['content'] as String? ?? '';
-    final lines = data['lines'] as int? ?? content.split('\n').length;
-    final success = data['success'] as bool? ?? true;
-
-    if (success) {
-      buffer.writeln('## 📖 File Read Successfully\n');
-      buffer.writeln('**File:** `$filePath`');
-      buffer.writeln('**Lines:** $lines\n');
-
-      if (content.isNotEmpty) {
-        buffer.writeln('**Content:**');
-        buffer.writeln('```');
-        buffer.writeln(content);
-        buffer.writeln('```');
-      }
-    } else {
-      buffer.writeln('## ❌ Failed to Read File\n');
-      buffer.writeln('**File:** `$filePath`');
-      final error = data['error'] as String? ?? 'Unknown error';
-      buffer.writeln('\n**Error:** $error');
-    }
-
-    return buffer.toString().trim();
-  }
-
-  /// Format write file results
-  static String _formatWriteFile(Map<String, dynamic> data) {
-    final buffer = StringBuffer();
-
-    final filePath = data['filePath'] as String? ?? 'unknown';
-    final bytesWritten = data['bytesWritten'] as int?;
-    final success = data['success'] as bool? ?? true;
-
-    if (success) {
-      buffer.writeln('## ✅ File Written Successfully\n');
-      buffer.writeln('**File:** `$filePath`');
-      if (bytesWritten != null) {
-        buffer.writeln('**Bytes Written:** $bytesWritten');
-      }
-    } else {
-      buffer.writeln('## ❌ Failed to Write File\n');
-      buffer.writeln('**File:** `$filePath`');
-      final error = data['error'] as String? ?? 'Unknown error';
-      buffer.writeln('\n**Error:** $error');
-    }
-
-    return buffer.toString().trim();
   }
 
   /// Format results for unknown/unsupported tools
