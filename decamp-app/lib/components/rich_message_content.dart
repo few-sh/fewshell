@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:decamp/database/database.dart';
 import 'package:decamp/database/tables/messages_table.dart';
 import 'package:decamp/utils/tool_result_formatter.dart';
+import 'package:decamp/themes/terminal_theme.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
@@ -136,18 +137,43 @@ class RichMessageContent extends StatelessWidget {
   }
 
   Widget _buildMarkdownContent(BuildContext context, String text) {
+    // Get terminal theme for code blocks
+    final terminalTheme =
+        Theme.of(context).extension<TerminalTheme>() ??
+        (Theme.of(context).brightness == Brightness.dark
+            ? TerminalTheme.dark
+            : TerminalTheme.light);
+
     // Extract base text color from stylesheet
     final textColor =
         styleSheet?.p?.color ??
         Theme.of(context).textTheme.bodyLarge?.color ??
         Colors.white;
 
+    // Create enhanced stylesheet with terminal theme for code blocks
+    final enhancedStyleSheet =
+        (styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
+            .copyWith(
+              code: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                color: terminalTheme.textColor,
+                backgroundColor: terminalTheme.backgroundColor,
+              ),
+              codeblockDecoration: BoxDecoration(
+                color: terminalTheme.backgroundColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: terminalTheme.borderColor, width: 1),
+              ),
+              codeblockPadding: const EdgeInsets.all(12),
+            );
+
     final markdown = Markdown(
       data: text,
       selectable: false,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      styleSheet: styleSheet,
+      styleSheet: enhancedStyleSheet,
       padding: EdgeInsets.zero,
       onTapLink: (text, href, title) {
         if (href != null) {
