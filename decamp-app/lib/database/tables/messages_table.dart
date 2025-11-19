@@ -30,6 +30,9 @@ class Messages extends Table {
   /// Timestamp when the message was created
   DateTimeColumn get createdAt => dateTime()();
 
+  /// Timestamp when the message was last edited (null if never edited)
+  DateTimeColumn get editedAt => dateTime().nullable()();
+
   /// Discriminator: what kind of message is this?
   IntColumn get messageKind =>
       intEnum<MessageKind>().withDefault(const Constant(0))();

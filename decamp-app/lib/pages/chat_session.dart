@@ -128,6 +128,69 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     }
   }
 
+  /// Handle editing a message
+  Future<void> _handleEditMessage(String messageId, String newContent) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) return;
+
+    developer.log('✏️ Editing message: $messageId', name: 'ChatSession');
+
+    final controller = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    await controller.editMessage(
+      messageId: messageId,
+      newContent: newContent,
+      sessionId: currentSessionId,
+    );
+  }
+
+  /// Handle resending a message
+  Future<void> _handleResendMessage(String messageId) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) return;
+
+    developer.log('🔄 Resending message: $messageId', name: 'ChatSession');
+
+    final controller = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    await controller.resendMessage(
+      messageId: messageId,
+      sessionId: currentSessionId,
+    );
+  }
+
+  /// Handle branching a session at a specific message
+  Future<void> _handleBranchSession(String messageId) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) return;
+
+    developer.log(
+      '🌿 Branching session at message: $messageId',
+      name: 'ChatSession',
+    );
+
+    final controller = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    final newSessionId = await controller.branchSession(
+      messageId: messageId,
+      sessionId: currentSessionId,
+    );
+
+    // Switch to the new session
+    ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+
+    developer.log(
+      '✅ Switched to new session: $newSessionId',
+      name: 'ChatSession',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Activate auto-session selection
@@ -258,6 +321,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         isLoading: chatState.isLoading,
                         streamingMessageId: chatState.streamingMessageId,
                         streamingText: chatState.streamingText,
+                        onEditMessage: _handleEditMessage,
+                        onResendMessage: _handleResendMessage,
+                        onBranchSession: _handleBranchSession,
                       ),
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),

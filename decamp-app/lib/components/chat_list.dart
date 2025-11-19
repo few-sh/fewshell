@@ -9,6 +9,9 @@ class ChatList extends StatefulWidget {
   final bool isLoading;
   final String? streamingMessageId;
   final String streamingText;
+  final Function(String messageId, String newContent)? onEditMessage;
+  final Function(String messageId)? onResendMessage;
+  final Function(String messageId)? onBranchSession;
 
   const ChatList({
     super.key,
@@ -16,6 +19,9 @@ class ChatList extends StatefulWidget {
     this.isLoading = false,
     this.streamingMessageId,
     this.streamingText = '',
+    this.onEditMessage,
+    this.onResendMessage,
+    this.onBranchSession,
   });
 
   @override
@@ -64,7 +70,7 @@ class _ChatListState extends State<ChatList> {
       controller: _scrollController,
       // Reverse the ListView so it naturally starts at the bottom
       reverse: true,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      padding: EdgeInsets.zero,
       itemCount: reversedMessages.length + (widget.isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (widget.isLoading && index == 0) {
@@ -84,19 +90,36 @@ class _ChatListState extends State<ChatList> {
         final displayText = isStreaming ? widget.streamingText : null;
         final isUser = message.userId == 'user';
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0),
-          child: Align(
-            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
-              child: RichMessageContent(
-                message: message,
-                displayText: displayText,
-                isUser: isUser,
+        return Column(
+          children: [
+            if (messageIndex > 0)
+              Divider(
+                height: 8,
+                thickness: 0.5,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.0),
+              child: Align(
+                alignment: isUser
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: RichMessageContent(
+                    message: message,
+                    displayText: displayText,
+                    isUser: isUser,
+                    onEdit: widget.onEditMessage,
+                    onResend: widget.onResendMessage,
+                    onBranch: widget.onBranchSession,
+                  ),
+                ),
               ),
             ),
-          ),
+          ],
         );
       },
     );

@@ -6,15 +6,21 @@ import 'package:decamp/database/tables/messages_table.dart';
 import 'package:decamp/utils/tool_result_formatter.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
+import 'package:decamp/components/message_context_menu.dart';
+import 'package:decamp/components/message_edit_field.dart';
 import 'package:markdown/markdown.dart' as md;
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
-class RichMessageContent extends StatelessWidget {
+/// Supports inline editing with context menu
+class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
   final String? displayText; // Override for streaming
   final bool isUser;
   final MarkdownStyleSheet? styleSheet;
+  final Function(String messageId, String newContent)? onEdit;
+  final Function(String messageId)? onResend;
+  final Function(String messageId)? onBranch;
 
   const RichMessageContent({
     super.key,
@@ -22,55 +28,118 @@ class RichMessageContent extends StatelessWidget {
     this.displayText,
     required this.isUser,
     this.styleSheet,
+    this.onEdit,
+    this.onResend,
+    this.onBranch,
   });
 
   @override
+  State<RichMessageContent> createState() => _RichMessageContentState();
+}
+
+class _RichMessageContentState extends State<RichMessageContent> {
+  bool _isEditMode = false;
+
+  void _enterEditMode() {
+    setState(() {
+      _isEditMode = true;
+    });
+  }
+
+  void _exitEditMode() {
+    setState(() {
+      _isEditMode = false;
+    });
+  }
+
+  void _handleSave(String newContent) {
+    widget.onEdit?.call(widget.message.id, newContent);
+    _exitEditMode();
+  }
+
+  void _handleResend() {
+    widget.onResend?.call(widget.message.id);
+  }
+
+  void _handleBranch() {
+    widget.onBranch?.call(widget.message.id);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Show edit field if in edit mode
+    if (_isEditMode) {
+      return MessageEditField(
+        initialContent: widget.message.content,
+        onSave: _handleSave,
+        onCancel: _exitEditMode,
+      );
+    }
+
     // Use displayText override if provided (for streaming), otherwise format message content
-    final text = displayText ?? _formatMessageContent();
+    final text = widget.displayText ?? _formatMessageContent();
 
     // Build markdown content
     final content = _buildMarkdownContent(context, text);
 
-    // Wrap content with timestamp at the bottom
-    final contentWithTimestamp = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    // Build timestamp with optional edit indicator
+    final timestamp = _buildTimestamp(context);
+
+    // Build controls row (timestamp + menu)
+    final controls = Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        content,
-        const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.bottomRight,
-          child: _buildTimestamp(context),
+        timestamp,
+        const SizedBox(width: 4),
+        // Show context menu (always visible)
+        MessageContextMenu(
+          onEdit: _enterEditMode,
+          onResend: _handleResend,
+          onBranch: _handleBranch,
+          messageContent: widget.message.content,
+          showResend: widget.isUser, // Only show re-send for user messages
         ),
       ],
     );
 
-    // Wrap user messages in a bubble container
-    if (isUser &&
-        (message.toolResultsJson == null || message.toolResultsJson!.isEmpty)) {
-      return Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(18),
-            topRight: Radius.circular(18),
-            bottomLeft: Radius.circular(18),
-            bottomRight: Radius.circular(0),
+    // Wrap user messages in a bubble container (content only, controls below)
+    if (widget.isUser &&
+        (widget.message.toolResultsJson == null ||
+            widget.message.toolResultsJson!.isEmpty)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(0),
+              ),
+            ),
+            child: content,
           ),
-        ),
-        child: contentWithTimestamp,
+          const SizedBox(height: 4),
+          controls,
+        ],
       );
     }
 
-    // AI messages: no bubble wrapper (flat appearance)
-    return contentWithTimestamp;
+    // AI messages: content with controls inline
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [content, const SizedBox(height: 4), controls],
+    );
   }
 
   Widget _buildTimestamp(BuildContext context) {
-    final timestamp = message.createdAt;
+    final timestamp = widget.message.createdAt;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final messageDate = DateTime(
@@ -94,8 +163,11 @@ class RichMessageContent extends StatelessWidget {
       formattedTime = DateFormat('MMM d, h:mm:ss a').format(timestamp);
     }
 
+    // Add edit indicator if message was edited
+    final editedIndicator = widget.message.editedAt != null ? ' (edited)' : '';
+
     return Text(
-      formattedTime,
+      formattedTime + editedIndicator,
       style: TextStyle(
         fontSize: 10,
         color: Theme.of(
@@ -109,21 +181,23 @@ class RichMessageContent extends StatelessWidget {
   /// Format message content based on message type
   String _formatMessageContent() {
     // For tool use messages, format the tool calls
-    if (message.messageKind == MessageKind.toolUse &&
-        message.toolCallsJson != null &&
-        message.toolCallsJson!.isNotEmpty) {
+    if (widget.message.messageKind == MessageKind.toolUse &&
+        widget.message.toolCallsJson != null &&
+        widget.message.toolCallsJson!.isNotEmpty) {
       return ToolResultFormatter.formatToolUse(
-        toolCalls: message.toolCallsJson!,
-        textContent: message.content.isNotEmpty ? message.content : null,
+        toolCalls: widget.message.toolCallsJson!,
+        textContent: widget.message.content.isNotEmpty
+            ? widget.message.content
+            : null,
       );
     }
 
     // For tool result messages, use the formatter
-    if (message.messageKind == MessageKind.toolResult &&
-        message.toolResultsJson != null &&
-        message.toolResultsJson!.isNotEmpty) {
+    if (widget.message.messageKind == MessageKind.toolResult &&
+        widget.message.toolResultsJson != null &&
+        widget.message.toolResultsJson!.isNotEmpty) {
       // Get the first tool result
-      final toolResult = message.toolResultsJson!.first;
+      final toolResult = widget.message.toolResultsJson!.first;
       final toolName = toolResult.function.name;
       final resultContent = toolResult.function.arguments;
 
@@ -135,7 +209,7 @@ class RichMessageContent extends StatelessWidget {
     }
 
     // For all other messages, use the content as-is
-    return message.content;
+    return widget.message.content;
   }
 
   Widget _buildMarkdownContent(BuildContext context, String text) {
@@ -148,7 +222,7 @@ class RichMessageContent extends StatelessWidget {
 
     // Extract base text color from stylesheet
     final textColor =
-        styleSheet?.p?.color ??
+        widget.styleSheet?.p?.color ??
         Theme.of(context).textTheme.bodyLarge?.color ??
         Colors.white;
 
@@ -157,7 +231,7 @@ class RichMessageContent extends StatelessWidget {
 
     // Create enhanced stylesheet with terminal theme for code blocks
     final enhancedStyleSheet =
-        (styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
+        (widget.styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
             .copyWith(
               code: TextStyle(
                 fontFamily: 'monospace',
@@ -183,7 +257,7 @@ class RichMessageContent extends StatelessWidget {
       builders: {
         'code': ExpandableCodeBlockBuilder(
           terminalTheme: terminalTheme,
-          messageId: message.id,
+          messageId: widget.message.id,
           getCodeBlockIndex: () => codeBlockIndex++,
         ),
       },
