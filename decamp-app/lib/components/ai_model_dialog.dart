@@ -275,9 +275,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
         (_supportedModels.isNotEmpty ? _supportedModels.first : '');
 
     _identifierController = TextEditingController(text: initialIdentifier);
-    _urlController = TextEditingController(
-      text: widget.initialUrl ?? _selectedApiType.defaultBaseUrl,
-    );
+    _urlController = TextEditingController(text: widget.initialUrl);
     _apiKeyController = TextEditingController(text: widget.initialApiKey);
     _maxTokensController = TextEditingController(
       text: widget.initialMaxTokens?.toString() ?? '',
