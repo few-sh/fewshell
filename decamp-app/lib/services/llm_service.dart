@@ -140,7 +140,7 @@ class LlmService {
     String apiKey, {
     String? systemInstruction,
   }) async {
-    final temperature = config.temperature ?? 0.7;
+    final temperature = config.temperature;
     final maxTokens = config.maxTokens;
 
     switch (config.apiType) {
@@ -149,8 +149,8 @@ class LlmService {
             .openai()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         if (systemInstruction != null) builder.systemPrompt(systemInstruction);
         return await builder.build();
@@ -160,8 +160,8 @@ class LlmService {
             .anthropic()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         if (systemInstruction != null) builder.systemPrompt(systemInstruction);
         return await builder.build();
@@ -171,28 +171,28 @@ class LlmService {
             .google()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         // Google Gemini requires system instruction in config, not in messages
         if (systemInstruction != null) builder.systemPrompt(systemInstruction);
         return await builder.build();
 
       case LlmApiType.ollama:
-        return await ai()
+        final builder = ai()
             .ollama()
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature)
-            .build();
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
+        return await builder.build();
 
       case LlmApiType.groq:
         final builder = ai()
             .groq()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         return await builder.build();
 
@@ -201,8 +201,8 @@ class LlmService {
             .deepseek()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         return await builder.build();
 
@@ -211,8 +211,8 @@ class LlmService {
             .xai()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         return await builder.build();
 
@@ -221,8 +221,8 @@ class LlmService {
             .openai()
             .apiKey(apiKey)
             .baseUrl(config.baseUrl)
-            .model(config.identifier)
-            .temperature(temperature);
+            .model(config.identifier);
+        if (temperature != null) builder.temperature(temperature);
         if (maxTokens != null) builder.maxTokens(maxTokens);
         return await builder.build();
     }
