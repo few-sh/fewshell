@@ -33,20 +33,23 @@ final projectLlmSettingsProvider =
       );
     });
 
-/// StateNotifier for global LLM settings
-class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
-  final GlobalSettingsNotifier _settingsNotifier;
+/// Base class for LLM settings logic to reduce duplication
+abstract class BaseLlmSettingsNotifier
+    extends StateNotifier<List<LlmApiSettings>> {
   final KeychainService _keychainService;
 
-  GlobalLlmSettingsNotifier(this._settingsNotifier, this._keychainService)
-    : super([]) {
-    _loadSettings();
-  }
+  BaseLlmSettingsNotifier(this._keychainService) : super([]);
 
-  /// Load LLM settings from app settings
-  void _loadSettings() {
-    state = _settingsNotifier.state.llmSettings;
-  }
+  // Abstract methods implemented by subclasses
+  Future<void> _saveSecret(String identifier, String key);
+  Future<String?> _getSecret(String identifier);
+  Future<void> _deleteSecret(String identifier);
+  Future<void> _saveSettings(
+    List<LlmApiSettings> settings, {
+    String? newDefaultIdentifier,
+    bool updateDefault = false,
+  });
+  String? get _currentDefaultIdentifier;
 
   /// Add a new LLM configuration with API key
   Future<void> addLlmSettings({
@@ -71,220 +74,24 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
       updatedAt: now,
     );
 
-    // Save API key to keychain
-    await _keychainService.saveGlobalSecret(
-      LlmApiKeychainKeys.buildGlobalKey(identifier),
-      apiKey,
-    );
+    await _saveSecret(identifier, apiKey);
 
-    // Update settings
     final updatedList = [...state, newSettings];
     state = updatedList;
 
-    // If this is the first model, automatically set it as default
-    final isFirstModel = state.isEmpty;
+    final isFirstModel = state.length == 1;
     final defaultLlmIdentifier = isFirstModel
         ? identifier
-        : _settingsNotifier.state.defaultLlmIdentifier;
+        : _currentDefaultIdentifier;
 
-    await _settingsNotifier.updateSettings(
-      _settingsNotifier.state.copyWith(
-        llmSettings: updatedList,
-        defaultLlmIdentifier: defaultLlmIdentifier,
-        updatedAt: now,
-      ),
+    await _saveSettings(
+      updatedList,
+      newDefaultIdentifier: defaultLlmIdentifier,
+      updateDefault: true,
     );
   }
 
   /// Update an existing LLM configuration
-  Future<void> updateLlmSettings({
-    required String identifier,
-    String? originalIdentifier,
-    LlmApiType? apiType,
-    required String baseUrl,
-    String? apiKey,
-    String? customHeaders,
-    int? maxTokens,
-    double? temperature,
-    bool? enabled,
-  }) async {
-    final now = DateTime.now();
-    final lookupId = originalIdentifier ?? identifier;
-    final index = state.indexWhere((s) => s.identifier == lookupId);
-
-    if (index == -1) {
-      throw Exception('LLM settings with identifier "$lookupId" not found');
-    }
-
-    final existing = state[index];
-    final updatedSettings = existing.copyWith(
-      identifier: identifier,
-      baseUrl: baseUrl,
-      customHeaders: customHeaders,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      enabled: enabled ?? existing.enabled,
-      updatedAt: now,
-    );
-
-    // Update API key in keychain if provided
-    if (apiKey != null) {
-      await _keychainService.saveGlobalSecret(
-        LlmApiKeychainKeys.buildGlobalKey(identifier),
-        apiKey,
-      );
-    }
-
-    // If renamed, handle key migration
-    if (originalIdentifier != null && originalIdentifier != identifier) {
-      // If no new key provided, migrate the old one
-      if (apiKey == null) {
-        final oldKey = await _keychainService.getGlobalSecret(
-          LlmApiKeychainKeys.buildGlobalKey(originalIdentifier),
-        );
-        if (oldKey != null) {
-          await _keychainService.saveGlobalSecret(
-            LlmApiKeychainKeys.buildGlobalKey(identifier),
-            oldKey,
-          );
-        }
-      }
-
-      // Clean up old key
-      await _keychainService.deleteGlobalSecret(
-        LlmApiKeychainKeys.buildGlobalKey(originalIdentifier),
-      );
-    }
-
-    // Update settings
-    final updatedList = [...state];
-    updatedList[index] = updatedSettings;
-    state = updatedList;
-
-    await _settingsNotifier.updateSettings(
-      _settingsNotifier.state.copyWith(
-        llmSettings: updatedList,
-        updatedAt: now,
-      ),
-    );
-  }
-
-  /// Delete an LLM configuration
-  Future<void> deleteLlmSettings(String identifier) async {
-    // Delete API key from keychain
-    await _keychainService.deleteGlobalSecret(
-      LlmApiKeychainKeys.buildGlobalKey(identifier),
-    );
-
-    // Update settings
-    final updatedList = state.where((s) => s.identifier != identifier).toList();
-    state = updatedList;
-
-    // If deleting the default model, clear the default
-    final currentDefault = _settingsNotifier.state.defaultLlmIdentifier;
-    final newDefault = currentDefault == identifier ? null : currentDefault;
-
-    await _settingsNotifier.updateSettings(
-      _settingsNotifier.state.copyWith(
-        llmSettings: updatedList,
-        defaultLlmIdentifier: newDefault,
-        updatedAt: DateTime.now(),
-      ),
-    );
-  }
-
-  /// Get API key for a specific LLM configuration
-  Future<String?> getApiKey(String identifier) async {
-    return await _keychainService.getGlobalSecret(
-      LlmApiKeychainKeys.buildGlobalKey(identifier),
-    );
-  }
-
-  /// Set the default LLM identifier
-  Future<void> setDefaultLlm(String identifier) async {
-    await _settingsNotifier.updateSettings(
-      _settingsNotifier.state.copyWith(
-        defaultLlmIdentifier: identifier,
-        updatedAt: DateTime.now(),
-      ),
-    );
-  }
-}
-
-/// StateNotifier for project-specific LLM settings
-class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
-  final String _projectId;
-  final ProjectSettingsNotifier _settingsNotifier;
-  final KeychainService _keychainService;
-
-  ProjectLlmSettingsNotifier(
-    this._projectId,
-    this._settingsNotifier,
-    this._keychainService,
-  ) : super([]) {
-    _loadSettings();
-  }
-
-  /// Load LLM settings from project settings
-  void _loadSettings() {
-    final projectSettings = _settingsNotifier.state;
-    state = projectSettings?.llmSettings ?? [];
-  }
-
-  /// Add a new LLM configuration with API key for this project
-  Future<void> addLlmSettings({
-    required String identifier,
-    required LlmApiType apiType,
-    required String baseUrl,
-    required String apiKey,
-    String? customHeaders,
-    int? maxTokens,
-    double? temperature,
-  }) async {
-    final now = DateTime.now();
-    final newSettings = LlmApiSettings(
-      identifier: identifier,
-      apiType: apiType,
-      baseUrl: baseUrl,
-      customHeaders: customHeaders,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      enabled: true,
-      createdAt: now,
-      updatedAt: now,
-    );
-
-    // Save API key to keychain with project scope
-    await _keychainService.saveProjectSecret(
-      _projectId,
-      LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
-      apiKey,
-    );
-
-    // Update settings
-    final updatedList = [...state, newSettings];
-    state = updatedList;
-
-    final currentSettings =
-        _settingsNotifier.state ??
-        ProjectSettings(projectId: _projectId, createdAt: now, updatedAt: now);
-
-    // If this is the first model, automatically set it as default
-    final isFirstModel = state.isEmpty;
-    final defaultLlmIdentifier = isFirstModel
-        ? identifier
-        : currentSettings.defaultLlmIdentifier;
-
-    await _settingsNotifier.updateSettings(
-      currentSettings.copyWith(
-        llmSettings: updatedList,
-        defaultLlmIdentifier: defaultLlmIdentifier,
-        updatedAt: now,
-      ),
-    );
-  }
-
-  /// Update an existing LLM configuration for this project
   Future<void> updateLlmSettings({
     required String identifier,
     String? originalIdentifier,
@@ -316,98 +123,179 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
       updatedAt: now,
     );
 
-    // Update API key in keychain if provided
     if (apiKey != null) {
-      await _keychainService.saveProjectSecret(
-        _projectId,
-        LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
-        apiKey,
-      );
+      await _saveSecret(identifier, apiKey);
     }
 
     // If renamed, handle key migration
     if (originalIdentifier != null && originalIdentifier != identifier) {
-      // If no new key provided, migrate the old one
       if (apiKey == null) {
-        final oldKey = await _keychainService.getProjectSecret(
-          _projectId,
-          LlmApiKeychainKeys.buildProjectKey(_projectId, originalIdentifier),
-        );
+        final oldKey = await _getSecret(originalIdentifier);
         if (oldKey != null) {
-          await _keychainService.saveProjectSecret(
-            _projectId,
-            LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
-            oldKey,
-          );
+          await _saveSecret(identifier, oldKey);
         }
       }
-
-      // Clean up old key
-      await _keychainService.deleteProjectSecret(
-        _projectId,
-        LlmApiKeychainKeys.buildProjectKey(_projectId, originalIdentifier),
-      );
+      await _deleteSecret(originalIdentifier);
     }
 
-    // Update settings
     final updatedList = [...state];
     updatedList[index] = updatedSettings;
     state = updatedList;
 
-    final currentSettings = _settingsNotifier.state;
-    if (currentSettings != null) {
-      await _settingsNotifier.updateSettings(
-        currentSettings.copyWith(llmSettings: updatedList, updatedAt: now),
-      );
-    }
+    await _saveSettings(updatedList);
   }
 
-  /// Delete an LLM configuration for this project
+  /// Delete an LLM configuration
   Future<void> deleteLlmSettings(String identifier) async {
-    // Delete API key from keychain
-    await _keychainService.deleteProjectSecret(
-      _projectId,
-      LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
-    );
+    await _deleteSecret(identifier);
 
-    // Update settings
     final updatedList = state.where((s) => s.identifier != identifier).toList();
     state = updatedList;
 
-    final currentSettings = _settingsNotifier.state;
-    if (currentSettings != null) {
-      // If deleting the default model, clear the default
-      final currentDefault = currentSettings.defaultLlmIdentifier;
-      final newDefault = currentDefault == identifier ? null : currentDefault;
+    final currentDefault = _currentDefaultIdentifier;
+    final newDefault = currentDefault == identifier ? null : currentDefault;
 
-      await _settingsNotifier.updateSettings(
-        currentSettings.copyWith(
-          llmSettings: updatedList,
-          defaultLlmIdentifier: newDefault,
-          updatedAt: DateTime.now(),
-        ),
-      );
-    }
+    await _saveSettings(
+      updatedList,
+      newDefaultIdentifier: newDefault,
+      updateDefault: true,
+    );
   }
 
-  /// Get API key for a specific LLM configuration in this project
+  /// Get API key for a specific LLM configuration
   Future<String?> getApiKey(String identifier) async {
-    return await _keychainService.getProjectSecret(
+    return await _getSecret(identifier);
+  }
+
+  /// Set the default LLM identifier
+  Future<void> setDefaultLlm(String identifier) async {
+    await _saveSettings(
+      state,
+      newDefaultIdentifier: identifier,
+      updateDefault: true,
+    );
+  }
+}
+
+/// StateNotifier for global LLM settings
+class GlobalLlmSettingsNotifier extends BaseLlmSettingsNotifier {
+  final GlobalSettingsNotifier _settingsNotifier;
+
+  GlobalLlmSettingsNotifier(
+    this._settingsNotifier,
+    KeychainService keychainService,
+  ) : super(keychainService) {
+    state = _settingsNotifier.state.llmSettings;
+  }
+
+  @override
+  String? get _currentDefaultIdentifier =>
+      _settingsNotifier.state.defaultLlmIdentifier;
+
+  @override
+  Future<void> _saveSecret(String identifier, String key) {
+    return _keychainService.saveGlobalSecret(
+      LlmApiKeychainKeys.buildGlobalKey(identifier),
+      key,
+    );
+  }
+
+  @override
+  Future<String?> _getSecret(String identifier) {
+    return _keychainService.getGlobalSecret(
+      LlmApiKeychainKeys.buildGlobalKey(identifier),
+    );
+  }
+
+  @override
+  Future<void> _deleteSecret(String identifier) {
+    return _keychainService.deleteGlobalSecret(
+      LlmApiKeychainKeys.buildGlobalKey(identifier),
+    );
+  }
+
+  @override
+  Future<void> _saveSettings(
+    List<LlmApiSettings> settings, {
+    String? newDefaultIdentifier,
+    bool updateDefault = false,
+  }) {
+    return _settingsNotifier.updateSettings(
+      _settingsNotifier.state.copyWith(
+        llmSettings: settings,
+        defaultLlmIdentifier: updateDefault
+            ? newDefaultIdentifier
+            : _settingsNotifier.state.defaultLlmIdentifier,
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
+}
+
+/// StateNotifier for project-specific LLM settings
+class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
+  final String _projectId;
+  final ProjectSettingsNotifier _settingsNotifier;
+
+  ProjectLlmSettingsNotifier(
+    this._projectId,
+    this._settingsNotifier,
+    KeychainService keychainService,
+  ) : super(keychainService) {
+    state = _settingsNotifier.state?.llmSettings ?? [];
+  }
+
+  @override
+  String? get _currentDefaultIdentifier =>
+      _settingsNotifier.state?.defaultLlmIdentifier;
+
+  @override
+  Future<void> _saveSecret(String identifier, String key) {
+    return _keychainService.saveProjectSecret(
+      _projectId,
+      LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
+      key,
+    );
+  }
+
+  @override
+  Future<String?> _getSecret(String identifier) {
+    return _keychainService.getProjectSecret(
       _projectId,
       LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
     );
   }
 
-  /// Set the default LLM identifier for this project
-  Future<void> setDefaultLlm(String identifier) async {
-    final currentSettings = _settingsNotifier.state;
-    if (currentSettings != null) {
-      await _settingsNotifier.updateSettings(
-        currentSettings.copyWith(
-          defaultLlmIdentifier: identifier,
+  @override
+  Future<void> _deleteSecret(String identifier) {
+    return _keychainService.deleteProjectSecret(
+      _projectId,
+      LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
+    );
+  }
+
+  @override
+  Future<void> _saveSettings(
+    List<LlmApiSettings> settings, {
+    String? newDefaultIdentifier,
+    bool updateDefault = false,
+  }) async {
+    final currentSettings =
+        _settingsNotifier.state ??
+        ProjectSettings(
+          projectId: _projectId,
+          createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
-        ),
-      );
-    }
+        );
+
+    await _settingsNotifier.updateSettings(
+      currentSettings.copyWith(
+        llmSettings: settings,
+        defaultLlmIdentifier: updateDefault
+            ? newDefaultIdentifier
+            : currentSettings.defaultLlmIdentifier,
+        updatedAt: DateTime.now(),
+      ),
+    );
   }
 }
