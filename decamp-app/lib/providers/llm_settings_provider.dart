@@ -133,13 +133,27 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
         LlmApiKeychainKeys.buildGlobalKey(identifier),
         apiKey,
       );
+    }
 
-      // If renamed, clean up old key
-      if (originalIdentifier != null && originalIdentifier != identifier) {
-        await _keychainService.deleteGlobalSecret(
+    // If renamed, handle key migration
+    if (originalIdentifier != null && originalIdentifier != identifier) {
+      // If no new key provided, migrate the old one
+      if (apiKey == null) {
+        final oldKey = await _keychainService.getGlobalSecret(
           LlmApiKeychainKeys.buildGlobalKey(originalIdentifier),
         );
+        if (oldKey != null) {
+          await _keychainService.saveGlobalSecret(
+            LlmApiKeychainKeys.buildGlobalKey(identifier),
+            oldKey,
+          );
+        }
       }
+
+      // Clean up old key
+      await _keychainService.deleteGlobalSecret(
+        LlmApiKeychainKeys.buildGlobalKey(originalIdentifier),
+      );
     }
 
     // Update settings
@@ -309,14 +323,30 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
         LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
         apiKey,
       );
+    }
 
-      // If renamed, clean up old key
-      if (originalIdentifier != null && originalIdentifier != identifier) {
-        await _keychainService.deleteProjectSecret(
+    // If renamed, handle key migration
+    if (originalIdentifier != null && originalIdentifier != identifier) {
+      // If no new key provided, migrate the old one
+      if (apiKey == null) {
+        final oldKey = await _keychainService.getProjectSecret(
           _projectId,
           LlmApiKeychainKeys.buildProjectKey(_projectId, originalIdentifier),
         );
+        if (oldKey != null) {
+          await _keychainService.saveProjectSecret(
+            _projectId,
+            LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
+            oldKey,
+          );
+        }
       }
+
+      // Clean up old key
+      await _keychainService.deleteProjectSecret(
+        _projectId,
+        LlmApiKeychainKeys.buildProjectKey(_projectId, originalIdentifier),
+      );
     }
 
     // Update settings
