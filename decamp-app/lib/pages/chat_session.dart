@@ -163,6 +163,34 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
   }
 
+  /// Handle branching a session at a specific message
+  Future<void> _handleBranchSession(String messageId) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) return;
+
+    developer.log(
+      '🌿 Branching session at message: $messageId',
+      name: 'ChatSession',
+    );
+
+    final controller = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    final newSessionId = await controller.branchSession(
+      messageId: messageId,
+      sessionId: currentSessionId,
+    );
+
+    // Switch to the new session
+    ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+
+    developer.log(
+      '✅ Switched to new session: $newSessionId',
+      name: 'ChatSession',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Activate auto-session selection
@@ -295,6 +323,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         streamingText: chatState.streamingText,
                         onEditMessage: _handleEditMessage,
                         onResendMessage: _handleResendMessage,
+                        onBranchSession: _handleBranchSession,
                       ),
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),

@@ -11,6 +11,7 @@ class ChatList extends StatefulWidget {
   final String streamingText;
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
+  final Function(String messageId)? onBranchSession;
 
   const ChatList({
     super.key,
@@ -20,6 +21,7 @@ class ChatList extends StatefulWidget {
     this.streamingText = '',
     this.onEditMessage,
     this.onResendMessage,
+    this.onBranchSession,
   });
 
   @override
@@ -112,6 +114,7 @@ class _ChatListState extends State<ChatList> {
                     isUser: isUser,
                     onEdit: widget.onEditMessage,
                     onResend: widget.onResendMessage,
+                    onBranch: widget.onBranchSession,
                   ),
                 ),
               ),

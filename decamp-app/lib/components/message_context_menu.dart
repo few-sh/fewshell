@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 /// Context menu for message actions
-/// Shows Copy, Edit, and Re-send options
+/// Shows Copy, Edit, Re-send, and Branch Session options
 class MessageContextMenu extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onResend;
+  final VoidCallback onBranch;
   final String messageContent;
   final bool showResend;
 
@@ -13,6 +14,7 @@ class MessageContextMenu extends StatelessWidget {
     super.key,
     required this.onEdit,
     required this.onResend,
+    required this.onBranch,
     required this.messageContent,
     this.showResend = true,
   });
@@ -68,6 +70,16 @@ class MessageContextMenu extends StatelessWidget {
               ],
             ),
           ),
+        PopupMenuItem<String>(
+          value: 'branch',
+          child: Row(
+            children: [
+              Icon(Icons.call_split, size: 18, color: colorScheme.onSurface),
+              const SizedBox(width: 12),
+              const Text('Branch Session'),
+            ],
+          ),
+        ),
       ],
     );
 
@@ -87,6 +99,9 @@ class MessageContextMenu extends StatelessWidget {
           break;
         case 'resend':
           onResend();
+          break;
+        case 'branch':
+          onBranch();
           break;
       }
     }

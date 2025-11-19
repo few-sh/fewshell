@@ -912,6 +912,30 @@ class ChatController extends StateNotifier<ChatState> {
     );
   }
 
+  /// Branch the session by creating a copy up to a specific message
+  /// Returns the new session ID
+  Future<String> branchSession({
+    required String messageId,
+    required String sessionId,
+  }) async {
+    developer.log(
+      '🌿 Branching session at message: $messageId',
+      name: 'ChatController',
+    );
+
+    final newSessionId = await _sessionDao.branchSession(
+      sessionId: sessionId,
+      upToMessageId: messageId,
+    );
+
+    developer.log(
+      '✅ Created new session: $newSessionId',
+      name: 'ChatController',
+    );
+
+    return newSessionId;
+  }
+
   /// Start streaming for a message
   void startStreaming(String messageId) {
     state = state.copyWith(streamingMessageId: messageId, streamingText: '');

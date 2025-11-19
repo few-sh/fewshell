@@ -20,6 +20,7 @@ class RichMessageContent extends StatefulWidget {
   final MarkdownStyleSheet? styleSheet;
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
+  final Function(String messageId)? onBranch;
 
   const RichMessageContent({
     super.key,
@@ -29,6 +30,7 @@ class RichMessageContent extends StatefulWidget {
     this.styleSheet,
     this.onEdit,
     this.onResend,
+    this.onBranch,
   });
 
   @override
@@ -57,6 +59,10 @@ class _RichMessageContentState extends State<RichMessageContent> {
 
   void _handleResend() {
     widget.onResend?.call(widget.message.id);
+  }
+
+  void _handleBranch() {
+    widget.onBranch?.call(widget.message.id);
   }
 
   @override
@@ -89,6 +95,7 @@ class _RichMessageContentState extends State<RichMessageContent> {
         MessageContextMenu(
           onEdit: _enterEditMode,
           onResend: _handleResend,
+          onBranch: _handleBranch,
           messageContent: widget.message.content,
           showResend: widget.isUser, // Only show re-send for user messages
         ),

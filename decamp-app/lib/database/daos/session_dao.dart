@@ -161,4 +161,75 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     await insertSession(companion);
     return id;
   }
+
+  /// Branch a session by creating a deep copy up to a specific message
+  /// Creates a new session with "Copy of: " prepended to the name
+  /// Copies all messages up to and including the specified message ID
+  /// All new entities get fresh IDs
+  Future<String> branchSession({
+    required String sessionId,
+    required String upToMessageId,
+  }) async {
+    // Get the original session
+    final originalSession = await getSession(sessionId);
+    if (originalSession == null) {
+      throw Exception('Session $sessionId not found');
+    }
+
+    // Get all messages up to and including the specified message
+    final allMessages = await db.messageDao.getMessagesBySession(sessionId);
+    final upToMessage = allMessages.firstWhere(
+      (msg) => msg.id == upToMessageId,
+      orElse: () => throw Exception('Message $upToMessageId not found'),
+    );
+
+    // Filter messages up to and including the target message
+    final messagesToCopy = allMessages
+        .where(
+          (msg) =>
+              msg.createdAt.isBefore(upToMessage.createdAt) ||
+              msg.createdAt.isAtSameMomentAs(upToMessage.createdAt),
+        )
+        .toList();
+
+    // Create new session with copied name
+    final now = DateTime.now();
+    final newSessionId = generateSessionId();
+    final newDescription = 'Copy of: ${originalSession.description}';
+
+    final sessionCompanion = SessionEntityCompanion(
+      id: Value(newSessionId),
+      projectId: Value(originalSession.projectId),
+      description: Value(newDescription),
+      timestamp: Value(now),
+      createdAt: Value(originalSession.createdAt),
+      updatedAt: Value(originalSession.updatedAt),
+      isArchived: Value(originalSession.isArchived),
+    );
+
+    await insertSession(sessionCompanion);
+
+    // Deep copy all messages with new IDs
+    for (final msg in messagesToCopy) {
+      final newMessageId = db.messageDao.generateMessageId();
+      final messageCompanion = MessageEntityCompanion(
+        id: Value(newMessageId),
+        sessionId: Value(newSessionId),
+        userId: Value(msg.userId),
+        userName: Value(msg.userName),
+        content: Value(msg.content),
+        timestamp: Value(msg.timestamp),
+        createdAt: Value(msg.createdAt),
+        editedAt: Value(msg.editedAt),
+        messageKind: Value(msg.messageKind),
+        imageUrl: Value(msg.imageUrl),
+        toolCallsJson: Value(msg.toolCallsJson),
+        toolResultsJson: Value(msg.toolResultsJson),
+      );
+
+      await db.messageDao.insertMessage(messageCompanion);
+    }
+
+    return newSessionId;
+  }
 }
