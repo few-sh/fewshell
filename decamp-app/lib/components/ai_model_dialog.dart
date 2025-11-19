@@ -78,6 +78,7 @@ class AIModelDialog {
                 maxTokens: maxTokens,
                 temperature: temperature,
                 enabled: enabled,
+                originalIdentifier: existingSettings?.identifier,
               );
             },
       ),
@@ -91,6 +92,7 @@ class AIModelDialog {
     required bool isGlobal,
     required bool isEditMode,
     required String identifier,
+    String? originalIdentifier,
     required LlmApiType apiType,
     required String url,
     required String apiKey,
@@ -105,6 +107,7 @@ class AIModelDialog {
         if (isEditMode) {
           await notifier.updateLlmSettings(
             identifier: identifier,
+            originalIdentifier: originalIdentifier,
             apiType: apiType,
             baseUrl: url,
             apiKey: apiKey.isNotEmpty ? apiKey : null,
@@ -133,6 +136,7 @@ class AIModelDialog {
           if (isEditMode) {
             await notifier.updateLlmSettings(
               identifier: identifier,
+              originalIdentifier: originalIdentifier,
               apiType: apiType,
               baseUrl: url,
               apiKey: apiKey.isNotEmpty ? apiKey : null,

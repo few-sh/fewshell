@@ -99,6 +99,7 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Update an existing LLM configuration
   Future<void> updateLlmSettings({
     required String identifier,
+    String? originalIdentifier,
     LlmApiType? apiType,
     required String baseUrl,
     String? apiKey,
@@ -108,14 +109,16 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     bool? enabled,
   }) async {
     final now = DateTime.now();
-    final index = state.indexWhere((s) => s.identifier == identifier);
+    final lookupId = originalIdentifier ?? identifier;
+    final index = state.indexWhere((s) => s.identifier == lookupId);
 
     if (index == -1) {
-      throw Exception('LLM settings with identifier "$identifier" not found');
+      throw Exception('LLM settings with identifier "$lookupId" not found');
     }
 
     final existing = state[index];
     final updatedSettings = existing.copyWith(
+      identifier: identifier,
       baseUrl: baseUrl,
       customHeaders: customHeaders,
       maxTokens: maxTokens,
@@ -130,6 +133,13 @@ class GlobalLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
         LlmApiKeychainKeys.buildGlobalKey(identifier),
         apiKey,
       );
+
+      // If renamed, clean up old key
+      if (originalIdentifier != null && originalIdentifier != identifier) {
+        await _keychainService.deleteGlobalSecret(
+          LlmApiKeychainKeys.buildGlobalKey(originalIdentifier),
+        );
+      }
     }
 
     // Update settings
@@ -263,6 +273,7 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
   /// Update an existing LLM configuration for this project
   Future<void> updateLlmSettings({
     required String identifier,
+    String? originalIdentifier,
     LlmApiType? apiType,
     required String baseUrl,
     String? apiKey,
@@ -272,14 +283,16 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
     bool? enabled,
   }) async {
     final now = DateTime.now();
-    final index = state.indexWhere((s) => s.identifier == identifier);
+    final lookupId = originalIdentifier ?? identifier;
+    final index = state.indexWhere((s) => s.identifier == lookupId);
 
     if (index == -1) {
-      throw Exception('LLM settings with identifier "$identifier" not found');
+      throw Exception('LLM settings with identifier "$lookupId" not found');
     }
 
     final existing = state[index];
     final updatedSettings = existing.copyWith(
+      identifier: identifier,
       apiType: apiType ?? existing.apiType,
       baseUrl: baseUrl,
       customHeaders: customHeaders,
@@ -296,6 +309,14 @@ class ProjectLlmSettingsNotifier extends StateNotifier<List<LlmApiSettings>> {
         LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
         apiKey,
       );
+
+      // If renamed, clean up old key
+      if (originalIdentifier != null && originalIdentifier != identifier) {
+        await _keychainService.deleteProjectSecret(
+          _projectId,
+          LlmApiKeychainKeys.buildProjectKey(_projectId, originalIdentifier),
+        );
+      }
     }
 
     // Update settings
