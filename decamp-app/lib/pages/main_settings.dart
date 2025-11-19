@@ -349,33 +349,39 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           children: [
             Row(
               children: [
-                InkWell(
-                  onTap: () =>
-                      _setDefaultModel(settings.identifier, isGlobal: isGlobal),
-                  borderRadius: BorderRadius.circular(4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Radio<String>(
-                        value: settings.identifier,
-                        groupValue: currentDefault,
-                        onChanged: (value) {
-                          if (value != null) {
-                            _setDefaultModel(value, isGlobal: isGlobal);
-                          }
-                        },
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      Text(
-                        settings.identifier,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _setDefaultModel(
+                      settings.identifier,
+                      isGlobal: isGlobal,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Radio<String>(
+                          value: settings.identifier,
+                          groupValue: currentDefault,
+                          onChanged: (value) {
+                            if (value != null) {
+                              _setDefaultModel(value, isGlobal: isGlobal);
+                            }
+                          },
+                          visualDensity: VisualDensity.compact,
                         ),
-                      ),
-                    ],
+                        Flexible(
+                          child: Text(
+                            settings.identifier,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const Spacer(),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
