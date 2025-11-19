@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import '../models/agent_instruction.dart';
 import '../models/llm_api_settings.dart';
 import '../providers/settings_provider.dart';
@@ -572,7 +572,7 @@ class _InstructionSection extends StatelessWidget {
                       ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   )
-                : MarkdownBody(data: controller.text),
+                : GptMarkdown(controller.text),
           )
         else
           TextField(
@@ -656,7 +656,7 @@ class _ModelOverrideSection extends StatelessWidget {
                           ).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       )
-                    : MarkdownBody(data: controller.text),
+                    : GptMarkdown(controller.text),
               )
             else
               TextField(

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:decamp/database/database.dart';
 import 'package:decamp/components/rich_message_content.dart';
+import 'package:decamp/utils/search_utils.dart';
 
 /// Simple chat message list widget
-/// Displays messages from database with streaming support
+/// Displays messages from database with streaming support and search highlighting
 class ChatList extends StatefulWidget {
   final List<MessageEntity> messages;
   final bool isLoading;
@@ -12,6 +13,8 @@ class ChatList extends StatefulWidget {
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
   final Function(String messageId)? onBranchSession;
+  final List<SearchMatch>? searchMatches;
+  final String? currentMatchMessageId;
 
   const ChatList({
     super.key,
@@ -22,6 +25,8 @@ class ChatList extends StatefulWidget {
     this.onEditMessage,
     this.onResendMessage,
     this.onBranchSession,
+    this.searchMatches,
+    this.currentMatchMessageId,
   });
 
   @override
@@ -30,6 +35,7 @@ class ChatList extends StatefulWidget {
 
 class _ChatListState extends State<ChatList> {
   final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _messageKeys = {};
 
   @override
   void didUpdateWidget(ChatList oldWidget) {
@@ -40,6 +46,17 @@ class _ChatListState extends State<ChatList> {
         widget.streamingText != oldWidget.streamingText) {
       WidgetsBinding.instance.endOfFrame.then((_) {
         if (mounted) _scrollToBottom();
+      });
+    }
+
+    // Scroll to current match when it changes
+    if (widget.currentMatchMessageId != null &&
+        widget.currentMatchMessageId != oldWidget.currentMatchMessageId) {
+      // Schedule scroll after next frame to ensure keys are attached
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scrollToMatch(widget.currentMatchMessageId!);
+        }
       });
     }
   }
@@ -59,6 +76,47 @@ class _ChatListState extends State<ChatList> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
     );
+  }
+
+  void _scrollToMatch(String messageId) {
+    final key = _messageKeys[messageId];
+    if (key == null) {
+      debugPrint('⚠️ No key found for message: $messageId');
+      return;
+    }
+
+    if (key.currentContext == null) {
+      debugPrint('⚠️ No context for message: $messageId');
+      return;
+    }
+
+    final context = key.currentContext!;
+    debugPrint('📍 Scrolling to message: $messageId');
+
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      alignment: 0.5, // Center the message
+    );
+  }
+
+  List<HighlightRange> _getHighlightsForMessage(String messageId) {
+    if (widget.searchMatches == null) return [];
+
+    final highlights = <HighlightRange>[];
+    for (final match in widget.searchMatches!) {
+      if (match.messageId == messageId) {
+        highlights.add(
+          HighlightRange(
+            offset: match.matchOffset,
+            length: match.matchLength,
+            isActive: messageId == widget.currentMatchMessageId,
+          ),
+        );
+      }
+    }
+    return highlights;
   }
 
   @override
@@ -84,13 +142,20 @@ class _ChatListState extends State<ChatList> {
         final messageIndex = widget.isLoading ? index - 1 : index;
         final message = reversedMessages[messageIndex];
 
+        // Ensure we have a key for this message
+        _messageKeys.putIfAbsent(message.id, () => GlobalKey());
+
         // Check if this message is currently streaming
         final isStreaming = message.id == widget.streamingMessageId;
         // Only provide displayText when actually streaming
         final displayText = isStreaming ? widget.streamingText : null;
         final isUser = message.userId == 'user';
 
+        // Get highlights for this message
+        final highlights = _getHighlightsForMessage(message.id);
+
         return Column(
+          key: _messageKeys[message.id],
           children: [
             if (messageIndex > 0)
               Divider(
@@ -115,6 +180,7 @@ class _ChatListState extends State<ChatList> {
                     onEdit: widget.onEditMessage,
                     onResend: widget.onResendMessage,
                     onBranch: widget.onBranchSession,
+                    highlights: highlights.isNotEmpty ? highlights : null,
                   ),
                 ),
               ),

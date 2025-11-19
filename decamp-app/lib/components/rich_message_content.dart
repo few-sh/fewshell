@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:decamp/database/database.dart';
 import 'package:decamp/database/tables/messages_table.dart';
@@ -8,29 +8,41 @@ import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
-import 'package:markdown/markdown.dart' as md;
+
+/// Highlight range for search matches
+class HighlightRange {
+  final int offset;
+  final int length;
+  final bool isActive;
+
+  const HighlightRange({
+    required this.offset,
+    required this.length,
+    this.isActive = false,
+  });
+}
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
-/// Supports inline editing with context menu
+/// Supports inline editing with context menu and search highlighting
 class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
   final String? displayText; // Override for streaming
   final bool isUser;
-  final MarkdownStyleSheet? styleSheet;
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
   final Function(String messageId)? onBranch;
+  final List<HighlightRange>? highlights; // Search highlights for this message
 
   const RichMessageContent({
     super.key,
     required this.message,
     this.displayText,
     required this.isUser,
-    this.styleSheet,
     this.onEdit,
     this.onResend,
     this.onBranch,
+    this.highlights,
   });
 
   @override
@@ -213,6 +225,9 @@ class _RichMessageContentState extends State<RichMessageContent> {
   }
 
   Widget _buildMarkdownContent(BuildContext context, String text) {
+    final textColor =
+        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white;
+
     // Get terminal theme for code blocks
     final terminalTheme =
         Theme.of(context).extension<TerminalTheme>() ??
@@ -220,89 +235,47 @@ class _RichMessageContentState extends State<RichMessageContent> {
             ? TerminalTheme.dark
             : TerminalTheme.light);
 
-    // Extract base text color from stylesheet
-    final textColor =
-        widget.styleSheet?.p?.color ??
-        Theme.of(context).textTheme.bodyLarge?.color ??
-        Colors.white;
-
     // Track code block index for unique hero tags
     int codeBlockIndex = 0;
 
-    // Create enhanced stylesheet with terminal theme for code blocks
-    final enhancedStyleSheet =
-        (widget.styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
-            .copyWith(
-              code: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color: terminalTheme.textColor,
-                backgroundColor: terminalTheme.backgroundColor,
-              ),
-              codeblockDecoration: BoxDecoration(
-                color: terminalTheme.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: terminalTheme.borderColor, width: 1),
-              ),
-              codeblockPadding: const EdgeInsets.all(12),
-            );
+    // Apply highlights to text using <u> tags (underline) which gpt_markdown supports
+    String processedText = text;
+    if (widget.highlights != null && widget.highlights!.isNotEmpty) {
+      // Sort highlights by offset in reverse to maintain positions
+      final sortedHighlights = List<HighlightRange>.from(widget.highlights!)
+        ..sort((a, b) => b.offset.compareTo(a.offset));
 
-    final markdown = Markdown(
-      data: text,
-      selectable: false,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      styleSheet: enhancedStyleSheet,
-      padding: EdgeInsets.zero,
-      builders: {
-        'code': ExpandableCodeBlockBuilder(
-          terminalTheme: terminalTheme,
-          messageId: widget.message.id,
-          getCodeBlockIndex: () => codeBlockIndex++,
-        ),
-      },
-      onTapLink: (text, href, title) {
-        if (href != null) {
-          // TODO: Handle link taps (open in browser, etc.)
-          debugPrint('Link tapped: $href');
-        }
-      },
-    );
+      for (final highlight in sortedHighlights) {
+        final start = highlight.offset;
+        final end = start + highlight.length;
+
+        if (start < 0 || end > processedText.length) continue;
+
+        final before = processedText.substring(0, start);
+        final match = processedText.substring(start, end);
+        final after = processedText.substring(end);
+
+        // Use <u> tags for underlining matches
+        processedText = '$before<u>$match</u>$after';
+      }
+    }
 
     return SelectionArea(
-      child: DefaultTextStyle(
+      child: GptMarkdown(
+        processedText,
         style: TextStyle(color: textColor),
-        child: markdown,
+        codeBuilder: (context, language, code, closed) {
+          final index = codeBlockIndex++;
+          final heroTag = 'code_block_${widget.message.id}_$index';
+
+          return ExpandableCodeBlock(
+            code: code,
+            language: language,
+            heroTag: heroTag,
+            terminalTheme: terminalTheme,
+          );
+        },
       ),
-    );
-  }
-}
-
-/// Custom markdown builder for expandable code blocks
-class ExpandableCodeBlockBuilder extends MarkdownElementBuilder {
-  final TerminalTheme terminalTheme;
-  final String messageId;
-  final int Function() getCodeBlockIndex;
-
-  ExpandableCodeBlockBuilder({
-    required this.terminalTheme,
-    required this.messageId,
-    required this.getCodeBlockIndex,
-  });
-
-  @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    final code = element.textContent;
-    final language =
-        element.attributes['class']?.replaceFirst('language-', '') ?? '';
-    final index = getCodeBlockIndex();
-    final heroTag = 'code_block_${messageId}_$index';
-
-    return ExpandableCodeBlock(
-      code: code,
-      language: language,
-      heroTag: heroTag,
-      terminalTheme: terminalTheme,
     );
   }
 }

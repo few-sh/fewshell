@@ -5,11 +5,14 @@ import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/execution_progress_overlay.dart';
 import 'package:decamp/components/chat_list.dart';
 import 'package:decamp/components/chat_input.dart';
+import 'package:decamp/components/search_controls.dart';
+import 'package:decamp/components/search_match_navigator.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'dart:developer' as developer;
@@ -25,10 +28,60 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   bool _previousKeyboardVisible = false;
   final FocusNode _inputFocusNode = FocusNode();
 
+  // Search state
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+  List<SearchMatch> _searchMatches = [];
+  int _currentMatchIndex = 0;
+
   @override
   void dispose() {
     _inputFocusNode.dispose();
     super.dispose();
+  }
+
+  void _activateSearch() {
+    setState(() {
+      _isSearchActive = true;
+    });
+  }
+
+  void _deactivateSearch() {
+    setState(() {
+      _isSearchActive = false;
+      _searchQuery = '';
+      _searchMatches = [];
+      _currentMatchIndex = 0;
+    });
+  }
+
+  void _updateSearch(String query, List<dynamic> messages) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _searchMatches = [];
+        _currentMatchIndex = 0;
+      } else {
+        _searchMatches = SearchUtils.findMatches(query, messages.cast());
+        _currentMatchIndex = _searchMatches.isNotEmpty ? 0 : 0;
+      }
+    });
+  }
+
+  void _nextMatch() {
+    if (_searchMatches.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + 1) % _searchMatches.length;
+    });
+  }
+
+  void _previousMatch() {
+    if (_searchMatches.isEmpty) return;
+    setState(() {
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _searchMatches.length) %
+          _searchMatches.length;
+    });
   }
 
   /// Create a new chat session
@@ -294,6 +347,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 backgroundColor: Theme.of(context).colorScheme.inversePrimary,
                 actions: [
                   IconButton(
+                    icon: const Icon(Icons.search),
+                    tooltip: 'Search',
+                    onPressed: hasProject ? _activateSearch : null,
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.add),
                     tooltip: 'New Session',
                     onPressed: hasProject ? _createNewSession : null,
@@ -313,6 +371,24 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               // Main chat UI
               Column(
                 children: [
+                  // Search UI (when active)
+                  if (_isSearchActive) ...[
+                    SearchControls(
+                      onSearchChanged: (query) {
+                        final messages = messagesAsync.valueOrNull ?? [];
+                        _updateSearch(query, messages);
+                      },
+                      onClose: _deactivateSearch,
+                      initialQuery: _searchQuery,
+                    ),
+                    if (_searchQuery.isNotEmpty)
+                      SearchMatchNavigator(
+                        currentMatch: _currentMatchIndex + 1,
+                        totalMatches: _searchMatches.length,
+                        onPrevious: _previousMatch,
+                        onNext: _nextMatch,
+                      ),
+                  ],
                   // Message list
                   Expanded(
                     child: messagesAsync.when(
@@ -324,6 +400,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         onEditMessage: _handleEditMessage,
                         onResendMessage: _handleResendMessage,
                         onBranchSession: _handleBranchSession,
+                        searchMatches: _searchMatches,
+                        currentMatchMessageId: _searchMatches.isNotEmpty
+                            ? _searchMatches[_currentMatchIndex].messageId
+                            : null,
                       ),
                       loading: () =>
                           const Center(child: CircularProgressIndicator()),
