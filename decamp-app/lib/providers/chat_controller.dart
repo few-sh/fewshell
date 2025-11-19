@@ -817,6 +817,101 @@ class ChatController extends StateNotifier<ChatState> {
     );
   }
 
+  /// Edit a message and resend from that point
+  /// Deletes all messages after the edited message and sends it to AI
+  Future<void> editMessage({
+    required String messageId,
+    required String newContent,
+    required String sessionId,
+  }) async {
+    developer.log('✏️ Editing message: $messageId', name: 'ChatController');
+
+    // Get the message to find its timestamp
+    final message = await _messageDao.getMessage(messageId);
+    if (message == null) {
+      developer.log('❌ Message not found: $messageId', name: 'ChatController');
+      return;
+    }
+
+    // Delete all messages after this one
+    final deletedCount = await _messageDao.deleteMessagesAfter(
+      sessionId: sessionId,
+      afterTimestamp: message.timestamp,
+    );
+
+    developer.log(
+      '🗑️ Deleted $deletedCount messages after edited message',
+      name: 'ChatController',
+    );
+
+    // Update the message content
+    await _messageDao.updateMessageContent(
+      messageId: messageId,
+      newContent: newContent,
+    );
+
+    developer.log('💾 Updated message content', name: 'ChatController');
+
+    // Get updated message history
+    final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+
+    // Check if this is the only message
+    final isFirstMessage = dbMessages.length == 1;
+
+    // Send the edited message to AI
+    await sendMessage(
+      content: newContent,
+      sessionId: sessionId,
+      dbMessages: dbMessages,
+      isFirstMessage: isFirstMessage,
+    );
+  }
+
+  /// Resend a message without editing
+  /// Deletes the message and all messages after it, then sends it again
+  Future<void> resendMessage({
+    required String messageId,
+    required String sessionId,
+  }) async {
+    developer.log('🔄 Resending message: $messageId', name: 'ChatController');
+
+    // Get the message
+    final message = await _messageDao.getMessage(messageId);
+    if (message == null) {
+      developer.log('❌ Message not found: $messageId', name: 'ChatController');
+      return;
+    }
+
+    final content = message.content;
+
+    // Delete all messages after this one (including this one)
+    final deletedCount = await _messageDao.deleteMessagesAfter(
+      sessionId: sessionId,
+      afterTimestamp: message.timestamp.subtract(
+        const Duration(milliseconds: 1),
+      ),
+    );
+
+    developer.log(
+      '🗑️ Deleted $deletedCount messages (including the message to resend)',
+      name: 'ChatController',
+    );
+
+    // Get updated message history
+    final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+
+    // Check if this will be the first message
+    final isFirstMessage = dbMessages.isEmpty;
+
+    // Send the message again
+    await sendMessage(
+      content: content,
+      sessionId: sessionId,
+      dbMessages: dbMessages,
+      isFirstMessage: isFirstMessage,
+    );
+  }
+
   /// Start streaming for a message
   void startStreaming(String messageId) {
     state = state.copyWith(streamingMessageId: messageId, streamingText: '');

@@ -9,6 +9,8 @@ class ChatList extends StatefulWidget {
   final bool isLoading;
   final String? streamingMessageId;
   final String streamingText;
+  final Function(String messageId, String newContent)? onEditMessage;
+  final Function(String messageId)? onResendMessage;
 
   const ChatList({
     super.key,
@@ -16,6 +18,8 @@ class ChatList extends StatefulWidget {
     this.isLoading = false,
     this.streamingMessageId,
     this.streamingText = '',
+    this.onEditMessage,
+    this.onResendMessage,
   });
 
   @override
@@ -94,6 +98,8 @@ class _ChatListState extends State<ChatList> {
                 message: message,
                 displayText: displayText,
                 isUser: isUser,
+                onEdit: widget.onEditMessage,
+                onResend: widget.onResendMessage,
               ),
             ),
           ),

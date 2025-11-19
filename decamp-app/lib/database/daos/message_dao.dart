@@ -119,4 +119,52 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
     await insertMessage(companion);
     return messageId;
   }
+
+  /// Update message content and set editedAt timestamp
+  Future<bool> updateMessageContent({
+    required String messageId,
+    required String newContent,
+  }) async {
+    // Get the current message
+    final message = await getMessage(messageId);
+    if (message == null) return false;
+
+    // Build the update companion
+    final companion = MessageEntityCompanion(
+      id: Value(messageId),
+      sessionId: Value(message.sessionId),
+      userId: Value(message.userId),
+      userName: Value(message.userName),
+      content: Value(newContent),
+      timestamp: Value(message.timestamp),
+      createdAt: Value(message.createdAt),
+      editedAt: Value(DateTime.now()),
+      messageKind: Value(message.messageKind),
+      imageUrl: Value(message.imageUrl),
+      toolCallsJson: Value(message.toolCallsJson),
+      toolResultsJson: Value(message.toolResultsJson),
+    );
+
+    return await updateMessage(companion);
+  }
+
+  /// Delete all messages after a specific message (by timestamp)
+  /// Used when editing a message to remove subsequent conversation
+  Future<int> deleteMessagesAfter({
+    required String sessionId,
+    required DateTime afterTimestamp,
+  }) async {
+    final result =
+        await (delete(messages)..where(
+              (m) =>
+                  m.sessionId.equals(sessionId) &
+                  m.timestamp.isBiggerThanValue(afterTimestamp),
+            ))
+            .go();
+
+    // Touch the session to update its updatedAt timestamp
+    await db.sessionDao.touchSession(sessionId);
+
+    return result;
+  }
 }
