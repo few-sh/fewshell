@@ -79,52 +79,56 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Build timestamp with optional edit indicator
     final timestamp = _buildTimestamp(context);
 
-    // Wrap content with timestamp and ellipsis menu
-    final contentWithControls = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+    // Build controls row (timestamp + menu)
+    final controls = Row(
+      mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        content,
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            timestamp,
-            const SizedBox(width: 4),
-            // Show context menu (always visible)
-            MessageContextMenu(
-              onEdit: _enterEditMode,
-              onResend: _handleResend,
-              messageContent: widget.message.content,
-              showResend: widget.isUser, // Only show re-send for user messages
-            ),
-          ],
+        timestamp,
+        const SizedBox(width: 4),
+        // Show context menu (always visible)
+        MessageContextMenu(
+          onEdit: _enterEditMode,
+          onResend: _handleResend,
+          messageContent: widget.message.content,
+          showResend: widget.isUser, // Only show re-send for user messages
         ),
       ],
     );
 
-    // Wrap user messages in a bubble container
+    // Wrap user messages in a bubble container (content only, controls below)
     if (widget.isUser &&
         (widget.message.toolResultsJson == null ||
             widget.message.toolResultsJson!.isEmpty)) {
-      return Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(18),
-            topRight: Radius.circular(18),
-            bottomLeft: Radius.circular(18),
-            bottomRight: Radius.circular(0),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(18),
+                topRight: Radius.circular(18),
+                bottomLeft: Radius.circular(18),
+                bottomRight: Radius.circular(0),
+              ),
+            ),
+            child: content,
           ),
-        ),
-        child: contentWithControls,
+          const SizedBox(height: 4),
+          controls,
+        ],
       );
     }
 
-    // AI messages: no bubble wrapper (flat appearance)
-    return contentWithControls;
+    // AI messages: content with controls inline
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [content, const SizedBox(height: 4), controls],
+    );
   }
 
   Widget _buildTimestamp(BuildContext context) {
