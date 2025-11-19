@@ -86,37 +86,15 @@ const List<String> kAnthropicModels = [
 
 /// Supported models for Google (Gemini)
 const List<String> kGoogleModels = [
-  // Gemini 3 models (latest)
+  // Gemini 2.5 models (latest)
   'gemini-3-pro',
-  'gemini-3-pro-latest',
-  // Gemini 2.5 models
   'gemini-2.5-pro',
-  'gemini-2.5-pro-latest',
   'gemini-2.5-flash',
-  'gemini-2.5-flash-latest',
-  'gemini-2.5-flash-lite',
-  'gemini-2.5-flash-lite-latest',
   // Gemini 2.0 models
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-latest',
-  'gemini-2.0-flash-lite',
-  'gemini-2.0-flash-lite-latest',
   'gemini-2.0-flash-exp',
-  // Generic latest aliases
-  'gemini-pro-latest',
-  'gemini-flash-latest',
-  // Gemini 1.5 models (legacy)
+  // Gemini 1.5 models
   'gemini-1.5-pro',
-  'gemini-1.5-pro-002',
-  'gemini-1.5-pro-001',
   'gemini-1.5-flash',
-  'gemini-1.5-flash-002',
-  'gemini-1.5-flash-001',
-  'gemini-1.5-flash-8b',
-  // Gemini 1.0 models (legacy)
-  'gemini-1.0-pro',
-  'gemini-1.0-pro-001',
-  'gemini-1.0-pro-vision',
 ];
 
 /// Supported models for DeepSeek
