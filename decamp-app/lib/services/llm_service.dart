@@ -75,11 +75,18 @@ class LlmService {
     }
 
     // Get API key from keychain
-    final keychainKey = projectId != null
-        ? LlmApiKeychainKeys.buildProjectKey(projectId, config.identifier)
-        : LlmApiKeychainKeys.buildGlobalKey(config.identifier);
+    final String? apiKey;
+    if (projectId != null) {
+      apiKey = await keychainService.getProjectSecret(
+        projectId,
+        LlmApiKeychainKeys.buildProjectKey(projectId, config.identifier),
+      );
+    } else {
+      apiKey = await keychainService.getGlobalSecret(
+        LlmApiKeychainKeys.buildGlobalKey(config.identifier),
+      );
+    }
 
-    final apiKey = await keychainService.getGlobalSecret(keychainKey);
     if (apiKey == null) {
       throw Exception('API key not found for ${config.identifier}');
     }
