@@ -82,8 +82,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildUserSettings() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
       children: [
         _buildAIModelsSection(isGlobal: true),
         const SizedBox(height: 24),
@@ -94,8 +93,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildProjectSettings() {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
       children: [
         _buildProjectSelector(),
         const SizedBox(height: 24),
