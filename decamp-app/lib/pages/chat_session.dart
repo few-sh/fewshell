@@ -401,8 +401,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         onResendMessage: _handleResendMessage,
                         onBranchSession: _handleBranchSession,
                         searchMatches: _searchMatches,
-                        currentMatchMessageId: _searchMatches.isNotEmpty
-                            ? _searchMatches[_currentMatchIndex].messageId
+                        currentMatchIndex: _searchMatches.isNotEmpty
+                            ? _currentMatchIndex
                             : null,
                       ),
                       loading: () =>

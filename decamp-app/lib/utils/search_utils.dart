@@ -1,5 +1,17 @@
-import 'dart:convert';
 import 'package:decamp/database/database.dart';
+
+/// Highlight range for search matches
+class HighlightRange {
+  final int offset;
+  final int length;
+  final bool isActive;
+
+  const HighlightRange({
+    required this.offset,
+    required this.length,
+    this.isActive = false,
+  });
+}
 
 /// Type of content where match was found
 enum MatchType { messageContent, toolCall, toolResult }
@@ -37,7 +49,7 @@ class SearchMatch {
 /// Utility functions for searching through messages
 class SearchUtils {
   /// Find all matches for a query in a list of messages
-  /// Supports regex patterns and searches message content, tool calls, and tool results
+  /// Supports regex patterns and searches only visible message content
   static List<SearchMatch> findMatches(
     String query,
     List<MessageEntity> messages,
@@ -45,7 +57,6 @@ class SearchUtils {
     if (query.isEmpty) return [];
 
     final matches = <SearchMatch>[];
-    int globalMatchIndex = 0;
 
     // Try to compile as regex, fall back to literal string search
     RegExp? regex;
@@ -58,45 +69,14 @@ class SearchUtils {
     }
 
     for (final message in messages) {
-      // Search in message content
+      // Only search in visible message content
       _findMatchesInText(
         text: message.content,
         regex: regex,
         messageId: message.id,
         matchType: MatchType.messageContent,
         matches: matches,
-        globalMatchIndex: globalMatchIndex,
       );
-      globalMatchIndex = matches.length;
-
-      // Search in tool calls JSON
-      if (message.toolCallsJson != null && message.toolCallsJson!.isNotEmpty) {
-        final toolCallsText = _jsonToSearchableText(message.toolCallsJson!);
-        _findMatchesInText(
-          text: toolCallsText,
-          regex: regex,
-          messageId: message.id,
-          matchType: MatchType.toolCall,
-          matches: matches,
-          globalMatchIndex: globalMatchIndex,
-        );
-        globalMatchIndex = matches.length;
-      }
-
-      // Search in tool results JSON
-      if (message.toolResultsJson != null &&
-          message.toolResultsJson!.isNotEmpty) {
-        final toolResultsText = _jsonToSearchableText(message.toolResultsJson!);
-        _findMatchesInText(
-          text: toolResultsText,
-          regex: regex,
-          messageId: message.id,
-          matchType: MatchType.toolResult,
-          matches: matches,
-          globalMatchIndex: globalMatchIndex,
-        );
-        globalMatchIndex = matches.length;
-      }
     }
 
     return matches;
@@ -109,7 +89,6 @@ class SearchUtils {
     required String messageId,
     required MatchType matchType,
     required List<SearchMatch> matches,
-    required int globalMatchIndex,
   }) {
     final allMatches = regex.allMatches(text);
 
@@ -121,25 +100,13 @@ class SearchUtils {
       matches.add(
         SearchMatch(
           messageId: messageId,
-          matchIndex: globalMatchIndex + matches.length,
+          matchIndex: matches.length,
           matchOffset: matchOffset,
           matchLength: matchLength,
           matchContext: matchContext,
           matchType: matchType,
         ),
       );
-    }
-  }
-
-  /// Convert JSON objects to searchable text
-  static String _jsonToSearchableText(List<dynamic> jsonList) {
-    try {
-      // Pretty print JSON for better readability in search
-      final encoder = JsonEncoder.withIndent('  ');
-      return encoder.convert(jsonList);
-    } catch (e) {
-      // Fall back to toString if JSON encoding fails
-      return jsonList.toString();
     }
   }
 

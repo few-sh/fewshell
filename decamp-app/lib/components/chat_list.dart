@@ -14,7 +14,7 @@ class ChatList extends StatefulWidget {
   final Function(String messageId)? onResendMessage;
   final Function(String messageId)? onBranchSession;
   final List<SearchMatch>? searchMatches;
-  final String? currentMatchMessageId;
+  final int? currentMatchIndex; // Index of currently active match
 
   const ChatList({
     super.key,
@@ -26,7 +26,7 @@ class ChatList extends StatefulWidget {
     this.onResendMessage,
     this.onBranchSession,
     this.searchMatches,
-    this.currentMatchMessageId,
+    this.currentMatchIndex,
   });
 
   @override
@@ -38,8 +38,19 @@ class _ChatListState extends State<ChatList> {
   final Map<String, GlobalKey> _messageKeys = {};
 
   @override
+  void initState() {
+    super.initState();
+    _updateMessageKeys();
+  }
+
+  @override
   void didUpdateWidget(ChatList oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    // Update message keys when message list changes
+    if (widget.messages != oldWidget.messages) {
+      _updateMessageKeys();
+    }
 
     // Scroll when messages change or streaming updates
     if (widget.messages.length != oldWidget.messages.length ||
@@ -50,14 +61,33 @@ class _ChatListState extends State<ChatList> {
     }
 
     // Scroll to current match when it changes
-    if (widget.currentMatchMessageId != null &&
-        widget.currentMatchMessageId != oldWidget.currentMatchMessageId) {
+    if (widget.currentMatchIndex != null &&
+        widget.currentMatchIndex != oldWidget.currentMatchIndex &&
+        widget.searchMatches != null &&
+        widget.currentMatchIndex! < widget.searchMatches!.length) {
+      final currentMatch = widget.searchMatches![widget.currentMatchIndex!];
       // Schedule scroll after next frame to ensure keys are attached
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _scrollToMatch(widget.currentMatchMessageId!);
+          _scrollToMatch(currentMatch.messageId);
         }
       });
+    }
+  }
+
+  /// Update message keys to stay in sync with current messages
+  void _updateMessageKeys() {
+    // Remove keys for messages that no longer exist
+    _messageKeys.removeWhere(
+      (messageId, _) => !widget.messages.any((m) => m.id == messageId),
+    );
+
+    // Add keys for new messages
+    for (final message in widget.messages) {
+      _messageKeys.putIfAbsent(
+        message.id,
+        () => GlobalKey(debugLabel: 'message_${message.id}'),
+      );
     }
   }
 
@@ -101,24 +131,6 @@ class _ChatListState extends State<ChatList> {
     );
   }
 
-  List<HighlightRange> _getHighlightsForMessage(String messageId) {
-    if (widget.searchMatches == null) return [];
-
-    final highlights = <HighlightRange>[];
-    for (final match in widget.searchMatches!) {
-      if (match.messageId == messageId) {
-        highlights.add(
-          HighlightRange(
-            offset: match.matchOffset,
-            length: match.matchLength,
-            isActive: messageId == widget.currentMatchMessageId,
-          ),
-        );
-      }
-    }
-    return highlights;
-  }
-
   @override
   Widget build(BuildContext context) {
     // Reverse the list so newest messages are at index 0
@@ -142,17 +154,11 @@ class _ChatListState extends State<ChatList> {
         final messageIndex = widget.isLoading ? index - 1 : index;
         final message = reversedMessages[messageIndex];
 
-        // Ensure we have a key for this message
-        _messageKeys.putIfAbsent(message.id, () => GlobalKey());
-
         // Check if this message is currently streaming
         final isStreaming = message.id == widget.streamingMessageId;
         // Only provide displayText when actually streaming
         final displayText = isStreaming ? widget.streamingText : null;
         final isUser = message.userId == 'user';
-
-        // Get highlights for this message
-        final highlights = _getHighlightsForMessage(message.id);
 
         return Column(
           key: _messageKeys[message.id],
@@ -180,7 +186,8 @@ class _ChatListState extends State<ChatList> {
                     onEdit: widget.onEditMessage,
                     onResend: widget.onResendMessage,
                     onBranch: widget.onBranchSession,
-                    highlights: highlights.isNotEmpty ? highlights : null,
+                    searchMatches: widget.searchMatches,
+                    currentMatchIndex: widget.currentMatchIndex,
                   ),
                 ),
               ),

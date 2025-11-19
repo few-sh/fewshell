@@ -8,19 +8,7 @@ import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
-
-/// Highlight range for search matches
-class HighlightRange {
-  final int offset;
-  final int length;
-  final bool isActive;
-
-  const HighlightRange({
-    required this.offset,
-    required this.length,
-    this.isActive = false,
-  });
-}
+import 'package:decamp/utils/search_utils.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
@@ -32,7 +20,8 @@ class RichMessageContent extends StatefulWidget {
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
   final Function(String messageId)? onBranch;
-  final List<HighlightRange>? highlights; // Search highlights for this message
+  final List<SearchMatch>? searchMatches; // All search matches
+  final int? currentMatchIndex; // Index of currently active match
 
   const RichMessageContent({
     super.key,
@@ -42,7 +31,8 @@ class RichMessageContent extends StatefulWidget {
     this.onEdit,
     this.onResend,
     this.onBranch,
-    this.highlights,
+    this.searchMatches,
+    this.currentMatchIndex,
   });
 
   @override
@@ -75,6 +65,28 @@ class _RichMessageContentState extends State<RichMessageContent> {
 
   void _handleBranch() {
     widget.onBranch?.call(widget.message.id);
+  }
+
+  /// Calculate highlights for this message from search matches
+  List<HighlightRange> _getHighlights() {
+    if (widget.searchMatches == null || widget.searchMatches!.isEmpty) {
+      return [];
+    }
+
+    final highlights = <HighlightRange>[];
+    for (int i = 0; i < widget.searchMatches!.length; i++) {
+      final match = widget.searchMatches![i];
+      if (match.messageId == widget.message.id) {
+        highlights.add(
+          HighlightRange(
+            offset: match.matchOffset,
+            length: match.matchLength,
+            isActive: i == widget.currentMatchIndex,
+          ),
+        );
+      }
+    }
+    return highlights;
   }
 
   @override
@@ -238,11 +250,14 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Track code block index for unique hero tags
     int codeBlockIndex = 0;
 
+    // Calculate highlights for this message
+    final highlights = _getHighlights();
+
     // Apply highlights to text using <u> tags (underline) which gpt_markdown supports
     String processedText = text;
-    if (widget.highlights != null && widget.highlights!.isNotEmpty) {
+    if (highlights.isNotEmpty) {
       // Sort highlights by offset in reverse to maintain positions
-      final sortedHighlights = List<HighlightRange>.from(widget.highlights!)
+      final sortedHighlights = List<HighlightRange>.from(highlights)
         ..sort((a, b) => b.offset.compareTo(a.offset));
 
       for (final highlight in sortedHighlights) {
