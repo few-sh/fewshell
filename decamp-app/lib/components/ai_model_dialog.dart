@@ -51,6 +51,8 @@ class AIModelDialog {
         initialApiType: existingSettings?.apiType,
         initialUrl: existingSettings?.baseUrl,
         initialApiKey: apiKey ?? '',
+        initialMaxTokens: existingSettings?.maxTokens,
+        initialTemperature: existingSettings?.temperature,
         initialEnabled: existingSettings?.enabled,
         onSave:
             (
@@ -190,6 +192,8 @@ class _AIModelDialogForm extends StatefulWidget {
   final LlmApiType? initialApiType;
   final String? initialUrl;
   final String? initialApiKey;
+  final int? initialMaxTokens;
+  final double? initialTemperature;
   final bool? initialEnabled;
   final Function(
     String identifier,
@@ -211,6 +215,8 @@ class _AIModelDialogForm extends StatefulWidget {
     this.initialApiType,
     this.initialUrl,
     this.initialApiKey,
+    this.initialMaxTokens,
+    this.initialTemperature,
     this.initialEnabled,
     required this.onSave,
   });
@@ -223,6 +229,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
   late final TextEditingController _identifierController;
   late final TextEditingController _urlController;
   late final TextEditingController _apiKeyController;
+  late final TextEditingController _maxTokensController;
+  late final TextEditingController _temperatureController;
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
   bool _obscureApiKey = true;
@@ -271,6 +279,12 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
       text: widget.initialUrl ?? _selectedApiType.defaultBaseUrl,
     );
     _apiKeyController = TextEditingController(text: widget.initialApiKey);
+    _maxTokensController = TextEditingController(
+      text: widget.initialMaxTokens?.toString() ?? '',
+    );
+    _temperatureController = TextEditingController(
+      text: widget.initialTemperature?.toString() ?? '0.7',
+    );
     _enabled = widget.initialEnabled ?? true;
   }
 
@@ -279,6 +293,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
     _identifierController.dispose();
     _urlController.dispose();
     _apiKeyController.dispose();
+    _maxTokensController.dispose();
+    _temperatureController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -466,6 +482,54 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   return null;
                 },
               ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _maxTokensController,
+                      decoration: const InputDecoration(
+                        labelText: 'Max Tokens',
+                        hintText: 'Optional',
+                        isDense: true,
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          final number = int.tryParse(value);
+                          if (number == null || number <= 0) {
+                            return 'Invalid number';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _temperatureController,
+                      decoration: const InputDecoration(
+                        labelText: 'Temperature',
+                        hintText: '0.0 - 2.0',
+                        isDense: true,
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      validator: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          final number = double.tryParse(value);
+                          if (number == null || number < 0 || number > 2) {
+                            return '0.0 - 2.0';
+                          }
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
+              ),
               if (_isEditMode) ...[
                 const SizedBox(height: 12),
                 SwitchListTile(
@@ -577,6 +641,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
         identifier: _identifierController.text,
         apiType: _selectedApiType,
         baseUrl: _urlController.text,
+        maxTokens: int.tryParse(_maxTokensController.text),
+        temperature: double.tryParse(_temperatureController.text),
       );
 
       // Use empty string if no API key provided (for edit mode)
@@ -640,6 +706,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
         _selectedApiType,
         _urlController.text,
         _apiKeyController.text,
+        maxTokens: int.tryParse(_maxTokensController.text),
+        temperature: double.tryParse(_temperatureController.text),
         enabled: _isEditMode ? _enabled : null,
       );
       Navigator.of(context).pop();
