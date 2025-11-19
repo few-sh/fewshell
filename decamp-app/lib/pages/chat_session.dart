@@ -63,7 +63,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         _currentMatchIndex = 0;
       } else {
         _searchMatches = SearchUtils.findMatches(query, messages.cast());
-        _currentMatchIndex = _searchMatches.isNotEmpty ? 0 : 0;
+        _currentMatchIndex = 0;
       }
     });
   }
