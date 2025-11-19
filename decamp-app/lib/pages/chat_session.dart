@@ -187,7 +187,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     return GestureDetector(
       onTap: () {
         // Dismiss keyboard when tapping outside
-        FocusScope.of(context).unfocus();
+        _inputFocusNode.unfocus();
       },
       child: SafeArea(
         top: !keyboardVisible,
