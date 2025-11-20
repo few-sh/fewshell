@@ -5,11 +5,14 @@ import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/execution_progress_overlay.dart';
 import 'package:decamp/components/chat_list.dart';
 import 'package:decamp/components/chat_input.dart';
+import 'package:decamp/components/search_controls.dart';
+import 'package:decamp/components/search_match_navigator.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'dart:developer' as developer;
@@ -25,10 +28,78 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   bool _previousKeyboardVisible = false;
   final FocusNode _inputFocusNode = FocusNode();
 
+  // Search state
+  bool _isSearchActive = false;
+  String _searchQuery = '';
+  List<SearchMatch> _searchMatches = [];
+  int _currentMatchIndex = 0;
+  final GlobalKey _searchNavigatorKey = GlobalKey();
+  double _searchNavigatorHeight = 0;
+
   @override
   void dispose() {
     _inputFocusNode.dispose();
     super.dispose();
+  }
+
+  void _activateSearch() {
+    setState(() {
+      _isSearchActive = true;
+    });
+  }
+
+  void _deactivateSearch() {
+    setState(() {
+      _isSearchActive = false;
+      _searchQuery = '';
+      _searchMatches = [];
+      _currentMatchIndex = 0;
+    });
+  }
+
+  void _updateSearch(String query, List<dynamic> messages) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _searchMatches = [];
+        _currentMatchIndex = 0;
+      } else {
+        _searchMatches = SearchUtils.findMatches(query, messages.cast());
+        _currentMatchIndex = 0;
+      }
+    });
+    _measureSearchNavigator();
+  }
+
+  void _measureSearchNavigator() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final RenderBox? renderBox =
+          _searchNavigatorKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null && mounted) {
+        final height = renderBox.size.height;
+        if (height != _searchNavigatorHeight) {
+          setState(() {
+            _searchNavigatorHeight = height;
+          });
+        }
+      }
+    });
+  }
+
+  void _nextMatch() {
+    if (_searchMatches.isEmpty) return;
+    setState(() {
+      _currentMatchIndex = (_currentMatchIndex + 1) % _searchMatches.length;
+    });
+  }
+
+  void _previousMatch() {
+    if (_searchMatches.isEmpty) return;
+    setState(() {
+      _currentMatchIndex =
+          (_currentMatchIndex - 1 + _searchMatches.length) %
+          _searchMatches.length;
+    });
   }
 
   /// Create a new chat session
@@ -230,6 +301,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
 
+    // Refresh search results when messages change
+    ref.listen(currentSessionMessagesProvider, (previous, next) {
+      if (_isSearchActive && _searchQuery.isNotEmpty) {
+        next.whenData((messages) {
+          _updateSearch(_searchQuery, messages);
+        });
+      }
+    });
+
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
 
@@ -294,6 +374,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 backgroundColor: Theme.of(context).colorScheme.inversePrimary,
                 actions: [
                   IconButton(
+                    icon: const Icon(Icons.search),
+                    tooltip: 'Search',
+                    onPressed: hasProject ? _activateSearch : null,
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.add),
                     tooltip: 'New Session',
                     onPressed: hasProject ? _createNewSession : null,
@@ -315,28 +400,67 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 children: [
                   // Message list
                   Expanded(
-                    child: messagesAsync.when(
-                      data: (messages) => ChatList(
-                        messages: messages,
-                        isLoading: chatState.isLoading,
-                        streamingMessageId: chatState.streamingMessageId,
-                        streamingText: chatState.streamingText,
-                        onEditMessage: _handleEditMessage,
-                        onResendMessage: _handleResendMessage,
-                        onBranchSession: _handleBranchSession,
-                      ),
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (error, stack) =>
-                          Center(child: Text('Error loading messages: $error')),
+                    child: Stack(
+                      children: [
+                        messagesAsync.when(
+                          data: (messages) => ChatList(
+                            messages: messages,
+                            isLoading: chatState.isLoading,
+                            streamingMessageId: chatState.streamingMessageId,
+                            streamingText: chatState.streamingText,
+                            onEditMessage: _handleEditMessage,
+                            onResendMessage: _handleResendMessage,
+                            onBranchSession: _handleBranchSession,
+                            searchMatches: _searchMatches,
+                            currentMatchIndex: _searchMatches.isNotEmpty
+                                ? _currentMatchIndex
+                                : null,
+                            searchNavigatorHeight:
+                                _isSearchActive && _searchQuery.isNotEmpty
+                                ? _searchNavigatorHeight + 16
+                                : 0,
+                          ),
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (error, stack) => Center(
+                            child: Text('Error loading messages: $error'),
+                          ),
+                        ),
+                        // Search navigator overlay
+                        if (_isSearchActive && _searchQuery.isNotEmpty)
+                          Positioned(
+                            bottom: 8,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: SearchMatchNavigator(
+                                key: _searchNavigatorKey,
+                                currentMatch: _currentMatchIndex + 1,
+                                totalMatches: _searchMatches.length,
+                                onPrevious: _previousMatch,
+                                onNext: _nextMatch,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  // Input field
-                  ChatInput(
-                    onSend: _handleSendMessage,
-                    enabled: !chatState.isLoading && hasProject,
-                    focusNode: _inputFocusNode,
-                  ),
+                  // Search controls (when active) or Input field
+                  if (_isSearchActive)
+                    SearchControls(
+                      onSearchChanged: (query) {
+                        final messages = messagesAsync.valueOrNull ?? [];
+                        _updateSearch(query, messages);
+                      },
+                      onClose: _deactivateSearch,
+                      initialQuery: _searchQuery,
+                    )
+                  else
+                    ChatInput(
+                      onSend: _handleSendMessage,
+                      enabled: !chatState.isLoading && hasProject,
+                      focusNode: _inputFocusNode,
+                    ),
                 ],
               ),
 

@@ -1,36 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:decamp/database/database.dart';
-import 'package:decamp/database/tables/messages_table.dart';
-import 'package:decamp/utils/tool_result_formatter.dart';
+import 'package:decamp/utils/message_formatter.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
-import 'package:markdown/markdown.dart' as md;
+import 'package:decamp/utils/search_utils.dart';
+import 'package:decamp/utils/highlight_injector.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
-/// Supports inline editing with context menu
+/// Supports inline editing with context menu and search highlighting
 class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
   final String? displayText; // Override for streaming
   final bool isUser;
-  final MarkdownStyleSheet? styleSheet;
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
   final Function(String messageId)? onBranch;
+  final List<HighlightRange>?
+  highlights; // Pre-computed highlights for this message
+  final int?
+  currentMatchIndex; // Index of currently active match (for animation)
 
   const RichMessageContent({
     super.key,
     required this.message,
     this.displayText,
     required this.isUser,
-    this.styleSheet,
     this.onEdit,
     this.onResend,
     this.onBranch,
+    this.highlights,
+    this.currentMatchIndex,
   });
 
   @override
@@ -65,6 +69,11 @@ class _RichMessageContentState extends State<RichMessageContent> {
     widget.onBranch?.call(widget.message.id);
   }
 
+  /// Get pre-computed highlights for this message
+  List<HighlightRange> _getHighlights() {
+    return widget.highlights ?? [];
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show edit field if in edit mode
@@ -77,7 +86,9 @@ class _RichMessageContentState extends State<RichMessageContent> {
     }
 
     // Use displayText override if provided (for streaming), otherwise format message content
-    final text = widget.displayText ?? _formatMessageContent();
+    final text =
+        widget.displayText ??
+        MessageFormatter.formatMessageContent(widget.message);
 
     // Build markdown content
     final content = _buildMarkdownContent(context, text);
@@ -178,41 +189,10 @@ class _RichMessageContentState extends State<RichMessageContent> {
     );
   }
 
-  /// Format message content based on message type
-  String _formatMessageContent() {
-    // For tool use messages, format the tool calls
-    if (widget.message.messageKind == MessageKind.toolUse &&
-        widget.message.toolCallsJson != null &&
-        widget.message.toolCallsJson!.isNotEmpty) {
-      return ToolResultFormatter.formatToolUse(
-        toolCalls: widget.message.toolCallsJson!,
-        textContent: widget.message.content.isNotEmpty
-            ? widget.message.content
-            : null,
-      );
-    }
-
-    // For tool result messages, use the formatter
-    if (widget.message.messageKind == MessageKind.toolResult &&
-        widget.message.toolResultsJson != null &&
-        widget.message.toolResultsJson!.isNotEmpty) {
-      // Get the first tool result
-      final toolResult = widget.message.toolResultsJson!.first;
-      final toolName = toolResult.function.name;
-      final resultContent = toolResult.function.arguments;
-
-      // Format using the tool result formatter
-      return ToolResultFormatter.format(
-        toolName: toolName,
-        result: resultContent,
-      );
-    }
-
-    // For all other messages, use the content as-is
-    return widget.message.content;
-  }
-
   Widget _buildMarkdownContent(BuildContext context, String text) {
+    final textColor =
+        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white;
+
     // Get terminal theme for code blocks
     final terminalTheme =
         Theme.of(context).extension<TerminalTheme>() ??
@@ -220,89 +200,55 @@ class _RichMessageContentState extends State<RichMessageContent> {
             ? TerminalTheme.dark
             : TerminalTheme.light);
 
-    // Extract base text color from stylesheet
-    final textColor =
-        widget.styleSheet?.p?.color ??
-        Theme.of(context).textTheme.bodyLarge?.color ??
-        Colors.white;
-
     // Track code block index for unique hero tags
     int codeBlockIndex = 0;
 
-    // Create enhanced stylesheet with terminal theme for code blocks
-    final enhancedStyleSheet =
-        (widget.styleSheet ?? MarkdownStyleSheet.fromTheme(Theme.of(context)))
-            .copyWith(
-              code: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color: terminalTheme.textColor,
-                backgroundColor: terminalTheme.backgroundColor,
-              ),
-              codeblockDecoration: BoxDecoration(
-                color: terminalTheme.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: terminalTheme.borderColor, width: 1),
-              ),
-              codeblockPadding: const EdgeInsets.all(12),
-            );
+    // Calculate highlights for this message
+    final highlights = _getHighlights();
 
-    final markdown = Markdown(
-      data: text,
-      selectable: false,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      styleSheet: enhancedStyleSheet,
-      padding: EdgeInsets.zero,
-      builders: {
-        'code': ExpandableCodeBlockBuilder(
+    // Pre-process text to inject highlight markers
+    final processedText = HighlightInjector.injectMarkers(text, highlights);
+
+    // Get highlight colors from theme
+    final colorScheme = Theme.of(context).colorScheme;
+    final activeHighlightColor = colorScheme.tertiary;
+    final inactiveHighlightColor = colorScheme.tertiaryContainer.withValues(
+      alpha: 0.5,
+    );
+
+    // Create custom component for rendering highlights
+    final highlightComponent = SearchHighlightComponent(
+      activeMatchIndex: widget.currentMatchIndex,
+      activeColor: activeHighlightColor,
+      inactiveColor: inactiveHighlightColor,
+    );
+
+    Widget markdown = GptMarkdown(
+      processedText,
+      style: TextStyle(color: textColor),
+      inlineComponents: [
+        highlightComponent,
+        ...MarkdownComponent.inlineComponents,
+      ],
+      codeBuilder: (context, language, code, closed) {
+        final index = codeBlockIndex++;
+        final heroTag = 'code_block_${widget.message.id}_$index';
+
+        // Extract highlights from code and clean it
+        final codeData = HighlightInjector.extractFromCode(code);
+
+        return ExpandableCodeBlock(
+          code: codeData.code,
+          language: language,
+          heroTag: heroTag,
           terminalTheme: terminalTheme,
-          messageId: widget.message.id,
-          getCodeBlockIndex: () => codeBlockIndex++,
-        ),
-      },
-      onTapLink: (text, href, title) {
-        if (href != null) {
-          // TODO: Handle link taps (open in browser, etc.)
-          debugPrint('Link tapped: $href');
-        }
+          highlights: codeData.highlights,
+          activeColor: activeHighlightColor,
+          inactiveColor: inactiveHighlightColor,
+        );
       },
     );
 
-    return SelectionArea(
-      child: DefaultTextStyle(
-        style: TextStyle(color: textColor),
-        child: markdown,
-      ),
-    );
-  }
-}
-
-/// Custom markdown builder for expandable code blocks
-class ExpandableCodeBlockBuilder extends MarkdownElementBuilder {
-  final TerminalTheme terminalTheme;
-  final String messageId;
-  final int Function() getCodeBlockIndex;
-
-  ExpandableCodeBlockBuilder({
-    required this.terminalTheme,
-    required this.messageId,
-    required this.getCodeBlockIndex,
-  });
-
-  @override
-  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
-    final code = element.textContent;
-    final language =
-        element.attributes['class']?.replaceFirst('language-', '') ?? '';
-    final index = getCodeBlockIndex();
-    final heroTag = 'code_block_${messageId}_$index';
-
-    return ExpandableCodeBlock(
-      code: code,
-      language: language,
-      heroTag: heroTag,
-      terminalTheme: terminalTheme,
-    );
+    return SelectionArea(child: markdown);
   }
 }
