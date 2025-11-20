@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:decamp/database/database.dart';
 import 'package:decamp/components/rich_message_content.dart';
 import 'package:decamp/utils/search_utils.dart';
@@ -36,6 +37,8 @@ class ChatList extends StatefulWidget {
 class _ChatListState extends State<ChatList> {
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _messageKeys = {};
+  bool _isScrollingToMatch = false; // Flag to prevent scroll conflicts
+  final Map<String, int> _scrollRetryCount = {}; // Track retries per message
 
   @override
   void initState() {
@@ -52,11 +55,12 @@ class _ChatListState extends State<ChatList> {
       _updateMessageKeys();
     }
 
-    // Scroll when messages change or streaming updates
-    if (widget.messages.length != oldWidget.messages.length ||
-        widget.streamingText != oldWidget.streamingText) {
+    // Scroll when messages change or streaming updates (but not during match navigation)
+    if (!_isScrollingToMatch &&
+        (widget.messages.length != oldWidget.messages.length ||
+            widget.streamingText != oldWidget.streamingText)) {
       WidgetsBinding.instance.endOfFrame.then((_) {
-        if (mounted) _scrollToBottom();
+        if (mounted && !_isScrollingToMatch) _scrollToBottom();
       });
     }
 
@@ -66,11 +70,27 @@ class _ChatListState extends State<ChatList> {
         widget.searchMatches != null &&
         widget.currentMatchIndex! < widget.searchMatches!.length) {
       final currentMatch = widget.searchMatches![widget.currentMatchIndex!];
-      // Schedule scroll after next frame to ensure keys are attached
+
+      // Clear retry counts when switching to a new match
+      _scrollRetryCount.clear();
+
+      _isScrollingToMatch = true;
+      // Use multiple frame callbacks to ensure layout is stable
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _scrollToMatch(currentMatch.messageId);
+        if (!mounted) {
+          _isScrollingToMatch = false;
+          return;
         }
+        // Add another frame delay to ensure rendering is complete
+        Future.delayed(const Duration(milliseconds: 50), () {
+          if (mounted) {
+            _scrollToMatch(currentMatch.messageId);
+          }
+          // Reset flag after scroll completes
+          Future.delayed(const Duration(milliseconds: 500), () {
+            _isScrollingToMatch = false;
+          });
+        });
       });
     }
   }
@@ -117,22 +137,114 @@ class _ChatListState extends State<ChatList> {
       return;
     }
 
-    if (key.currentContext == null) {
-      debugPrint('⚠️ No context for message: $messageId');
+    final context = key.currentContext;
+    if (context == null) {
+      // Check retry count to prevent infinite loops
+      final retryCount = _scrollRetryCount[messageId] ?? 0;
+      if (retryCount >= 3) {
+        debugPrint('⚠️ Max retries reached for message: $messageId');
+        _scrollRetryCount.remove(messageId);
+        return;
+      }
+
+      debugPrint('⚠️ No context for message: $messageId (retry $retryCount)');
+      // Item not yet rendered - use scrollToIndex-like approach
+      final messageIndex = widget.messages.indexWhere((m) => m.id == messageId);
+      if (messageIndex != -1 && _scrollController.hasClients) {
+        final position = _scrollController.position;
+
+        // In a reversed list, index 0 is at the bottom (maxScrollExtent)
+        // So we need to reverse the index calculation
+        final reversedIndex = widget.messages.length - 1 - messageIndex;
+        final ratio = reversedIndex / (widget.messages.length - 1);
+
+        // Calculate estimated offset (0 = bottom, maxScrollExtent = top for reversed list)
+        final estimatedOffset = position.maxScrollExtent * ratio;
+
+        debugPrint(
+          '📍 Message index: $messageIndex, reversed: $reversedIndex, ratio: $ratio',
+        );
+        debugPrint(
+          '📍 Scrolling to estimated position: $estimatedOffset (max: ${position.maxScrollExtent})',
+        );
+
+        _scrollRetryCount[messageId] = retryCount + 1;
+
+        _scrollController
+            .animateTo(
+              estimatedOffset,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+            )
+            .then((_) {
+              // Retry after scroll completes and item is rendered
+              Future.delayed(const Duration(milliseconds: 150), () {
+                if (mounted) _scrollToMatch(messageId);
+              });
+            });
+      }
       return;
     }
 
-    final context = key.currentContext!;
-    debugPrint('📍 Scrolling to message: $messageId');
+    // Reset retry count on successful context found
+    _scrollRetryCount.remove(messageId);
 
-    // Use alignmentPolicy to ensure it works in both directions
-    Scrollable.ensureVisible(
-      context,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      alignment: 0.3, // Position near top for better visibility
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-    );
+    if (!_scrollController.hasClients) {
+      debugPrint('⚠️ Scroll controller has no clients');
+      return;
+    }
+
+    try {
+      debugPrint('📍 Scrolling to message: $messageId');
+
+      // Get the RenderObject to calculate position
+      final renderObject = context.findRenderObject();
+      if (renderObject == null || renderObject is! RenderBox) {
+        debugPrint('⚠️ No valid RenderObject');
+        return;
+      }
+
+      // Get the scroll position and viewport
+      final scrollPosition = _scrollController.position;
+      final viewport = RenderAbstractViewport.of(renderObject);
+
+      // For reversed lists, getOffsetToReveal with alignment 0.0 gives us the offset
+      // needed to put the item at the TOP of the viewport
+      final revealTop = viewport.getOffsetToReveal(renderObject, 0.0);
+
+      // And alignment 1.0 gives us the offset for BOTTOM of viewport
+      final revealBottom = viewport.getOffsetToReveal(renderObject, 1.0);
+
+      debugPrint('📊 Current offset: ${scrollPosition.pixels}');
+      debugPrint('📊 Reveal at top (0.0): ${revealTop.offset}');
+      debugPrint('📊 Reveal at bottom (1.0): ${revealBottom.offset}');
+
+      // We want to position at 30% from top, so interpolate
+      final targetOffset =
+          revealTop.offset + (revealBottom.offset - revealTop.offset) * 0.3;
+
+      debugPrint('📊 Target offset (30% from top): $targetOffset');
+      debugPrint(
+        '📊 Min: ${scrollPosition.minScrollExtent}, Max: ${scrollPosition.maxScrollExtent}',
+      );
+
+      // Clamp and animate
+      final clampedTarget = targetOffset.clamp(
+        scrollPosition.minScrollExtent,
+        scrollPosition.maxScrollExtent,
+      );
+
+      debugPrint('📊 Clamped target: $clampedTarget');
+
+      _scrollController.animateTo(
+        clampedTarget,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    } catch (e, stack) {
+      debugPrint('⚠️ Exception during scroll: $e');
+      debugPrint('Stack: $stack');
+    }
   }
 
   @override

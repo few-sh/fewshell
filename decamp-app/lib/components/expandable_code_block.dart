@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/utils/constants.dart';
 import 'package:decamp/components/full_screen_code_view.dart';
+import 'package:decamp/utils/highlight_injector.dart';
 
 /// Expandable code block with truncation and hero animation
 ///
@@ -13,6 +14,9 @@ class ExpandableCodeBlock extends StatelessWidget {
   final String language;
   final String heroTag;
   final TerminalTheme terminalTheme;
+  final List<CodeHighlight> highlights;
+  final Color activeColor;
+  final Color inactiveColor;
 
   const ExpandableCodeBlock({
     super.key,
@@ -20,6 +24,9 @@ class ExpandableCodeBlock extends StatelessWidget {
     required this.language,
     required this.heroTag,
     required this.terminalTheme,
+    this.highlights = const [],
+    this.activeColor = Colors.yellow,
+    this.inactiveColor = Colors.yellow,
   });
 
   @override
@@ -50,15 +57,7 @@ class ExpandableCodeBlock extends StatelessWidget {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.all(12),
-                child: Text(
-                  displayedContent,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                    color: terminalTheme.textColor,
-                    height: 1.5,
-                  ),
-                ),
+                child: _buildHighlightedCode(displayedContent),
               ),
             ),
             // Expand button (only if truncated)
@@ -102,6 +101,60 @@ class ExpandableCodeBlock extends StatelessWidget {
       '... ($hiddenCount more lines) ...',
       ...lastLines,
     ].join('\n');
+  }
+
+  /// Build code text with highlights using RichText
+  Widget _buildHighlightedCode(String text) {
+    final baseStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: 14,
+      color: terminalTheme.textColor,
+      height: 1.5,
+    );
+
+    if (highlights.isEmpty) {
+      return Text(text, style: baseStyle);
+    }
+
+    // Build TextSpans with highlights
+    final spans = <TextSpan>[];
+    var lastIndex = 0;
+
+    // Sort highlights by offset
+    final sortedHighlights = highlights.toList()
+      ..sort((a, b) => a.offset.compareTo(b.offset));
+
+    for (final highlight in sortedHighlights) {
+      final start = highlight.offset;
+      final end = start + highlight.length;
+
+      // Validate bounds
+      if (start < 0 || end > text.length || start < lastIndex) continue;
+
+      // Add text before highlight
+      if (start > lastIndex) {
+        spans.add(TextSpan(text: text.substring(lastIndex, start)));
+      }
+
+      // Add highlighted text
+      spans.add(TextSpan(
+        text: text.substring(start, end),
+        style: baseStyle.copyWith(
+          backgroundColor: highlight.isActive ? activeColor : inactiveColor,
+        ),
+      ));
+
+      lastIndex = end;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      spans.add(TextSpan(text: text.substring(lastIndex)));
+    }
+
+    return RichText(
+      text: TextSpan(children: spans, style: baseStyle),
+    );
   }
 
   /// Open full-screen code view with hero animation

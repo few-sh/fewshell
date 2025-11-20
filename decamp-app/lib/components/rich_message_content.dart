@@ -243,11 +243,17 @@ class _RichMessageContentState extends State<RichMessageContent> {
         final index = codeBlockIndex++;
         final heroTag = 'code_block_${widget.message.id}_$index';
 
+        // Extract highlights from code and clean it
+        final codeData = HighlightInjector.extractFromCode(code);
+
         return ExpandableCodeBlock(
-          code: code,
+          code: codeData.code,
           language: language,
           heroTag: heroTag,
           terminalTheme: terminalTheme,
+          highlights: codeData.highlights,
+          activeColor: Colors.amber.shade300,
+          inactiveColor: Colors.yellow.shade100.withValues(alpha: 0.5),
         );
       },
     );

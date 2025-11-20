@@ -3,6 +3,29 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart';
 import 'package:decamp/utils/search_utils.dart';
 
+/// Result of extracting highlights from code
+class CodeWithHighlights {
+  final String code;
+  final List<CodeHighlight> highlights;
+
+  CodeWithHighlights({required this.code, required this.highlights});
+}
+
+/// Highlight information for code blocks
+class CodeHighlight {
+  final int offset;
+  final int length;
+  final bool isActive;
+  final int matchIndex;
+
+  CodeHighlight({
+    required this.offset,
+    required this.length,
+    required this.isActive,
+    required this.matchIndex,
+  });
+}
+
 /// Injects special highlight markers into text for custom markdown component
 class HighlightInjector {
   /// Marker pattern: §M<matchIndex>:<active>§text§/M§
@@ -31,6 +54,52 @@ class HighlightInjector {
     }
 
     return result;
+  }
+
+  /// Extract highlights from marked code text and return cleaned code + highlight info
+  static CodeWithHighlights extractFromCode(String markedCode) {
+    final highlights = <CodeHighlight>[];
+    final pattern = RegExp(r'§M(\d+):(0|1)§(.*?)§/M§', dotAll: true);
+
+    var cleanCode = '';
+    var lastEnd = 0;
+    var offsetShift = 0; // Track cumulative offset shift from removed markers
+
+    // Process matches forward to maintain correct offsets
+    for (final match in pattern.allMatches(markedCode)) {
+      final matchIndex = int.parse(match.group(1)!);
+      final isActive = match.group(2) == '1';
+      final text = match.group(3)!;
+
+      // Add text before this match
+      cleanCode += markedCode.substring(lastEnd, match.start);
+
+      // Calculate position in cleaned text
+      final cleanStart = match.start - offsetShift;
+
+      // Add the highlighted text (without markers)
+      cleanCode += text;
+
+      highlights.add(
+        CodeHighlight(
+          offset: cleanStart,
+          length: text.length,
+          isActive: isActive,
+          matchIndex: matchIndex,
+        ),
+      );
+
+      // Update offset shift (marker length = total match length - text length)
+      final markerLength = match.group(0)!.length - text.length;
+      offsetShift += markerLength;
+
+      lastEnd = match.end;
+    }
+
+    // Add remaining text after last match
+    cleanCode += markedCode.substring(lastEnd);
+
+    return CodeWithHighlights(code: cleanCode, highlights: highlights);
   }
 }
 
