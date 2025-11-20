@@ -112,20 +112,20 @@ class _AnimatedHighlightState extends State<_AnimatedHighlight>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 1200),
       vsync: this,
     );
 
+    // Flash from bright orange to the base color with ease-out
     _colorAnimation = ColorTween(
-      begin: widget.color,
-      end: widget.color.withValues(alpha: widget.color.a * 0.3),
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      begin: Colors.orange.shade400,
+      end: widget.color,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    // Pulse animation: fade in and out twice
-    _controller.repeat(
-      reverse: true,
-      period: const Duration(milliseconds: 600),
-    );
+    // Play flash animation once, then repeat with reverse for pulsing effect
+    _controller.forward().then((_) {
+      _controller.repeat(reverse: true);
+    });
   }
 
   @override

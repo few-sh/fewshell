@@ -228,10 +228,8 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Create custom component for rendering highlights
     final highlightComponent = SearchHighlightComponent(
       activeMatchIndex: widget.currentMatchIndex,
-      activeColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-      inactiveColor: Theme.of(
-        context,
-      ).colorScheme.secondary.withValues(alpha: 0.2),
+      activeColor: Colors.orange.shade500,
+      inactiveColor: Colors.red.shade100.withValues(alpha: 0.5),
     );
 
     Widget markdown = GptMarkdown(
