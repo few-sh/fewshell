@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     
     <application
-        android:label="decamp"
+        android:label="Fewshell"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
