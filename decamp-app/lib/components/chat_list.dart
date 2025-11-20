@@ -39,11 +39,13 @@ class _ChatListState extends State<ChatList> {
   final Map<String, GlobalKey> _messageKeys = {};
   bool _isScrollingToMatch = false; // Flag to prevent scroll conflicts
   final Map<String, int> _scrollRetryCount = {}; // Track retries per message
+  Map<String, List<HighlightRange>> _highlightsByMessage = {}; // O(1) lookup cache
 
   @override
   void initState() {
     super.initState();
     _updateMessageKeys();
+    _updateHighlightsCache();
   }
 
   @override
@@ -53,6 +55,12 @@ class _ChatListState extends State<ChatList> {
     // Update message keys when message list changes
     if (widget.messages != oldWidget.messages) {
       _updateMessageKeys();
+    }
+
+    // Update highlights cache when search matches or current index changes
+    if (widget.searchMatches != oldWidget.searchMatches ||
+        widget.currentMatchIndex != oldWidget.currentMatchIndex) {
+      _updateHighlightsCache();
     }
 
     // Scroll when messages change or streaming updates (but not during match navigation)
@@ -110,6 +118,31 @@ class _ChatListState extends State<ChatList> {
         message.id,
         () => GlobalKey(debugLabel: 'message_${message.id}'),
       );
+    }
+  }
+
+  /// Pre-process search matches into a map for O(1) lookup performance
+  /// This avoids iterating through all matches for every message in the list
+  void _updateHighlightsCache() {
+    _highlightsByMessage.clear();
+
+    if (widget.searchMatches == null || widget.searchMatches!.isEmpty) {
+      return;
+    }
+
+    // Group matches by message ID
+    for (int i = 0; i < widget.searchMatches!.length; i++) {
+      final match = widget.searchMatches![i];
+      final highlight = HighlightRange(
+        offset: match.matchOffset,
+        length: match.matchLength,
+        isActive: i == widget.currentMatchIndex,
+        matchIndex: i,
+      );
+
+      _highlightsByMessage
+          .putIfAbsent(match.messageId, () => [])
+          .add(highlight);
     }
   }
 
@@ -302,7 +335,7 @@ class _ChatListState extends State<ChatList> {
                     onEdit: widget.onEditMessage,
                     onResend: widget.onResendMessage,
                     onBranch: widget.onBranchSession,
-                    searchMatches: widget.searchMatches,
+                    highlights: _highlightsByMessage[message.id],
                     currentMatchIndex: widget.currentMatchIndex,
                   ),
                 ),

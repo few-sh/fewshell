@@ -20,8 +20,8 @@ class RichMessageContent extends StatefulWidget {
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
   final Function(String messageId)? onBranch;
-  final List<SearchMatch>? searchMatches; // All search matches
-  final int? currentMatchIndex; // Index of currently active match
+  final List<HighlightRange>? highlights; // Pre-computed highlights for this message
+  final int? currentMatchIndex; // Index of currently active match (for animation)
 
   const RichMessageContent({
     super.key,
@@ -31,7 +31,7 @@ class RichMessageContent extends StatefulWidget {
     this.onEdit,
     this.onResend,
     this.onBranch,
-    this.searchMatches,
+    this.highlights,
     this.currentMatchIndex,
   });
 
@@ -67,27 +67,9 @@ class _RichMessageContentState extends State<RichMessageContent> {
     widget.onBranch?.call(widget.message.id);
   }
 
-  /// Calculate highlights for this message from search matches
+  /// Get pre-computed highlights for this message
   List<HighlightRange> _getHighlights() {
-    if (widget.searchMatches == null || widget.searchMatches!.isEmpty) {
-      return [];
-    }
-
-    return widget.searchMatches!
-        .asMap()
-        .entries
-        .where((entry) => entry.value.messageId == widget.message.id)
-        .map((entry) {
-          final i = entry.key;
-          final match = entry.value;
-          return HighlightRange(
-            offset: match.matchOffset,
-            length: match.matchLength,
-            isActive: i == widget.currentMatchIndex,
-            matchIndex: i,
-          );
-        })
-        .toList();
+    return widget.highlights ?? [];
   }
 
   @override
