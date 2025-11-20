@@ -39,7 +39,8 @@ class _ChatListState extends State<ChatList> {
   final Map<String, GlobalKey> _messageKeys = {};
   bool _isScrollingToMatch = false; // Flag to prevent scroll conflicts
   final Map<String, int> _scrollRetryCount = {}; // Track retries per message
-  Map<String, List<HighlightRange>> _highlightsByMessage = {}; // O(1) lookup cache
+  Map<String, List<HighlightRange>> _highlightsByMessage =
+      {}; // O(1) lookup cache
 
   @override
   void initState() {
@@ -82,23 +83,29 @@ class _ChatListState extends State<ChatList> {
       // Clear retry counts when switching to a new match
       _scrollRetryCount.clear();
 
-      _isScrollingToMatch = true;
+      setState(() {
+        _isScrollingToMatch = true;
+      });
+
       // Use multiple frame callbacks to ensure layout is stable
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) {
-          _isScrollingToMatch = false;
+          setState(() {
+            _isScrollingToMatch = false;
+          });
           return;
         }
         // Add another frame delay to ensure rendering is complete
-        Future.delayed(const Duration(milliseconds: 50), () {
-          if (mounted) {
-            _scrollToMatch(currentMatch.messageId);
-          }
+        await Future.delayed(const Duration(milliseconds: 50));
+        if (mounted) {
+          await _scrollToMatch(currentMatch.messageId);
           // Reset flag after scroll completes
-          Future.delayed(const Duration(milliseconds: 500), () {
-            _isScrollingToMatch = false;
-          });
-        });
+          if (mounted) {
+            setState(() {
+              _isScrollingToMatch = false;
+            });
+          }
+        }
       });
     }
   }
@@ -163,7 +170,7 @@ class _ChatListState extends State<ChatList> {
     );
   }
 
-  void _scrollToMatch(String messageId) {
+  Future<void> _scrollToMatch(String messageId) async {
     final key = _messageKeys[messageId];
     if (key == null) {
       debugPrint('⚠️ No key found for message: $messageId');
@@ -203,18 +210,17 @@ class _ChatListState extends State<ChatList> {
 
         _scrollRetryCount[messageId] = retryCount + 1;
 
-        _scrollController
-            .animateTo(
-              estimatedOffset,
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOut,
-            )
-            .then((_) {
-              // Retry after scroll completes and item is rendered
-              Future.delayed(const Duration(milliseconds: 150), () {
-                if (mounted) _scrollToMatch(messageId);
-              });
-            });
+        await _scrollController.animateTo(
+          estimatedOffset,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+
+        // Retry after scroll completes and item is rendered
+        await Future.delayed(const Duration(milliseconds: 150));
+        if (mounted) {
+          await _scrollToMatch(messageId);
+        }
       }
       return;
     }
@@ -269,7 +275,7 @@ class _ChatListState extends State<ChatList> {
 
       debugPrint('📊 Clamped target: $clampedTarget');
 
-      _scrollController.animateTo(
+      await _scrollController.animateTo(
         clampedTarget,
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
