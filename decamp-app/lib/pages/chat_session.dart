@@ -371,24 +371,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               // Main chat UI
               Column(
                 children: [
-                  // Search UI (when active)
-                  if (_isSearchActive) ...[
-                    SearchControls(
-                      onSearchChanged: (query) {
-                        final messages = messagesAsync.valueOrNull ?? [];
-                        _updateSearch(query, messages);
-                      },
-                      onClose: _deactivateSearch,
-                      initialQuery: _searchQuery,
-                    ),
-                    if (_searchQuery.isNotEmpty)
-                      SearchMatchNavigator(
-                        currentMatch: _currentMatchIndex + 1,
-                        totalMatches: _searchMatches.length,
-                        onPrevious: _previousMatch,
-                        onNext: _nextMatch,
-                      ),
-                  ],
                   // Message list
                   Expanded(
                     child: messagesAsync.when(
@@ -411,12 +393,29 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                           Center(child: Text('Error loading messages: $error')),
                     ),
                   ),
-                  // Input field
-                  ChatInput(
-                    onSend: _handleSendMessage,
-                    enabled: !chatState.isLoading && hasProject,
-                    focusNode: _inputFocusNode,
-                  ),
+                  // Search UI (when active) or Input field
+                  if (_isSearchActive) ...[
+                    if (_searchQuery.isNotEmpty)
+                      SearchMatchNavigator(
+                        currentMatch: _currentMatchIndex + 1,
+                        totalMatches: _searchMatches.length,
+                        onPrevious: _previousMatch,
+                        onNext: _nextMatch,
+                      ),
+                    SearchControls(
+                      onSearchChanged: (query) {
+                        final messages = messagesAsync.valueOrNull ?? [];
+                        _updateSearch(query, messages);
+                      },
+                      onClose: _deactivateSearch,
+                      initialQuery: _searchQuery,
+                    ),
+                  ] else
+                    ChatInput(
+                      onSend: _handleSendMessage,
+                      enabled: !chatState.isLoading && hasProject,
+                      focusNode: _inputFocusNode,
+                    ),
                 ],
               ),
 
