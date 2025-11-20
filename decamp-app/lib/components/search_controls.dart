@@ -43,11 +43,6 @@ class _SearchControlsState extends State<SearchControls> {
     widget.onSearchChanged(_controller.text);
   }
 
-  void _clearSearch() {
-    _controller.clear();
-    _focusNode.requestFocus();
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -76,19 +71,6 @@ class _SearchControlsState extends State<SearchControls> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
-            if (_controller.text.isNotEmpty)
-              IconButton(
-                icon: Icon(
-                  Icons.clear,
-                  size: 18,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'Clear search',
-                onPressed: _clearSearch,
-              ),
-            const SizedBox(width: 4),
             IconButton(
               icon: Icon(
                 Icons.close,

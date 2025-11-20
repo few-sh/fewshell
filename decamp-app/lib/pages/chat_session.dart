@@ -373,35 +373,48 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                 children: [
                   // Message list
                   Expanded(
-                    child: messagesAsync.when(
-                      data: (messages) => ChatList(
-                        messages: messages,
-                        isLoading: chatState.isLoading,
-                        streamingMessageId: chatState.streamingMessageId,
-                        streamingText: chatState.streamingText,
-                        onEditMessage: _handleEditMessage,
-                        onResendMessage: _handleResendMessage,
-                        onBranchSession: _handleBranchSession,
-                        searchMatches: _searchMatches,
-                        currentMatchIndex: _searchMatches.isNotEmpty
-                            ? _currentMatchIndex
-                            : null,
-                      ),
-                      loading: () =>
-                          const Center(child: CircularProgressIndicator()),
-                      error: (error, stack) =>
-                          Center(child: Text('Error loading messages: $error')),
+                    child: Stack(
+                      children: [
+                        messagesAsync.when(
+                          data: (messages) => ChatList(
+                            messages: messages,
+                            isLoading: chatState.isLoading,
+                            streamingMessageId: chatState.streamingMessageId,
+                            streamingText: chatState.streamingText,
+                            onEditMessage: _handleEditMessage,
+                            onResendMessage: _handleResendMessage,
+                            onBranchSession: _handleBranchSession,
+                            searchMatches: _searchMatches,
+                            currentMatchIndex: _searchMatches.isNotEmpty
+                                ? _currentMatchIndex
+                                : null,
+                          ),
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (error, stack) => Center(
+                            child: Text('Error loading messages: $error'),
+                          ),
+                        ),
+                        // Search navigator overlay
+                        if (_isSearchActive && _searchQuery.isNotEmpty)
+                          Positioned(
+                            bottom: 8,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: SearchMatchNavigator(
+                                currentMatch: _currentMatchIndex + 1,
+                                totalMatches: _searchMatches.length,
+                                onPrevious: _previousMatch,
+                                onNext: _nextMatch,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  // Search UI (when active) or Input field
-                  if (_isSearchActive) ...[
-                    if (_searchQuery.isNotEmpty)
-                      SearchMatchNavigator(
-                        currentMatch: _currentMatchIndex + 1,
-                        totalMatches: _searchMatches.length,
-                        onPrevious: _previousMatch,
-                        onNext: _nextMatch,
-                      ),
+                  // Search controls (when active) or Input field
+                  if (_isSearchActive)
                     SearchControls(
                       onSearchChanged: (query) {
                         final messages = messagesAsync.valueOrNull ?? [];
@@ -409,8 +422,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       },
                       onClose: _deactivateSearch,
                       initialQuery: _searchQuery,
-                    ),
-                  ] else
+                    )
+                  else
                     ChatInput(
                       onSend: _handleSendMessage,
                       enabled: !chatState.isLoading && hasProject,
