@@ -6,11 +6,13 @@ class HighlightRange {
   final int offset;
   final int length;
   final bool isActive;
+  final int matchIndex; // For animation tracking
 
   const HighlightRange({
     required this.offset,
     required this.length,
     this.isActive = false,
+    required this.matchIndex,
   });
 }
 

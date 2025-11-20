@@ -125,11 +125,13 @@ class _ChatListState extends State<ChatList> {
     final context = key.currentContext!;
     debugPrint('📍 Scrolling to message: $messageId');
 
+    // Use alignmentPolicy to ensure it works in both directions
     Scrollable.ensureVisible(
       context,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      alignment: 0.5, // Center the message
+      alignment: 0.3, // Position near top for better visibility
+      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
     );
   }
 

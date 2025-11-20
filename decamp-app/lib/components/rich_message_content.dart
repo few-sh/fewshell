@@ -8,6 +8,7 @@ import 'package:decamp/components/expandable_code_block.dart';
 import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
 import 'package:decamp/utils/search_utils.dart';
+import 'package:decamp/utils/highlight_injector.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
@@ -83,6 +84,7 @@ class _RichMessageContentState extends State<RichMessageContent> {
             offset: match.matchOffset,
             length: match.matchLength,
             isActive: i == widget.currentMatchIndex,
+            matchIndex: i,
           );
         })
         .toList();
@@ -220,47 +222,38 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Calculate highlights for this message
     final highlights = _getHighlights();
 
-    // Apply highlights to text using <u> tags (underline) which gpt_markdown supports
-    // NOTE: This approach of injecting HTML tags can be fragile if a match occurs
-    // within markdown syntax (inside links, code blocks, etc.). A more robust solution
-    // would process the markdown AST, but this is acceptable for a preliminary implementation.
-    String processedText = text;
-    if (highlights.isNotEmpty) {
-      // Sort highlights by offset in reverse to maintain positions
-      final sortedHighlights = List<HighlightRange>.from(highlights)
-        ..sort((a, b) => b.offset.compareTo(a.offset));
+    // Pre-process text to inject highlight markers
+    final processedText = HighlightInjector.injectMarkers(text, highlights);
 
-      for (final highlight in sortedHighlights) {
-        final start = highlight.offset;
-        final end = start + highlight.length;
-
-        if (start < 0 || end > processedText.length) continue;
-
-        final before = processedText.substring(0, start);
-        final match = processedText.substring(start, end);
-        final after = processedText.substring(end);
-
-        // Use <u> tags for underlining matches
-        processedText = '$before<u>$match</u>$after';
-      }
-    }
-
-    return SelectionArea(
-      child: GptMarkdown(
-        processedText,
-        style: TextStyle(color: textColor),
-        codeBuilder: (context, language, code, closed) {
-          final index = codeBlockIndex++;
-          final heroTag = 'code_block_${widget.message.id}_$index';
-
-          return ExpandableCodeBlock(
-            code: code,
-            language: language,
-            heroTag: heroTag,
-            terminalTheme: terminalTheme,
-          );
-        },
-      ),
+    // Create custom component for rendering highlights
+    final highlightComponent = SearchHighlightComponent(
+      activeMatchIndex: widget.currentMatchIndex,
+      activeColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
+      inactiveColor: Theme.of(
+        context,
+      ).colorScheme.secondary.withValues(alpha: 0.2),
     );
+
+    Widget markdown = GptMarkdown(
+      processedText,
+      style: TextStyle(color: textColor),
+      inlineComponents: [
+        highlightComponent,
+        ...MarkdownComponent.inlineComponents,
+      ],
+      codeBuilder: (context, language, code, closed) {
+        final index = codeBlockIndex++;
+        final heroTag = 'code_block_${widget.message.id}_$index';
+
+        return ExpandableCodeBlock(
+          code: code,
+          language: language,
+          heroTag: heroTag,
+          terminalTheme: terminalTheme,
+        );
+      },
+    );
+
+    return SelectionArea(child: markdown);
   }
 }
