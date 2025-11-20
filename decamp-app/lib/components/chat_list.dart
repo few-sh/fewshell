@@ -16,6 +16,8 @@ class ChatList extends StatefulWidget {
   final Function(String messageId)? onBranchSession;
   final List<SearchMatch>? searchMatches;
   final int? currentMatchIndex; // Index of currently active match
+  final double
+  searchNavigatorHeight; // Height of search navigator overlay for bottom padding
 
   const ChatList({
     super.key,
@@ -28,6 +30,7 @@ class ChatList extends StatefulWidget {
     this.onBranchSession,
     this.searchMatches,
     this.currentMatchIndex,
+    this.searchNavigatorHeight = 0,
   });
 
   @override
@@ -295,7 +298,9 @@ class _ChatListState extends State<ChatList> {
       controller: _scrollController,
       // Reverse the ListView so it naturally starts at the bottom
       reverse: true,
-      padding: EdgeInsets.zero,
+      padding: widget.searchNavigatorHeight > 0
+          ? EdgeInsets.only(bottom: widget.searchNavigatorHeight)
+          : EdgeInsets.zero,
       itemCount: reversedMessages.length + (widget.isLoading ? 1 : 0),
       itemBuilder: (context, index) {
         if (widget.isLoading && index == 0) {

@@ -33,6 +33,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   String _searchQuery = '';
   List<SearchMatch> _searchMatches = [];
   int _currentMatchIndex = 0;
+  final GlobalKey _searchNavigatorKey = GlobalKey();
+  double _searchNavigatorHeight = 0;
 
   @override
   void dispose() {
@@ -64,6 +66,22 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       } else {
         _searchMatches = SearchUtils.findMatches(query, messages.cast());
         _currentMatchIndex = 0;
+      }
+    });
+    _measureSearchNavigator();
+  }
+
+  void _measureSearchNavigator() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final RenderBox? renderBox =
+          _searchNavigatorKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null && mounted) {
+        final height = renderBox.size.height;
+        if (height != _searchNavigatorHeight) {
+          setState(() {
+            _searchNavigatorHeight = height;
+          });
+        }
       }
     });
   }
@@ -388,6 +406,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             currentMatchIndex: _searchMatches.isNotEmpty
                                 ? _currentMatchIndex
                                 : null,
+                            searchNavigatorHeight:
+                                _isSearchActive && _searchQuery.isNotEmpty
+                                ? _searchNavigatorHeight + 16
+                                : 0,
                           ),
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
@@ -403,6 +425,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             right: 0,
                             child: Center(
                               child: SearchMatchNavigator(
+                                key: _searchNavigatorKey,
                                 currentMatch: _currentMatchIndex + 1,
                                 totalMatches: _searchMatches.length,
                                 onPrevious: _previousMatch,
