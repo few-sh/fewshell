@@ -185,9 +185,15 @@ class _AnimatedHighlightState extends State<_AnimatedHighlight>
       vsync: this,
     );
 
-    // Flash from bright orange to the base color with ease-out
+    // Flash from a brighter version to the base color with ease-out
+    // Use HSL to create a brighter version of the color for the flash effect
+    final hsl = HSLColor.fromColor(widget.color);
+    final brighterColor = hsl
+        .withLightness((hsl.lightness + 0.2).clamp(0.0, 1.0))
+        .toColor();
+
     _colorAnimation = ColorTween(
-      begin: Colors.orange.shade400,
+      begin: brighterColor,
       end: widget.color,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 

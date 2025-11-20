@@ -20,8 +20,10 @@ class RichMessageContent extends StatefulWidget {
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
   final Function(String messageId)? onBranch;
-  final List<HighlightRange>? highlights; // Pre-computed highlights for this message
-  final int? currentMatchIndex; // Index of currently active match (for animation)
+  final List<HighlightRange>?
+  highlights; // Pre-computed highlights for this message
+  final int?
+  currentMatchIndex; // Index of currently active match (for animation)
 
   const RichMessageContent({
     super.key,
@@ -207,11 +209,18 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Pre-process text to inject highlight markers
     final processedText = HighlightInjector.injectMarkers(text, highlights);
 
+    // Get highlight colors from theme
+    final colorScheme = Theme.of(context).colorScheme;
+    final activeHighlightColor = colorScheme.tertiary;
+    final inactiveHighlightColor = colorScheme.tertiaryContainer.withValues(
+      alpha: 0.5,
+    );
+
     // Create custom component for rendering highlights
     final highlightComponent = SearchHighlightComponent(
       activeMatchIndex: widget.currentMatchIndex,
-      activeColor: Colors.orange.shade500,
-      inactiveColor: Colors.red.shade100.withValues(alpha: 0.5),
+      activeColor: activeHighlightColor,
+      inactiveColor: inactiveHighlightColor,
     );
 
     Widget markdown = GptMarkdown(
@@ -234,8 +243,8 @@ class _RichMessageContentState extends State<RichMessageContent> {
           heroTag: heroTag,
           terminalTheme: terminalTheme,
           highlights: codeData.highlights,
-          activeColor: Colors.amber.shade300,
-          inactiveColor: Colors.yellow.shade100.withValues(alpha: 0.5),
+          activeColor: activeHighlightColor,
+          inactiveColor: inactiveHighlightColor,
         );
       },
     );
