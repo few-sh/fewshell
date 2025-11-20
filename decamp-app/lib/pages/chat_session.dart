@@ -301,6 +301,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
 
+    // Refresh search results when messages change
+    ref.listen(currentSessionMessagesProvider, (previous, next) {
+      if (_isSearchActive && _searchQuery.isNotEmpty) {
+        next.whenData((messages) {
+          _updateSearch(_searchQuery, messages);
+        });
+      }
+    });
+
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
 
