@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:decamp/database/database.dart';
-import 'package:decamp/database/tables/messages_table.dart';
-import 'package:decamp/utils/tool_result_formatter.dart';
+import 'package:decamp/utils/message_formatter.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import 'package:decamp/components/message_context_menu.dart';
@@ -73,20 +72,20 @@ class _RichMessageContentState extends State<RichMessageContent> {
       return [];
     }
 
-    final highlights = <HighlightRange>[];
-    for (int i = 0; i < widget.searchMatches!.length; i++) {
-      final match = widget.searchMatches![i];
-      if (match.messageId == widget.message.id) {
-        highlights.add(
-          HighlightRange(
+    return widget.searchMatches!
+        .asMap()
+        .entries
+        .where((entry) => entry.value.messageId == widget.message.id)
+        .map((entry) {
+          final i = entry.key;
+          final match = entry.value;
+          return HighlightRange(
             offset: match.matchOffset,
             length: match.matchLength,
             isActive: i == widget.currentMatchIndex,
-          ),
-        );
-      }
-    }
-    return highlights;
+          );
+        })
+        .toList();
   }
 
   @override
@@ -101,7 +100,9 @@ class _RichMessageContentState extends State<RichMessageContent> {
     }
 
     // Use displayText override if provided (for streaming), otherwise format message content
-    final text = widget.displayText ?? _formatMessageContent();
+    final text =
+        widget.displayText ??
+        MessageFormatter.formatMessageContent(widget.message);
 
     // Build markdown content
     final content = _buildMarkdownContent(context, text);
@@ -202,40 +203,6 @@ class _RichMessageContentState extends State<RichMessageContent> {
     );
   }
 
-  /// Format message content based on message type
-  String _formatMessageContent() {
-    // For tool use messages, format the tool calls
-    if (widget.message.messageKind == MessageKind.toolUse &&
-        widget.message.toolCallsJson != null &&
-        widget.message.toolCallsJson!.isNotEmpty) {
-      return ToolResultFormatter.formatToolUse(
-        toolCalls: widget.message.toolCallsJson!,
-        textContent: widget.message.content.isNotEmpty
-            ? widget.message.content
-            : null,
-      );
-    }
-
-    // For tool result messages, use the formatter
-    if (widget.message.messageKind == MessageKind.toolResult &&
-        widget.message.toolResultsJson != null &&
-        widget.message.toolResultsJson!.isNotEmpty) {
-      // Get the first tool result
-      final toolResult = widget.message.toolResultsJson!.first;
-      final toolName = toolResult.function.name;
-      final resultContent = toolResult.function.arguments;
-
-      // Format using the tool result formatter
-      return ToolResultFormatter.format(
-        toolName: toolName,
-        result: resultContent,
-      );
-    }
-
-    // For all other messages, use the content as-is
-    return widget.message.content;
-  }
-
   Widget _buildMarkdownContent(BuildContext context, String text) {
     final textColor =
         Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white;
@@ -254,6 +221,9 @@ class _RichMessageContentState extends State<RichMessageContent> {
     final highlights = _getHighlights();
 
     // Apply highlights to text using <u> tags (underline) which gpt_markdown supports
+    // NOTE: This approach of injecting HTML tags can be fragile if a match occurs
+    // within markdown syntax (inside links, code blocks, etc.). A more robust solution
+    // would process the markdown AST, but this is acceptable for a preliminary implementation.
     String processedText = text;
     if (highlights.isNotEmpty) {
       // Sort highlights by offset in reverse to maintain positions

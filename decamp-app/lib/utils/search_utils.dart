@@ -1,4 +1,5 @@
 import 'package:decamp/database/database.dart';
+import 'package:decamp/utils/message_formatter.dart';
 
 /// Highlight range for search matches
 class HighlightRange {
@@ -69,9 +70,10 @@ class SearchUtils {
     }
 
     for (final message in messages) {
-      // Only search in visible message content
+      // Search in formatted message content (same as what's displayed)
+      final formattedContent = MessageFormatter.formatMessageContent(message);
       _findMatchesInText(
-        text: message.content,
+        text: formattedContent,
         regex: regex,
         messageId: message.id,
         matchType: MatchType.messageContent,

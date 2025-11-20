@@ -77,9 +77,11 @@ class _ChatListState extends State<ChatList> {
 
   /// Update message keys to stay in sync with current messages
   void _updateMessageKeys() {
+    final currentMessageIds = widget.messages.map((m) => m.id).toSet();
+
     // Remove keys for messages that no longer exist
     _messageKeys.removeWhere(
-      (messageId, _) => !widget.messages.any((m) => m.id == messageId),
+      (messageId, _) => !currentMessageIds.contains(messageId),
     );
 
     // Add keys for new messages
