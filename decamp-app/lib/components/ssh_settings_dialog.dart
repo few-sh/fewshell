@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
 import '../providers/ssh_settings_provider.dart';
-import '../utils/text_pattern_matcher.dart';
 
 /// Reusable dialog for configuring SSH/Remote Shell settings
 class SshSettingsDialog {
@@ -853,51 +852,6 @@ class _SshSettingsDialogFormState
       return true;
     } catch (e) {
       return false;
-    }
-  }
-
-  Future<void> _scanHost() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.hostname),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _hostController.text = scannedText;
-      });
-    }
-  }
-
-  Future<void> _scanPassword() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.apiKey),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _passwordController.text = scannedText;
-      });
-    }
-  }
-
-  Future<void> _scanPrivateKey() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.sshKey),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _privateKeyController.text = scannedText;
-      });
     }
   }
 

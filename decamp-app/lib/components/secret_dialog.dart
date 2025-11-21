@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../utils/text_pattern_matcher.dart';
-
 /// Reusable dialog for adding or editing secrets
 class SecretDialog {
   /// Show dialog to add or edit a secret
