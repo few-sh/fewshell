@@ -29,11 +29,13 @@ class SecretRedactor {
     final secretValues = secrets.values.toList()
       ..sort((a, b) => b.length.compareTo(a.length));
 
-    return secretValues.fold(
-      text,
-      (currentText, secret) =>
-          secret.isEmpty ? currentText : currentText.replaceAll(secret, '[REDACTED]'),
-    );
+    String redactedText = text;
+    for (final secret in secretValues) {
+      if (secret.isNotEmpty) {
+        redactedText = redactedText.replaceAll(secret, '[REDACTED]');
+      }
+    }
+    return redactedText;
   }
 
   /// Fetches all secrets (global + project-specific if applicable).
