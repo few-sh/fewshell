@@ -1,61 +1,76 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:llm_dart/core/provider_defaults.dart';
 
 part 'llm_api_settings.freezed.dart';
 part 'llm_api_settings.g.dart';
 
-/// Supported LLM API types
+/// Supported LLM API types with configuration using Enhanced Enums
 enum LlmApiType {
-  openai,
-  anthropic,
-  google,
-  deepseek,
-  groq,
-  ollama,
-  xai,
-  openaiCompatible, // For any OpenAI-compatible API
-}
+  openai(
+    displayName: 'OpenAI',
+    defaultBaseUrl: ProviderDefaults.openaiBaseUrl,
+    defaultModelId: ProviderDefaults.openaiDefaultModel,
+    aliases: ['oai'],
+  ),
+  anthropic(
+    displayName: 'Anthropic (Claude)',
+    defaultBaseUrl: ProviderDefaults.anthropicBaseUrl,
+    defaultModelId: ProviderDefaults.anthropicDefaultModel,
+    aliases: ['ant'],
+  ),
+  google(
+    displayName: 'Google (Gemini)',
+    defaultBaseUrl: ProviderDefaults.googleBaseUrl,
+    defaultModelId: ProviderDefaults.googleDefaultModel,
+    aliases: ['gem', 'gemini'],
+  ),
+  deepseek(
+    displayName: 'DeepSeek',
+    defaultBaseUrl: ProviderDefaults.deepseekBaseUrl,
+    defaultModelId: ProviderDefaults.deepseekDefaultModel,
+  ),
+  groq(
+    displayName: 'Groq',
+    defaultBaseUrl: ProviderDefaults.groqBaseUrl,
+    defaultModelId: ProviderDefaults.groqDefaultModel,
+  ),
+  ollama(
+    displayName: 'Ollama (Local)',
+    defaultBaseUrl: ProviderDefaults.ollamaBaseUrl,
+    defaultModelId: ProviderDefaults.ollamaDefaultModel,
+  ),
+  xai(
+    displayName: 'xAI (Grok)',
+    defaultBaseUrl: ProviderDefaults.xaiBaseUrl,
+    defaultModelId: ProviderDefaults.xaiDefaultModel,
+  ),
+  openaiCompatible(
+    displayName: 'OpenAI Compatible',
+    defaultBaseUrl: '',
+    defaultModelId: 'model-identifier',
+  );
 
-/// Extension to provide display names for LLM API types
-extension LlmApiTypeExtension on LlmApiType {
-  String get displayName {
-    switch (this) {
-      case LlmApiType.openai:
-        return 'OpenAI';
-      case LlmApiType.anthropic:
-        return 'Anthropic (Claude)';
-      case LlmApiType.google:
-        return 'Google (Gemini)';
-      case LlmApiType.deepseek:
-        return 'DeepSeek';
-      case LlmApiType.groq:
-        return 'Groq';
-      case LlmApiType.ollama:
-        return 'Ollama (Local)';
-      case LlmApiType.xai:
-        return 'xAI (Grok)';
-      case LlmApiType.openaiCompatible:
-        return 'OpenAI Compatible';
-    }
-  }
+  const LlmApiType({
+    required this.displayName,
+    required this.defaultBaseUrl,
+    required this.defaultModelId,
+    this.aliases = const [],
+  });
 
-  String get defaultBaseUrl {
-    switch (this) {
-      case LlmApiType.openai:
-        return 'https://api.openai.com/v1/';
-      case LlmApiType.anthropic:
-        return 'https://api.anthropic.com/v1/';
-      case LlmApiType.google:
-        return 'https://generativelanguage.googleapis.com/v1beta/';
-      case LlmApiType.deepseek:
-        return 'https://api.deepseek.com/';
-      case LlmApiType.groq:
-        return 'https://api.groq.com/openai/v1/';
-      case LlmApiType.ollama:
-        return 'http://localhost:11434';
-      case LlmApiType.xai:
-        return 'https://api.x.ai/v1/';
-      case LlmApiType.openaiCompatible:
-        return '';
+  final String displayName;
+  final String defaultBaseUrl;
+  final String defaultModelId;
+  final List<String> aliases;
+
+  /// Helper to parse string code to LlmApiType
+  static LlmApiType? fromCode(String code) {
+    final normalized = code.toLowerCase();
+    try {
+      return LlmApiType.values.firstWhere(
+        (e) => e.name == normalized || e.aliases.contains(normalized),
+      );
+    } catch (_) {
+      return null;
     }
   }
 }

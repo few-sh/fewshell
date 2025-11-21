@@ -335,10 +335,10 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                       _selectedApiType = value;
                       // Update URL to default for selected API type
                       _urlController.text = value.defaultBaseUrl;
-                      // Auto-populate model identifier with first supported model
+                      // Auto-populate model identifier with default model
                       // (unless in edit mode)
-                      if (!_isEditMode && _supportedModels.isNotEmpty) {
-                        _identifierController.text = _supportedModels.first;
+                      if (!_isEditMode) {
+                        _identifierController.text = value.defaultModelId;
                       }
                     });
                   }

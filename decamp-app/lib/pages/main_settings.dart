@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'qr_scanner_page.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
@@ -106,6 +108,117 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
+  Future<void> _scanAndConfigureProject(String? projectId) async {
+    if (projectId == null) return _showSnack('Please select a project first');
+
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const QrScannerPage()),
+    );
+
+    if (result == null) return;
+
+    try {
+      final data = jsonDecode(result) as Map<String, dynamic>;
+
+      if (data['l'] != null && data['k'] != null) {
+        await _configureLlm(projectId, data['l'], data['k']);
+      }
+
+      if (data['i'] != null && data['s'] != null) {
+        await _configureSsh(projectId, data['i'], data['s']);
+      }
+
+      if (mounted) _showSnack('Project configured successfully');
+    } catch (e) {
+      if (mounted) _showSnack('Error configuring project: $e');
+    }
+  }
+
+  Future<void> _configureLlm(
+    String projectId,
+    String providerCode,
+    String apiKey,
+  ) async {
+    final apiType = LlmApiType.fromCode(providerCode);
+    if (apiType == null) return;
+
+    final modelId = apiType.defaultModelId;
+    final baseUrl = apiType.defaultBaseUrl;
+
+    final llmNotifier = ref.read(
+      projectLlmSettingsProvider(projectId).notifier,
+    );
+    final currentModels = ref.read(projectLlmSettingsProvider(projectId));
+    final exists = currentModels.any((m) => m.identifier == modelId);
+
+    if (exists) {
+      await llmNotifier.updateLlmSettings(
+        identifier: modelId,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+      );
+    } else {
+      await llmNotifier.addLlmSettings(
+        identifier: modelId,
+        apiType: apiType,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+      );
+    }
+  }
+
+  Future<void> _configureSsh(
+    String projectId,
+    String userHost,
+    String privateKey,
+  ) async {
+    var formattedKey = privateKey;
+    if (!formattedKey.contains('-----BEGIN')) {
+      formattedKey =
+          '-----BEGIN OPENSSH PRIVATE KEY-----\n$formattedKey\n-----END OPENSSH PRIVATE KEY-----';
+    }
+
+    final parts = userHost.split('@');
+    if (parts.length != 2) {
+      throw FormatException(
+        'Invalid SSH host format: $userHost. Expected user@host',
+      );
+    }
+
+    final username = parts[0];
+    final host = parts[1];
+
+    final sshNotifier = ref.read(
+      projectSshSettingsProvider(projectId).notifier,
+    );
+    final currentSsh = ref.read(projectSshSettingsProvider(projectId));
+
+    if (currentSsh == null) {
+      await sshNotifier.createSshSettings(
+        host: host,
+        port: 22,
+        username: username,
+        authMethod: SshAuthMethod.privateKey,
+        privateKey: formattedKey,
+      );
+    } else {
+      await sshNotifier.updateSshSettings(
+        host: host,
+        username: username,
+        authMethod: SshAuthMethod.privateKey,
+        privateKey: formattedKey,
+      );
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Widget _buildProjectSelector() {
     final theme = Theme.of(context);
     final projectsAsync = ref.watch(projectsStreamProvider);
@@ -157,26 +270,40 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                   );
                 }
 
-                return DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                return Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.folder),
+                        ),
+                        hint: const Text('Select a project'),
+                        value: currentProjectId,
+                        items: projects.map((project) {
+                          return DropdownMenuItem<String>(
+                            value: project.id,
+                            child: Text(project.name),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            ref.read(currentProjectIdProvider.notifier).state =
+                                value;
+                          }
+                        },
+                      ),
                     ),
-                    prefixIcon: const Icon(Icons.folder),
-                  ),
-                  hint: const Text('Select a project'),
-                  value: currentProjectId,
-                  items: projects.map((project) {
-                    return DropdownMenuItem<String>(
-                      value: project.id,
-                      child: Text(project.name),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      ref.read(currentProjectIdProvider.notifier).state = value;
-                    }
-                  },
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: () =>
+                          _scanAndConfigureProject(currentProjectId),
+                      icon: const Icon(Icons.qr_code_scanner),
+                      tooltip: 'Scan Project Config',
+                    ),
+                  ],
                 );
               },
               loading: () => const Center(
