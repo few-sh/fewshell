@@ -109,17 +109,11 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Future<void> _scanAndConfigureProject(String? projectId) async {
-    if (projectId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a project first')),
-      );
-      return;
-    }
+    if (projectId == null) return _showSnack('Please select a project first');
 
-    // Open QR Scanner
     final result = await Navigator.push<String>(
       context,
-      MaterialPageRoute(builder: (context) => const QrScannerPage()),
+      MaterialPageRoute(builder: (_) => const QrScannerPage()),
     );
 
     if (result == null) return;
@@ -127,107 +121,110 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     try {
       final data = jsonDecode(result) as Map<String, dynamic>;
 
-      // Parse JSON
-      final userHost = data['i'] as String?;
-      final providerCode = data['l'] as String?;
-      final apiKey = data['k'] as String?;
-      final privateKey = data['s'] as String?;
-
-      // Configure Model
-      if (providerCode != null && apiKey != null) {
-        LlmApiType? apiType;
-        String modelId = '';
-        String baseUrl = '';
-
-        switch (providerCode) {
-          case 'oai':
-            apiType = LlmApiType.openai;
-            break;
-          case 'ant':
-            apiType = LlmApiType.anthropic;
-            break;
-          case 'gem':
-            apiType = LlmApiType.google;
-            break;
-        }
-
-        if (apiType != null) {
-          modelId = apiType.defaultModelId;
-          baseUrl = apiType.defaultBaseUrl;
-
-          final llmNotifier = ref.read(
-            projectLlmSettingsProvider(projectId).notifier,
-          );
-          final currentModels = ref.read(projectLlmSettingsProvider(projectId));
-          final exists = currentModels.any((m) => m.identifier == modelId);
-
-          if (exists) {
-            await llmNotifier.updateLlmSettings(
-              identifier: modelId,
-              baseUrl: baseUrl,
-              apiKey: apiKey,
-            );
-          } else {
-            await llmNotifier.addLlmSettings(
-              identifier: modelId,
-              apiType: apiType,
-              baseUrl: baseUrl,
-              apiKey: apiKey,
-            );
-          }
-        }
+      if (data['l'] != null && data['k'] != null) {
+        await _configureLlm(projectId, data['l'], data['k']);
       }
 
-      // Configure SSH
-      if (userHost != null && privateKey != null) {
-        // Ensure private key has proper headers/footers
-        var formattedKey = privateKey;
-        if (!formattedKey.contains('-----BEGIN')) {
-          formattedKey =
-              '-----BEGIN OPENSSH PRIVATE KEY-----\n$formattedKey\n-----END OPENSSH PRIVATE KEY-----';
-        }
-
-        final parts = userHost.split('@');
-        if (parts.length == 2) {
-          final username = parts[0];
-          final host = parts[1];
-
-          final sshNotifier = ref.read(
-            projectSshSettingsProvider(projectId).notifier,
-          );
-          final currentSsh = ref.read(projectSshSettingsProvider(projectId));
-
-          if (currentSsh == null) {
-            await sshNotifier.createSshSettings(
-              host: host,
-              port: 22,
-              username: username,
-              authMethod: SshAuthMethod.privateKey,
-              privateKey: formattedKey,
-            );
-          } else {
-            await sshNotifier.updateSshSettings(
-              host: host,
-              username: username,
-              authMethod: SshAuthMethod.privateKey,
-              privateKey: formattedKey,
-            );
-          }
-        }
+      if (data['i'] != null && data['s'] != null) {
+        await _configureSsh(projectId, data['i'], data['s']);
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Project configured successfully')),
-        );
-      }
+      if (mounted) _showSnack('Project configured successfully');
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error configuring project: $e')),
-        );
-      }
+      if (mounted) _showSnack('Error configuring project: $e');
     }
+  }
+
+  Future<void> _configureLlm(
+    String projectId,
+    String providerCode,
+    String apiKey,
+  ) async {
+    LlmApiType? apiType;
+    switch (providerCode) {
+      case 'oai':
+        apiType = LlmApiType.openai;
+        break;
+      case 'ant':
+        apiType = LlmApiType.anthropic;
+        break;
+      case 'gem':
+        apiType = LlmApiType.google;
+        break;
+    }
+
+    if (apiType == null) return;
+
+    final modelId = apiType.defaultModelId;
+    final baseUrl = apiType.defaultBaseUrl;
+
+    final llmNotifier = ref.read(
+      projectLlmSettingsProvider(projectId).notifier,
+    );
+    final currentModels = ref.read(projectLlmSettingsProvider(projectId));
+    final exists = currentModels.any((m) => m.identifier == modelId);
+
+    if (exists) {
+      await llmNotifier.updateLlmSettings(
+        identifier: modelId,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+      );
+    } else {
+      await llmNotifier.addLlmSettings(
+        identifier: modelId,
+        apiType: apiType,
+        baseUrl: baseUrl,
+        apiKey: apiKey,
+      );
+    }
+  }
+
+  Future<void> _configureSsh(
+    String projectId,
+    String userHost,
+    String privateKey,
+  ) async {
+    var formattedKey = privateKey;
+    if (!formattedKey.contains('-----BEGIN')) {
+      formattedKey =
+          '-----BEGIN OPENSSH PRIVATE KEY-----\n$formattedKey\n-----END OPENSSH PRIVATE KEY-----';
+    }
+
+    final parts = userHost.split('@');
+    if (parts.length != 2) return;
+
+    final username = parts[0];
+    final host = parts[1];
+
+    final sshNotifier = ref.read(
+      projectSshSettingsProvider(projectId).notifier,
+    );
+    final currentSsh = ref.read(projectSshSettingsProvider(projectId));
+
+    if (currentSsh == null) {
+      await sshNotifier.createSshSettings(
+        host: host,
+        port: 22,
+        username: username,
+        authMethod: SshAuthMethod.privateKey,
+        privateKey: formattedKey,
+      );
+    } else {
+      await sshNotifier.updateSshSettings(
+        host: host,
+        username: username,
+        authMethod: SshAuthMethod.privateKey,
+        privateKey: formattedKey,
+      );
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _buildProjectSelector() {
