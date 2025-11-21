@@ -6,6 +6,7 @@ import '../models/llm_api_settings.dart';
 import '../providers/settings_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
+import '../components/project_title_bar.dart';
 
 /// Agent Instructions page with User and Project settings tabs
 class AgentInstructionsPage extends ConsumerStatefulWidget {
@@ -23,7 +24,7 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
   }
 
   @override
@@ -38,7 +39,7 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agent Instructions'),
+        title: const ProjectTitleBar(title: 'Agent Instructions'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),

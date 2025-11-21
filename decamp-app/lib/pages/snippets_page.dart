@@ -4,6 +4,7 @@ import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../database/database.dart';
 import '../themes/terminal_theme.dart';
+import '../components/project_title_bar.dart';
 
 /// Snippets page with User and Project snippets tabs
 class SnippetsPage extends ConsumerStatefulWidget {
@@ -21,7 +22,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
   }
 
   @override
@@ -41,7 +42,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Snippets'),
+          title: const ProjectTitleBar(title: 'Snippets'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => Navigator.of(context).pop(),

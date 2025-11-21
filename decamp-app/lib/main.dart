@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logging/logging.dart';
 import 'pages/chat_session.dart';
+import 'pages/projects_page.dart';
 import 'providers/theme_provider.dart';
+import 'providers/project_provider.dart';
 import 'themes/neon_dark.dart';
 import 'themes/terminal_theme.dart';
 
@@ -38,7 +40,6 @@ class DecampApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the theme provider to reactively rebuild when theme changes
     final themeMode = ref.watch(themeProvider);
 
     return MaterialApp(
@@ -50,7 +51,17 @@ class DecampApp extends ConsumerWidget {
       ),
       darkTheme: neonDarkTheme,
       themeMode: themeMode,
-      home: const ChatSession(),
+      home: const _HomeSelector(),
     );
+  }
+}
+
+class _HomeSelector extends ConsumerWidget {
+  const _HomeSelector();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentProject = ref.watch(currentProjectProvider);
+    return currentProject == null ? const ProjectsPage() : const ChatSession();
   }
 }

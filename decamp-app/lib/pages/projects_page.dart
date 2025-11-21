@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/themes/terminal_theme.dart';
+import 'package:decamp/components/expandable_code_block.dart';
 import '../utils/date_formatter.dart';
 
 class ProjectsPage extends ConsumerWidget {
@@ -264,6 +266,7 @@ class ProjectsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch the projects stream
     final projectsAsync = ref.watch(projectsStreamProvider);
+    final terminalTheme = Theme.of(context).extension<TerminalTheme>()!;
 
     return Scaffold(
       appBar: AppBar(
@@ -286,7 +289,7 @@ class ProjectsPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No projects yet',
+                    'run this command from a host',
                     style: TextStyle(
                       fontSize: 18,
                       color: Theme.of(
@@ -294,9 +297,31 @@ class ProjectsPage extends ConsumerWidget {
                       ).colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: ExpandableCodeBlock(
+                      code: 'curl -LsSf get.few.sh | bash',
+                      language: 'bash',
+                      heroTag: 'projects_setup_command',
+                      terminalTheme: terminalTheme,
+                      centered: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
-                    'Create a new project to get started',
+                    'then scan the QR code',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'fewshell will:\n1. get your host\'s IP address\n2. create new ssh keys\n3. select LLM provider and key',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
                       color: Theme.of(
@@ -487,10 +512,16 @@ class ProjectsPage extends ConsumerWidget {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateProjectDialog(context, ref),
-        icon: const Icon(Icons.add),
-        label: const Text('New Project'),
+      floatingActionButton: projectsAsync.when(
+        data: (projects) => projects.isEmpty
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () => _showCreateProjectDialog(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('New Project'),
+              ),
+        loading: () => null,
+        error: (_, __) => null,
       ),
     );
   }

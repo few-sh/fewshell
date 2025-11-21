@@ -7,6 +7,7 @@ import 'package:decamp/components/chat_list.dart';
 import 'package:decamp/components/chat_input.dart';
 import 'package:decamp/components/search_controls.dart';
 import 'package:decamp/components/search_match_navigator.dart';
+import 'package:decamp/components/project_title_bar.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
@@ -344,32 +345,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               curve: Curves.easeInOut,
               height: keyboardVisible ? 0 : kToolbarHeight,
               child: AppBar(
-                title: GestureDetector(
-                  onTap: hasProject
-                      ? null
-                      : () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ProjectsPage(),
-                            ),
-                          );
-                        },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(currentProjectName),
-                      if (!hasProject) ...[
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.add_circle_outline,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                title: ProjectTitleBar(title: currentProjectName),
                 centerTitle: false,
                 backgroundColor: Theme.of(context).colorScheme.inversePrimary,
                 actions: [

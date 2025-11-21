@@ -17,6 +17,7 @@ class ExpandableCodeBlock extends StatelessWidget {
   final List<CodeHighlight> highlights;
   final Color activeColor;
   final Color inactiveColor;
+  final bool centered;
 
   const ExpandableCodeBlock({
     super.key,
@@ -27,6 +28,7 @@ class ExpandableCodeBlock extends StatelessWidget {
     this.highlights = const [],
     this.activeColor = Colors.yellow,
     this.inactiveColor = Colors.yellow,
+    this.centered = false,
   });
 
   @override
@@ -54,11 +56,18 @@ class ExpandableCodeBlock extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: terminalTheme.borderColor, width: 1),
               ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(12),
-                child: _buildHighlightedCode(displayedContent),
-              ),
+              child: centered
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: _buildHighlightedCode(displayedContent),
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.all(12),
+                      child: _buildHighlightedCode(displayedContent),
+                    ),
             ),
             // Expand button (only if truncated)
             if (needsTruncation)

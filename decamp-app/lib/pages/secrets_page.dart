@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/keychain_service.dart';
 import '../providers/project_provider.dart';
 import '../components/secret_dialog.dart';
+import '../components/project_title_bar.dart';
 
 /// Secrets management page with User Secrets and Project Secrets tabs
 class SecretsPage extends ConsumerStatefulWidget {
@@ -20,7 +21,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
   }
 
   @override
@@ -35,7 +36,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Secrets'),
+        title: const ProjectTitleBar(title: 'Secrets'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -109,15 +110,11 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   }
 
   Widget _buildProjectSecretsTab() {
-    final projectsAsync = ref.watch(projectsStreamProvider);
     final currentProjectId = ref.watch(currentProjectIdProvider);
 
-    return projectsAsync.when(
-      data: (projects) {
-        return Column(
-          children: [
-            _buildProjectSelector(projects, currentProjectId),
-            _buildSecurityInfoBanner(),
+    return Column(
+      children: [
+        _buildSecurityInfoBanner(),
             Expanded(
               child: currentProjectId == null
                   ? _buildEmptyState('Please select a project')
@@ -160,11 +157,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                   projectId: currentProjectId,
                 ),
               ),
-          ],
-        );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(child: Text('Error: $error')),
+      ],
     );
   }
 

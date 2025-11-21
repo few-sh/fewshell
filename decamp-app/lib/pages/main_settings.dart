@@ -11,6 +11,7 @@ import '../models/llm_api_settings.dart';
 import '../models/ssh_settings.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
+import '../components/project_title_bar.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -27,7 +28,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
   }
 
   @override
@@ -42,7 +43,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const ProjectTitleBar(title: 'Settings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -97,13 +98,9 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildProjectSelector(),
-        const SizedBox(height: 24),
         _buildAIModelsSection(isGlobal: false),
         const SizedBox(height: 24),
         _buildRemoteShellSection(),
-        const SizedBox(height: 24),
-        _buildThemeSection(),
       ],
     );
   }
