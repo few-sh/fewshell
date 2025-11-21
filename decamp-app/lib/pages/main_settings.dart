@@ -142,22 +142,19 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         switch (providerCode) {
           case 'oai':
             apiType = LlmApiType.openai;
-            modelId = 'gpt-4o';
-            baseUrl = LlmApiType.openai.defaultBaseUrl;
             break;
           case 'ant':
             apiType = LlmApiType.anthropic;
-            modelId = 'claude-3-5-sonnet-latest';
-            baseUrl = LlmApiType.anthropic.defaultBaseUrl;
             break;
           case 'gem':
             apiType = LlmApiType.google;
-            modelId = 'gemini-1.5-pro';
-            baseUrl = LlmApiType.google.defaultBaseUrl;
             break;
         }
 
         if (apiType != null) {
+          modelId = apiType.defaultModelId;
+          baseUrl = apiType.defaultBaseUrl;
+
           final llmNotifier = ref.read(
             projectLlmSettingsProvider(projectId).notifier,
           );

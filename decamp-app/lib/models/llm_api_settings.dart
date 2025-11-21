@@ -58,6 +58,27 @@ extension LlmApiTypeExtension on LlmApiType {
         return '';
     }
   }
+
+  String get defaultModelId {
+    switch (this) {
+      case LlmApiType.openai:
+        return 'gpt-4o';
+      case LlmApiType.anthropic:
+        return 'claude-3-5-sonnet-latest';
+      case LlmApiType.google:
+        return 'gemini-1.5-pro';
+      case LlmApiType.deepseek:
+        return 'deepseek-chat';
+      case LlmApiType.groq:
+        return 'llama3-70b-8192';
+      case LlmApiType.ollama:
+        return 'llama3';
+      case LlmApiType.xai:
+        return 'grok-beta';
+      case LlmApiType.openaiCompatible:
+        return 'model-identifier';
+    }
+  }
 }
 
 /// Configuration for an LLM API endpoint.
