@@ -8,20 +8,20 @@ enum LlmApiType {
   openai(
     displayName: 'OpenAI',
     defaultBaseUrl: 'https://api.openai.com/v1/',
-    defaultModelId: 'gpt-4o',
-    aliases: ['oai'],
+    defaultModelId: 'gpt-5',
+    aliases: ['oai', 'openai'],
   ),
   anthropic(
     displayName: 'Anthropic (Claude)',
     defaultBaseUrl: 'https://api.anthropic.com/v1/',
-    defaultModelId: 'claude-3-5-sonnet-latest',
-    aliases: ['ant'],
+    defaultModelId: 'claude-4-5-sonnet',
+    aliases: ['ant', 'anthropic'],
   ),
   google(
     displayName: 'Google (Gemini)',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/',
-    defaultModelId: 'gemini-1.5-pro',
-    aliases: ['gem', 'gemini'],
+    defaultModelId: 'gemini-3-pro',
+    aliases: ['gem', 'gemini', 'google'],
   ),
   deepseek(
     displayName: 'DeepSeek',
