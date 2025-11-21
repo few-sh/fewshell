@@ -75,12 +75,19 @@ class LlmService {
     }
 
     // Get API key from keychain
-    final String? apiKey;
+    // Try project-specific key first, then fall back to global key
+    String? apiKey;
     if (projectId != null) {
       apiKey = await keychainService.getProjectSecret(
         projectId,
         LlmApiKeychainKeys.buildProjectKey(projectId, config.identifier),
       );
+      // Fall back to global key if project-specific key not found
+      if (apiKey == null) {
+        apiKey = await keychainService.getGlobalSecret(
+          LlmApiKeychainKeys.buildGlobalKey(config.identifier),
+        );
+      }
     } else {
       apiKey = await keychainService.getGlobalSecret(
         LlmApiKeychainKeys.buildGlobalKey(config.identifier),
