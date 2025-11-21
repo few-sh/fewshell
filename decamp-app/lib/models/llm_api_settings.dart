@@ -79,6 +79,36 @@ extension LlmApiTypeExtension on LlmApiType {
         return 'model-identifier';
     }
   }
+
+  /// Helper to parse string code to LlmApiType
+  static LlmApiType? fromCode(String code) {
+    switch (code.toLowerCase()) {
+      case 'oai':
+      case 'openai':
+        return LlmApiType.openai;
+      case 'ant':
+      case 'anthropic':
+        return LlmApiType.anthropic;
+      case 'gem':
+      case 'google':
+      case 'gemini':
+        return LlmApiType.google;
+      case 'deepseek':
+        return LlmApiType.deepseek;
+      case 'groq':
+        return LlmApiType.groq;
+      case 'ollama':
+        return LlmApiType.ollama;
+      case 'xai':
+        return LlmApiType.xai;
+      default:
+        try {
+          return LlmApiType.values.byName(code);
+        } catch (_) {
+          return null;
+        }
+    }
+  }
 }
 
 /// Configuration for an LLM API endpoint.

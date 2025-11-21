@@ -140,19 +140,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     String providerCode,
     String apiKey,
   ) async {
-    LlmApiType? apiType;
-    switch (providerCode) {
-      case 'oai':
-        apiType = LlmApiType.openai;
-        break;
-      case 'ant':
-        apiType = LlmApiType.anthropic;
-        break;
-      case 'gem':
-        apiType = LlmApiType.google;
-        break;
-    }
-
+    final apiType = LlmApiTypeExtension.fromCode(providerCode);
     if (apiType == null) return;
 
     final modelId = apiType.defaultModelId;
