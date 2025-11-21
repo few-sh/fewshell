@@ -9,6 +9,7 @@ import '../providers/ssh_settings_provider.dart';
 import '../providers/settings_provider.dart';
 import '../models/llm_api_settings.dart';
 import '../models/ssh_settings.dart';
+import '../database/database.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
@@ -95,9 +96,15 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildProjectSettings() {
+    final currentProject = ref.watch(currentProjectProvider);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (currentProject != null) ...[
+          _buildProjectNameSection(currentProject),
+          const SizedBox(height: 24),
+        ],
         _buildAIModelsSection(isGlobal: false),
         const SizedBox(height: 24),
         _buildRemoteShellSection(),
@@ -214,6 +221,85 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _buildProjectNameSection(ProjectEntity project) {
+    final theme = Theme.of(context);
+    final controller = TextEditingController(text: project.name);
+    final projectsAsync = ref.watch(projectsStreamProvider);
+
+    Future<void> saveChanges(String value) async {
+      final trimmedValue = value.trim();
+
+      // Check if empty
+      if (trimmedValue.isEmpty) {
+        controller.text = project.name;
+        if (mounted) {
+          _showSnack('Project name cannot be empty');
+        }
+        return;
+      }
+
+      // Check if unchanged
+      if (trimmedValue == project.name) {
+        return;
+      }
+
+      // Check for duplicates
+      final projects = projectsAsync.value ?? [];
+      final existingNames = projects
+          .where((p) => p.id != project.id)
+          .map((p) => p.name)
+          .toList();
+
+      if (existingNames.contains(trimmedValue)) {
+        controller.text = project.name;
+        if (mounted) {
+          _showSnack('A project with this name already exists');
+        }
+        return;
+      }
+
+      // Save the change
+      await updateProject(
+        ref,
+        id: project.id,
+        name: trimmedValue,
+      );
+      if (mounted) {
+        _showSnack('Project name updated');
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Project Name',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: controller,
+              decoration: InputDecoration(
+                labelText: 'Name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                prefixIcon: const Icon(Icons.folder),
+              ),
+              onSubmitted: saveChanges,
+              onTapOutside: (_) => saveChanges(controller.text),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildProjectSelector() {

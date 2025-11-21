@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/project_provider.dart';
@@ -5,103 +6,107 @@ import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import '../utils/date_formatter.dart';
+import '../pages/main_settings.dart';
 
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});
 
-  void _showCreateProjectDialog(BuildContext context, WidgetRef ref) {
-    final nameController = TextEditingController();
-    final descriptionController = TextEditingController();
+  static const _descriptors = [
+    'Analog',
+    'Binary',
+    'Copper',
+    'Crystal',
+    'Dynamo',
+    'Electric',
+    'Fiber',
+    'Iron',
+    'Quantum',
+    'Relay',
+    'Silicon',
+    'Static',
+    'Steam',
+    'Turing',
+    'Vacuum',
+    'Vintage',
+    'Wired',
+    'Magnetic',
+    'Solid-State',
+    'Turbo',
+  ];
 
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Create New Project'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Project Name',
-                    hintText: 'Enter project name',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    hintText: 'Enter project description',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Project name cannot be empty'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
+  static const _objects = [
+    'Abacus',
+    'Babbage',
+    'Calculator',
+    'Colossus',
+    'Commodore',
+    'Core',
+    'ENIAC',
+    'Jacquard',
+    'Mainframe',
+    'Microchip',
+    'Minicomputer',
+    'PDP',
+    'Punchcard',
+    'Radar',
+    'RISC',
+    'Tape Drive',
+    'Terminal',
+    'Transistor',
+    'VAX',
+    'Workstation',
+  ];
 
-                final description = descriptionController.text.trim();
-                final projectDao = ref.read(databaseProvider).projectDao;
+  String _generateUniqueName(List<String> existingNames) {
+    final random = Random();
+    String name;
+    int attempts = 0;
+    const maxAttempts = 1000;
 
-                try {
-                  await projectDao.createProjectWithId(
-                    name: name,
-                    description: description.isEmpty ? null : description,
-                  );
+    do {
+      final descriptor = _descriptors[random.nextInt(_descriptors.length)];
+      final object = _objects[random.nextInt(_objects.length)];
+      name = '$descriptor $object';
+      attempts++;
 
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop();
-                  }
+      if (attempts >= maxAttempts) {
+        // Fallback: append a number
+        name = '$name ${random.nextInt(9999)}';
+        break;
+      }
+    } while (existingNames.contains(name));
 
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Project "$name" created successfully'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error creating project: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
+    return name;
+  }
+
+  Future<void> _createProjectWithRandomName(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> existingNames,
+  ) async {
+    final name = _generateUniqueName(existingNames);
+    final projectDao = ref.read(databaseProvider).projectDao;
+
+    try {
+      final projectId = await projectDao.createProjectWithId(name: name);
+      await selectProject(ref, projectId);
+
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const MainSettingsPage()),
         );
-      },
-    );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating project: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showDeleteConfirmation(
@@ -331,7 +336,11 @@ class ProjectsPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () => _showCreateProjectDialog(context, ref),
+                    onPressed: () => _createProjectWithRandomName(
+                      context,
+                      ref,
+                      projects.map((p) => p.name).toList(),
+                    ),
                     icon: const Icon(Icons.add),
                     label: const Text('Create Your First Project'),
                     style: ElevatedButton.styleFrom(
@@ -516,7 +525,11 @@ class ProjectsPage extends ConsumerWidget {
         data: (projects) => projects.isEmpty
             ? null
             : FloatingActionButton.extended(
-                onPressed: () => _showCreateProjectDialog(context, ref),
+                onPressed: () => _createProjectWithRandomName(
+                  context,
+                  ref,
+                  projects.map((p) => p.name).toList(),
+                ),
                 icon: const Icon(Icons.add),
                 label: const Text('New Project'),
               ),
