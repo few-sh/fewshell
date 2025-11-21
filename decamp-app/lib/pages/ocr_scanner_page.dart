@@ -26,7 +26,9 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   List<MatchedTextBlock> _matchedBlocks = [];
   bool _isInitialized = false;
   String? _errorMessage;
-  bool _hasFoundMatch = false; // Stop processing once we find matches
+
+  // Cumulative map to track all matches across frames (never reset)
+  final Map<String, int> _cumulativeMatches = {};
 
   // Throttle image processing to improve performance
   DateTime? _lastProcessedTime;
@@ -117,9 +119,6 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
   Future<void> _processCameraImage(CameraImage image) async {
     if (_isDetecting) return;
 
-    // Stop processing if we already found matches (to save battery/CPU)
-    if (_hasFoundMatch && _matchedBlocks.isNotEmpty) return;
-
     // Throttle processing to avoid overwhelming the device
     final now = DateTime.now();
     if (_lastProcessedTime != null &&
@@ -156,11 +155,17 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
       }
 
       // Filter text blocks that match the pattern
-      final matchedBlocks = <MatchedTextBlock>[];
+      // Track matches in this frame (to avoid double-counting in same frame)
+      final thisFrameMatches = <String>{};
+
+      // Debug: Log all detected text
+      debugPrint('OCR detected ${recognizedTexts.length} text blocks');
+
       for (final textBlock in recognizedTexts) {
         // Check each text candidate in the block
         for (final text in textBlock.listText) {
           final trimmedText = text.trim();
+          debugPrint('  OCR text: "$trimmedText"');
           bool matches = false;
 
           switch (widget.scanType) {
@@ -185,32 +190,35 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
             debugPrint(
               'Found match: "$extractedText" at ${textBlock.boundingBox}',
             );
-            matchedBlocks.add(
-              MatchedTextBlock(
-                text: extractedText,
-                boundingBox: textBlock.boundingBox,
-              ),
-            );
+
+            // Track this match in the current frame
+            thisFrameMatches.add(extractedText);
             break; // Only add one match per text block
           }
         }
       }
 
+      // Update cumulative counts for matches found in this frame
+      for (final match in thisFrameMatches) {
+        _cumulativeMatches[match] = (_cumulativeMatches[match] ?? 0) + 1;
+      }
+
+      // Convert cumulative map to sorted list (top 5 by occurrence count)
+      final matchedBlocks =
+          _cumulativeMatches.entries
+              .map(
+                (entry) => MatchedTextBlock(
+                  text: entry.key,
+                  boundingBox: Rect.zero, // Not used for display
+                  occurrences: entry.value,
+                ),
+              )
+              .toList()
+            ..sort((a, b) => b.occurrences.compareTo(a.occurrences));
+
       if (mounted) {
         setState(() {
-          _matchedBlocks = matchedBlocks;
-          if (matchedBlocks.isNotEmpty) {
-            _hasFoundMatch = true; // Stop continuous processing
-
-            // Auto-return the detected result
-            // If multiple matches, prefer the one closest to screen center
-            final selectedMatch = _selectCenterMostMatch(matchedBlocks);
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                Navigator.of(context).pop(selectedMatch.text);
-              }
-            });
-          }
+          _matchedBlocks = matchedBlocks.take(5).toList();
         });
       }
     } catch (e) {
@@ -218,45 +226,6 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
     } finally {
       _isDetecting = false;
     }
-  }
-
-  /// Selects the match closest to the center of the screen
-  MatchedTextBlock _selectCenterMostMatch(List<MatchedTextBlock> matches) {
-    if (matches.length == 1) {
-      return matches.first;
-    }
-
-    // Get camera preview center point (in camera coordinate space)
-    final previewSize = _cameraController!.value.previewSize!;
-    final centerX = previewSize.width / 2;
-    final centerY = previewSize.height / 2;
-
-    // Find the match with minimum distance to center
-    MatchedTextBlock closestMatch = matches.first;
-    double minDistance = double.infinity;
-
-    for (final match in matches) {
-      // Calculate the center of the bounding box
-      final boxCenterX = match.boundingBox.left + match.boundingBox.width / 2;
-      final boxCenterY = match.boundingBox.top + match.boundingBox.height / 2;
-
-      // Calculate Euclidean distance to screen center
-      final dx = boxCenterX - centerX;
-      final dy = boxCenterY - centerY;
-      final distance = dx * dx + dy * dy; // No need for sqrt, just comparing
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestMatch = match;
-      }
-    }
-
-    debugPrint(
-      'Selected center-most match: "${closestMatch.text}" '
-      'from ${matches.length} candidates',
-    );
-
-    return closestMatch;
   }
 
   Uint8List? _convertCameraImageToBytes(CameraImage image) {
@@ -418,13 +387,78 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
                 const SizedBox(height: 4),
                 Text(
                   _matchedBlocks.isEmpty
-                      ? 'Matching text will be highlighted'
-                      : 'Match detected - returning...',
+                      ? 'Scanning for matches...'
+                      : '${_matchedBlocks.length} unique ${_matchedBlocks.length == 1 ? 'match' : 'matches'} - tap to select',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: Colors.white.withValues(alpha: 0.9),
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (_matchedBlocks.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  ..._matchedBlocks.map(
+                    (match) => Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: 16,
+                      ),
+                      child: Material(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            Navigator.of(context).pop(match.text);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${match.occurrences}×',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    match.text,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: Colors.white,
+                                      fontFamily: 'monospace',
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -438,8 +472,13 @@ class _OcrScannerPageState extends State<OcrScannerPage> {
 class MatchedTextBlock {
   final String text;
   final Rect boundingBox;
+  final int occurrences;
 
-  MatchedTextBlock({required this.text, required this.boundingBox});
+  MatchedTextBlock({
+    required this.text,
+    required this.boundingBox,
+    this.occurrences = 1,
+  });
 }
 
 /// Custom painter to draw overlay boxes on detected text

@@ -6,14 +6,16 @@
 class TextPatternMatcher {
   /// Regex pattern for detecting API keys
   /// Matches common formats:
-  /// - OpenAI style: sk-...
+  /// - OpenAI/Anthropic style: sk-... (with underscores, dashes, alphanumeric)
   /// - Gemini style: AIza...
   /// - Generic: api_key_..., apikey:..., etc.
+  /// - Alphanumeric with dashes (20+ chars)
   /// - Long alphanumeric strings (32+ chars)
   static final RegExp apiKeyPattern = RegExp(
-    r'(?:sk-[A-Za-z0-9]{20,})|'
+    r'(?:sk-[A-Za-z0-9_\-]{20,})|' // SK keys with underscores and dashes
     r'(?:AIza[A-Za-z0-9_\-]{35})|'
-    r'(?:api[_-]?key[_:\s]*[A-Za-z0-9]{20,})|'
+    r'(?:api[_-]?key[_:\s]*[A-Za-z0-9_\-]{20,})|'
+    r'(?:[A-Za-z0-9][A-Za-z0-9\-_]{19,})|' // Alphanumeric with dashes/underscores, 20+ chars
     r'(?:[A-Za-z0-9]{32,})',
     caseSensitive: false,
   );
@@ -56,6 +58,13 @@ class TextPatternMatcher {
     r'(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::[0-9]{1,5})?'
     r')',
   );
+
+  /// Normalize text for API key matching by removing whitespace
+  /// OCR often adds spaces within keys
+  static String normalizeForApiKey(String text) {
+    // Remove ALL whitespace (spaces, tabs, newlines)
+    return text.replaceAll(RegExp(r'\s+'), '');
+  }
 
   /// Check if text contains ellipsis or other indicators of incomplete text
   static bool hasEllipsisOrIncomplete(String text) {
@@ -103,13 +112,28 @@ class TextPatternMatcher {
 
   /// Check if text matches API key pattern
   static bool isApiKey(String text) {
-    final match = apiKeyPattern.firstMatch(text.trim());
-    if (match == null) return false;
+    final trimmed = text.trim();
 
-    // Ensure the match covers most of the text (not just a substring)
-    final matchedText = match.group(0) ?? '';
-    final cleanedText = text.trim();
-    return matchedText.length >= cleanedText.length * 0.7;
+    // Try original text first
+    var match = apiKeyPattern.firstMatch(trimmed);
+    if (match != null) {
+      final matchedText = match.group(0) ?? '';
+      if (matchedText.length >= trimmed.length * 0.7) {
+        return true;
+      }
+    }
+
+    // Try with whitespace removed (common OCR issue)
+    final normalized = normalizeForApiKey(trimmed);
+    if (normalized != trimmed) {
+      match = apiKeyPattern.firstMatch(normalized);
+      if (match != null) {
+        final matchedText = match.group(0) ?? '';
+        return matchedText.length >= normalized.length * 0.7;
+      }
+    }
+
+    return false;
   }
 
   /// Check if text matches URL pattern
@@ -156,7 +180,16 @@ class TextPatternMatcher {
       case ScanType.apiKey:
         pattern = apiKeyPattern;
         input = text.trim();
-        break;
+
+        // Try original first
+        var match = pattern.firstMatch(input);
+        if (match != null) return match.group(0);
+
+        // Try normalized (no whitespace)
+        input = normalizeForApiKey(text);
+        match = pattern.firstMatch(input);
+        return match?.group(0);
+
       case ScanType.url:
         pattern = urlPattern;
         input = normalizeUrl(text);
