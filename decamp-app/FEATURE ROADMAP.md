@@ -1,0 +1,66 @@
+# FEATURE ROADMAP - HIGH LEVEL
+
+
+First customer use-case:
+
+MVP (Version 0 - private alpha) - Typical use-case
+1. User gets paged on slack or pagerduty or any other system
+2. User opens Decamp
+3. Asks decamp to investigate
+4. Decamp queries the logs via ssh + google cloud logs
+5. Decamp provides the log output and the summary.
+
+TODOS:
+
+Smoother onboarding:
+[ ] When no project exists, automatically pop up the new project dialog
+[ ] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
+[ ] When no model configuration exists, guide the user through setting up.*
+
+
+* Disrplay step-by-step instructions in the app: eg instruct the user that they need a server
+and access, "Open a terminal and ssh to your development machine, type curl ... get.few.sh | bash"
+
+
+[ ] +-- Add choice/action buttons to rich-chat-content.
+
+Onboarding shell script:
+[ ] Provide options for the user:
+    = Guided "Wizard-like"
+    = Custom "Select from various tools":
+      - QR Code
+
+
+Basic architecture:
+
+[Phone] -> SSH -> [Appliance(Docker or micro isntance*) + gcloud CLI]
+*NOTE: Micro instance preferred
+
+
+Feature brainstorm (random ideas in no particular order)
+
+[ ] Sync with desktop
+[ ] Sync across multiple users (live collaborative sessions)
+[ ] Runbooks
+[ ] Snippets
+[ ] Push notifications - we could set up our own service
+[ ] Slack integration
+[ ] Export sessions as markdown files
+[ ] Import sessions from markdown files
+[ ] Compact/summarize session
+[ ] Display token usage
+[ ] Built-in fetch/curl tool for direct api calls without a shell box
+[ ] A set of pre-made quick API references in a compressed, summarized format that the LLM can search/include
+[ ] Ability to set up multiple SSH configurations (just like we have for models)
+[ ] Abulity to add attach note to anything, eg a note for an SSH configuration that LLM would see
+
+
+Background agent:
+[ ] Reactive system to alerts (Webhooks)
+
+Onboarding:
+[ ] Agent-guided onboarding
+[ ] Need minimal tools to be able to invoke cloud APIs in order to:
+    1. Spin up a docker instance
+    2. Open a communication channel to it
+
