@@ -82,25 +82,18 @@ extension LlmApiTypeExtension on LlmApiType {
 
   /// Helper to parse string code to LlmApiType
   static LlmApiType? fromCode(String code) {
-    switch (code.toLowerCase()) {
-      case 'openai':
+    final normalized = code.toLowerCase();
+    switch (normalized) {
+      case 'oai':
         return LlmApiType.openai;
-      case 'anthropic':
+      case 'ant':
         return LlmApiType.anthropic;
-      case 'google':
+      case 'gem':
       case 'gemini':
         return LlmApiType.google;
-      case 'deepseek':
-        return LlmApiType.deepseek;
-      case 'groq':
-        return LlmApiType.groq;
-      case 'ollama':
-        return LlmApiType.ollama;
-      case 'xai':
-        return LlmApiType.xai;
       default:
         try {
-          return LlmApiType.values.byName(code);
+          return LlmApiType.values.byName(normalized);
         } catch (_) {
           return null;
         }
