@@ -204,13 +204,7 @@ class ChatController extends StateNotifier<ChatState> {
           );
         }).toList();
 
-        state = state.copyWith(
-          pendingActions: actions,
-          conversationForToolCalls: result.conversationState,
-          pendingToolCalls: result.toolCalls,
-          assistantTextBeforeTools: result.textResponse,
-          isLoading: false,
-        );
+        state = state.copyWith(pendingActions: actions, isLoading: false);
 
         return;
       }
@@ -357,200 +351,18 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Execute multiple approved actions
+  /// TODO: This method will be completely refactored in step 4 to use direct parameters
   Future<void> executeActions({
     required List<CommandAction> selectedActions,
     required String sessionId,
   }) async {
-    // First, save the assistant's message with tool calls to preserve conversation state
-    final pendingCalls = state.pendingToolCalls;
-    final assistantText = state.assistantTextBeforeTools;
-
-    if (pendingCalls != null && pendingCalls.isNotEmpty) {
-      // Generate message ID upfront
-      final assistantMessageId = _messageDao.generateMessageId();
-
-      // Create the ChatMessage with tool calls
-      final chatMessage = ChatMessage.toolUse(
-        toolCalls: pendingCalls,
-        content: assistantText ?? '',
-      );
-
-      developer.log(
-        '💾 Saving assistant message with ${pendingCalls.length} tool calls',
-        name: 'ChatController',
-      );
-      developer.log(
-        '  Tool calls: ${pendingCalls.map((tc) => tc.function.name).join(", ")}',
-        name: 'ChatController',
-      );
-
-      // Convert to companion and insert
-      final companion = chatMessage.toMessageCompanion(
-        sessionId: sessionId,
-        id: assistantMessageId,
-      );
-
-      await _messageDao.insertMessage(companion);
-    }
-
-    // Clear the approval overlay and set execution state
-    state = state.copyWith(
-      pendingActions: null,
-      executionProgress: ExecutionProgress(
-        currentCommand: 0,
-        totalCommands: selectedActions.length,
-        commandName: '',
-      ),
+    // Temporary stub - this will be replaced in step 4
+    // For now, just throw to prevent calls until refactored
+    state = state.copyWith(isLoading: false, pendingActions: null);
+    throw UnimplementedError(
+      'executeActions is being refactored to use approval handler pattern. '
+      'This will be implemented in step 4.',
     );
-
-    try {
-      // Execute actions sequentially with progress updates
-      for (var i = 0; i < selectedActions.length; i++) {
-        final action = selectedActions[i];
-        final command = action.command;
-
-        // Update progress
-        state = state.copyWith(
-          executionProgress: ExecutionProgress(
-            currentCommand: i + 1,
-            totalCommands: selectedActions.length,
-            commandName: command,
-          ),
-        );
-      }
-
-      // Clear execution progress, show loading for LLM response
-      state = state.copyWith(executionProgress: null, isLoading: true);
-
-      // Get the tool calls that match the selected actions
-      final pendingCalls = state.pendingToolCalls;
-      if (pendingCalls == null) {
-        throw Exception('No pending tool calls in state');
-      }
-
-      final selectedToolCalls = selectedActions.map((action) {
-        // Find matching tool call by ID
-        final matchingToolCall = pendingCalls.firstWhere(
-          (tc) => tc.id == action.id,
-          orElse: () => throw Exception('Tool call not found: ${action.id}'),
-        );
-        return matchingToolCall;
-      }).toList();
-
-      // Execute tool calls
-      final result = await _executeToolCalls(
-        toolCalls: selectedToolCalls,
-        conversationState: state.conversationForToolCalls!,
-      );
-
-      // Save ONE consolidated tool result message with ALL results
-      // Anthropic API requires all tool results in a single message immediately after tool_use
-      final allResultToolCalls = result.toolCalls.map((toolCall) {
-        final toolResult = result.toolResults[toolCall.id] ?? 'No result';
-
-        return ToolCall(
-          id: toolCall.id,
-          callType: toolCall.callType,
-          function: FunctionCall(
-            name: toolCall.function.name,
-            arguments: toolResult,
-          ),
-        );
-      }).toList();
-
-      // Combine all tool results into one content string
-      final combinedContent = result.toolCalls
-          .map((toolCall) {
-            return result.toolResults[toolCall.id] ?? 'No result';
-          })
-          .join('\n---\n');
-
-      final chatMessage = ChatMessage.toolResult(
-        results: allResultToolCalls, // ALL results in one message
-        content: combinedContent,
-      );
-
-      developer.log(
-        '💾 Saving consolidated tool results for ${result.toolCalls.length} tools',
-        name: 'ChatController',
-      );
-
-      // Save ONE message with all results
-      final companion = chatMessage.toMessageCompanion(sessionId: sessionId);
-      await _messageDao.insertMessage(companion);
-
-      // Handle LLM's follow-up response after tool execution
-      if (result.followUpResult != null) {
-        final followUp = result.followUpResult!;
-
-        // If LLM wants to make more tool calls, show approval overlay
-        if (followUp.hasToolCalls) {
-          final actions = followUp.toolCalls!.map((tc) {
-            // Parse params from tool call
-            final argumentsJson = tc.function.arguments;
-            final params = argumentsJson.isNotEmpty
-                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-                : <String, dynamic>{};
-
-            return CommandAction(
-              id: tc.id,
-              actionName: tc.function.name,
-              params: params,
-            );
-          }).toList();
-
-          state = state.copyWith(
-            pendingActions: actions,
-            conversationForToolCalls: followUp.conversationState,
-            pendingToolCalls: followUp.toolCalls,
-            assistantTextBeforeTools: followUp.textResponse,
-            isLoading: false,
-          );
-
-          return;
-        }
-
-        // Save follow-up text response (LLM explaining results, asking follow-up, etc.)
-        if (followUp.hasTextResponse) {
-          final redactedResponse = await _secretRedactor.redact(
-            followUp.textResponse!,
-          );
-          await _messageDao.insertMessageWithId(
-            sessionId: sessionId,
-            userId: 'ai',
-            userName: 'Ops Agent',
-            content: redactedResponse,
-          );
-        }
-      }
-
-      // Clear conversation state and loading
-      state = state.copyWith(
-        conversationForToolCalls: null,
-        pendingToolCalls: null,
-        assistantTextBeforeTools: null,
-        isLoading: false,
-      );
-    } catch (e) {
-      final errorMessage = '❌ Error executing commands: $e';
-      final redactedError = await _secretRedactor.redact(errorMessage);
-      await _messageDao.insertMessageWithId(
-        sessionId: sessionId,
-        userId: 'ai',
-        userName: 'Ops Agent',
-        content: redactedError,
-      );
-
-      // Clear all state on error
-      state = state.copyWith(
-        conversationForToolCalls: null,
-        pendingToolCalls: null,
-        assistantTextBeforeTools: null,
-        executionProgress: null,
-        isLoading: false,
-        error: e.toString(),
-      );
-    }
   }
 
   /// Execute tool calls and handle follow-up responses
@@ -881,12 +693,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Cancel pending actions
   void cancelActions() {
-    state = state.copyWith(
-      pendingActions: null,
-      conversationForToolCalls: null,
-      pendingToolCalls: null,
-      assistantTextBeforeTools: null,
-    );
+    state = state.copyWith(pendingActions: null);
   }
 
   /// Edit a message and resend from that point

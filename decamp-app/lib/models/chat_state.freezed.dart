@@ -203,14 +203,10 @@ mixin _$ChatState {
   // Loading state
   bool get isLoading =>
       throw _privateConstructorUsedError; // Pending actions approval (for multi-command support)
+  // Note: This will be removed in final step after verification
   List<CommandAction>? get pendingActions =>
       throw _privateConstructorUsedError; // Execution progress tracking
   ExecutionProgress? get executionProgress =>
-      throw _privateConstructorUsedError; // Conversation state for tool calls (following official llm_dart pattern)
-  List<ChatMessage>? get conversationForToolCalls =>
-      throw _privateConstructorUsedError;
-  List<ToolCall>? get pendingToolCalls => throw _privateConstructorUsedError;
-  String? get assistantTextBeforeTools =>
       throw _privateConstructorUsedError; // Streaming state
   String? get streamingMessageId => throw _privateConstructorUsedError;
   String get streamingText => throw _privateConstructorUsedError; // Error state
@@ -232,9 +228,6 @@ abstract class $ChatStateCopyWith<$Res> {
     bool isLoading,
     List<CommandAction>? pendingActions,
     ExecutionProgress? executionProgress,
-    List<ChatMessage>? conversationForToolCalls,
-    List<ToolCall>? pendingToolCalls,
-    String? assistantTextBeforeTools,
     String? streamingMessageId,
     String streamingText,
     String? error,
@@ -261,9 +254,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
     Object? isLoading = null,
     Object? pendingActions = freezed,
     Object? executionProgress = freezed,
-    Object? conversationForToolCalls = freezed,
-    Object? pendingToolCalls = freezed,
-    Object? assistantTextBeforeTools = freezed,
     Object? streamingMessageId = freezed,
     Object? streamingText = null,
     Object? error = freezed,
@@ -282,18 +272,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
                 ? _value.executionProgress
                 : executionProgress // ignore: cast_nullable_to_non_nullable
                       as ExecutionProgress?,
-            conversationForToolCalls: freezed == conversationForToolCalls
-                ? _value.conversationForToolCalls
-                : conversationForToolCalls // ignore: cast_nullable_to_non_nullable
-                      as List<ChatMessage>?,
-            pendingToolCalls: freezed == pendingToolCalls
-                ? _value.pendingToolCalls
-                : pendingToolCalls // ignore: cast_nullable_to_non_nullable
-                      as List<ToolCall>?,
-            assistantTextBeforeTools: freezed == assistantTextBeforeTools
-                ? _value.assistantTextBeforeTools
-                : assistantTextBeforeTools // ignore: cast_nullable_to_non_nullable
-                      as String?,
             streamingMessageId: freezed == streamingMessageId
                 ? _value.streamingMessageId
                 : streamingMessageId // ignore: cast_nullable_to_non_nullable
@@ -339,9 +317,6 @@ abstract class _$$ChatStateImplCopyWith<$Res>
     bool isLoading,
     List<CommandAction>? pendingActions,
     ExecutionProgress? executionProgress,
-    List<ChatMessage>? conversationForToolCalls,
-    List<ToolCall>? pendingToolCalls,
-    String? assistantTextBeforeTools,
     String? streamingMessageId,
     String streamingText,
     String? error,
@@ -368,9 +343,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     Object? isLoading = null,
     Object? pendingActions = freezed,
     Object? executionProgress = freezed,
-    Object? conversationForToolCalls = freezed,
-    Object? pendingToolCalls = freezed,
-    Object? assistantTextBeforeTools = freezed,
     Object? streamingMessageId = freezed,
     Object? streamingText = null,
     Object? error = freezed,
@@ -389,18 +361,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
             ? _value.executionProgress
             : executionProgress // ignore: cast_nullable_to_non_nullable
                   as ExecutionProgress?,
-        conversationForToolCalls: freezed == conversationForToolCalls
-            ? _value._conversationForToolCalls
-            : conversationForToolCalls // ignore: cast_nullable_to_non_nullable
-                  as List<ChatMessage>?,
-        pendingToolCalls: freezed == pendingToolCalls
-            ? _value._pendingToolCalls
-            : pendingToolCalls // ignore: cast_nullable_to_non_nullable
-                  as List<ToolCall>?,
-        assistantTextBeforeTools: freezed == assistantTextBeforeTools
-            ? _value.assistantTextBeforeTools
-            : assistantTextBeforeTools // ignore: cast_nullable_to_non_nullable
-                  as String?,
         streamingMessageId: freezed == streamingMessageId
             ? _value.streamingMessageId
             : streamingMessageId // ignore: cast_nullable_to_non_nullable
@@ -425,15 +385,10 @@ class _$ChatStateImpl extends _ChatState {
     this.isLoading = false,
     final List<CommandAction>? pendingActions,
     this.executionProgress,
-    final List<ChatMessage>? conversationForToolCalls,
-    final List<ToolCall>? pendingToolCalls,
-    this.assistantTextBeforeTools,
     this.streamingMessageId,
     this.streamingText = '',
     this.error,
   }) : _pendingActions = pendingActions,
-       _conversationForToolCalls = conversationForToolCalls,
-       _pendingToolCalls = pendingToolCalls,
        super._();
 
   // Loading state
@@ -441,8 +396,10 @@ class _$ChatStateImpl extends _ChatState {
   @JsonKey()
   final bool isLoading;
   // Pending actions approval (for multi-command support)
+  // Note: This will be removed in final step after verification
   final List<CommandAction>? _pendingActions;
   // Pending actions approval (for multi-command support)
+  // Note: This will be removed in final step after verification
   @override
   List<CommandAction>? get pendingActions {
     final value = _pendingActions;
@@ -455,32 +412,6 @@ class _$ChatStateImpl extends _ChatState {
   // Execution progress tracking
   @override
   final ExecutionProgress? executionProgress;
-  // Conversation state for tool calls (following official llm_dart pattern)
-  final List<ChatMessage>? _conversationForToolCalls;
-  // Conversation state for tool calls (following official llm_dart pattern)
-  @override
-  List<ChatMessage>? get conversationForToolCalls {
-    final value = _conversationForToolCalls;
-    if (value == null) return null;
-    if (_conversationForToolCalls is EqualUnmodifiableListView)
-      return _conversationForToolCalls;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
-  }
-
-  final List<ToolCall>? _pendingToolCalls;
-  @override
-  List<ToolCall>? get pendingToolCalls {
-    final value = _pendingToolCalls;
-    if (value == null) return null;
-    if (_pendingToolCalls is EqualUnmodifiableListView)
-      return _pendingToolCalls;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
-  }
-
-  @override
-  final String? assistantTextBeforeTools;
   // Streaming state
   @override
   final String? streamingMessageId;
@@ -493,7 +424,7 @@ class _$ChatStateImpl extends _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(isLoading: $isLoading, pendingActions: $pendingActions, executionProgress: $executionProgress, conversationForToolCalls: $conversationForToolCalls, pendingToolCalls: $pendingToolCalls, assistantTextBeforeTools: $assistantTextBeforeTools, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
+    return 'ChatState(isLoading: $isLoading, pendingActions: $pendingActions, executionProgress: $executionProgress, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
   }
 
   @override
@@ -509,19 +440,6 @@ class _$ChatStateImpl extends _ChatState {
             ) &&
             (identical(other.executionProgress, executionProgress) ||
                 other.executionProgress == executionProgress) &&
-            const DeepCollectionEquality().equals(
-              other._conversationForToolCalls,
-              _conversationForToolCalls,
-            ) &&
-            const DeepCollectionEquality().equals(
-              other._pendingToolCalls,
-              _pendingToolCalls,
-            ) &&
-            (identical(
-                  other.assistantTextBeforeTools,
-                  assistantTextBeforeTools,
-                ) ||
-                other.assistantTextBeforeTools == assistantTextBeforeTools) &&
             (identical(other.streamingMessageId, streamingMessageId) ||
                 other.streamingMessageId == streamingMessageId) &&
             (identical(other.streamingText, streamingText) ||
@@ -535,9 +453,6 @@ class _$ChatStateImpl extends _ChatState {
     isLoading,
     const DeepCollectionEquality().hash(_pendingActions),
     executionProgress,
-    const DeepCollectionEquality().hash(_conversationForToolCalls),
-    const DeepCollectionEquality().hash(_pendingToolCalls),
-    assistantTextBeforeTools,
     streamingMessageId,
     streamingText,
     error,
@@ -557,9 +472,6 @@ abstract class _ChatState extends ChatState {
     final bool isLoading,
     final List<CommandAction>? pendingActions,
     final ExecutionProgress? executionProgress,
-    final List<ChatMessage>? conversationForToolCalls,
-    final List<ToolCall>? pendingToolCalls,
-    final String? assistantTextBeforeTools,
     final String? streamingMessageId,
     final String streamingText,
     final String? error,
@@ -569,16 +481,11 @@ abstract class _ChatState extends ChatState {
   // Loading state
   @override
   bool get isLoading; // Pending actions approval (for multi-command support)
+  // Note: This will be removed in final step after verification
   @override
   List<CommandAction>? get pendingActions; // Execution progress tracking
   @override
-  ExecutionProgress? get executionProgress; // Conversation state for tool calls (following official llm_dart pattern)
-  @override
-  List<ChatMessage>? get conversationForToolCalls;
-  @override
-  List<ToolCall>? get pendingToolCalls;
-  @override
-  String? get assistantTextBeforeTools; // Streaming state
+  ExecutionProgress? get executionProgress; // Streaming state
   @override
   String? get streamingMessageId;
   @override
