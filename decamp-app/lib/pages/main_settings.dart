@@ -140,7 +140,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     String providerCode,
     String apiKey,
   ) async {
-    final apiType = LlmApiTypeExtension.fromCode(providerCode);
+    final apiType = LlmApiType.fromCode(providerCode);
     if (apiType == null) return;
 
     final modelId = apiType.defaultModelId;

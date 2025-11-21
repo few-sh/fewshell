@@ -3,100 +3,73 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'llm_api_settings.freezed.dart';
 part 'llm_api_settings.g.dart';
 
-/// Supported LLM API types
+/// Supported LLM API types with configuration using Enhanced Enums
 enum LlmApiType {
-  openai,
-  anthropic,
-  google,
-  deepseek,
-  groq,
-  ollama,
-  xai,
-  openaiCompatible, // For any OpenAI-compatible API
-}
+  openai(
+    displayName: 'OpenAI',
+    defaultBaseUrl: 'https://api.openai.com/v1/',
+    defaultModelId: 'gpt-4o',
+    aliases: ['oai'],
+  ),
+  anthropic(
+    displayName: 'Anthropic (Claude)',
+    defaultBaseUrl: 'https://api.anthropic.com/v1/',
+    defaultModelId: 'claude-3-5-sonnet-latest',
+    aliases: ['ant'],
+  ),
+  google(
+    displayName: 'Google (Gemini)',
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/',
+    defaultModelId: 'gemini-1.5-pro',
+    aliases: ['gem', 'gemini'],
+  ),
+  deepseek(
+    displayName: 'DeepSeek',
+    defaultBaseUrl: 'https://api.deepseek.com/',
+    defaultModelId: 'deepseek-chat',
+  ),
+  groq(
+    displayName: 'Groq',
+    defaultBaseUrl: 'https://api.groq.com/openai/v1/',
+    defaultModelId: 'llama3-70b-8192',
+  ),
+  ollama(
+    displayName: 'Ollama (Local)',
+    defaultBaseUrl: 'http://localhost:11434',
+    defaultModelId: 'llama3',
+  ),
+  xai(
+    displayName: 'xAI (Grok)',
+    defaultBaseUrl: 'https://api.x.ai/v1/',
+    defaultModelId: 'grok-beta',
+  ),
+  openaiCompatible(
+    displayName: 'OpenAI Compatible',
+    defaultBaseUrl: '',
+    defaultModelId: 'model-identifier',
+  );
 
-/// Extension to provide display names for LLM API types
-extension LlmApiTypeExtension on LlmApiType {
-  String get displayName {
-    switch (this) {
-      case LlmApiType.openai:
-        return 'OpenAI';
-      case LlmApiType.anthropic:
-        return 'Anthropic (Claude)';
-      case LlmApiType.google:
-        return 'Google (Gemini)';
-      case LlmApiType.deepseek:
-        return 'DeepSeek';
-      case LlmApiType.groq:
-        return 'Groq';
-      case LlmApiType.ollama:
-        return 'Ollama (Local)';
-      case LlmApiType.xai:
-        return 'xAI (Grok)';
-      case LlmApiType.openaiCompatible:
-        return 'OpenAI Compatible';
-    }
-  }
+  const LlmApiType({
+    required this.displayName,
+    required this.defaultBaseUrl,
+    required this.defaultModelId,
+    this.aliases = const [],
+  });
 
-  String get defaultBaseUrl {
-    switch (this) {
-      case LlmApiType.openai:
-        return 'https://api.openai.com/v1/';
-      case LlmApiType.anthropic:
-        return 'https://api.anthropic.com/v1/';
-      case LlmApiType.google:
-        return 'https://generativelanguage.googleapis.com/v1beta/';
-      case LlmApiType.deepseek:
-        return 'https://api.deepseek.com/';
-      case LlmApiType.groq:
-        return 'https://api.groq.com/openai/v1/';
-      case LlmApiType.ollama:
-        return 'http://localhost:11434';
-      case LlmApiType.xai:
-        return 'https://api.x.ai/v1/';
-      case LlmApiType.openaiCompatible:
-        return '';
-    }
-  }
-
-  String get defaultModelId {
-    switch (this) {
-      case LlmApiType.openai:
-        return 'gpt-5';
-      case LlmApiType.anthropic:
-        return 'claude-4-5-sonnet';
-      case LlmApiType.google:
-        return 'gemini-3-pro';
-      case LlmApiType.deepseek:
-        return 'deepseek-chat';
-      case LlmApiType.groq:
-        return 'llama3-70b-8192';
-      case LlmApiType.ollama:
-        return 'llama3';
-      case LlmApiType.xai:
-        return 'grok-beta';
-      case LlmApiType.openaiCompatible:
-        return 'model-identifier';
-    }
-  }
+  final String displayName;
+  final String defaultBaseUrl;
+  final String defaultModelId;
+  final List<String> aliases;
 
   /// Helper to parse string code to LlmApiType
   static LlmApiType? fromCode(String code) {
     final normalized = code.toLowerCase();
-    switch (normalized) {
-      case 'oai':
-        return LlmApiType.openai;
-      case 'ant':
-        return LlmApiType.anthropic;
-      case 'gem':
-      case 'gemini':
-        return LlmApiType.google;
-      default:
-        try {
-          return LlmApiType.values.byName(normalized);
-        } catch (_) {
-          return null;
-        }
+    try {
+      return LlmApiType.values.firstWhere(
+        (e) => e.name == normalized || e.aliases.contains(normalized),
+      );
+    } catch (_) {
+      return null;
     }
   }
 }
