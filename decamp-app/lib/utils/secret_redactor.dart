@@ -25,15 +25,15 @@ class SecretRedactor {
     // If no secrets to redact, return original text
     if (secrets.isEmpty) return text;
 
-    // Replace each secret value with [REDACTED]
-    String redactedText = text;
-    for (final secretValue in secrets.values) {
-      if (secretValue.isNotEmpty) {
-        redactedText = redactedText.replaceAll(secretValue, '[REDACTED]');
-      }
-    }
+    // Sort secrets by length descending and replace them.
+    final secretValues = secrets.values.toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
 
-    return redactedText;
+    return secretValues.fold(
+      text,
+      (currentText, secret) =>
+          secret.isEmpty ? currentText : currentText.replaceAll(secret, '[REDACTED]'),
+    );
   }
 
   /// Fetches all secrets (global + project-specific if applicable).
