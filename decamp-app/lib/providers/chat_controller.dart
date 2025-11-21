@@ -838,7 +838,7 @@ class ChatController extends StateNotifier<ChatState> {
               data: body,
               options: Options(
                 method: method,
-                headers: headers?.map((k, v) => MapEntry(k, v.toString())),
+                headers: headers,
                 responseType: ResponseType.plain,
                 validateStatus: (status) => true, // Accept all status codes
               ),
