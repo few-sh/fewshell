@@ -27,6 +27,11 @@ class ProjectsPage extends ConsumerWidget {
       );
 
       if (jsonString != null && context.mounted) {
+        if (jsonString.isEmpty) {
+          await _createProjectWithRandomName(context, ref, existingNames);
+          return;
+        }
+
         try {
           final importer = ref.read(projectImporterProvider);
           final projectId = await importer.importFromQrCode(jsonString);
