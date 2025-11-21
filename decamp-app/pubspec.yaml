@@ -86,6 +86,7 @@ dev_dependencies:
   drift_dev: ^2.20.0
   freezed: ^2.4.5
   json_serializable: ^6.7.1
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -127,3 +128,8 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/fewshell_app_icon_v0.png"
