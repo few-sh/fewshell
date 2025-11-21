@@ -89,7 +89,7 @@ final shellTools = [
           description: 'Brief explanation of the purpose of this HTTP request.',
         ),
       },
-      required: ['url', 'method', 'explanation'],
+      required: ['url', 'explanation'],
     ),
   ),
 ];
