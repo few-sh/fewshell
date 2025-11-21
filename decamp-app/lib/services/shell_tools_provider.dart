@@ -1,10 +1,14 @@
 import 'package:llm_dart/llm_dart.dart';
 
+/// Tool name constants
+const String kExecuteShellCommand = 'execute_shell_command';
+const String kFetch = 'fetch';
+
 /// Shell execution tools for LLM
 /// Direct Tool definitions - no translation layer needed
 final shellTools = [
   Tool.function(
-    name: 'execute_shell_command',
+    name: kExecuteShellCommand,
     description:
         'Executes a shell command on the server or infrastructure returns its resulting output of stdout, stderr and exitCode'
         'Use this to run commands like checking logs, restarting services, '
@@ -39,7 +43,7 @@ final shellTools = [
     ),
   ),
   Tool.function(
-    name: 'fetch',
+    name: kFetch,
     description:
         'Performs an HTTP request to a specified URL, similar to the curl command-line tool. '
         'Returns the response status code, headers, and body. '
@@ -74,6 +78,11 @@ final shellTools = [
           propertyType: 'string',
           description:
               'The request body data. Useful for POST, PUT, and PATCH requests.',
+        ),
+        'timeout': ParameterProperty(
+          propertyType: 'number',
+          description:
+              'Request timeout in seconds. Defaults to 30 seconds if not specified.',
         ),
         'explanation': ParameterProperty(
           propertyType: 'string',

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
@@ -8,7 +9,8 @@ import '../models/chat_state.dart';
 import '../models/ssh_settings.dart';
 import '../services/llm_service.dart';
 import '../services/shell_service.dart';
-import '../services/shell_tools_provider.dart';
+import '../services/shell_tools_provider.dart'
+    show shellTools, kExecuteShellCommand, kFetch;
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/ssh_settings_provider.dart';
@@ -215,7 +217,9 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Save text response if any
       if (result.hasTextResponse) {
-        final redactedResponse = await _secretRedactor.redact(result.textResponse!);
+        final redactedResponse = await _secretRedactor.redact(
+          result.textResponse!,
+        );
         await _messageDao.insertMessageWithId(
           id: aiMessageId,
           sessionId: sessionId,
@@ -508,7 +512,9 @@ class ChatController extends StateNotifier<ChatState> {
 
         // Save follow-up text response (LLM explaining results, asking follow-up, etc.)
         if (followUp.hasTextResponse) {
-          final redactedResponse = await _secretRedactor.redact(followUp.textResponse!);
+          final redactedResponse = await _secretRedactor.redact(
+            followUp.textResponse!,
+          );
           await _messageDao.insertMessageWithId(
             sessionId: sessionId,
             userId: 'ai',
@@ -793,7 +799,7 @@ class ChatController extends StateNotifier<ChatState> {
     String actionName,
     Map<String, dynamic> params,
   ) async {
-    if (actionName == 'execute_shell_command') {
+    if (actionName == kExecuteShellCommand) {
       final command = params['command'] as String;
       final sudoRequired = params['sudo_required'] as bool? ?? false;
 
@@ -815,6 +821,59 @@ class ChatController extends StateNotifier<ChatState> {
         'data': result,
         'error': result['stderr'] as String?,
       };
+    }
+
+    if (actionName == kFetch) {
+      final url = params['url'] as String;
+      final method = (params['method'] as String?)?.toUpperCase() ?? 'GET';
+      final headers = params['headers'] as Map<String, dynamic>?;
+      final body = params['body'] as String?;
+      final timeoutSeconds = params['timeout'] as int? ?? 30;
+
+      try {
+        final dio = Dio();
+        final response = await dio
+            .request(
+              url,
+              data: body,
+              options: Options(
+                method: method,
+                headers: headers?.map((k, v) => MapEntry(k, v.toString())),
+                responseType: ResponseType.plain,
+                validateStatus: (status) => true, // Accept all status codes
+              ),
+            )
+            .timeout(Duration(seconds: timeoutSeconds));
+
+        final isSuccess =
+            response.statusCode != null &&
+            response.statusCode! >= 200 &&
+            response.statusCode! < 300;
+
+        return {
+          'success': isSuccess,
+          'data': {
+            'statusCode': response.statusCode ?? 0,
+            'headers': response.headers.map,
+            'body': response.data?.toString() ?? '',
+            'url': url,
+            'method': method,
+          },
+          'error': isSuccess ? null : 'HTTP ${response.statusCode}',
+        };
+      } catch (e) {
+        return {
+          'success': false,
+          'data': {
+            'statusCode': 0,
+            'headers': {},
+            'body': '',
+            'url': url,
+            'method': method,
+          },
+          'error': e.toString(),
+        };
+      }
     }
 
     throw Exception('Unknown action: $actionName');
