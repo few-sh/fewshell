@@ -62,11 +62,11 @@ extension LlmApiTypeExtension on LlmApiType {
   String get defaultModelId {
     switch (this) {
       case LlmApiType.openai:
-        return 'gpt-4o';
+        return 'gpt-5';
       case LlmApiType.anthropic:
-        return 'claude-3-5-sonnet-latest';
+        return 'claude-4-5-sonnet';
       case LlmApiType.google:
-        return 'gemini-1.5-pro';
+        return 'gemini-3-pro';
       case LlmApiType.deepseek:
         return 'deepseek-chat';
       case LlmApiType.groq:
