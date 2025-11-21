@@ -225,8 +225,23 @@ class ChatController extends StateNotifier<ChatState> {
           name: 'ChatController',
         );
 
-        // Execute tools and handle follow-up (will be implemented in step 4)
-        // TODO: Call _executeToolCallsAndContinue here
+        // Get the selected tool calls
+        final selectedToolCalls = selectedActions.map((action) {
+          // Find matching tool call by ID
+          final matchingToolCall = result.toolCalls!.firstWhere(
+            (tc) => tc.id == action.id,
+          );
+          return matchingToolCall;
+        }).toList();
+
+        // Execute tools and handle recursive approvals
+        await _executeToolCallsAndContinue(
+          toolCalls: selectedToolCalls,
+          conversationState: result.conversationState!,
+          sessionId: sessionId,
+          requestApproval: requestApproval,
+        );
+
         state = state.copyWith(isLoading: false);
         return;
       }
@@ -372,25 +387,13 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  /// Execute multiple approved actions
-  /// TODO: This method will be completely refactored in step 4 to use direct parameters
-  Future<void> executeActions({
-    required List<CommandAction> selectedActions,
-    required String sessionId,
-  }) async {
-    // Temporary stub - this will be replaced in step 4
-    // For now, just throw to prevent calls until refactored
-    state = state.copyWith(isLoading: false, pendingActions: null);
-    throw UnimplementedError(
-      'executeActions is being refactored to use approval handler pattern. '
-      'This will be implemented in step 4.',
-    );
-  }
-
-  /// Execute tool calls and handle follow-up responses
-  Future<_ToolExecutionResult> _executeToolCalls({
+  /// Execute tool calls and handle follow-up responses with recursive approval support
+  Future<void> _executeToolCallsAndContinue({
     required List<ToolCall> toolCalls,
     required List<ChatMessage> conversationState,
+    required String sessionId,
+    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    requestApproval,
   }) async {
     final toolResults = <String, String>{};
     final chatMessages = <String>[];
@@ -493,19 +496,116 @@ class ChatController extends StateNotifier<ChatState> {
         tools: tools,
       );
 
-      return _ToolExecutionResult(
-        toolResults: toolResults,
-        chatMessages: chatMessages,
+      // Save assistant's tool use message with all tool calls to database
+      final assistantMessageId = _messageDao.generateMessageId();
+      final assistantMessage = ChatMessage.toolUse(
         toolCalls: toolCalls,
-        followUpResult: followUpResult,
+        content: '', // Tool use messages don't have text content
       );
+      final assistantCompanion = assistantMessage.toMessageCompanion(
+        sessionId: sessionId,
+        id: assistantMessageId,
+      );
+      await _messageDao.insertMessage(assistantCompanion);
+
+      developer.log(
+        '💾 Saved assistant message with ${toolCalls.length} tool calls',
+        name: 'ChatController',
+      );
+
+      // Save consolidated tool results message to database
+      final toolResultMessage = ChatMessage.toolResult(
+        results: allResults,
+        content: combinedContent,
+      );
+      final resultCompanion = toolResultMessage.toMessageCompanion(
+        sessionId: sessionId,
+      );
+      await _messageDao.insertMessage(resultCompanion);
+
+      developer.log(
+        '💾 Saved tool results for ${toolCalls.length} tools',
+        name: 'ChatController',
+      );
+
+      // Handle follow-up response from LLM
+      if (followUpResult != null) {
+        if (followUpResult.hasToolCalls) {
+          // LLM wants to make more tool calls - request approval recursively!
+          developer.log(
+            '🔁 LLM wants to make ${followUpResult.toolCalls!.length} more tool calls',
+            name: 'ChatController',
+          );
+
+          final followUpActions = followUpResult.toolCalls!.map((tc) {
+            final argumentsJson = tc.function.arguments;
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+                : <String, dynamic>{};
+
+            return CommandAction(
+              id: tc.id,
+              actionName: tc.function.name,
+              params: params,
+            );
+          }).toList();
+
+          // Recursively request approval
+          final selectedFollowUpActions = await requestApproval(
+            followUpActions,
+          );
+
+          if (selectedFollowUpActions != null) {
+            // User approved - execute recursively
+            final selectedFollowUpToolCalls = selectedFollowUpActions.map((
+              action,
+            ) {
+              return followUpResult.toolCalls!.firstWhere(
+                (tc) => tc.id == action.id,
+              );
+            }).toList();
+
+            await _executeToolCallsAndContinue(
+              toolCalls: selectedFollowUpToolCalls,
+              conversationState: followUpResult.conversationState!,
+              sessionId: sessionId,
+              requestApproval: requestApproval,
+            );
+          } else {
+            developer.log(
+              '🚨 User cancelled follow-up tool execution',
+              name: 'ChatController',
+            );
+          }
+        } else if (followUpResult.hasTextResponse) {
+          // LLM provided a text response - save it
+          final redactedResponse = await _secretRedactor.redact(
+            followUpResult.textResponse!,
+          );
+          await _messageDao.insertMessageWithId(
+            sessionId: sessionId,
+            userId: 'ai',
+            userName: 'Ops Agent',
+            content: redactedResponse,
+          );
+
+          developer.log(
+            '💾 Saved LLM follow-up response',
+            name: 'ChatController',
+          );
+        }
+      }
     } catch (e) {
-      return _ToolExecutionResult(
-        toolResults: toolResults,
-        chatMessages: chatMessages,
-        toolCalls: toolCalls,
-        error: e.toString(),
+      final errorMessage = '❌ Error executing tools: $e';
+      final redactedError = await _secretRedactor.redact(errorMessage);
+      await _messageDao.insertMessageWithId(
+        sessionId: sessionId,
+        userId: 'ai',
+        userName: 'Ops Agent',
+        content: redactedError,
       );
+
+      developer.log(errorMessage, name: 'ChatController');
     }
   }
 
@@ -713,11 +813,6 @@ class ChatController extends StateNotifier<ChatState> {
     throw Exception('Unknown action: $actionName');
   }
 
-  /// Cancel pending actions
-  void cancelActions() {
-    state = state.copyWith(pendingActions: null);
-  }
-
   /// Edit a message
   /// Deletes all messages after the edited message and updates the message content
   /// UI should call sendMessage separately if resend is desired
@@ -885,25 +980,4 @@ class _MessageResult {
   bool get hasError => error != null;
   bool get hasToolCalls => toolCalls != null && toolCalls!.isNotEmpty;
   bool get hasTextResponse => textResponse != null && textResponse!.isNotEmpty;
-}
-
-/// Result of executing tool calls
-class _ToolExecutionResult {
-  final Map<String, String> toolResults;
-  final List<String> chatMessages;
-  final List<ToolCall> toolCalls;
-  final _MessageResult? followUpResult;
-  final String? error;
-
-  const _ToolExecutionResult({
-    required this.toolResults,
-    required this.chatMessages,
-    required this.toolCalls,
-    this.followUpResult,
-    this.error,
-  });
-
-  bool get hasError => error != null;
-  bool get hasFollowUp =>
-      followUpResult != null && followUpResult!.hasToolCalls;
 }

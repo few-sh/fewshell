@@ -1,5 +1,4 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import '../components/multi_command_approval_overlay.dart';
 
 part 'chat_state.freezed.dart';
 
@@ -22,10 +21,6 @@ class ChatState with _$ChatState {
     // Loading state
     @Default(false) bool isLoading,
 
-    // Pending actions approval (for multi-command support)
-    // Note: This will be removed in final step after verification
-    List<CommandAction>? pendingActions,
-
     // Execution progress tracking
     ExecutionProgress? executionProgress,
 
@@ -38,10 +33,6 @@ class ChatState with _$ChatState {
   }) = _ChatState;
 
   const ChatState._();
-
-  /// Check if there are pending actions to approve
-  bool get hasPendingActions =>
-      pendingActions != null && pendingActions!.isNotEmpty;
 
   /// Check if currently executing commands
   bool get isExecuting => executionProgress != null;

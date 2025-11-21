@@ -202,9 +202,6 @@ abstract class _ExecutionProgress implements ExecutionProgress {
 mixin _$ChatState {
   // Loading state
   bool get isLoading =>
-      throw _privateConstructorUsedError; // Pending actions approval (for multi-command support)
-  // Note: This will be removed in final step after verification
-  List<CommandAction>? get pendingActions =>
       throw _privateConstructorUsedError; // Execution progress tracking
   ExecutionProgress? get executionProgress =>
       throw _privateConstructorUsedError; // Streaming state
@@ -226,7 +223,6 @@ abstract class $ChatStateCopyWith<$Res> {
   @useResult
   $Res call({
     bool isLoading,
-    List<CommandAction>? pendingActions,
     ExecutionProgress? executionProgress,
     String? streamingMessageId,
     String streamingText,
@@ -252,7 +248,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   @override
   $Res call({
     Object? isLoading = null,
-    Object? pendingActions = freezed,
     Object? executionProgress = freezed,
     Object? streamingMessageId = freezed,
     Object? streamingText = null,
@@ -264,10 +259,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
                 ? _value.isLoading
                 : isLoading // ignore: cast_nullable_to_non_nullable
                       as bool,
-            pendingActions: freezed == pendingActions
-                ? _value.pendingActions
-                : pendingActions // ignore: cast_nullable_to_non_nullable
-                      as List<CommandAction>?,
             executionProgress: freezed == executionProgress
                 ? _value.executionProgress
                 : executionProgress // ignore: cast_nullable_to_non_nullable
@@ -315,7 +306,6 @@ abstract class _$$ChatStateImplCopyWith<$Res>
   @useResult
   $Res call({
     bool isLoading,
-    List<CommandAction>? pendingActions,
     ExecutionProgress? executionProgress,
     String? streamingMessageId,
     String streamingText,
@@ -341,7 +331,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   @override
   $Res call({
     Object? isLoading = null,
-    Object? pendingActions = freezed,
     Object? executionProgress = freezed,
     Object? streamingMessageId = freezed,
     Object? streamingText = null,
@@ -353,10 +342,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
             ? _value.isLoading
             : isLoading // ignore: cast_nullable_to_non_nullable
                   as bool,
-        pendingActions: freezed == pendingActions
-            ? _value._pendingActions
-            : pendingActions // ignore: cast_nullable_to_non_nullable
-                  as List<CommandAction>?,
         executionProgress: freezed == executionProgress
             ? _value.executionProgress
             : executionProgress // ignore: cast_nullable_to_non_nullable
@@ -383,32 +368,16 @@ class __$$ChatStateImplCopyWithImpl<$Res>
 class _$ChatStateImpl extends _ChatState {
   const _$ChatStateImpl({
     this.isLoading = false,
-    final List<CommandAction>? pendingActions,
     this.executionProgress,
     this.streamingMessageId,
     this.streamingText = '',
     this.error,
-  }) : _pendingActions = pendingActions,
-       super._();
+  }) : super._();
 
   // Loading state
   @override
   @JsonKey()
   final bool isLoading;
-  // Pending actions approval (for multi-command support)
-  // Note: This will be removed in final step after verification
-  final List<CommandAction>? _pendingActions;
-  // Pending actions approval (for multi-command support)
-  // Note: This will be removed in final step after verification
-  @override
-  List<CommandAction>? get pendingActions {
-    final value = _pendingActions;
-    if (value == null) return null;
-    if (_pendingActions is EqualUnmodifiableListView) return _pendingActions;
-    // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(value);
-  }
-
   // Execution progress tracking
   @override
   final ExecutionProgress? executionProgress;
@@ -424,7 +393,7 @@ class _$ChatStateImpl extends _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(isLoading: $isLoading, pendingActions: $pendingActions, executionProgress: $executionProgress, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
+    return 'ChatState(isLoading: $isLoading, executionProgress: $executionProgress, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
   }
 
   @override
@@ -434,10 +403,6 @@ class _$ChatStateImpl extends _ChatState {
             other is _$ChatStateImpl &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading) &&
-            const DeepCollectionEquality().equals(
-              other._pendingActions,
-              _pendingActions,
-            ) &&
             (identical(other.executionProgress, executionProgress) ||
                 other.executionProgress == executionProgress) &&
             (identical(other.streamingMessageId, streamingMessageId) ||
@@ -451,7 +416,6 @@ class _$ChatStateImpl extends _ChatState {
   int get hashCode => Object.hash(
     runtimeType,
     isLoading,
-    const DeepCollectionEquality().hash(_pendingActions),
     executionProgress,
     streamingMessageId,
     streamingText,
@@ -470,7 +434,6 @@ class _$ChatStateImpl extends _ChatState {
 abstract class _ChatState extends ChatState {
   const factory _ChatState({
     final bool isLoading,
-    final List<CommandAction>? pendingActions,
     final ExecutionProgress? executionProgress,
     final String? streamingMessageId,
     final String streamingText,
@@ -480,10 +443,7 @@ abstract class _ChatState extends ChatState {
 
   // Loading state
   @override
-  bool get isLoading; // Pending actions approval (for multi-command support)
-  // Note: This will be removed in final step after verification
-  @override
-  List<CommandAction>? get pendingActions; // Execution progress tracking
+  bool get isLoading; // Execution progress tracking
   @override
   ExecutionProgress? get executionProgress; // Streaming state
   @override
