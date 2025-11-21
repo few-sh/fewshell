@@ -180,7 +180,11 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     }
 
     final parts = userHost.split('@');
-    if (parts.length != 2) return;
+    if (parts.length != 2) {
+      throw FormatException(
+        'Invalid SSH host format: $userHost. Expected user@host',
+      );
+    }
 
     final username = parts[0];
     final host = parts[1];
