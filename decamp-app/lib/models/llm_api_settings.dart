@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:llm_dart/core/provider_defaults.dart';
 
 part 'llm_api_settings.freezed.dart';
 part 'llm_api_settings.g.dart';
@@ -7,41 +8,41 @@ part 'llm_api_settings.g.dart';
 enum LlmApiType {
   openai(
     displayName: 'OpenAI',
-    defaultBaseUrl: 'https://api.openai.com/v1/',
-    defaultModelId: 'gpt-5',
-    aliases: ['oai', 'openai'],
+    defaultBaseUrl: ProviderDefaults.openaiBaseUrl,
+    defaultModelId: ProviderDefaults.openaiDefaultModel,
+    aliases: ['oai'],
   ),
   anthropic(
     displayName: 'Anthropic (Claude)',
-    defaultBaseUrl: 'https://api.anthropic.com/v1/',
-    defaultModelId: 'claude-4-5-sonnet',
-    aliases: ['ant', 'anthropic'],
+    defaultBaseUrl: ProviderDefaults.anthropicBaseUrl,
+    defaultModelId: ProviderDefaults.anthropicDefaultModel,
+    aliases: ['ant'],
   ),
   google(
     displayName: 'Google (Gemini)',
-    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/',
-    defaultModelId: 'gemini-3-pro',
-    aliases: ['gem', 'gemini', 'google'],
+    defaultBaseUrl: ProviderDefaults.googleBaseUrl,
+    defaultModelId: ProviderDefaults.googleDefaultModel,
+    aliases: ['gem', 'gemini'],
   ),
   deepseek(
     displayName: 'DeepSeek',
-    defaultBaseUrl: 'https://api.deepseek.com/',
-    defaultModelId: 'deepseek-chat',
+    defaultBaseUrl: ProviderDefaults.deepseekBaseUrl,
+    defaultModelId: ProviderDefaults.deepseekDefaultModel,
   ),
   groq(
     displayName: 'Groq',
-    defaultBaseUrl: 'https://api.groq.com/openai/v1/',
-    defaultModelId: 'llama3-70b-8192',
+    defaultBaseUrl: ProviderDefaults.groqBaseUrl,
+    defaultModelId: ProviderDefaults.groqDefaultModel,
   ),
   ollama(
     displayName: 'Ollama (Local)',
-    defaultBaseUrl: 'http://localhost:11434',
-    defaultModelId: 'llama3',
+    defaultBaseUrl: ProviderDefaults.ollamaBaseUrl,
+    defaultModelId: ProviderDefaults.ollamaDefaultModel,
   ),
   xai(
     displayName: 'xAI (Grok)',
-    defaultBaseUrl: 'https://api.x.ai/v1/',
-    defaultModelId: 'grok-beta',
+    defaultBaseUrl: ProviderDefaults.xaiBaseUrl,
+    defaultModelId: ProviderDefaults.xaiDefaultModel,
   ),
   openaiCompatible(
     displayName: 'OpenAI Compatible',
