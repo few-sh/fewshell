@@ -73,10 +73,26 @@ class _QrScannerPageState extends State<QrScannerPage> {
               cutOutSize: 250,
             ),
             onPermissionSet: (ctrl, p) {
-              if (!p)
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Camera permission denied')),
+              if (!p) {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Permission Denied'),
+                    content: const Text(
+                      'Camera permission is required to scan QR codes.',
+                    ),
+                    actions: [
+                      TextButton(
+                        child: const Text('OK'),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ],
+                  ),
                 );
+              }
             },
           ),
           const Align(
