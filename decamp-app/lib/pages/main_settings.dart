@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/project_importer.dart';
+import 'chat_session.dart';
 import 'qr_scanner_page.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
@@ -49,7 +50,10 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         title: const ProjectTitleBar(title: 'Settings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ChatSession()),
+            (route) => false,
+          ),
         ),
       ),
       body: Column(
