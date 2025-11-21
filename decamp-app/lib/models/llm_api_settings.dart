@@ -83,13 +83,10 @@ extension LlmApiTypeExtension on LlmApiType {
   /// Helper to parse string code to LlmApiType
   static LlmApiType? fromCode(String code) {
     switch (code.toLowerCase()) {
-      case 'oai':
       case 'openai':
         return LlmApiType.openai;
-      case 'ant':
       case 'anthropic':
         return LlmApiType.anthropic;
-      case 'gem':
       case 'google':
       case 'gemini':
         return LlmApiType.google;
