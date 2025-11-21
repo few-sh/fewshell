@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/project_importer.dart';
 import 'qr_scanner_page.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
@@ -128,96 +129,13 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     if (result == null) return;
 
     try {
-      final data = jsonDecode(result) as Map<String, dynamic>;
-
-      if (data['l'] != null && data['k'] != null) {
-        await _configureLlm(projectId, data['l'], data['k']);
-      }
-
-      if (data['i'] != null && data['s'] != null) {
-        await _configureSsh(projectId, data['i'], data['s']);
-      }
+      await ref
+          .read(projectImporterProvider)
+          .importFromQrCode(result, targetProjectId: projectId);
 
       if (mounted) _showSnack('Project configured successfully');
     } catch (e) {
       if (mounted) _showSnack('Error configuring project: $e');
-    }
-  }
-
-  Future<void> _configureLlm(
-    String projectId,
-    String providerCode,
-    String apiKey,
-  ) async {
-    final apiType = LlmApiType.fromCode(providerCode);
-    if (apiType == null) return;
-
-    final modelId = apiType.defaultModelId;
-    final baseUrl = apiType.defaultBaseUrl;
-
-    final llmNotifier = ref.read(
-      projectLlmSettingsProvider(projectId).notifier,
-    );
-    final currentModels = ref.read(projectLlmSettingsProvider(projectId));
-    final exists = currentModels.any((m) => m.identifier == modelId);
-
-    if (exists) {
-      await llmNotifier.updateLlmSettings(
-        identifier: modelId,
-        baseUrl: baseUrl,
-        apiKey: apiKey,
-      );
-    } else {
-      await llmNotifier.addLlmSettings(
-        identifier: modelId,
-        apiType: apiType,
-        baseUrl: baseUrl,
-        apiKey: apiKey,
-      );
-    }
-  }
-
-  Future<void> _configureSsh(
-    String projectId,
-    String userHost,
-    String privateKey,
-  ) async {
-    var formattedKey = privateKey;
-    if (!formattedKey.contains('-----BEGIN')) {
-      formattedKey =
-          '-----BEGIN OPENSSH PRIVATE KEY-----\n$formattedKey\n-----END OPENSSH PRIVATE KEY-----';
-    }
-
-    final parts = userHost.split('@');
-    if (parts.length != 2) {
-      throw FormatException(
-        'Invalid SSH host format: $userHost. Expected user@host',
-      );
-    }
-
-    final username = parts[0];
-    final host = parts[1];
-
-    final sshNotifier = ref.read(
-      projectSshSettingsProvider(projectId).notifier,
-    );
-    final currentSsh = ref.read(projectSshSettingsProvider(projectId));
-
-    if (currentSsh == null) {
-      await sshNotifier.createSshSettings(
-        host: host,
-        port: 22,
-        username: username,
-        authMethod: SshAuthMethod.privateKey,
-        privateKey: formattedKey,
-      );
-    } else {
-      await sshNotifier.updateSshSettings(
-        host: host,
-        username: username,
-        authMethod: SshAuthMethod.privateKey,
-        privateKey: formattedKey,
-      );
     }
   }
 
@@ -327,11 +245,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       }
 
       // Save the change
-      await updateProject(
-        ref,
-        id: project.id,
-        name: trimmedValue,
-      );
+      await updateProject(ref, id: project.id, name: trimmedValue);
       if (mounted) {
         _showSnack('Project name updated');
       }

@@ -1,4 +1,5 @@
-import 'dart:math';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/project_provider.dart';
@@ -8,56 +9,49 @@ import 'package:decamp/components/expandable_code_block.dart';
 import '../utils/date_formatter.dart';
 import '../utils/project_utils.dart';
 import '../pages/main_settings.dart';
+import 'qr_scanner_page.dart';
+import '../services/project_importer.dart';
 
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});
 
-  static const _descriptors = [
-    'Analog',
-    'Binary',
-    'Copper',
-    'Crystal',
-    'Dynamo',
-    'Fiber',
-    'Iron',
-    'Static',
-    'Steam',
-    'Turing',
-    'Wired',
-    'Turbo',
-  ];
+  Future<void> _handleCreateProject(
+    BuildContext context,
+    WidgetRef ref,
+    List<String> existingNames,
+  ) async {
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final jsonString = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(builder: (context) => const QrScannerPage()),
+      );
 
-  static const _objects = [
-    'Abacus',
-    'Core',
-    'ENIAC',
-    'Relay',
-    'Radar',
-    'RISC',
-    'Chip',
-    'Vacuum',
-  ];
+      if (jsonString != null && context.mounted) {
+        try {
+          final importer = ref.read(projectImporterProvider);
+          final projectId = await importer.importFromQrCode(jsonString);
+          await selectProject(ref, projectId);
 
-  String _generateUniqueName(List<String> existingNames) {
-    final random = Random();
-    String name;
-    int attempts = 0;
-    const maxAttempts = 1000;
-
-    do {
-      final descriptor = _descriptors[random.nextInt(_descriptors.length)];
-      final object = _objects[random.nextInt(_objects.length)];
-      name = '$descriptor$object';
-      attempts++;
-
-      if (attempts >= maxAttempts) {
-        // Fallback: append a number
-        name = '$descriptor${random.nextInt(99)}';
-        break;
+          if (context.mounted) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const MainSettingsPage()),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error importing project: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       }
-    } while (existingNames.contains(name) || name.length > 12);
-
-    return name;
+    } else {
+      await _createProjectWithRandomName(context, ref, existingNames);
+    }
   }
 
   Future<void> _createProjectWithRandomName(
@@ -65,7 +59,7 @@ class ProjectsPage extends ConsumerWidget {
     WidgetRef ref,
     List<String> existingNames,
   ) async {
-    final name = _generateUniqueName(existingNames);
+    final name = generateUniqueProjectName(existingNames);
     final projectDao = ref.read(databaseProvider).projectDao;
 
     try {
@@ -159,7 +153,7 @@ class ProjectsPage extends ConsumerWidget {
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton.icon(
-                    onPressed: () => _createProjectWithRandomName(
+                    onPressed: () => _handleCreateProject(
                       context,
                       ref,
                       projects.map((p) => p.name).toList(),
@@ -307,7 +301,7 @@ class ProjectsPage extends ConsumerWidget {
         data: (projects) => projects.isEmpty
             ? null
             : FloatingActionButton.extended(
-                onPressed: () => _createProjectWithRandomName(
+                onPressed: () => _handleCreateProject(
                   context,
                   ref,
                   projects.map((p) => p.name).toList(),
