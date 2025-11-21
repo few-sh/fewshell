@@ -114,6 +114,8 @@ class ChatController extends StateNotifier<ChatState> {
     required String sessionId,
     required List<dynamic> dbMessages,
     required bool isFirstMessage,
+    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    requestApproval,
   }) async {
     // Redact secrets from user's message before saving to database
     final redactedContent = await _secretRedactor.redact(content);
@@ -187,9 +189,9 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
-      // Handle tool calls by showing approval overlay
+      // Handle tool calls by requesting approval
       if (result.hasToolCalls && result.conversationState != null) {
-        // Save conversation state for later continuation
+        // Convert tool calls to actions
         final actions = result.toolCalls!.map((tc) {
           // Parse params from tool call
           final argumentsJson = tc.function.arguments;
@@ -204,8 +206,28 @@ class ChatController extends StateNotifier<ChatState> {
           );
         }).toList();
 
-        state = state.copyWith(pendingActions: actions, isLoading: false);
+        // Directly await user approval - no state updates!
+        final selectedActions = await requestApproval(actions);
 
+        // If user cancelled, we're done
+        if (selectedActions == null) {
+          developer.log(
+            '🚨 User cancelled tool execution',
+            name: 'ChatController',
+          );
+          state = state.copyWith(isLoading: false);
+          return;
+        }
+
+        // User approved - execute the selected tools
+        developer.log(
+          '✅ User approved ${selectedActions.length} tool calls',
+          name: 'ChatController',
+        );
+
+        // Execute tools and handle follow-up (will be implemented in step 4)
+        // TODO: Call _executeToolCallsAndContinue here
+        state = state.copyWith(isLoading: false);
         return;
       }
 
@@ -696,8 +718,9 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(pendingActions: null);
   }
 
-  /// Edit a message and resend from that point
-  /// Deletes all messages after the edited message and sends it to AI
+  /// Edit a message
+  /// Deletes all messages after the edited message and updates the message content
+  /// UI should call sendMessage separately if resend is desired
   Future<void> editMessage({
     required String messageId,
     required String newContent,
@@ -730,35 +753,24 @@ class ChatController extends StateNotifier<ChatState> {
     );
 
     developer.log('💾 Updated message content', name: 'ChatController');
-
-    // Get updated message history
-    final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-
-    // Check if this is the only message
-    final isFirstMessage = dbMessages.length == 1;
-
-    // Send the edited message to AI
-    await sendMessage(
-      content: newContent,
-      sessionId: sessionId,
-      dbMessages: dbMessages,
-      isFirstMessage: isFirstMessage,
-    );
   }
 
-  /// Resend a message without editing
-  /// Deletes the message and all messages after it, then sends it again
-  Future<void> resendMessage({
+  /// Delete a message and all messages after it
+  /// Returns the message content so UI can resend it
+  Future<String?> resendMessage({
     required String messageId,
     required String sessionId,
   }) async {
-    developer.log('🔄 Resending message: $messageId', name: 'ChatController');
+    developer.log(
+      '🔄 Preparing to resend message: $messageId',
+      name: 'ChatController',
+    );
 
     // Get the message
     final message = await _messageDao.getMessage(messageId);
     if (message == null) {
       developer.log('❌ Message not found: $messageId', name: 'ChatController');
-      return;
+      return null;
     }
 
     final content = message.content;
@@ -776,19 +788,7 @@ class ChatController extends StateNotifier<ChatState> {
       name: 'ChatController',
     );
 
-    // Get updated message history
-    final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-
-    // Check if this will be the first message
-    final isFirstMessage = dbMessages.isEmpty;
-
-    // Send the message again
-    await sendMessage(
-      content: content,
-      sessionId: sessionId,
-      dbMessages: dbMessages,
-      isFirstMessage: isFirstMessage,
-    );
+    return content;
   }
 
   /// Branch the session by creating a copy up to a specific message
