@@ -38,4 +38,49 @@ final shellTools = [
       required: ['command', 'sudo_required', 'explanation'],
     ),
   ),
+  Tool.function(
+    name: 'fetch',
+    description:
+        'Performs an HTTP request to a specified URL, similar to the curl command-line tool. '
+        'Returns the response status code, headers, and body. '
+        'Use this for API interactions, downloading files, or checking web endpoints.',
+    parameters: ParametersSchema(
+      schemaType: 'object',
+      properties: {
+        'url': ParameterProperty(
+          propertyType: 'string',
+          description: 'The target URL for the request.',
+        ),
+        'method': ParameterProperty(
+          propertyType: 'string',
+          description:
+              'The HTTP method to use. Defaults to "GET" if not specified.',
+          enumList: [
+            'GET',
+            'POST',
+            'PUT',
+            'DELETE',
+            'PATCH',
+            'HEAD',
+            'OPTIONS',
+          ],
+        ),
+        'headers': ParameterProperty(
+          propertyType: 'object',
+          description:
+              'A JSON object representing the HTTP headers (key-value pairs).',
+        ),
+        'body': ParameterProperty(
+          propertyType: 'string',
+          description:
+              'The request body data. Useful for POST, PUT, and PATCH requests.',
+        ),
+        'explanation': ParameterProperty(
+          propertyType: 'string',
+          description: 'Brief explanation of the purpose of this HTTP request.',
+        ),
+      },
+      required: ['url', 'method', 'explanation'],
+    ),
+  ),
 ];
