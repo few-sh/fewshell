@@ -1,10 +1,14 @@
 import 'package:llm_dart/llm_dart.dart';
 
+/// Tool name constants
+const String kExecuteShellCommand = 'execute_shell_command';
+const String kFetch = 'fetch';
+
 /// Shell execution tools for LLM
 /// Direct Tool definitions - no translation layer needed
 final shellTools = [
   Tool.function(
-    name: 'execute_shell_command',
+    name: kExecuteShellCommand,
     description:
         'Executes a shell command on the server or infrastructure returns its resulting output of stdout, stderr and exitCode'
         'Use this to run commands like checking logs, restarting services, '
@@ -36,6 +40,56 @@ final shellTools = [
         ),
       },
       required: ['command', 'sudo_required', 'explanation'],
+    ),
+  ),
+  Tool.function(
+    name: kFetch,
+    description:
+        'Performs an HTTP request to a specified URL, similar to the curl command-line tool. '
+        'Returns the response status code, headers, and body. '
+        'Use this for API interactions, downloading files, or checking web endpoints.',
+    parameters: ParametersSchema(
+      schemaType: 'object',
+      properties: {
+        'url': ParameterProperty(
+          propertyType: 'string',
+          description: 'The target URL for the request.',
+        ),
+        'method': ParameterProperty(
+          propertyType: 'string',
+          description:
+              'The HTTP method to use. Defaults to "GET" if not specified.',
+          enumList: [
+            'GET',
+            'POST',
+            'PUT',
+            'DELETE',
+            'PATCH',
+            'HEAD',
+            'OPTIONS',
+          ],
+        ),
+        'headers': ParameterProperty(
+          propertyType: 'object',
+          description:
+              'A JSON object representing the HTTP headers (key-value pairs).',
+        ),
+        'body': ParameterProperty(
+          propertyType: 'string',
+          description:
+              'The request body data. Useful for POST, PUT, and PATCH requests.',
+        ),
+        'timeout': ParameterProperty(
+          propertyType: 'number',
+          description:
+              'Request timeout in seconds. Defaults to 30 seconds if not specified.',
+        ),
+        'explanation': ParameterProperty(
+          propertyType: 'string',
+          description: 'Brief explanation of the purpose of this HTTP request.',
+        ),
+      },
+      required: ['url', 'explanation'],
     ),
   ),
 ];

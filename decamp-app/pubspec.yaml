@@ -68,6 +68,9 @@ dependencies:
   llm_dart:
     path: ../llm_dart
 
+  # HTTP Client
+  dio: ^5.4.0
+
   # SSH Client
   dartssh2: ^2.9.2
 

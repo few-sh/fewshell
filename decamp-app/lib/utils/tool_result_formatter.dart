@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:llm_dart/llm_dart.dart';
+import '../services/shell_tools_provider.dart'
+    show kExecuteShellCommand, kFetch;
 
 /// Formats tool execution results with pretty markdown templates
 ///
@@ -39,7 +41,7 @@ class ToolResultFormatter {
 
     for (final toolCall in toolCalls) {
       // Special handling for execute_shell_command
-      if (toolCall.function.name == 'execute_shell_command') {
+      if (toolCall.function.name == kExecuteShellCommand) {
         try {
           final args =
               jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
@@ -63,6 +65,50 @@ class ToolResultFormatter {
             buffer.writeln('\$ $command');
             buffer.writeln('```');
           }
+          buffer.writeln();
+          continue;
+        } catch (e) {
+          // Fall through to generic handling
+        }
+      }
+
+      // Special handling for fetch
+      if (toolCall.function.name == kFetch) {
+        try {
+          final args =
+              jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
+          final explanation = args['explanation'] as String? ?? '';
+          final url = args['url'] as String? ?? 'unknown';
+          final method = (args['method'] as String?)?.toUpperCase() ?? 'GET';
+          final headers = args['headers'] as Map<String, dynamic>?;
+          final body = args['body'] as String?;
+
+          // Show explanation if present
+          if (explanation.isNotEmpty) {
+            buffer.writeln('*$explanation*\n');
+          }
+
+          buffer.writeln('🌐 **$method** `$url`');
+
+          if (headers != null && headers.isNotEmpty) {
+            buffer.writeln('\n**Headers:**');
+            for (final entry in headers.entries) {
+              buffer.writeln('- `${entry.key}`: ${entry.value}');
+            }
+          }
+
+          if (body != null && body.isNotEmpty) {
+            buffer.writeln('\n**Request Body:**');
+            buffer.writeln('```');
+            // Truncate long bodies
+            if (body.length > 500) {
+              buffer.writeln('${body.substring(0, 500)}...');
+            } else {
+              buffer.writeln(body);
+            }
+            buffer.writeln('```');
+          }
+
           buffer.writeln();
           continue;
         } catch (e) {
@@ -109,7 +155,8 @@ class ToolResultFormatter {
 
     // Route to specific formatter based on tool name
     return switch (toolName) {
-      'execute_shell_command' => _formatShellCommand(data),
+      kExecuteShellCommand => _formatShellCommand(data),
+      kFetch => _formatFetchResult(data),
       _ => _formatUnknownTool(toolName, result),
     };
   }
@@ -166,6 +213,75 @@ class ToolResultFormatter {
     // If no output at all
     if (stdout.isEmpty && stderr.isEmpty) {
       buffer.writeln('*No output*\n');
+    }
+
+    return buffer.toString().trim();
+  }
+
+  /// Format HTTP fetch results
+  ///
+  /// Displays:
+  /// - Success/failure status
+  /// - HTTP method and URL
+  /// - Status code
+  /// - Response headers (key headers only)
+  /// - Response body with syntax highlighting
+  static String _formatFetchResult(Map<String, dynamic> data) {
+    final buffer = StringBuffer();
+
+    final statusCode = data['statusCode'] as int? ?? 0;
+    final method = data['method'] as String? ?? 'GET';
+    final url = data['url'] as String? ?? '';
+    final headers = data['headers'] as Map<String, dynamic>? ?? {};
+    final body = (data['body']?.toString() ?? '').trim();
+    final success =
+        data['success'] as bool? ?? (statusCode >= 200 && statusCode < 300);
+
+    // Header with status
+    if (success) {
+      buffer.writeln('✅ **HTTP $statusCode** - Request Successful\n');
+    } else {
+      buffer.writeln('❌ **HTTP $statusCode** - Request Failed\n');
+    }
+
+    // Request details
+    buffer.writeln('**$method** `$url`\n');
+
+    // Show key response headers
+    final keyHeaders = ['content-type', 'content-length', 'server'];
+    final foundHeaders = <String, String>{};
+    for (final key in keyHeaders) {
+      final value = headers[key];
+      if (value != null) {
+        foundHeaders[key] = value.toString();
+      }
+    }
+
+    if (foundHeaders.isNotEmpty) {
+      buffer.writeln('**Headers:**');
+      for (final entry in foundHeaders.entries) {
+        buffer.writeln('- `${entry.key}`: ${entry.value}');
+      }
+      buffer.writeln();
+    }
+
+    // Response body
+    if (body.isNotEmpty) {
+      buffer.writeln('**Response Body:**');
+      final language = _detectLanguage(body);
+      buffer.writeln('```$language');
+      // Truncate very long responses
+      if (body.length > 10000) {
+        buffer.writeln('${body.substring(0, 10000)}...');
+        buffer.writeln(
+          '\n[Response truncated - ${body.length} total characters]',
+        );
+      } else {
+        buffer.writeln(body);
+      }
+      buffer.writeln('```\n');
+    } else {
+      buffer.writeln('*No response body*\n');
     }
 
     return buffer.toString().trim();

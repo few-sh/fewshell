@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
@@ -8,14 +9,17 @@ import '../models/chat_state.dart';
 import '../models/ssh_settings.dart';
 import '../services/llm_service.dart';
 import '../services/shell_service.dart';
-import '../services/shell_tools_provider.dart';
+import '../services/shell_tools_provider.dart'
+    show shellTools, kExecuteShellCommand, kFetch;
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/ssh_settings_provider.dart';
+import '../providers/secret_provider.dart';
 import '../database/daos/message_dao.dart';
 import '../database/daos/session_dao.dart';
 import '../database/database.dart';
 import '../components/multi_command_approval_overlay.dart';
+import '../utils/secret_redactor.dart';
 
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
@@ -25,6 +29,7 @@ class ChatController extends StateNotifier<ChatState> {
   final SessionDao _sessionDao;
   final LlmService _llmService;
   final ShellService _shellService;
+  final SecretRedactor _secretRedactor;
   final SshSettings? _sshSettings;
   final String? sessionId;
 
@@ -33,12 +38,14 @@ class ChatController extends StateNotifier<ChatState> {
     required SessionDao sessionDao,
     required LlmService llmService,
     required ShellService shellService,
+    required SecretRedactor secretRedactor,
     SshSettings? sshSettings,
     this.sessionId,
   }) : _messageDao = messageDao,
        _sessionDao = sessionDao,
        _llmService = llmService,
        _shellService = shellService,
+       _secretRedactor = secretRedactor,
        _sshSettings = sshSettings,
        super(const ChatState());
 
@@ -108,12 +115,15 @@ class ChatController extends StateNotifier<ChatState> {
     required List<dynamic> dbMessages,
     required bool isFirstMessage,
   }) async {
+    // Redact secrets from user's message before saving to database
+    final redactedContent = await _secretRedactor.redact(content);
+
     // Save user's message to database
     await _messageDao.insertMessageWithId(
       sessionId: sessionId,
       userId: 'user',
       userName: 'You',
-      content: content,
+      content: redactedContent,
     );
 
     // Update session description if first message
@@ -165,11 +175,12 @@ class ChatController extends StateNotifier<ChatState> {
       // Handle error
       if (result.hasError) {
         final errorMessage = 'Sorry, I encountered an error: ${result.error}';
+        final redactedError = await _secretRedactor.redact(errorMessage);
         await _messageDao.insertMessageWithId(
           sessionId: sessionId,
           userId: 'ai',
           userName: 'Ops Agent',
-          content: errorMessage,
+          content: redactedError,
         );
 
         state = state.copyWith(isLoading: false, error: result.error);
@@ -206,23 +217,27 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Save text response if any
       if (result.hasTextResponse) {
+        final redactedResponse = await _secretRedactor.redact(
+          result.textResponse!,
+        );
         await _messageDao.insertMessageWithId(
           id: aiMessageId,
           sessionId: sessionId,
           userId: 'ai',
           userName: 'Ops Agent',
-          content: result.textResponse!,
+          content: redactedResponse,
         );
       }
 
       state = state.copyWith(isLoading: false);
     } catch (e) {
       final errorMessage = 'Sorry, I encountered an error: $e';
+      final redactedError = await _secretRedactor.redact(errorMessage);
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
         userId: 'ai',
         userName: 'Ops Agent',
-        content: errorMessage,
+        content: redactedError,
       );
 
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -497,11 +512,14 @@ class ChatController extends StateNotifier<ChatState> {
 
         // Save follow-up text response (LLM explaining results, asking follow-up, etc.)
         if (followUp.hasTextResponse) {
+          final redactedResponse = await _secretRedactor.redact(
+            followUp.textResponse!,
+          );
           await _messageDao.insertMessageWithId(
             sessionId: sessionId,
             userId: 'ai',
             userName: 'Ops Agent',
-            content: followUp.textResponse!,
+            content: redactedResponse,
           );
         }
       }
@@ -515,11 +533,12 @@ class ChatController extends StateNotifier<ChatState> {
       );
     } catch (e) {
       final errorMessage = '❌ Error executing commands: $e';
+      final redactedError = await _secretRedactor.redact(errorMessage);
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
         userId: 'ai',
         userName: 'Ops Agent',
-        content: errorMessage,
+        content: redactedError,
       );
 
       // Clear all state on error
@@ -780,7 +799,7 @@ class ChatController extends StateNotifier<ChatState> {
     String actionName,
     Map<String, dynamic> params,
   ) async {
-    if (actionName == 'execute_shell_command') {
+    if (actionName == kExecuteShellCommand) {
       final command = params['command'] as String;
       final sudoRequired = params['sudo_required'] as bool? ?? false;
 
@@ -802,6 +821,59 @@ class ChatController extends StateNotifier<ChatState> {
         'data': result,
         'error': result['stderr'] as String?,
       };
+    }
+
+    if (actionName == kFetch) {
+      final url = params['url'] as String;
+      final method = (params['method'] as String?)?.toUpperCase() ?? 'GET';
+      final headers = params['headers'] as Map<String, dynamic>?;
+      final body = params['body'] as String?;
+      final timeoutSeconds = params['timeout'] as int? ?? 30;
+
+      try {
+        final dio = Dio();
+        final response = await dio
+            .request(
+              url,
+              data: body,
+              options: Options(
+                method: method,
+                headers: headers,
+                responseType: ResponseType.plain,
+                validateStatus: (status) => true, // Accept all status codes
+              ),
+            )
+            .timeout(Duration(seconds: timeoutSeconds));
+
+        final isSuccess =
+            response.statusCode != null &&
+            response.statusCode! >= 200 &&
+            response.statusCode! < 300;
+
+        return {
+          'success': isSuccess,
+          'data': {
+            'statusCode': response.statusCode ?? 0,
+            'headers': response.headers.map,
+            'body': response.data?.toString() ?? '',
+            'url': url,
+            'method': method,
+          },
+          'error': isSuccess ? null : 'HTTP ${response.statusCode}',
+        };
+      } catch (e) {
+        return {
+          'success': false,
+          'data': {
+            'statusCode': 0,
+            'headers': {},
+            'body': '',
+            'url': url,
+            'method': method,
+          },
+          'error': e.toString(),
+        };
+      }
     }
 
     throw Exception('Unknown action: $actionName');
@@ -972,11 +1044,16 @@ final chatControllerProvider =
           ? ref.watch(projectSshSettingsProvider(projectId))
           : null;
 
+      // Create secret redactor for this project
+      final keychain = ref.watch(keychainServiceProvider);
+      final secretRedactor = SecretRedactor(keychain, projectId);
+
       return ChatController(
         messageDao: ref.watch(databaseProvider).messageDao,
         sessionDao: ref.watch(databaseProvider).sessionDao,
         llmService: ref.watch(llmServiceProvider),
         shellService: ref.watch(shellServiceProvider(projectId)),
+        secretRedactor: secretRedactor,
         sshSettings: sshSettings,
         sessionId: sessionId,
       );
