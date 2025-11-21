@@ -57,7 +57,7 @@ dependencies:
   # OCR and Camera
   apple_vision_recognize_text: ^0.0.4
   camera: ^0.11.0+2
-  mobile_scanner: ^5.1.1
+  qr_code_scanner: ^1.0.1
   permission_handler: ^11.3.1
 
   # Code Generation
