@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../pages/ocr_scanner_page.dart';
+
 import '../utils/text_pattern_matcher.dart';
 
 /// Reusable dialog for adding or editing secrets
@@ -111,11 +111,6 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.camera_alt),
-                        onPressed: _scanValue,
-                        tooltip: 'Scan value with camera',
-                      ),
-                      IconButton(
                         icon: Icon(
                           _obscureValue
                               ? Icons.visibility
@@ -158,21 +153,6 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
     if (_formKey.currentState!.validate()) {
       widget.onSave(_keyController.text, _valueController.text);
       Navigator.of(context).pop();
-    }
-  }
-
-  Future<void> _scanValue() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.apiKey),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _valueController.text = scannedText;
-      });
     }
   }
 }
