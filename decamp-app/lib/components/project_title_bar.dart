@@ -14,6 +14,8 @@ class ProjectTitleBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final displayTitle = title.length > 12 ? title.substring(0, 12) : title;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -24,7 +26,7 @@ class ProjectTitleBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(title),
+          Text(displayTitle),
           const SizedBox(width: 8),
           Icon(
             Icons.import_export,

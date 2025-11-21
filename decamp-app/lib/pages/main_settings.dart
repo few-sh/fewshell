@@ -10,6 +10,7 @@ import '../providers/settings_provider.dart';
 import '../models/llm_api_settings.dart';
 import '../models/ssh_settings.dart';
 import '../database/database.dart';
+import '../utils/project_utils.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
@@ -108,6 +109,10 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         _buildAIModelsSection(isGlobal: false),
         const SizedBox(height: 24),
         _buildRemoteShellSection(),
+        if (currentProject != null) ...[
+          const SizedBox(height: 24),
+          _buildDeleteProjectSection(currentProject),
+        ],
       ],
     );
   }
@@ -221,6 +226,67 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _buildDeleteProjectSection(ProjectEntity project) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Danger Zone',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.error,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delete Project',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Permanently delete "${project.name}" and all associated data.',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => showDeleteProjectDialog(
+                      context: context,
+                      ref: ref,
+                      projectId: project.id,
+                      projectName: project.name,
+                      onDeleted: () {
+                        if (mounted) Navigator.pop(context);
+                      },
+                    ),
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('Delete Project'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: theme.colorScheme.error,
+                      foregroundColor: theme.colorScheme.onError,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildProjectNameSection(ProjectEntity project) {

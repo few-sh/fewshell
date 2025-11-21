@@ -6,6 +6,7 @@ import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import '../utils/date_formatter.dart';
+import '../utils/project_utils.dart';
 import '../pages/main_settings.dart';
 
 class ProjectsPage extends ConsumerWidget {
@@ -17,44 +18,24 @@ class ProjectsPage extends ConsumerWidget {
     'Copper',
     'Crystal',
     'Dynamo',
-    'Electric',
     'Fiber',
     'Iron',
-    'Quantum',
-    'Relay',
-    'Silicon',
     'Static',
     'Steam',
     'Turing',
-    'Vacuum',
-    'Vintage',
     'Wired',
-    'Magnetic',
-    'Solid-State',
     'Turbo',
   ];
 
   static const _objects = [
     'Abacus',
-    'Babbage',
-    'Calculator',
-    'Colossus',
-    'Commodore',
     'Core',
     'ENIAC',
-    'Jacquard',
-    'Mainframe',
-    'Microchip',
-    'Minicomputer',
-    'PDP',
-    'Punchcard',
+    'Relay',
     'Radar',
     'RISC',
-    'Tape Drive',
-    'Terminal',
-    'Transistor',
-    'VAX',
-    'Workstation',
+    'Chip',
+    'Vacuum',
   ];
 
   String _generateUniqueName(List<String> existingNames) {
@@ -66,15 +47,15 @@ class ProjectsPage extends ConsumerWidget {
     do {
       final descriptor = _descriptors[random.nextInt(_descriptors.length)];
       final object = _objects[random.nextInt(_objects.length)];
-      name = '$descriptor $object';
+      name = '$descriptor$object';
       attempts++;
 
       if (attempts >= maxAttempts) {
         // Fallback: append a number
-        name = '$name ${random.nextInt(9999)}';
+        name = '$descriptor${random.nextInt(99)}';
         break;
       }
-    } while (existingNames.contains(name));
+    } while (existingNames.contains(name) || name.length > 12);
 
     return name;
   }
@@ -107,164 +88,6 @@ class ProjectsPage extends ConsumerWidget {
         );
       }
     }
-  }
-
-  void _showDeleteConfirmation(
-    BuildContext context,
-    WidgetRef ref,
-    String projectId,
-    String projectName,
-  ) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Delete Project'),
-          content: Text(
-            'Are you sure you want to delete "$projectName"?\n\nThis will also delete all sessions and messages associated with this project. This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                try {
-                  await deleteProject(ref, projectId);
-
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop();
-                  }
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Project "$projectName" deleted'),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error deleting project: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showEditProjectDialog(
-    BuildContext context,
-    WidgetRef ref,
-    String projectId,
-    String currentName,
-    String? currentDescription,
-  ) {
-    final nameController = TextEditingController(text: currentName);
-    final descriptionController = TextEditingController(
-      text: currentDescription ?? '',
-    );
-
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Edit Project'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Project Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final name = nameController.text.trim();
-                if (name.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Project name cannot be empty'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                final description = descriptionController.text.trim();
-
-                try {
-                  await updateProject(
-                    ref,
-                    id: projectId,
-                    name: name,
-                    description: description.isEmpty ? null : description,
-                  );
-
-                  if (dialogContext.mounted) {
-                    Navigator.of(dialogContext).pop();
-                  }
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Project "$name" updated successfully'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error updating project: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -425,56 +248,15 @@ class ProjectsPage extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  trailing: PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        _showEditProjectDialog(
-                          context,
-                          ref,
-                          project.id,
-                          project.name,
-                          project.description,
-                        );
-                      } else if (value == 'delete') {
-                        _showDeleteConfirmation(
-                          context,
-                          ref,
-                          project.id,
-                          project.name,
-                        );
-                      }
-                    },
-                    itemBuilder: (BuildContext context) => [
-                      const PopupMenuItem<String>(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.delete,
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Delete',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: () => showDeleteProjectDialog(
+                      context: context,
+                      ref: ref,
+                      projectId: project.id,
+                      projectName: project.name,
+                    ),
+                    tooltip: 'Delete project',
                   ),
                   onTap: () async {
                     // Select this project and navigate back
