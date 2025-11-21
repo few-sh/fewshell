@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'qr_scanner_page.dart';
 import '../providers/theme_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
@@ -106,6 +108,131 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
+  Future<void> _scanAndConfigureProject(String? projectId) async {
+    if (projectId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a project first')),
+      );
+      return;
+    }
+
+    // Open QR Scanner
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const QrScannerPage()),
+    );
+
+    if (result == null) return;
+
+    try {
+      final data = jsonDecode(result) as Map<String, dynamic>;
+
+      // Parse JSON
+      final userHost = data['i'] as String?;
+      final providerCode = data['l'] as String?;
+      final apiKey = data['k'] as String?;
+      final privateKey = data['s'] as String?;
+
+      // Configure Model
+      if (providerCode != null && apiKey != null) {
+        LlmApiType? apiType;
+        String modelId = '';
+        String baseUrl = '';
+
+        switch (providerCode) {
+          case 'oai':
+            apiType = LlmApiType.openai;
+            modelId = 'gpt-4o';
+            baseUrl = LlmApiType.openai.defaultBaseUrl;
+            break;
+          case 'ant':
+            apiType = LlmApiType.anthropic;
+            modelId = 'claude-3-5-sonnet-latest';
+            baseUrl = LlmApiType.anthropic.defaultBaseUrl;
+            break;
+          case 'gem':
+            apiType = LlmApiType.google;
+            modelId = 'gemini-1.5-pro';
+            baseUrl = LlmApiType.google.defaultBaseUrl;
+            break;
+        }
+
+        if (apiType != null) {
+          final llmNotifier = ref.read(
+            projectLlmSettingsProvider(projectId).notifier,
+          );
+          final currentModels = ref.read(projectLlmSettingsProvider(projectId));
+          final exists = currentModels.any((m) => m.identifier == modelId);
+
+          if (exists) {
+            await llmNotifier.updateLlmSettings(
+              identifier: modelId,
+              baseUrl: baseUrl,
+              apiKey: apiKey,
+            );
+          } else {
+            await llmNotifier.addLlmSettings(
+              identifier: modelId,
+              apiType: apiType,
+              baseUrl: baseUrl,
+              apiKey: apiKey,
+            );
+          }
+        }
+      }
+
+      // Configure SSH
+      if (userHost != null && privateKey != null) {
+        // Ensure private key has proper headers/footers
+        var formattedKey = privateKey;
+        if (!formattedKey.contains('-----BEGIN')) {
+          formattedKey =
+              '-----BEGIN OPENSSH PRIVATE KEY-----\n$formattedKey\n-----END OPENSSH PRIVATE KEY-----';
+        }
+
+        final parts = userHost.split('@');
+        if (parts.length == 2) {
+          final username = parts[0];
+          final host = parts[1];
+
+          final sshNotifier = ref.read(
+            projectSshSettingsProvider(projectId).notifier,
+          );
+          final currentSsh = ref.read(projectSshSettingsProvider(projectId));
+
+          if (currentSsh == null) {
+            await sshNotifier.createSshSettings(
+              host: host,
+              port: 22,
+              username: username,
+              authMethod: SshAuthMethod.privateKey,
+              privateKey: formattedKey,
+            );
+          } else {
+            await sshNotifier.updateSshSettings(
+              host: host,
+              username: username,
+              authMethod: SshAuthMethod.privateKey,
+              privateKey: formattedKey,
+            );
+          }
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Project configured successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error configuring project: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildProjectSelector() {
     final theme = Theme.of(context);
     final projectsAsync = ref.watch(projectsStreamProvider);
@@ -157,26 +284,40 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                   );
                 }
 
-                return DropdownButtonFormField<String>(
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                return Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<String>(
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          prefixIcon: const Icon(Icons.folder),
+                        ),
+                        hint: const Text('Select a project'),
+                        value: currentProjectId,
+                        items: projects.map((project) {
+                          return DropdownMenuItem<String>(
+                            value: project.id,
+                            child: Text(project.name),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            ref.read(currentProjectIdProvider.notifier).state =
+                                value;
+                          }
+                        },
+                      ),
                     ),
-                    prefixIcon: const Icon(Icons.folder),
-                  ),
-                  hint: const Text('Select a project'),
-                  value: currentProjectId,
-                  items: projects.map((project) {
-                    return DropdownMenuItem<String>(
-                      value: project.id,
-                      child: Text(project.name),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      ref.read(currentProjectIdProvider.notifier).state = value;
-                    }
-                  },
+                    const SizedBox(width: 8),
+                    IconButton.filledTonal(
+                      onPressed: () =>
+                          _scanAndConfigureProject(currentProjectId),
+                      icon: const Icon(Icons.qr_code_scanner),
+                      tooltip: 'Scan Project Config',
+                    ),
+                  ],
                 );
               },
               loading: () => const Center(

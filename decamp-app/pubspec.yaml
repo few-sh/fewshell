@@ -2,7 +2,7 @@ name: decamp
 description: "Terminals reinvented."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -37,36 +37,37 @@ dependencies:
   intl: ^0.20.2
   timeago: ^3.7.0
   shared_preferences: ^2.3.3
-  
+
   # State Management
   flutter_riverpod: ^2.5.1
-  
+
   # Database
   drift: ^2.20.0
   sqlite3_flutter_libs: ^0.5.0
   path_provider: ^2.1.0
   path: ^1.9.0
-  
+
   # Secure Storage
   flutter_secure_storage: ^9.2.2
-  
+
   # Utilities
   uuid: ^4.5.1
   gpt_markdown: ^1.1.2
-  
+
   # OCR and Camera
   apple_vision_recognize_text: ^0.0.4
   camera: ^0.11.0+2
+  mobile_scanner: ^5.1.1
   permission_handler: ^11.3.1
-  
+
   # Code Generation
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
-  
+
   # LLM Integration
   llm_dart:
     path: ../llm_dart
-  
+
   # SSH Client
   dartssh2: ^2.9.2
 
@@ -80,7 +81,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  
+
   # Code Generation
   build_runner: ^2.4.6
   drift_dev: ^2.20.0
@@ -93,7 +94,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
