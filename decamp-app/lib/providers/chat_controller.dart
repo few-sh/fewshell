@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
+import 'package:html2md/html2md.dart' as html2md;
 import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
 import '../models/ssh_settings.dart';
@@ -505,12 +506,28 @@ class ChatController extends StateNotifier<ChatState> {
             response.statusCode! >= 200 &&
             response.statusCode! < 300;
 
+        // Check if response is HTML and convert to markdown
+        String responseBody = response.data?.toString() ?? '';
+        final contentType = response.headers.value('content-type');
+        if (contentType != null &&
+            contentType.toLowerCase().contains('text/html')) {
+          try {
+            // responseBody = html2md.convert(responseBody);
+          } catch (e) {
+            developer.log(
+              'Failed to convert HTML to markdown: $e',
+              name: 'ChatController',
+            );
+            // Keep original HTML if conversion fails
+          }
+        }
+
         return {
           'success': isSuccess,
           'data': {
             'statusCode': response.statusCode ?? 0,
             'headers': response.headers.map,
-            'body': response.data?.toString() ?? '',
+            'body': responseBody,
             'url': url,
             'method': method,
           },
