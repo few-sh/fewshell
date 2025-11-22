@@ -1,6 +1,4 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:llm_dart/llm_dart.dart';
-import '../components/multi_command_approval_overlay.dart';
 
 part 'chat_state.freezed.dart';
 
@@ -23,16 +21,8 @@ class ChatState with _$ChatState {
     // Loading state
     @Default(false) bool isLoading,
 
-    // Pending actions approval (for multi-command support)
-    List<CommandAction>? pendingActions,
-
     // Execution progress tracking
     ExecutionProgress? executionProgress,
-
-    // Conversation state for tool calls (following official llm_dart pattern)
-    List<ChatMessage>? conversationForToolCalls,
-    List<ToolCall>? pendingToolCalls,
-    String? assistantTextBeforeTools,
 
     // Streaming state
     String? streamingMessageId,
@@ -43,10 +33,6 @@ class ChatState with _$ChatState {
   }) = _ChatState;
 
   const ChatState._();
-
-  /// Check if there are pending actions to approve
-  bool get hasPendingActions =>
-      pendingActions != null && pendingActions!.isNotEmpty;
 
   /// Check if currently executing commands
   bool get isExecuting => executionProgress != null;

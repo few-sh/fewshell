@@ -14,7 +14,6 @@ import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
-import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'dart:developer' as developer;
 
@@ -158,46 +157,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
-    // Get message history from database
-    final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final messages = messagesAsync.when(
-      data: (msgs) => msgs,
-      loading: () => [],
-      error: (_, __) => [],
-    );
-
-    final isFirstMessage = messages.isEmpty;
-
     // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,
-      dbMessages: messages,
-      isFirstMessage: isFirstMessage,
+      requestApproval: (actions) =>
+          MultiCommandApprovalOverlay.show(context, actions),
     );
-  }
-
-  /// Show command approval overlay and handle result
-  Future<void> _handlePendingActions(
-    BuildContext context,
-    List<CommandAction> actions,
-    String sessionId,
-  ) async {
-    final selectedActions = await MultiCommandApprovalOverlay.show(
-      context,
-      actions,
-    );
-
-    if (selectedActions != null) {
-      final controller = ref.read(chatControllerProvider(sessionId).notifier);
-      await controller.executeActions(
-        selectedActions: selectedActions,
-        sessionId: sessionId,
-      );
-    } else {
-      developer.log('🧹 User cancelled actions', name: 'ChatSession');
-      ref.read(chatControllerProvider(sessionId).notifier).cancelActions();
-    }
   }
 
   /// Handle editing a message
@@ -215,6 +181,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       messageId: messageId,
       newContent: newContent,
       sessionId: currentSessionId,
+      requestApproval: (actions) =>
+          MultiCommandApprovalOverlay.show(context, actions),
     );
   }
 
@@ -232,6 +200,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     await controller.resendMessage(
       messageId: messageId,
       sessionId: currentSessionId,
+      requestApproval: (actions) =>
+          MultiCommandApprovalOverlay.show(context, actions),
     );
   }
 
@@ -279,23 +249,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     ref.listen(currentProjectProvider, (previous, next) {
       if (previous?.id != next?.id) _inputFocusNode.unfocus();
-    });
-
-    // Listen for pending actions and show overlay
-    ref.listen(chatControllerProvider(currentSessionId), (previous, next) {
-      // Only show if we transitioned from no pending actions to having pending actions
-      final hadPendingActions = previous?.hasPendingActions ?? false;
-      final hasPendingActions = next.hasPendingActions;
-
-      if (hasPendingActions && !hadPendingActions && currentSessionId != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _handlePendingActions(
-            context,
-            next.pendingActions!,
-            currentSessionId,
-          );
-        });
-      }
     });
 
     // Watch chat state and messages
