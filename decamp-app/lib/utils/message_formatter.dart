@@ -22,16 +22,26 @@ class MessageFormatter {
     if (message.messageKind == MessageKind.toolResult &&
         message.toolResultsJson != null &&
         message.toolResultsJson!.isNotEmpty) {
-      // Get the first tool result
-      final toolResult = message.toolResultsJson!.first;
-      final toolName = toolResult.function.name;
-      final resultContent = toolResult.function.arguments;
+      final buffer = StringBuffer();
 
-      // Format using the tool result formatter
-      return ToolResultFormatter.format(
-        toolName: toolName,
-        result: resultContent,
-      );
+      // Format all tool results
+      for (var i = 0; i < message.toolResultsJson!.length; i++) {
+        final toolResult = message.toolResultsJson![i];
+        final toolName = toolResult.function.name;
+        final resultContent = toolResult.function.arguments;
+
+        // Add separator between multiple results
+        if (i > 0) {
+          buffer.writeln('\n');
+        }
+
+        // Format using the tool result formatter
+        buffer.write(
+          ToolResultFormatter.format(toolName: toolName, result: resultContent),
+        );
+      }
+
+      return buffer.toString();
     }
 
     // For all other messages, use the content as-is
