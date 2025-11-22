@@ -1,37 +1,53 @@
 import 'package:flutter/material.dart';
 
-/// Represents a single command action with its parameters
-class CommandAction {
+/// Represents a single tool action with its parameters
+class ToolAction {
   final String id;
-  final String actionName;
+  final String toolName;
   final Map<String, dynamic> params;
   bool isSelected;
 
-  CommandAction({
+  ToolAction({
     required this.id,
-    required this.actionName,
+    required this.toolName,
     required this.params,
     this.isSelected = false, // Deselected by default
   });
 
-  String get command => params['command']?.toString() ?? 'unknown';
+  /// Primary display text - works for any tool type
+  String get primaryDisplay {
+    // For shell commands, show the command
+    if (params['command'] != null) return params['command'].toString();
+    // For fetch, show method + URL
+    if (params['url'] != null) {
+      final method = params['method']?.toString().toUpperCase() ?? 'GET';
+      return '$method ${params['url']}';
+    }
+    // Fallback: show tool name
+    return toolName;
+  }
+
   String get explanation => params['explanation']?.toString() ?? '';
-  bool get isSudoRequired => params['sudo_required'] as bool? ?? false;
+  bool get requiresPrivileges => params['sudo_required'] as bool? ?? false;
+
+  // Legacy getters for backwards compatibility
+  String get command => primaryDisplay;
+  bool get isSudoRequired => requiresPrivileges;
 }
 
-/// Overlay widget that shows multiple command approvals in a scrollable list
+/// Overlay widget that shows multiple tool action approvals in a scrollable list
 /// Returns selected actions when approved, null when cancelled
 class MultiCommandApprovalOverlay extends StatefulWidget {
-  final List<CommandAction> actions;
+  final List<ToolAction> actions;
 
   const MultiCommandApprovalOverlay({super.key, required this.actions});
 
   /// Show the overlay and await user selection
-  static Future<List<CommandAction>?> show(
+  static Future<List<ToolAction>?> show(
     BuildContext context,
-    List<CommandAction> actions,
+    List<ToolAction> actions,
   ) async {
-    return await showModalBottomSheet<List<CommandAction>>(
+    return await showModalBottomSheet<List<ToolAction>>(
       context: context,
       isScrollControlled: true,
       isDismissible: false,
@@ -79,7 +95,7 @@ class _MultiCommandApprovalOverlayState
     if (selectedActions.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select at least one command')),
+          const SnackBar(content: Text('Please select at least one action')),
         );
       }
       return;
@@ -102,7 +118,8 @@ class _MultiCommandApprovalOverlayState
   }
 
   int get _selectedCount => widget.actions.where((a) => a.isSelected).length;
-  int get _sudoCount => widget.actions.where((a) => a.isSudoRequired).length;
+  int get _privilegedCount =>
+      widget.actions.where((a) => a.requiresPrivileges).length;
 
   @override
   Widget build(BuildContext context) {
@@ -143,15 +160,11 @@ class _MultiCommandApprovalOverlayState
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.terminal,
-                          color: colorScheme.primary,
-                          size: 28,
-                        ),
+                        Icon(Icons.build, color: colorScheme.primary, size: 28),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Shell Commands Request',
+                            'Tool Execution Request',
                             style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
@@ -161,12 +174,12 @@ class _MultiCommandApprovalOverlayState
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Review and approve commands ($_selectedCount of ${widget.actions.length} selected)',
+                      'Review and approve actions ($_selectedCount of ${widget.actions.length} selected)',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurface.withValues(alpha: 0.7),
                       ),
                     ),
-                    if (_sudoCount > 0) ...[
+                    if (_privilegedCount > 0) ...[
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -177,7 +190,7 @@ class _MultiCommandApprovalOverlayState
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '$_sudoCount ${_sudoCount == 1 ? 'command requires' : 'commands require'} sudo',
+                            '$_privilegedCount ${_privilegedCount == 1 ? 'action requires' : 'actions require'} elevated privileges',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.error,
                               fontWeight: FontWeight.bold,
@@ -232,11 +245,11 @@ class _MultiCommandApprovalOverlayState
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: action.isSudoRequired
+                          color: action.requiresPrivileges
                               ? colorScheme.error.withValues(alpha: 0.05)
                               : colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
-                          border: action.isSudoRequired
+                          border: action.requiresPrivileges
                               ? Border.all(
                                   color: colorScheme.error.withValues(
                                     alpha: 0.3,
@@ -247,7 +260,7 @@ class _MultiCommandApprovalOverlayState
                         ),
                         child: Row(
                           children: [
-                            if (action.isSudoRequired) ...[
+                            if (action.requiresPrivileges) ...[
                               Icon(
                                 Icons.security,
                                 size: 16,
@@ -255,20 +268,21 @@ class _MultiCommandApprovalOverlayState
                               ),
                               const SizedBox(width: 4),
                             ],
-                            Text(
-                              action.isSudoRequired ? 'sudo \$ ' : '\$ ',
-                              style: TextStyle(
-                                fontFamily: 'monospace',
-                                fontSize: 14,
-                                color: action.isSudoRequired
-                                    ? colorScheme.error
-                                    : colorScheme.primary,
-                                fontWeight: FontWeight.bold,
+                            if (action.params['command'] != null)
+                              Text(
+                                action.requiresPrivileges ? 'sudo \$ ' : '\$ ',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 14,
+                                  color: action.requiresPrivileges
+                                      ? colorScheme.error
+                                      : colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
                             Expanded(
                               child: Text(
-                                action.command,
+                                action.primaryDisplay,
                                 style: const TextStyle(
                                   fontFamily: 'monospace',
                                   fontSize: 14,
@@ -322,7 +336,7 @@ class _MultiCommandApprovalOverlayState
                           vertical: 12,
                         ),
                         child: Text(
-                          'Run ${_selectedCount > 1 ? '$_selectedCount Commands' : 'Command'}',
+                          'Run ${_selectedCount > 1 ? '$_selectedCount Actions' : 'Action'}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,

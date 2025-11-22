@@ -156,18 +156,14 @@ class ChatController extends StateNotifier<ChatState> {
     return true;
   }
 
-  /// Convert tool calls to command actions for approval
-  List<CommandAction> _toolCallsToActions(List<ToolCall> toolCalls) {
+  /// Convert tool calls to tool actions for approval
+  List<ToolAction> _toolCallsToActions(List<ToolCall> toolCalls) {
     return toolCalls.map((tc) {
       final argumentsJson = tc.function.arguments;
       final params = argumentsJson.isNotEmpty
           ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
           : <String, dynamic>{};
-      return CommandAction(
-        id: tc.id,
-        actionName: tc.function.name,
-        params: params,
-      );
+      return ToolAction(id: tc.id, toolName: tc.function.name, params: params);
     }).toList();
   }
 
@@ -184,7 +180,7 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> sendMessage({
     String? content,
     required String sessionId,
-    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
     requestApproval,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -544,7 +540,7 @@ class ChatController extends StateNotifier<ChatState> {
     required String messageId,
     required String newContent,
     required String sessionId,
-    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
     requestApproval,
   }) async {
     developer.log('✏️ Editing message: $messageId', name: 'ChatController');
@@ -587,7 +583,7 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> resendMessage({
     required String messageId,
     required String sessionId,
-    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
     requestApproval,
   }) async {
     developer.log(
