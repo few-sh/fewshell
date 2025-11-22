@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FewShell Host Setup Script - Explained</title>
+    <!-- Pico CSS for quick, clean styling without build steps -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <!-- PrismJS for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --primary: #00acc1;
+        }
+        header {
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--muted-border-color);
+            margin-bottom: 2rem;
+        }
+        .badge {
+            background-color: var(--primary);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            vertical-align: middle;
+        }
+        pre {
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        .security-note {
+            background-color: #1e293b;
+            border-left: 4px solid #4ade80;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        details {
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--muted-border-color);
+            padding-bottom: 1rem;
+        }
+        summary {
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <h1>FewShell Host Setup <span class="badge">Technical Deep Dive</span></h1>
+            <p>Transparency report and code explanation for the <code>get.few.sh</code> setup script.</p>
+        </header>
+
+        <section>
+            <h2>Overview</h2>
+            <p>
+                The <code>get.few.sh</code> script is a Bash utility designed to bootstrap a connection between your server and the FewShell mobile application.
+                It automates the process of gathering necessary credentials (SSH keys, API keys) and transferring them securely to your phone via a QR code.
+            </p>
+            <div class="security-note">
+                <strong>🔒 Privacy First:</strong> This script runs entirely on your local machine/server. No data is sent to any third-party server during the execution of this script.
+                The QR code generated is rendered locally in your terminal.
+            </div>
+        </section>
+
+        <section>
+            <h2>Step-by-Step Breakdown</h2>
+
+            <details open>
+                <summary>1. Environment Setup & Input Parsing</summary>
+                <p>
+                    The script starts by defining color codes for readability and parsing command-line arguments.
+                    It checks for flags like <code>--all-keys</code> which increases the search depth for API keys.
+                </p>
+                <pre><code class="language-bash"># Parse args
+LIMIT_KEYS=5
+SEARCH_LIMIT=20
+for arg in "$@"; do
+    if [[ "$arg" == "-a" || "$arg" == "--all-keys" ]]; then
+        LIMIT_KEYS=1000
+        SEARCH_LIMIT=1000
+    fi
+done</code></pre>
+            </details>
+
+            <details>
+                <summary>2. Project Naming</summary>
+                <p>
+                    To help you organize connections in the app, the script attempts to guess a logical name for the current environment.
+                    It checks:
+                </p>
+                <ol>
+                    <li>Git configuration (if inside a repo)</li>
+                    <li>System hostname</li>
+                    <li>Falls back to "skip"</li>
+                </ol>
+                <p>You are always prompted to confirm or override this name.</p>
+            </details>
+
+            <details>
+                <summary>3. Public IP Detection</summary>
+                <p>
+                    To allow the mobile app to connect, the script needs the server's external IP address.
+                    It queries trusted public APIs with a short timeout to prevent hanging.
+                </p>
+                <pre><code class="language-bash">EXTERNAL_IP=$(curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://api.ipify.org || echo "Unavailable")</code></pre>
+            </details>
+
+            <details>
+                <summary>4. API Key Discovery</summary>
+                <p>
+                    This is the most complex part of the script. To save you from copy-pasting long keys from a browser, the script can scan your home directory for existing LLM provider keys.
+                </p>
+                <ul>
+                    <li><strong>Manual Entry:</strong> You can always paste a key directly.</li>
+                    <li><strong>Auto-Discovery:</strong> It uses <code>rg</code> (ripgrep) or <code>grep</code> to look for patterns like <code>OPENAI_API_KEY=...</code>.</li>
+                </ul>
+                <p>
+                    <strong>Safety Mechanisms:</strong>
+                    <ul>
+                        <li>Excludes huge directories like <code>node_modules</code>, <code>.git</code>, <code>venv</code>.</li>
+                        <li>Excludes log files.</li>
+                        <li>Checks for dummy values (e.g., "your_key_here").</li>
+                        <li>Only scans the <code>$HOME</code> directory.</li>
+                    </ul>
+                </p>
+                <pre><code class="language-bash"># Simplified grep command used internally
+grep -rIE -m 5 \
+    --include="*config*" --include="*env*" ... \
+    --exclude-dir={.git,node_modules,...} \
+    "$PATTERN" "$HOME"</code></pre>
+            </details>
+
+            <details>
+                <summary>5. SSH Key Configuration</summary>
+                <p>
+                    The script ensures a dedicated SSH key pair exists for this connection. It does <strong>not</strong> reuse your main identity keys (like id_rsa) unless you manually specified that path (though the script defaults to a specific file).
+                </p>
+                <ol>
+                    <li>Checks for <code>~/.ssh/few.sh</code>.</li>
+                    <li>If missing, generates a new Ed25519 key pair.</li>
+                    <li>Appends the public key to <code>~/.ssh/authorized_keys</code> to authorize access.</li>
+                    <li>Reads the private key into memory to include in the QR code.</li>
+                </ol>
+                <pre><code class="language-bash">ssh-keygen -t ed25519 -f "$KEY_FILE" -N "" -q
+cat "${KEY_FILE}.pub" >> "$HOME/.ssh/authorized_keys"
+chmod 600 "$HOME/.ssh/authorized_keys"</code></pre>
+            </details>
+
+            <details open>
+                <summary>6. QR Code Generation</summary>
+                <p>
+                    Finally, the script bundles the gathered information into a JSON object and generates a QR code in the terminal.
+                </p>
+                <p>The payload structure:</p>
+                <ul>
+                    <li><code>n</code>: Project Name</li>
+                    <li><code>i</code>: Host (user@ip)</li>
+                    <li><code>l</code>: Provider Label (e.g., "openai")</li>
+                    <li><code>k</code>: API Key</li>
+                    <li><code>s</code>: SSH Private Key (stripped of headers to save space)</li>
+                </ul>
+                <pre><code class="language-bash">jq -n '{n: env.PROJECT_NAME, i: env.QR_HOST, ...}' | qrencode -m 2 -t UTF8</code></pre>
+                <p>
+                    <em>Note: This requires <code>jq</code> and <code>qrencode</code> installed on the system. If missing, the script will skip this step and ask you to install them.</em>
+                </p>
+            </details>
+        </section>
+
+        <section>
+            <h2>FAQ</h2>
+            <h3>Is my API key sent to FewShell developers?</h3>
+            <p><strong>No.</strong> The script operates strictly on your machine. The API key is read from your file (or input), printed to the QR code on your screen, and then the script exits. The data transfer happens optically between your monitor and your phone camera.</p>
+
+            <h3>Why does it need my SSH private key?</h3>
+            <p>The FewShell app acts as an SSH client. To connect securely to your server without passwords, it needs the private key corresponding to the public key added to your <code>authorized_keys</code> file. The key generated is specific to this usage (<code>~/.ssh/few.sh</code>).</p>
+
+            <h3>Can I review the code myself?</h3>
+            <p>Absolutely. The script is delivered as a plain text bash file. You can inspect it before running:</p>
+            <pre><code class="language-bash">curl -sSf https://get.few.sh/index.html > inspect_me.sh
+less inspect_me.sh</code></pre>
+        </section>
+
+        <footer>
+            <small>&copy; FewShell. Open source and community driven.</small>
+        </footer>
+    </main>
+
+    <!-- PrismJS Script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+</body>
+</html>
