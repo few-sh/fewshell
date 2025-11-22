@@ -1,7 +1,4 @@
 PODS:
-  - apple_vision_recognize_text (0.0.4):
-    - Flutter
-    - FlutterMacOS
   - camera_avfoundation (0.0.1):
     - Flutter
   - Flutter (1.0.0)
@@ -46,7 +43,6 @@ PODS:
     - sqlite3/session
 
 DEPENDENCIES:
-  - apple_vision_recognize_text (from `.symlinks/plugins/apple_vision_recognize_text/darwin`)
   - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/ios`)
   - Flutter (from `Flutter`)
   - flutter_secure_storage (from `.symlinks/plugins/flutter_secure_storage/ios`)
@@ -62,8 +58,6 @@ SPEC REPOS:
     - sqlite3
 
 EXTERNAL SOURCES:
-  apple_vision_recognize_text:
-    :path: ".symlinks/plugins/apple_vision_recognize_text/darwin"
   camera_avfoundation:
     :path: ".symlinks/plugins/camera_avfoundation/ios"
   Flutter:
@@ -82,7 +76,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/sqlite3_flutter_libs/darwin"
 
 SPEC CHECKSUMS:
-  apple_vision_recognize_text: bfeefd7756b6f96c40c1b840a444b345a31ff15b
   camera_avfoundation: be3be85408cd4126f250386828e9b1dfa40ab436
   Flutter: e0871f40cf51350855a761d2e70bf5af5b9b5de7
   flutter_secure_storage: 1ed9476fba7e7a782b22888f956cce43e2c62f13

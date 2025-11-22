@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import '../models/ssh_settings.dart';
 import '../providers/ssh_settings_provider.dart';
-import '../pages/ocr_scanner_page.dart';
-import '../utils/text_pattern_matcher.dart';
 
 /// Reusable dialog for configuring SSH/Remote Shell settings
 class SshSettingsDialog {
@@ -299,13 +297,6 @@ class _SshSettingsDialogFormState
                   labelText: 'Host',
                   hintText: 'example.com or 192.168.1.100',
                   isDense: true,
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.camera_alt, size: 20),
-                    onPressed: _scanHost,
-                    tooltip: 'Scan host with camera',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
                 ),
                 autocorrect: false,
                 enableSuggestions: false,
@@ -436,13 +427,6 @@ class _SshSettingsDialogFormState
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.camera_alt, size: 20),
-                          onPressed: _scanPassword,
-                          tooltip: 'Scan password with camera',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        IconButton(
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility
@@ -487,13 +471,6 @@ class _SshSettingsDialogFormState
                         ? 'Leave blank to keep current key'
                         : 'Paste your private key',
                     isDense: true,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.camera_alt, size: 20),
-                      onPressed: _scanPrivateKey,
-                      tooltip: 'Scan private key with camera',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
                     helperText: 'Paste the contents of your private key file',
                   ),
                   autocorrect: false,
@@ -875,51 +852,6 @@ class _SshSettingsDialogFormState
       return true;
     } catch (e) {
       return false;
-    }
-  }
-
-  Future<void> _scanHost() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.hostname),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _hostController.text = scannedText;
-      });
-    }
-  }
-
-  Future<void> _scanPassword() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.apiKey),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _passwordController.text = scannedText;
-      });
-    }
-  }
-
-  Future<void> _scanPrivateKey() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.sshKey),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _privateKeyController.text = scannedText;
-      });
     }
   }
 

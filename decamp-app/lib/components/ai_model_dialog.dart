@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/llm_api_settings.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
-import '../pages/ocr_scanner_page.dart';
-import '../utils/text_pattern_matcher.dart';
+
 import '../services/llm_service.dart';
 import '../utils/constants.dart';
 
@@ -412,13 +411,6 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   labelText: 'API URL',
                   hintText: 'https://api.example.com/v1',
                   isDense: true,
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.camera_alt, size: 20),
-                    onPressed: _scanUrl,
-                    tooltip: 'Scan URL with camera',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -443,13 +435,6 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.camera_alt, size: 20),
-                        onPressed: _scanApiKey,
-                        tooltip: 'Scan API key with camera',
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
                       IconButton(
                         icon: Icon(
                           _obscureApiKey
@@ -713,36 +698,6 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
         enabled: _isEditMode ? _enabled : null,
       );
       Navigator.of(context).pop();
-    }
-  }
-
-  Future<void> _scanApiKey() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.apiKey),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _apiKeyController.text = scannedText;
-      });
-    }
-  }
-
-  Future<void> _scanUrl() async {
-    final scannedText = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const OcrScannerPage(scanType: ScanType.url),
-      ),
-    );
-
-    if (scannedText != null && mounted) {
-      setState(() {
-        _urlController.text = scannedText;
-      });
     }
   }
 }
