@@ -190,15 +190,16 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
-      // Fetch current messages from database
-      final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+      // Save user message first (will be included in conversation on first iteration)
+      // This is done in _validateAndPrepare
 
-      // Build initial conversation with user message
-      var currentConversation = _buildConversationHistory(dbMessages);
-      currentConversation.add(ChatMessage.user(content));
       var aiMessageId = _messageDao.generateMessageId();
 
       while (true) {
+        // Rebuild conversation from database (single source of truth)
+        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+        final currentConversation = _buildConversationHistory(dbMessages);
+
         // Send message to AI
         final result = await _sendMessageToAI(
           conversation: currentConversation,
@@ -287,15 +288,9 @@ class ChatController extends StateNotifier<ChatState> {
           ),
         );
 
-        // Update conversation for next iteration:
-        // Add assistant's tool use and tool results to current conversation
-        currentConversation
-          ..add(assistantMessage)
-          ..add(toolExecutionResult.toolResultMessage);
-
         aiMessageId = _messageDao.generateMessageId();
 
-        // Loop continues to get AI's response to the tool results
+        // Loop continues - next iteration will rebuild conversation from DB
       }
 
       state = state.copyWith(isLoading: false);
