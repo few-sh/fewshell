@@ -27,8 +27,6 @@ const String _kUserUserId = 'user';
 const String _kUserUserName = 'You';
 const String _kAiUserId = 'ai';
 const String _kAiUserName = 'Ops Agent';
-const String _kSystemUserId = 'system';
-const String _kSystemUserName = 'System';
 
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
@@ -176,12 +174,15 @@ class ChatController extends StateNotifier<ChatState> {
   /// Send a message to the AI
   /// Handles saving to database, getting AI response, and managing tool calls
   ///
+  /// If content is null, resends the last user message in the conversation.
+  /// This is used for resend/edit operations.
+  ///
   /// Streaming is managed internally through ChatState:
   /// - startStreaming: Sets streamingMessageId in state
   /// - updateStreamingText: Updates streamingText in state
   /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
-    required String content,
+    String? content,
     required String sessionId,
     required Future<List<CommandAction>?> Function(List<CommandAction>)
     requestApproval,
@@ -189,18 +190,17 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Validate and prepare
-      final isValid = await _validateAndPrepare(
-        sessionId: sessionId,
-        content: content,
-      );
-      if (!isValid) {
-        state = state.copyWith(isLoading: false);
-        return;
+      // If content is provided, validate and save the new user message
+      if (content != null) {
+        final isValid = await _validateAndPrepare(
+          sessionId: sessionId,
+          content: content,
+        );
+        if (!isValid) {
+          state = state.copyWith(isLoading: false);
+          return;
+        }
       }
-
-      // Save user message first (will be included in conversation on first iteration)
-      // This is done in _validateAndPrepare
 
       var aiMessageId = _messageDao.generateMessageId();
 
@@ -418,7 +418,6 @@ class ChatController extends StateNotifier<ChatState> {
     required String sessionId,
   }) async {
     final toolResults = <String, String>{};
-    final displayMessages = <String>[];
 
     // Execute each tool call
     for (final toolCall in toolCalls) {
@@ -427,39 +426,12 @@ class ChatController extends StateNotifier<ChatState> {
           ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
           : <String, dynamic>{};
 
-      final command = params['command'] as String? ?? 'unknown';
-
       // Execute the action
       final result = await _executeAction(toolCall.function.name, params);
-
-      // Build display message
-      final displayMessage = _formatExecutionResult(
-        command,
-        result['success'] as bool,
-        result['data'],
-        result['error'],
-      );
-      displayMessages.add(displayMessage);
 
       // Map result for LLM
       toolResults[toolCall.id] = jsonEncode(result['data']);
     }
-
-    // Save display messages to database
-    for (final message in displayMessages) {
-      final redactedMessage = await _secretRedactor.redact(message);
-      await _messageDao.insertMessageWithId(
-        sessionId: sessionId,
-        userId: _kSystemUserId,
-        userName: _kSystemUserName,
-        content: redactedMessage,
-      );
-    }
-
-    developer.log(
-      '💾 Saved ${displayMessages.length} tool execution messages',
-      name: 'ChatController',
-    );
 
     // Build consolidated tool result message
     final allResults = toolCalls.map((toolCall) {
@@ -480,64 +452,7 @@ class ChatController extends StateNotifier<ChatState> {
       content: combinedContent,
     );
 
-    return _ToolExecutionResult(
-      toolResultMessage: toolResultMessage,
-      displayMessages: displayMessages,
-    );
-  }
-
-  /// Format execution result as a chat message
-  String _formatExecutionResult(
-    String command,
-    bool success,
-    dynamic data,
-    dynamic error,
-  ) {
-    final buffer = StringBuffer();
-
-    if (success) {
-      buffer.writeln('✅ **Executed:**');
-      buffer.writeln('```');
-      buffer.writeln(command);
-      buffer.writeln('```');
-      buffer.writeln();
-
-      // Print stdout if available
-      final stdout = data?['stdout']?.toString().trim() ?? '';
-      if (stdout.isNotEmpty) {
-        buffer.writeln('**Result:**');
-        buffer.writeln('```');
-        buffer.writeln(stdout);
-        buffer.writeln('```');
-        buffer.writeln();
-      }
-
-      // Print stderr if available
-      final stderr = data?['stderr']?.toString().trim() ?? '';
-      if (stderr.isNotEmpty) {
-        buffer.writeln();
-        buffer.writeln('**⚠️ Warning (stderr):**');
-        buffer.writeln('```');
-        buffer.writeln(stderr);
-        buffer.writeln('```');
-      }
-
-      // Print exit code only if non-zero
-      final exitCode = data?['exitCode'] as int?;
-      if (exitCode != null && exitCode != 0) {
-        buffer.writeln();
-        buffer.writeln('**Exit Code:** $exitCode');
-      }
-    } else {
-      buffer.writeln('❌ **Failed:** `$command`');
-      buffer.writeln();
-      buffer.writeln('**Error:**');
-      buffer.writeln('```');
-      buffer.writeln(error?.toString() ?? 'Unknown error');
-      buffer.writeln('```');
-    }
-
-    return buffer.toString().trim();
+    return _ToolExecutionResult(toolResultMessage: toolResultMessage);
   }
 
   /// Execute a single action (shell command)
@@ -625,13 +540,14 @@ class ChatController extends StateNotifier<ChatState> {
     throw Exception('Unknown action: $actionName');
   }
 
-  /// Edit a message
-  /// Deletes all messages after the edited message and updates the message content
-  /// UI should call sendMessage separately if resend is desired
+  /// Edit a message and resend from that point
+  /// Updates the message content, deletes all messages after it, then resends
   Future<void> editMessage({
     required String messageId,
     required String newContent,
     required String sessionId,
+    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    requestApproval,
   }) async {
     developer.log('✏️ Editing message: $messageId', name: 'ChatController');
 
@@ -642,17 +558,6 @@ class ChatController extends StateNotifier<ChatState> {
       return;
     }
 
-    // Delete all messages after this one
-    final deletedCount = await _messageDao.deleteMessagesAfter(
-      sessionId: sessionId,
-      afterTimestamp: message.timestamp,
-    );
-
-    developer.log(
-      '🗑️ Deleted $deletedCount messages after edited message',
-      name: 'ChatController',
-    );
-
     // Update the message content
     await _messageDao.updateMessageContent(
       messageId: messageId,
@@ -660,42 +565,62 @@ class ChatController extends StateNotifier<ChatState> {
     );
 
     developer.log('💾 Updated message content', name: 'ChatController');
-  }
 
-  /// Delete a message and all messages after it
-  /// Returns the message content so UI can resend it
-  Future<String?> resendMessage({
-    required String messageId,
-    required String sessionId,
-  }) async {
+    // Delete all messages AFTER this one (keep the edited message)
+    final deletedCount = await _messageDao.deleteMessagesAfter(
+      sessionId: sessionId,
+      afterTimestamp: message.timestamp,
+    );
+
     developer.log(
-      '🔄 Preparing to resend message: $messageId',
+      '🗑️ Deleted $deletedCount messages after edit, now resending',
       name: 'ChatController',
     );
 
-    // Get the message
+    // Resend from the edited message
+    await sendMessage(
+      content: null, // Use existing conversation (now with edited message)
+      sessionId: sessionId,
+      requestApproval: requestApproval,
+    );
+  }
+
+  /// Resend a message: delete all messages after it, then resend from that point
+  Future<void> resendMessage({
+    required String messageId,
+    required String sessionId,
+    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    requestApproval,
+  }) async {
+    developer.log(
+      '🔄 Resending from message: $messageId',
+      name: 'ChatController',
+    );
+
+    // Get the message to find its timestamp
     final message = await _messageDao.getMessage(messageId);
     if (message == null) {
       developer.log('❌ Message not found: $messageId', name: 'ChatController');
-      return null;
+      return;
     }
 
-    final content = message.content;
-
-    // Delete all messages after this one (including this one)
+    // Delete all messages AFTER this one (keep the message itself)
     final deletedCount = await _messageDao.deleteMessagesAfter(
       sessionId: sessionId,
-      afterTimestamp: message.timestamp.subtract(
-        const Duration(milliseconds: 1),
-      ),
+      afterTimestamp: message.timestamp,
     );
 
     developer.log(
-      '🗑️ Deleted $deletedCount messages (including the message to resend)',
+      '🗑️ Deleted $deletedCount messages after target, now resending',
       name: 'ChatController',
     );
 
-    return content;
+    // Resend - conversation will include the message we're resending from
+    await sendMessage(
+      content: null, // Use existing conversation
+      sessionId: sessionId,
+      requestApproval: requestApproval,
+    );
   }
 
   /// Branch the session by creating a copy up to a specific message
@@ -791,10 +716,6 @@ class _MessageResult {
 /// Result of tool execution
 class _ToolExecutionResult {
   final ChatMessage toolResultMessage;
-  final List<String> displayMessages;
 
-  _ToolExecutionResult({
-    required this.toolResultMessage,
-    required this.displayMessages,
-  });
+  _ToolExecutionResult({required this.toolResultMessage});
 }

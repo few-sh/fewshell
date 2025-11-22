@@ -177,17 +177,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
-    // Edit the message (deletes subsequent messages)
     await controller.editMessage(
       messageId: messageId,
       newContent: newContent,
-      sessionId: currentSessionId,
-    );
-
-    // Get updated messages and resend
-    // Resend the edited message
-    await controller.sendMessage(
-      content: newContent,
       sessionId: currentSessionId,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
@@ -205,17 +197,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
-    // Delete the message and get its content
-    final content = await controller.resendMessage(
+    await controller.resendMessage(
       messageId: messageId,
-      sessionId: currentSessionId,
-    );
-
-    if (content == null) return;
-
-    // Resend the message
-    await controller.sendMessage(
-      content: content,
       sessionId: currentSessionId,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
