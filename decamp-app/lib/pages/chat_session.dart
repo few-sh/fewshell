@@ -157,21 +157,18 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
-    // Get message history from database
+    // Check if this is the first message
     final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final messages = messagesAsync.when(
-      data: (msgs) => msgs,
-      loading: () => [],
-      error: (_, __) => [],
+    final isFirstMessage = messagesAsync.when(
+      data: (msgs) => msgs.isEmpty,
+      loading: () => false,
+      error: (_, __) => false,
     );
-
-    final isFirstMessage = messages.isEmpty;
 
     // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,
-      dbMessages: messages,
       isFirstMessage: isFirstMessage,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
@@ -197,20 +194,18 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
 
     // Get updated messages and resend
+    // Check if this is the first message after edit
     final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final messages = messagesAsync.when(
-      data: (msgs) => msgs,
-      loading: () => [],
-      error: (_, __) => [],
+    final isFirstMessage = messagesAsync.when(
+      data: (msgs) => msgs.isEmpty,
+      loading: () => false,
+      error: (_, __) => false,
     );
-
-    final isFirstMessage = messages.isEmpty;
 
     // Resend the edited message
     await controller.sendMessage(
       content: newContent,
       sessionId: currentSessionId,
-      dbMessages: messages,
       isFirstMessage: isFirstMessage,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
@@ -236,21 +231,18 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     if (content == null) return;
 
-    // Get updated messages and resend
+    // Check if this is the first message after deletion
     final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final messages = messagesAsync.when(
-      data: (msgs) => msgs,
-      loading: () => [],
-      error: (_, __) => [],
+    final isFirstMessage = messagesAsync.when(
+      data: (msgs) => msgs.isEmpty,
+      loading: () => false,
+      error: (_, __) => false,
     );
-
-    final isFirstMessage = messages.isEmpty;
 
     // Resend the message
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,
-      dbMessages: messages,
       isFirstMessage: isFirstMessage,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),

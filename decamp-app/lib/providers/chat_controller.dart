@@ -102,25 +102,14 @@ class ChatController extends StateNotifier<ChatState> {
     return conversation;
   }
 
-  /// Send a message to the AI
-  /// Handles saving to database, getting AI response, and managing tool calls
-  ///
-  /// Streaming is managed internally through ChatState:
-  /// - startStreaming: Sets streamingMessageId in state
-  /// - updateStreamingText: Updates streamingText in state
-  /// - stopStreaming: Clears streaming state
-  Future<void> sendMessage({
-    required String content,
+  /// Validate and prepare for sending a message
+  Future<bool> _validateAndPrepare({
     required String sessionId,
-    required List<dynamic> dbMessages,
+    required String content,
     required bool isFirstMessage,
-    required Future<List<CommandAction>?> Function(List<CommandAction>)
-    requestApproval,
   }) async {
-    // Redact secrets from user's message before saving to database
+    // Redact and save user's message
     final redactedContent = await _secretRedactor.redact(content);
-
-    // Save user's message to database
     await _messageDao.insertMessageWithId(
       sessionId: sessionId,
       userId: 'user',
@@ -133,7 +122,6 @@ class ChatController extends StateNotifier<ChatState> {
       final description = content.length > 495
           ? '${content.substring(0, 495)}...'
           : content;
-
       await _sessionDao.updateSession(
         SessionEntityCompanion(
           id: Value(sessionId),
@@ -142,122 +130,172 @@ class ChatController extends StateNotifier<ChatState> {
       );
     }
 
-    // Set loading state
+    // Check if LLM is configured
+    final isConfigured = await _llmService.isConfigured();
+    if (!isConfigured) {
+      const configMessage =
+          "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
+      await _messageDao.insertMessageWithId(
+        sessionId: sessionId,
+        userId: 'ai',
+        userName: 'Ops Agent',
+        content: configMessage,
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Convert tool calls to command actions for approval
+  List<CommandAction> _toolCallsToActions(List<ToolCall> toolCalls) {
+    return toolCalls.map((tc) {
+      final argumentsJson = tc.function.arguments;
+      final params = argumentsJson.isNotEmpty
+          ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+          : <String, dynamic>{};
+      return CommandAction(
+        id: tc.id,
+        actionName: tc.function.name,
+        params: params,
+      );
+    }).toList();
+  }
+
+  /// Send a message to the AI
+  /// Handles saving to database, getting AI response, and managing tool calls
+  ///
+  /// Streaming is managed internally through ChatState:
+  /// - startStreaming: Sets streamingMessageId in state
+  /// - updateStreamingText: Updates streamingText in state
+  /// - stopStreaming: Clears streaming state
+  Future<void> sendMessage({
+    required String content,
+    required String sessionId,
+    required bool isFirstMessage,
+    required Future<List<CommandAction>?> Function(List<CommandAction>)
+    requestApproval,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Check if LLM is configured
-      final isConfigured = await _llmService.isConfigured();
-
-      if (!isConfigured) {
-        const configMessage =
-            "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
-
-        await _messageDao.insertMessageWithId(
-          sessionId: sessionId,
-          userId: 'ai',
-          userName: 'Ops Agent',
-          content: configMessage,
-        );
-
+      // Validate and prepare
+      final isValid = await _validateAndPrepare(
+        sessionId: sessionId,
+        content: content,
+        isFirstMessage: isFirstMessage,
+      );
+      if (!isValid) {
         state = state.copyWith(isLoading: false);
         return;
       }
 
-      // Generate message ID upfront for consistent tracking across streaming and DB
-      final aiMessageId = _messageDao.generateMessageId();
+      // Fetch current messages from database
+      final dbMessages = await _messageDao.getMessagesBySession(sessionId);
 
-      // Send message to AI with streaming support
-      final result = await _sendMessageToAI(
-        messageContent: content,
-        dbMessages: dbMessages,
-        messageId: aiMessageId,
-      );
+      // Build initial conversation with user message
+      var currentConversation = _buildConversationHistory(dbMessages);
+      currentConversation.add(ChatMessage.user(content));
+      var aiMessageId = _messageDao.generateMessageId();
 
-      // Handle error
-      if (result.hasError) {
-        final errorMessage = 'Sorry, I encountered an error: ${result.error}';
-        final redactedError = await _secretRedactor.redact(errorMessage);
-        await _messageDao.insertMessageWithId(
-          sessionId: sessionId,
-          userId: 'ai',
-          userName: 'Ops Agent',
-          content: redactedError,
+      while (true) {
+        // Send message to AI
+        final result = await _sendMessageToAI(
+          conversation: currentConversation,
+          messageId: aiMessageId,
         );
 
-        state = state.copyWith(isLoading: false, error: result.error);
-        return;
-      }
-
-      // Handle tool calls by requesting approval
-      if (result.hasToolCalls && result.conversationState != null) {
-        // Convert tool calls to actions
-        final actions = result.toolCalls!.map((tc) {
-          // Parse params from tool call
-          final argumentsJson = tc.function.arguments;
-          final params = argumentsJson.isNotEmpty
-              ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-              : <String, dynamic>{};
-
-          return CommandAction(
-            id: tc.id,
-            actionName: tc.function.name,
-            params: params,
+        // Check for error
+        if (result.hasError) {
+          final errorMessage = 'Sorry, I encountered an error: ${result.error}';
+          final redactedError = await _secretRedactor.redact(errorMessage);
+          await _messageDao.insertMessageWithId(
+            sessionId: sessionId,
+            userId: 'ai',
+            userName: 'Ops Agent',
+            content: redactedError,
           );
-        }).toList();
+          state = state.copyWith(isLoading: false, error: result.error);
+          return;
+        }
 
-        // Directly await user approval - no state updates!
+        // If no tool calls, save text response and exit loop
+        if (!result.hasToolCalls) {
+          if (result.hasTextResponse) {
+            final redactedResponse = await _secretRedactor.redact(
+              result.textResponse!,
+            );
+            await _messageDao.insertMessageWithId(
+              id: aiMessageId,
+              sessionId: sessionId,
+              userId: 'ai',
+              userName: 'Ops Agent',
+              content: redactedResponse,
+            );
+          }
+          break;
+        }
+
+        // Has tool calls - request approval
+        final actions = _toolCallsToActions(result.toolCalls!);
         final selectedActions = await requestApproval(actions);
 
-        // If user cancelled, we're done
+        // User cancelled
         if (selectedActions == null) {
           developer.log(
             '🚨 User cancelled tool execution',
             name: 'ChatController',
           );
-          state = state.copyWith(isLoading: false);
-          return;
+          break;
         }
 
-        // User approved - execute the selected tools
         developer.log(
           '✅ User approved ${selectedActions.length} tool calls',
           name: 'ChatController',
         );
 
-        // Get the selected tool calls
-        final selectedToolCalls = selectedActions.map((action) {
-          // Find matching tool call by ID
-          final matchingToolCall = result.toolCalls!.firstWhere(
-            (tc) => tc.id == action.id,
-          );
-          return matchingToolCall;
-        }).toList();
+        // Get selected tool calls
+        final selectedToolCalls = selectedActions
+            .map(
+              (action) =>
+                  result.toolCalls!.firstWhere((tc) => tc.id == action.id),
+            )
+            .toList();
 
-        // Execute tools and handle recursive approvals
-        await _executeToolCallsAndContinue(
+        // Execute tools and get results
+        final toolExecutionResult = await _executeToolCalls(
           toolCalls: selectedToolCalls,
-          conversationState: result.conversationState!,
           sessionId: sessionId,
-          requestApproval: requestApproval,
         );
 
-        state = state.copyWith(isLoading: false);
-        return;
-      }
+        // Save assistant's tool use message
+        final assistantMessage = ChatMessage.toolUse(
+          toolCalls: selectedToolCalls,
+          content: result.textResponse ?? '',
+        );
+        await _messageDao.insertMessage(
+          assistantMessage.toMessageCompanion(
+            sessionId: sessionId,
+            id: aiMessageId,
+          ),
+        );
 
-      // Save text response if any
-      if (result.hasTextResponse) {
-        final redactedResponse = await _secretRedactor.redact(
-          result.textResponse!,
+        // Save tool results message
+        await _messageDao.insertMessage(
+          toolExecutionResult.toolResultMessage.toMessageCompanion(
+            sessionId: sessionId,
+          ),
         );
-        await _messageDao.insertMessageWithId(
-          id: aiMessageId,
-          sessionId: sessionId,
-          userId: 'ai',
-          userName: 'Ops Agent',
-          content: redactedResponse,
-        );
+
+        // Update conversation for next iteration:
+        // Add assistant's tool use and tool results to current conversation
+        currentConversation
+          ..add(assistantMessage)
+          ..add(toolExecutionResult.toolResultMessage);
+
+        aiMessageId = _messageDao.generateMessageId();
+
+        // Loop continues to get AI's response to the tool results
       }
 
       state = state.copyWith(isLoading: false);
@@ -270,7 +308,6 @@ class ChatController extends StateNotifier<ChatState> {
         userName: 'Ops Agent',
         content: redactedError,
       );
-
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -278,17 +315,10 @@ class ChatController extends StateNotifier<ChatState> {
   /// Send a message to the AI and get response
   /// Handles streaming, tool calls, and conversation state
   Future<_MessageResult> _sendMessageToAI({
-    required String messageContent,
-    required List<dynamic> dbMessages,
+    required List<ChatMessage> conversation,
     required String messageId,
   }) async {
     try {
-      // Build conversation from database messages
-      final conversation = _buildConversationHistory(dbMessages);
-
-      // Add the new user message
-      conversation.add(ChatMessage.user(messageContent));
-
       developer.log(
         '📤 Sending to LLM with ${conversation.length} messages in conversation',
         name: 'ChatController',
@@ -359,18 +389,9 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Build result
       if (collectedToolCalls.isNotEmpty) {
-        // Add assistant's tool use message to conversation
-        conversation.add(
-          ChatMessage.toolUse(
-            toolCalls: collectedToolCalls,
-            content: buffer.toString(),
-          ),
-        );
-
         return _MessageResult(
           textResponse: buffer.toString(),
           toolCalls: collectedToolCalls,
-          conversationState: conversation,
         );
       }
 
@@ -387,291 +408,78 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  /// Execute tool calls and handle follow-up responses with recursive approval support
-  Future<void> _executeToolCallsAndContinue({
+  /// Execute tool calls and return results
+  Future<_ToolExecutionResult> _executeToolCalls({
     required List<ToolCall> toolCalls,
-    required List<ChatMessage> conversationState,
     required String sessionId,
-    required Future<List<CommandAction>?> Function(List<CommandAction>)
-    requestApproval,
   }) async {
     final toolResults = <String, String>{};
-    final chatMessages = <String>[];
+    final displayMessages = <String>[];
 
-    try {
-      // Execute each tool call
-      for (var i = 0; i < toolCalls.length; i++) {
-        final toolCall = toolCalls[i];
+    // Execute each tool call
+    for (final toolCall in toolCalls) {
+      final argumentsJson = toolCall.function.arguments;
+      final params = argumentsJson.isNotEmpty
+          ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+          : <String, dynamic>{};
 
-        // Parse params from tool call
-        final argumentsJson = toolCall.function.arguments;
-        final params = argumentsJson.isNotEmpty
-            ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-            : <String, dynamic>{};
+      final command = params['command'] as String? ?? 'unknown';
 
-        final command = params['command'] as String? ?? 'unknown';
+      // Execute the action
+      final result = await _executeAction(toolCall.function.name, params);
 
-        // Execute the action directly
-        final result = await _executeAction(toolCall.function.name, params);
-
-        // Build result message
-        final resultMessage = _formatExecutionResult(
-          command,
-          result['success'] as bool,
-          result['data'],
-          result['error'],
-        );
-
-        chatMessages.add(resultMessage);
-
-        // Map result for LLM
-        toolResults[toolCall.id] = jsonEncode(result['data']);
-      }
-
-      // Get tools for potential follow-up
-      final tools = shellTools;
-
-      // Create a mutable copy of conversation and add tool results
-      // (conversationState may be unmodifiable)
-      final conversationWithResults = List<ChatMessage>.from(conversationState);
-
-      // Consolidate ALL tool results into a single message
-      // Anthropic API requires all tool results in one message immediately after tool_use
-      final allResults = toolCalls.map((toolCall) {
-        final result = toolResults[toolCall.id] ?? 'No result';
-        return ToolCall(
-          id: toolCall.id,
-          callType: toolCall.callType,
-          function: FunctionCall(
-            name: toolCall.function.name,
-            arguments: result,
-          ),
-        );
-      }).toList();
-
-      final combinedContent = toolCalls
-          .map((toolCall) {
-            return toolResults[toolCall.id] ?? 'No result';
-          })
-          .join('\n---\n');
-
-      conversationWithResults.add(
-        ChatMessage.toolResult(
-          results: allResults, // ALL results in one message
-          content: combinedContent,
-        ),
+      // Build display message
+      final displayMessage = _formatExecutionResult(
+        command,
+        result['success'] as bool,
+        result['data'],
+        result['error'],
       );
+      displayMessages.add(displayMessage);
 
-      developer.log(
-        '📋 Conversation state before follow-up (${conversationWithResults.length} messages):',
-        name: 'ChatController',
-      );
-      for (var i = 0; i < conversationWithResults.length; i++) {
-        final msg = conversationWithResults[i];
-        final messageType = msg.messageType;
-        if (messageType is ToolUseMessage) {
-          developer.log(
-            '  [$i] ${msg.role.name}: Tool calls',
-            name: 'ChatController',
-          );
-        } else if (messageType is ToolResultMessage) {
-          developer.log(
-            '  [$i] ${msg.role.name}: Tool results',
-            name: 'ChatController',
-          );
-        } else {
-          final preview = msg.content.length > 50
-              ? '${msg.content.substring(0, 50)}...'
-              : msg.content;
-          developer.log(
-            '  [$i] ${msg.role.name}: $preview',
-            name: 'ChatController',
-          );
-        }
-      }
+      // Map result for LLM
+      toolResults[toolCall.id] = jsonEncode(result['data']);
+    }
 
-      // Continue conversation with tool results
-      final followUpResult = await _continueWithToolResults(
-        conversationState: conversationWithResults,
-        tools: tools,
-      );
-
-      // Save assistant's tool use message with all tool calls to database
-      final assistantMessageId = _messageDao.generateMessageId();
-      final assistantMessage = ChatMessage.toolUse(
-        toolCalls: toolCalls,
-        content: '', // Tool use messages don't have text content
-      );
-      final assistantCompanion = assistantMessage.toMessageCompanion(
-        sessionId: sessionId,
-        id: assistantMessageId,
-      );
-      await _messageDao.insertMessage(assistantCompanion);
-
-      developer.log(
-        '💾 Saved assistant message with ${toolCalls.length} tool calls',
-        name: 'ChatController',
-      );
-
-      // Save consolidated tool results message to database
-      final toolResultMessage = ChatMessage.toolResult(
-        results: allResults,
-        content: combinedContent,
-      );
-      final resultCompanion = toolResultMessage.toMessageCompanion(
-        sessionId: sessionId,
-      );
-      await _messageDao.insertMessage(resultCompanion);
-
-      developer.log(
-        '💾 Saved tool results for ${toolCalls.length} tools',
-        name: 'ChatController',
-      );
-
-      // Handle follow-up response from LLM
-      if (followUpResult != null) {
-        if (followUpResult.hasToolCalls) {
-          // LLM wants to make more tool calls - request approval recursively!
-          developer.log(
-            '🔁 LLM wants to make ${followUpResult.toolCalls!.length} more tool calls',
-            name: 'ChatController',
-          );
-
-          final followUpActions = followUpResult.toolCalls!.map((tc) {
-            final argumentsJson = tc.function.arguments;
-            final params = argumentsJson.isNotEmpty
-                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-                : <String, dynamic>{};
-
-            return CommandAction(
-              id: tc.id,
-              actionName: tc.function.name,
-              params: params,
-            );
-          }).toList();
-
-          // Recursively request approval
-          final selectedFollowUpActions = await requestApproval(
-            followUpActions,
-          );
-
-          if (selectedFollowUpActions != null) {
-            // User approved - execute recursively
-            final selectedFollowUpToolCalls = selectedFollowUpActions.map((
-              action,
-            ) {
-              return followUpResult.toolCalls!.firstWhere(
-                (tc) => tc.id == action.id,
-              );
-            }).toList();
-
-            await _executeToolCallsAndContinue(
-              toolCalls: selectedFollowUpToolCalls,
-              conversationState: followUpResult.conversationState!,
-              sessionId: sessionId,
-              requestApproval: requestApproval,
-            );
-          } else {
-            developer.log(
-              '🚨 User cancelled follow-up tool execution',
-              name: 'ChatController',
-            );
-          }
-        } else if (followUpResult.hasTextResponse) {
-          // LLM provided a text response - save it
-          final redactedResponse = await _secretRedactor.redact(
-            followUpResult.textResponse!,
-          );
-          await _messageDao.insertMessageWithId(
-            sessionId: sessionId,
-            userId: 'ai',
-            userName: 'Ops Agent',
-            content: redactedResponse,
-          );
-
-          developer.log(
-            '💾 Saved LLM follow-up response',
-            name: 'ChatController',
-          );
-        }
-      }
-    } catch (e) {
-      final errorMessage = '❌ Error executing tools: $e';
-      final redactedError = await _secretRedactor.redact(errorMessage);
+    // Save display messages to database
+    for (final message in displayMessages) {
+      final redactedMessage = await _secretRedactor.redact(message);
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
-        userId: 'ai',
-        userName: 'Ops Agent',
-        content: redactedError,
+        userId: 'system',
+        userName: 'System',
+        content: redactedMessage,
       );
-
-      developer.log(errorMessage, name: 'ChatController');
     }
-  }
 
-  /// Continue conversation with tool results
-  Future<_MessageResult?> _continueWithToolResults({
-    required List<ChatMessage> conversationState,
-    required List<Tool> tools,
-  }) async {
-    try {
-      final buffer = StringBuffer();
-      final followUpToolCalls = <ToolCall>[];
+    developer.log(
+      '💾 Saved ${displayMessages.length} tool execution messages',
+      name: 'ChatController',
+    );
 
-      await for (final event in _llmService.streamChat(
-        conversationState,
-        tools: tools,
-      )) {
-        switch (event) {
-          case TextDeltaEvent(delta: final delta):
-            buffer.write(delta);
-
-          case ToolCallDeltaEvent(toolCall: final toolCall):
-            followUpToolCalls.add(toolCall);
-
-          case CompletionEvent():
-            break;
-
-          case ErrorEvent(error: final error):
-            return _MessageResult(error: error.message);
-
-          case ThinkingDeltaEvent():
-            break;
-        }
-      }
-
-      // Return result if we have follow-up tool calls or text
-      if (followUpToolCalls.isNotEmpty) {
-        // Add assistant's tool use message to conversation
-        conversationState.add(
-          ChatMessage.toolUse(
-            toolCalls: followUpToolCalls,
-            content: buffer.toString(),
-          ),
-        );
-
-        return _MessageResult(
-          textResponse: buffer.toString(),
-          toolCalls: followUpToolCalls,
-          conversationState: conversationState,
-        );
-      }
-
-      if (buffer.isNotEmpty) {
-        return _MessageResult(textResponse: buffer.toString());
-      }
-
-      return null;
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error continuing with tool results: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
+    // Build consolidated tool result message
+    final allResults = toolCalls.map((toolCall) {
+      final result = toolResults[toolCall.id] ?? 'No result';
+      return ToolCall(
+        id: toolCall.id,
+        callType: toolCall.callType,
+        function: FunctionCall(name: toolCall.function.name, arguments: result),
       );
+    }).toList();
 
-      return _MessageResult(error: e.toString());
-    }
+    final combinedContent = toolCalls
+        .map((toolCall) => toolResults[toolCall.id] ?? 'No result')
+        .join('\n---\n');
+
+    final toolResultMessage = ChatMessage.toolResult(
+      results: allResults,
+      content: combinedContent,
+    );
+
+    return _ToolExecutionResult(
+      toolResultMessage: toolResultMessage,
+      displayMessages: displayMessages,
+    );
   }
 
   /// Format execution result as a chat message
@@ -967,17 +775,22 @@ final chatControllerProvider =
 class _MessageResult {
   final String? textResponse;
   final List<ToolCall>? toolCalls;
-  final List<ChatMessage>? conversationState;
   final String? error;
 
-  const _MessageResult({
-    this.textResponse,
-    this.toolCalls,
-    this.conversationState,
-    this.error,
-  });
+  const _MessageResult({this.textResponse, this.toolCalls, this.error});
 
   bool get hasError => error != null;
   bool get hasToolCalls => toolCalls != null && toolCalls!.isNotEmpty;
   bool get hasTextResponse => textResponse != null && textResponse!.isNotEmpty;
+}
+
+/// Result of tool execution
+class _ToolExecutionResult {
+  final ChatMessage toolResultMessage;
+  final List<String> displayMessages;
+
+  _ToolExecutionResult({
+    required this.toolResultMessage,
+    required this.displayMessages,
+  });
 }
