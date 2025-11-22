@@ -157,19 +157,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
-    // Check if this is the first message
-    final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final isFirstMessage = messagesAsync.when(
-      data: (msgs) => msgs.isEmpty,
-      loading: () => false,
-      error: (_, __) => false,
-    );
-
     // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,
-      isFirstMessage: isFirstMessage,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
     );
@@ -194,19 +185,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
 
     // Get updated messages and resend
-    // Check if this is the first message after edit
-    final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final isFirstMessage = messagesAsync.when(
-      data: (msgs) => msgs.isEmpty,
-      loading: () => false,
-      error: (_, __) => false,
-    );
-
     // Resend the edited message
     await controller.sendMessage(
       content: newContent,
       sessionId: currentSessionId,
-      isFirstMessage: isFirstMessage,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
     );
@@ -231,19 +213,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     if (content == null) return;
 
-    // Check if this is the first message after deletion
-    final messagesAsync = ref.read(currentSessionMessagesProvider);
-    final isFirstMessage = messagesAsync.when(
-      data: (msgs) => msgs.isEmpty,
-      loading: () => false,
-      error: (_, __) => false,
-    );
-
     // Resend the message
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,
-      isFirstMessage: isFirstMessage,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
     );

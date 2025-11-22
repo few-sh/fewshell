@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/sessions_table.dart';
 import '../../utils/id_generator.dart';
+import '../../utils/constants.dart';
 
 part 'session_dao.g.dart';
 
@@ -152,7 +153,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     final companion = SessionEntityCompanion(
       id: Value(id),
       projectId: Value(projectId),
-      description: Value(description ?? 'New conversation'),
+      description: Value(description ?? kDefaultSessionDescription),
       timestamp: Value(now),
       createdAt: Value(now),
       updatedAt: Value(now),

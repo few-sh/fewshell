@@ -20,6 +20,15 @@ import '../database/daos/session_dao.dart';
 import '../database/database.dart';
 import '../components/multi_command_approval_overlay.dart';
 import '../utils/secret_redactor.dart';
+import '../utils/constants.dart';
+
+// Constants for message user IDs
+const String _kUserUserId = 'user';
+const String _kUserUserName = 'You';
+const String _kAiUserId = 'ai';
+const String _kAiUserName = 'Ops Agent';
+const String _kSystemUserId = 'system';
+const String _kSystemUserName = 'System';
 
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
@@ -106,19 +115,21 @@ class ChatController extends StateNotifier<ChatState> {
   Future<bool> _validateAndPrepare({
     required String sessionId,
     required String content,
-    required bool isFirstMessage,
   }) async {
     // Redact and save user's message
     final redactedContent = await _secretRedactor.redact(content);
     await _messageDao.insertMessageWithId(
       sessionId: sessionId,
-      userId: 'user',
-      userName: 'You',
+      userId: _kUserUserId,
+      userName: _kUserUserName,
       content: redactedContent,
     );
 
-    // Update session description if first message
-    if (isFirstMessage) {
+    // Update session description if it's empty or default (first message)
+    final session = await _sessionDao.getSession(sessionId);
+    final currentDescription = session?.description ?? '';
+    if (currentDescription.isEmpty ||
+        currentDescription == kDefaultSessionDescription) {
       final description = content.length > 495
           ? '${content.substring(0, 495)}...'
           : content;
@@ -137,8 +148,8 @@ class ChatController extends StateNotifier<ChatState> {
           "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
-        userId: 'ai',
-        userName: 'Ops Agent',
+        userId: _kAiUserId,
+        userName: _kAiUserName,
         content: configMessage,
       );
       return false;
@@ -172,7 +183,6 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> sendMessage({
     required String content,
     required String sessionId,
-    required bool isFirstMessage,
     required Future<List<CommandAction>?> Function(List<CommandAction>)
     requestApproval,
   }) async {
@@ -183,7 +193,6 @@ class ChatController extends StateNotifier<ChatState> {
       final isValid = await _validateAndPrepare(
         sessionId: sessionId,
         content: content,
-        isFirstMessage: isFirstMessage,
       );
       if (!isValid) {
         state = state.copyWith(isLoading: false);
@@ -212,8 +221,8 @@ class ChatController extends StateNotifier<ChatState> {
           final redactedError = await _secretRedactor.redact(errorMessage);
           await _messageDao.insertMessageWithId(
             sessionId: sessionId,
-            userId: 'ai',
-            userName: 'Ops Agent',
+            userId: _kAiUserId,
+            userName: _kAiUserName,
             content: redactedError,
           );
           state = state.copyWith(isLoading: false, error: result.error);
@@ -229,8 +238,8 @@ class ChatController extends StateNotifier<ChatState> {
             await _messageDao.insertMessageWithId(
               id: aiMessageId,
               sessionId: sessionId,
-              userId: 'ai',
-              userName: 'Ops Agent',
+              userId: _kAiUserId,
+              userName: _kAiUserName,
               content: redactedResponse,
             );
           }
@@ -299,8 +308,8 @@ class ChatController extends StateNotifier<ChatState> {
       final redactedError = await _secretRedactor.redact(errorMessage);
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
-        userId: 'ai',
-        userName: 'Ops Agent',
+        userId: _kAiUserId,
+        userName: _kAiUserName,
         content: redactedError,
       );
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -441,8 +450,8 @@ class ChatController extends StateNotifier<ChatState> {
       final redactedMessage = await _secretRedactor.redact(message);
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
-        userId: 'system',
-        userName: 'System',
+        userId: _kSystemUserId,
+        userName: _kSystemUserName,
         content: redactedMessage,
       );
     }

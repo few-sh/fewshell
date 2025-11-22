@@ -1,5 +1,16 @@
 /// Application-wide constants
 
+// ============================================================================
+// Session Constants
+// ============================================================================
+
+/// Default description for new sessions
+const String kDefaultSessionDescription = 'New conversation';
+
+// ============================================================================
+// Terminal Display Constants
+// ============================================================================
+
 /// Maximum number of lines to display in a code block before truncating
 const int kTerminalMaxLines = 24;
 
