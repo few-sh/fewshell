@@ -275,7 +275,6 @@ class ChatController extends StateNotifier<ChatState> {
         // Execute tools and get results
         final toolExecutionResult = await _executeToolCalls(
           toolCalls: selectedToolCalls,
-          sessionId: sessionId,
         );
 
         // Save assistant's tool use message
@@ -415,7 +414,6 @@ class ChatController extends StateNotifier<ChatState> {
   /// Execute tool calls and return results
   Future<_ToolExecutionResult> _executeToolCalls({
     required List<ToolCall> toolCalls,
-    required String sessionId,
   }) async {
     final toolResults = <String, String>{};
 
