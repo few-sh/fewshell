@@ -1,7 +1,6 @@
 # Dart build artifacts
 .dart_tool/
 build/
-*.lock
 
 # IDE and editor files
 .idea/
