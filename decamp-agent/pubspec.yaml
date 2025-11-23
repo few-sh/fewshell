@@ -1,0 +1,15 @@
+name: decamp_agent
+description: Agent service for Decamp - handles shell commands and real-time communication
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  shelf_web_socket: ^2.0.0
+
+dev_dependencies:
+  lints: ^4.0.0
