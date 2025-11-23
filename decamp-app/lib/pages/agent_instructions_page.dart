@@ -218,6 +218,10 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
+              // Template variables info
+              const _TemplateVariablesInfo(),
+              const SizedBox(height: 16),
+
               // Default Instruction Section
               _InstructionSection(
                 title: 'Default Instruction',
@@ -459,7 +463,11 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
               ),
               const SizedBox(height: 16),
 
-              // Default Instruction Section
+              // Template variables info
+              const _TemplateVariablesInfo(),
+              const SizedBox(height: 16),
+
+              // Default Project Instruction Section
               _InstructionSection(
                 title: 'Default Project Instruction',
                 subtitle:
@@ -739,5 +747,62 @@ class _AddModelOverrideButton extends StatelessWidget {
     if (result != null) {
       onAdd(result);
     }
+  }
+}
+
+/// Info banner explaining available template variables
+class _TemplateVariablesInfo extends StatelessWidget {
+  const _TemplateVariablesInfo();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Template Variables',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Use {{SECRETS_LIST}} to automatically insert a comma-separated list of all secret names.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  r'Use \{{ to escape and show literal braces.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

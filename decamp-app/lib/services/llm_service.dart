@@ -6,6 +6,7 @@ import '../providers/project_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/secret_provider.dart';
 import '../services/keychain_service.dart';
+import '../utils/template_processor.dart';
 
 /// Provider for the LLM service
 final llmServiceProvider = Provider<LlmService>((ref) {
@@ -103,7 +104,10 @@ class LlmService {
 
   /// Get the final agent instruction for a model
   /// Simplified hierarchy: project override > project default > global override > global default
-  String? getAgentInstruction(String modelIdentifier) {
+  /// Processes template variables like {{SECRETS_LIST}}
+  Future<String?> getAgentInstruction(String modelIdentifier) async {
+    String? instruction;
+
     // Get project instruction if we have a project
     if (currentProjectId != null) {
       final projectSettings = ref.read(
@@ -113,7 +117,7 @@ class LlmService {
 
       if (projectInstruction != null) {
         // Check model override first, then default
-        final instruction =
+        instruction =
             projectInstruction.modelOverrides[modelIdentifier] ??
             (projectInstruction.defaultInstruction.isNotEmpty
                 ? projectInstruction.defaultInstruction
@@ -122,22 +126,30 @@ class LlmService {
         if (instruction != null) {
           // Optionally prepend global instruction
           if (projectSettings?.includeUserInstructions ?? false) {
-            final globalInstruction = _getGlobalInstruction(modelIdentifier);
+            final globalInstruction = await _getGlobalInstruction(
+              modelIdentifier,
+            );
             if (globalInstruction != null) {
-              return '$globalInstruction\n\n$instruction';
+              instruction = '$globalInstruction\n\n$instruction';
             }
           }
-          return instruction;
         }
       }
     }
 
-    // Fall back to global instruction
-    return _getGlobalInstruction(modelIdentifier);
+    // Fall back to global instruction if not set
+    instruction ??= await _getGlobalInstruction(modelIdentifier);
+
+    // Process template variables if instruction exists
+    if (instruction != null) {
+      instruction = await _processTemplateVariables(instruction);
+    }
+
+    return instruction;
   }
 
   /// Get global instruction for a model
-  String? _getGlobalInstruction(String modelIdentifier) {
+  Future<String?> _getGlobalInstruction(String modelIdentifier) async {
     final userInstruction = ref.read(globalSettingsProvider).agentInstruction;
     if (userInstruction == null) return null;
 
@@ -146,6 +158,23 @@ class LlmService {
         (userInstruction.defaultInstruction.isNotEmpty
             ? userInstruction.defaultInstruction
             : null);
+  }
+
+  /// Process template variables in the instruction text
+  Future<String> _processTemplateVariables(String instruction) async {
+    // Quick check if there are any template variables
+    if (!TemplateProcessor.hasTemplateVariables(instruction)) {
+      return instruction;
+    }
+
+    // Fetch all secret names (global + project merged)
+    final secretsMap = await ref.read(
+      allSecretsProvider(currentProjectId).future,
+    );
+    final secretNames = secretsMap.keys.toList()..sort();
+
+    // Process the template
+    return TemplateProcessor.process(instruction, secretNames: secretNames);
   }
 
   /// Create an LLM provider based on the API type
@@ -262,7 +291,7 @@ class LlmService {
     }
 
     try {
-      final agentInstruction = getAgentInstruction(
+      final agentInstruction = await getAgentInstruction(
         activeConfig.config.identifier,
       );
       final provider = await _createProvider(
