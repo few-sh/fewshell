@@ -8,86 +8,13 @@ import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import '../utils/date_formatter.dart';
 import '../utils/project_utils.dart';
-import '../pages/main_settings.dart';
-import 'qr_scanner_page.dart';
-import '../services/project_importer.dart';
+import 'project_setup_page.dart';
+import '../components/project_setup_view.dart';
 
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});
 
-  Future<void> _handleCreateProject(
-    BuildContext context,
-    WidgetRef ref,
-    List<String> existingNames,
-  ) async {
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      final jsonString = await Navigator.push<String>(
-        context,
-        MaterialPageRoute(builder: (context) => const QrScannerPage()),
-      );
 
-      if (jsonString != null && context.mounted) {
-        if (jsonString.isEmpty) {
-          await _createProjectWithRandomName(context, ref, existingNames);
-          return;
-        }
-
-        try {
-          final importer = ref.read(projectImporterProvider);
-          final projectId = await importer.importFromQrCode(jsonString);
-          await selectProject(ref, projectId);
-
-          if (context.mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const MainSettingsPage()),
-            );
-          }
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error importing project: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      }
-    } else {
-      await _createProjectWithRandomName(context, ref, existingNames);
-    }
-  }
-
-  Future<void> _createProjectWithRandomName(
-    BuildContext context,
-    WidgetRef ref,
-    List<String> existingNames,
-  ) async {
-    final name = generateUniqueProjectName(existingNames);
-    final projectDao = ref.read(databaseProvider).projectDao;
-
-    try {
-      final projectId = await projectDao.createProjectWithId(name: name);
-      await selectProject(ref, projectId);
-
-      if (context.mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const MainSettingsPage()),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating project: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -103,78 +30,7 @@ class ProjectsPage extends ConsumerWidget {
       body: projectsAsync.when(
         data: (projects) {
           if (projects.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.folder_open,
-                    size: 64,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.3),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'run this command from a host',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: ExpandableCodeBlock(
-                      code: 'curl -LsSf get.few.sh | bash',
-                      language: 'bash',
-                      heroTag: 'projects_setup_command',
-                      terminalTheme: terminalTheme,
-                      centered: true,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'then scan the QR code',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'fewshell will:\n1. get your host\'s IP address\n2. create new ssh keys\n3. select LLM provider and key',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => _handleCreateProject(
-                      context,
-                      ref,
-                      projects.map((p) => p.name).toList(),
-                    ),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create Your First Project'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 32,
-                        vertical: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return const ProjectSetupView();
           }
 
           return ListView.builder(
@@ -306,11 +162,14 @@ class ProjectsPage extends ConsumerWidget {
         data: (projects) => projects.isEmpty
             ? null
             : FloatingActionButton.extended(
-                onPressed: () => _handleCreateProject(
-                  context,
-                  ref,
-                  projects.map((p) => p.name).toList(),
-                ),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProjectSetupPage(),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.add),
                 label: const Text('New Project'),
               ),
