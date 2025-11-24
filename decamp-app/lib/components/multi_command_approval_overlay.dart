@@ -287,8 +287,6 @@ class _MultiCommandApprovalOverlayState
                                   fontFamily: 'monospace',
                                   fontSize: 14,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -304,8 +302,6 @@ class _MultiCommandApprovalOverlayState
                                     alpha: 0.7,
                                   ),
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             )
                           : null,
