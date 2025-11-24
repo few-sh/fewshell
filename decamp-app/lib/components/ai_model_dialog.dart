@@ -308,296 +308,314 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
       titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       title: Text(widget.title),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // API Type dropdown (moved to top)
-              DropdownButtonFormField<LlmApiType>(
-                value: _selectedApiType,
-                decoration: const InputDecoration(
-                  labelText: 'API Type',
-                  isDense: true,
-                ),
-                items: LlmApiType.values.map((type) {
-                  return DropdownMenuItem(
-                    value: type,
-                    child: Text(type.displayName),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedApiType = value;
-                      // Update URL to default for selected API type
-                      _urlController.text = value.defaultBaseUrl;
-                      // Auto-populate model identifier with default model
-                      // (unless in edit mode)
-                      if (!_isEditMode) {
-                        _identifierController.text = value.defaultModelId;
-                      }
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              // Model Identifier dropdown (searchable)
-              Autocomplete<String>(
-                initialValue: TextEditingValue(
-                  text: _identifierController.text,
-                ),
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  if (textEditingValue.text.isEmpty) {
-                    return _supportedModels;
-                  }
-                  return _supportedModels.where((String option) {
-                    return option.toLowerCase().contains(
-                      textEditingValue.text.toLowerCase(),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // API Type dropdown (moved to top)
+                DropdownButtonFormField<LlmApiType>(
+                  value: _selectedApiType,
+                  decoration: const InputDecoration(
+                    labelText: 'API Type',
+                    isDense: true,
+                  ),
+                  items: LlmApiType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(
+                        type.displayName,
+                        overflow: TextOverflow.visible,
+                        softWrap: true,
+                      ),
                     );
-                  });
-                },
-                onSelected: (String selection) {
-                  _identifierController.text = selection;
-                },
-                fieldViewBuilder:
-                    (
-                      BuildContext context,
-                      TextEditingController fieldTextEditingController,
-                      FocusNode fieldFocusNode,
-                      VoidCallback onFieldSubmitted,
-                    ) {
-                      // Sync our controller with the autocomplete's controller
-                      if (_identifierController.text !=
-                          fieldTextEditingController.text) {
-                        fieldTextEditingController.text =
-                            _identifierController.text;
-                      }
-                      // Listen to changes in the autocomplete field
-                      fieldTextEditingController.addListener(() {
-                        if (_identifierController.text !=
-                            fieldTextEditingController.text) {
-                          _identifierController.text =
-                              fieldTextEditingController.text;
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedApiType = value;
+                        // Update URL to default for selected API type
+                        _urlController.text = value.defaultBaseUrl;
+                        // Auto-populate model identifier with default model
+                        // (unless in edit mode)
+                        if (!_isEditMode) {
+                          _identifierController.text = value.defaultModelId;
                         }
                       });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Model Identifier dropdown (searchable)
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(
+                    text: _identifierController.text,
+                  ),
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return _supportedModels;
+                    }
+                    return _supportedModels.where((String option) {
+                      return option.toLowerCase().contains(
+                        textEditingValue.text.toLowerCase(),
+                      );
+                    });
+                  },
+                  onSelected: (String selection) {
+                    _identifierController.text = selection;
+                  },
+                  fieldViewBuilder:
+                      (
+                        BuildContext context,
+                        TextEditingController fieldTextEditingController,
+                        FocusNode fieldFocusNode,
+                        VoidCallback onFieldSubmitted,
+                      ) {
+                        // Sync our controller with the autocomplete's controller
+                        if (_identifierController.text !=
+                            fieldTextEditingController.text) {
+                          fieldTextEditingController.text =
+                              _identifierController.text;
+                        }
+                        // Listen to changes in the autocomplete field
+                        fieldTextEditingController.addListener(() {
+                          if (_identifierController.text !=
+                              fieldTextEditingController.text) {
+                            _identifierController.text =
+                                fieldTextEditingController.text;
+                          }
+                        });
 
-                      return TextFormField(
-                        controller: fieldTextEditingController,
-                        focusNode: fieldFocusNode,
+                        return TextFormField(
+                          controller: fieldTextEditingController,
+                          focusNode: fieldFocusNode,
+                          decoration: const InputDecoration(
+                            labelText: 'Model Identifier',
+                            hintText: 'Start typing to search...',
+                            isDense: true,
+                          ),
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textCapitalization: TextCapitalization.none,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter a model identifier';
+                            }
+                            return null;
+                          },
+                        );
+                      },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _urlController,
+                  decoration: InputDecoration(
+                    labelText: 'API URL',
+                    hintText: 'https://api.example.com/v1',
+                    isDense: true,
+                  ),
+                  minLines: 1,
+                  maxLines: null,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter an API URL';
+                    }
+                    if (!value.startsWith('http://') &&
+                        !value.startsWith('https://')) {
+                      return 'URL must start with http:// or https://';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _apiKeyController,
+                  decoration: InputDecoration(
+                    labelText: 'API Key',
+                    hintText: _isEditMode
+                        ? 'Leave blank to keep current key'
+                        : 'Enter your API key',
+                    isDense: true,
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            _obscureApiKey
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                            size: 20,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _obscureApiKey = !_obscureApiKey;
+                            });
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  style: const TextStyle(
+                    fontFamily: 'Courier New',
+                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                  minLines: 1,
+                  maxLines: _obscureApiKey ? 1 : null,
+                  obscureText: _obscureApiKey,
+                  validator: (value) {
+                    // API key is required for new models but optional for edits
+                    if (!_isEditMode && (value == null || value.isEmpty)) {
+                      return 'Please enter an API key';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _maxTokensController,
                         decoration: const InputDecoration(
-                          labelText: 'Model Identifier',
-                          hintText: 'Start typing to search...',
+                          labelText: 'Max Tokens',
+                          hintText: 'Optional',
                           isDense: true,
                         ),
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        textCapitalization: TextCapitalization.none,
+                        keyboardType: TextInputType.number,
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter a model identifier';
+                          if (value != null && value.isNotEmpty) {
+                            final number = int.tryParse(value);
+                            if (number == null || number <= 0) {
+                              return 'Invalid number';
+                            }
                           }
                           return null;
                         },
-                      );
-                    },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _urlController,
-                decoration: InputDecoration(
-                  labelText: 'API URL',
-                  hintText: 'https://api.example.com/v1',
-                  isDense: true,
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an API URL';
-                  }
-                  if (!value.startsWith('http://') &&
-                      !value.startsWith('https://')) {
-                    return 'URL must start with http:// or https://';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _apiKeyController,
-                decoration: InputDecoration(
-                  labelText: 'API Key',
-                  hintText: _isEditMode
-                      ? 'Leave blank to keep current key'
-                      : 'Enter your API key',
-                  isDense: true,
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          _obscureApiKey
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                          size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _temperatureController,
+                        decoration: const InputDecoration(
+                          labelText: 'Temperature',
+                          hintText: '0.0 - 2.0',
+                          isDense: true,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureApiKey = !_obscureApiKey;
-                          });
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        validator: (value) {
+                          if (value != null && value.isNotEmpty) {
+                            final number = double.tryParse(value);
+                            if (number == null || number < 0 || number > 2) {
+                              return '0.0 - 2.0';
+                            }
+                          }
+                          return null;
                         },
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
                       ),
-                    ],
-                  ),
-                ),
-                style: const TextStyle(
-                  fontFamily: 'Courier New',
-                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-                minLines: 1,
-                maxLines: _obscureApiKey ? 1 : 3,
-                obscureText: _obscureApiKey,
-                validator: (value) {
-                  // API key is required for new models but optional for edits
-                  if (!_isEditMode && (value == null || value.isEmpty)) {
-                    return 'Please enter an API key';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _maxTokensController,
-                      decoration: const InputDecoration(
-                        labelText: 'Max Tokens',
-                        hintText: 'Optional',
-                        isDense: true,
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          final number = int.tryParse(value);
-                          if (number == null || number <= 0) {
-                            return 'Invalid number';
-                          }
-                        }
-                        return null;
-                      },
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _temperatureController,
-                      decoration: const InputDecoration(
-                        labelText: 'Temperature',
-                        hintText: '0.0 - 2.0',
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      validator: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          final number = double.tryParse(value);
-                          if (number == null || number < 0 || number > 2) {
-                            return '0.0 - 2.0';
-                          }
-                        }
-                        return null;
-                      },
+                  ],
+                ),
+                if (_isEditMode) ...[
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    title: const Text(
+                      'Enabled',
+                      overflow: TextOverflow.visible,
                     ),
+                    subtitle: const Text(
+                      'Allow this model to be used',
+                      overflow: TextOverflow.visible,
+                    ),
+                    value: _enabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _enabled = value;
+                      });
+                    },
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
                   ),
                 ],
-              ),
-              if (_isEditMode) ...[
                 const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text('Enabled'),
-                  subtitle: const Text('Allow this model to be used'),
-                  value: _enabled,
-                  onChanged: (value) {
-                    setState(() {
-                      _enabled = value;
-                    });
-                  },
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ],
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _isTestingConnection ? null : _testConnection,
-                  icon: _isTestingConnection
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.network_check, size: 20),
-                  label: Text(
-                    _isTestingConnection ? 'Testing...' : 'Test Connection',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-
-              // Display test result message
-              if (_testResultMessage != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _testResultSuccess == true
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _testResultSuccess == true
-                          ? Colors.green
-                          : Colors.red,
-                      width: 1,
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isTestingConnection ? null : _testConnection,
+                    icon: _isTestingConnection
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.network_check, size: 20),
+                    label: Text(
+                      _isTestingConnection ? 'Testing...' : 'Test Connection',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _testResultSuccess == true
-                            ? Icons.check_circle
-                            : Icons.error,
+                ),
+
+                // Display test result message
+                if (_testResultMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _testResultSuccess == true
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
                         color: _testResultSuccess == true
                             ? Colors.green
                             : Colors.red,
-                        size: 18,
+                        width: 1,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _testResultMessage!,
-                          style: TextStyle(
-                            color: _testResultSuccess == true
-                                ? Colors.green.shade700
-                                : Colors.red.shade700,
-                            fontSize: 13,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _testResultSuccess == true
+                              ? Icons.check_circle
+                              : Icons.error,
+                          color: _testResultSuccess == true
+                              ? Colors.green
+                              : Colors.red,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _testResultMessage!,
+                            style: TextStyle(
+                              color: _testResultSuccess == true
+                                  ? Colors.green.shade700
+                                  : Colors.red.shade700,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.visible,
+                            softWrap: true,
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

@@ -17,8 +17,12 @@ Smoother onboarding:
 [ ] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
 [ ] When no model configuration exists, guide the user through setting up.*
 
+General papercuts:
+[ ] Add a context menu button to re-run command
+[ ] Eliminate all non-expandable ellipsis in any of the text controls
 
-* Disrplay step-by-step instructions in the app: eg instruct the user that they need a server
+
+* Display step-by-step instructions in the app: eg instruct the user that they need a server
 and access, "Open a terminal and ssh to your development machine, type curl ... get.few.sh | bash"
 
 
