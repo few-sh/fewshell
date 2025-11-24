@@ -108,12 +108,20 @@ class EncryptedWebSocketTransport implements AgentTransport {
   "v": 1,                          // Protocol version
   "id": "msg_uuid",                // Unique message ID
   "timestamp": "2025-11-24T...",   // ISO 8601
-  "sessionId": "session_123",      // Session context
+  "connectionId": "device_abc",    // WebSocket connection (for remote only)
+  "sessionId": "session_123",      // Chat session being addressed
   "userId": "user_456",            // Sender (null for server)
   "type": "event",                 // Envelope type: "command" | "event" | "sync"
   "payload": { /* type-specific */ }
 }
 ```
+
+**Connection vs Session IDs:**
+- `connectionId`: Identifies the WebSocket connection (one per device/project for remote)
+- `sessionId`: Identifies which chat session this message is about
+- **Local mode (Isolate):** No connectionId, each isolate handles one session
+- **Remote mode (WebSocket):** One connection carries events for all sessions in project
+- Client routes events to appropriate UI based on `sessionId` in envelope
 
 **Envelope types:**
 - `command` - Client requests action (send message, approve tools, etc.)
@@ -332,27 +340,103 @@ class IsolateTransport implements AgentTransport {
 **WebSocketTransport (Remote Only):**
 ```dart
 class WebSocketTransport implements AgentTransport {
+  final String _connectionId;  // Device/user connection ID
+  final String _projectId;     // Project this connection serves
+  WebSocketChannel? _channel;
+  
   Future<void> connect() async {
     _channel = WebSocketChannel.connect(
-      Uri.parse('$serverUrl/ws?sessionId=$sessionId')
+      Uri.parse('$serverUrl/ws?connectionId=$_connectionId&projectId=$_projectId&userId=$userId'),
+      // Compression enabled by default (permessage-deflate)
+      // Typically 60-80% reduction for JSON payloads
     );
+    
+    // Receive ALL events for ALL sessions in this project
     _channel!.stream.listen((data) {
-      _messageController.add(jsonDecode(data));
+      final envelope = jsonDecode(data);
+      // Client routes by sessionId to appropriate UI component
+      _messageController.add(envelope);
     });
   }
   
   void send(Map<String, dynamic> message) {
+    // Ensure connectionId is in every message
+    message['connectionId'] = _connectionId;
     _channel!.sink.add(jsonEncode(message));
   }
 }
 ```
 
-### 2.7 Reconnection
+### 2.7 WebSocket Connection Strategy (Remote Projects)
+
+**One connection per project, broadcast all session events:**
+
+```
+┌──────────────────┐
+│  Mobile Device   │
+│                  │
+│  Session A (viewing)    ← Render deltas in real-time
+│  Session B (background) ← Update unread badge, cache to DB
+│  Session C (background) ← Update unread badge, cache to DB
+│                  │
+└────────┬─────────┘
+         │ One WebSocket (all session events)
+         ▼
+    ┌─────────┐
+    │  Server │
+    └─────────┘
+```
+
+**Simple broadcast approach:**
+
+1. **One WebSocket connection per project** (not per session)
+   - Better battery life on mobile
+   - Simpler reconnection
+   - Server broadcasts ALL events for ALL sessions in the project
+
+2. **Client routes by `sessionId`:**
+   ```dart
+   void handleAgentEvent(Map<String, dynamic> envelope) {
+     final sessionId = envelope['sessionId'];
+     final payload = envelope['payload'];
+     
+     if (sessionId == activeSessionId) {
+       // Active session: render deltas in real-time
+       _renderDelta(payload);
+     } else {
+       // Background session: update badge, cache to DB
+       _updateUnreadBadge(sessionId);
+       _cacheToDatabase(envelope);
+     }
+   }
+   ```
+
+3. **No subscribe/unsubscribe needed:**
+   - All events flow over one connection
+   - Client decides what to do based on which session is active in UI
+   - Envelope's `sessionId` provides all the routing info needed
+
+4. **Bandwidth:**
+   - Compressed via permessage-deflate (60-80% reduction)
+   - Most projects won't have many simultaneous active agent loops
+   - Simplicity worth the trade-off
+
+**Benefits:**
+- 🔋 Battery efficient: one connection vs N
+- 🔄 Simple reconnection: one connection to restore
+- 📊 Automatic sync: all sessions stay current
+- 🎯 Client-side routing: simpler server logic
+- 🔔 Real-time unread badges: naturally falls out of event stream
+
+### 2.8 Reconnection
 
 **WebSocket only:**
-- Client stores last rendered `messageId`
+- Client stores last seen `messageId` per session
 - On disconnect: exponential backoff reconnection (1s, 2s, 4s, 8s, max 30s)
-- On reconnect: server streams all events since last `messageId`
+- On reconnect:
+  1. Restore WebSocket connection with same `connectionId`
+  2. Server streams all missed events for all sessions since last `messageId`
+  3. Client routes events to appropriate sessions
 
 **Isolate (local):**
 - No reconnection needed (in-process)
@@ -479,19 +563,33 @@ class SessionStore {
 ```dart
 // Transport factory - project-based selection
 class AgentTransportFactory {
-  static AgentTransport create({
+  static final _connections = <String, WebSocketTransport>{};
+  
+  static AgentTransport createForSession({
     required String projectId,
     required String sessionId,
   }) async {
     // Get project from database
     final project = await projectDao.getProject(projectId);
     
-    // Remote project - use WebSocket
+    // Remote project - use WebSocket (reuse connection per project)
     if (project.serverUrl != null) {
-      return WebSocketTransport(project.serverUrl!, sessionId);
+      // Reuse or create connection for this project
+      final transport = _connections[projectId] ??= WebSocketTransport(
+        serverUrl: project.serverUrl!,
+        connectionId: await _getDeviceId(),
+        projectId: projectId,
+        userId: await _getUserId(),
+      );
+      
+      if (!transport.isConnected) {
+        await transport.connect();
+      }
+      
+      return transport;
     }
     
-    // Local project - use Isolate
+    // Local project - use Isolate (one per session)
     return IsolateTransport(sessionId);
   }
 }
@@ -517,8 +615,18 @@ class ChatController extends StateNotifier<ChatState> {
   }
   
   void handleAgentEvent(Map<String, dynamic> envelope) {
+    final sessionId = envelope['sessionId'];
     final payload = envelope['payload'];
     
+    // Only process events for the currently active session
+    if (sessionId != activeSessionId) {
+      // Background session: update unread badge and cache
+      _updateUnreadBadge(sessionId, payload);
+      _cacheToDatabase(envelope);
+      return;
+    }
+    
+    // Active session: render in real-time
     switch (payload['event']) {
       case 'aiDelta':
         state = state.copyWith(
@@ -536,6 +644,13 @@ class ChatController extends StateNotifier<ChatState> {
         _handleUserActivity(envelope['userId'], payload);
       case 'error':
         state = state.copyWith(error: payload['error']);
+    }
+  }
+  
+  void _updateUnreadBadge(String sessionId, Map<String, dynamic> payload) {
+    // Increment unread count based on event type
+    if (payload['event'] == 'messageComplete') {
+      sessionListController.incrementUnread(sessionId);
     }
   }
   
@@ -790,6 +905,35 @@ if (serverApiKey != null && requestApiKey != serverApiKey) {
 - WebSocket only needed for actual remote servers
 - Less code, fewer edge cases
 - Test local mode once, works everywhere
+
+### 7.7 Connection-Level WebSocket (Remote Projects)
+
+**Decision:** One WebSocket per project, broadcasts all session events
+
+**Rationale:**
+- **Simplicity:** No subscribe/unsubscribe protocol, no subscription state
+- **Mobile battery:** One connection vs N connections = significant savings
+- **Simpler reconnection:** Restore one connection, not N
+- **Client-side routing:** Envelope `sessionId` tells client which session each event is for
+- **Automatic sync:** All sessions stay current automatically
+
+**Implementation:**
+- Connection identified by `connectionId` (device) and `projectId`
+- Server broadcasts ALL events for ALL sessions in project
+- Client routes events based on `sessionId` in envelope
+- Active session: render deltas in real-time
+- Background sessions: update unread badges, cache to database
+
+**Trade-offs:**
+- More bandwidth than selective streaming (but compressed 60-80%)
+- Most projects won't have many simultaneous active agent loops
+- Simplicity and fewer bugs worth the bandwidth cost
+
+**Mobile UX benefits:**
+- Real-time unread badges (events flow automatically)
+- All sessions stay synced without extra protocol
+- Battery efficient (one connection total)
+- Simple: server doesn't track subscriptions, just broadcasts
 
 ---
 
