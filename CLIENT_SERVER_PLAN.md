@@ -235,15 +235,6 @@ await agentLoop.run(
 ```
 
 **Offline:** Everything works (source of truth is on device)
-      }
-      
-      return transport;
-    }
-    
-    // Local project - use Isolate (one per session)
-    return IsolateTransport(sessionId);
-  }
-}
 
 // Thin client controller - just UI logic
 class ChatController extends StateNotifier<ChatState> {
@@ -255,21 +246,7 @@ class ChatController extends StateNotifier<ChatState> {
 
 **Cache implementation** (pick one based on need):
 
-1. **Atomic JSON file** (start here):
-   ```dart
-   class RemoteSessionCache {
-     final _cache = <String, List<Message>>{};
-     
-     Future<void> save() async {
-       final file = File(await _cacheFile);
-       final temp = File('${file.path}.tmp');
-       await temp.writeAsString(jsonEncode(_cache));
-       await temp.rename(file.path); // Atomic rename
-     }
-   }
-   ```
-
-2. **Single-table SQLite** (if performance becomes an issue):
+1. **Single-table SQLite** (if performance becomes an issue):
    ```dart
    // One disposable table, no migrations
    CREATE TABLE cache(session_id TEXT PRIMARY KEY, data TEXT)
@@ -393,21 +370,21 @@ class RemoteSessionStore implements SessionStore {
 
 ## 5. Migration Path
 
-### Week 1: Extract Agent Loop
+### Phase 1: Extract Agent Loop
 
 - Create `decamp_core` package
 - Extract 8-line loop to `runAgentLoop()` function
 - `ChatController` now calls `runAgentLoop()`
 - **Test:** App works identically
 
-### Week 2: Basic Server
+### Phase 2: Basic Server
 
 - Implement WebSocket handler
 - Wire up `runAgentLoop()` with WebSocket callbacks
 - SQLite on server (copy client schema)
 - **Test:** Manual with `websocat` tool
 
-### Week 3: Client WebSocket
+### Phase 3: Client WebSocket
 
 - Add `serverUrl` to Sessions table
 - Implement `RemoteSessionStore`
@@ -415,7 +392,7 @@ class RemoteSessionStore implements SessionStore {
 - JSON file cache (atomic writes)
 - **Test:** Local server connection
 
-### Week 4: Polish
+### Phase 4: Polish
 
 - Reconnection (exponential backoff)
 - Error messages
