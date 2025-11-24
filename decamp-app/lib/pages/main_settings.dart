@@ -258,11 +258,21 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Project Name',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Project Name',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            IconButton.filledTonal(
+              onPressed: () => _scanAndConfigureProject(project.id),
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: 'Scan Project Config',
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         Card(
@@ -286,126 +296,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-  Widget _buildProjectSelector() {
-    final theme = Theme.of(context);
-    final projectsAsync = ref.watch(projectsStreamProvider);
-    final currentProjectId = ref.watch(currentProjectIdProvider);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Selected Project',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            projectsAsync.when(
-              data: (projects) {
-                if (projects.isEmpty) {
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: theme.colorScheme.outline),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.info_outline,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.6,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'No projects yet. Create a project from the main drawer.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(
-                                alpha: 0.6,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          prefixIcon: const Icon(Icons.folder),
-                        ),
-                        hint: const Text('Select a project'),
-                        value: currentProjectId,
-                        items: projects.map((project) {
-                          return DropdownMenuItem<String>(
-                            value: project.id,
-                            child: Text(project.name),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          if (value != null) {
-                            ref.read(currentProjectIdProvider.notifier).state =
-                                value;
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filledTonal(
-                      onPressed: () =>
-                          _scanAndConfigureProject(currentProjectId),
-                      icon: const Icon(Icons.qr_code_scanner),
-                      tooltip: 'Scan Project Config',
-                    ),
-                  ],
-                );
-              },
-              loading: () => const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (error, stack) => Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.colorScheme.error),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: theme.colorScheme.error),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Error loading projects: $error',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildAIModelsSection({required bool isGlobal}) {
     final theme = Theme.of(context);
