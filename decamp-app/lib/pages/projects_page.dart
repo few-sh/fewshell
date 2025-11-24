@@ -38,8 +38,8 @@ class ProjectsPage extends ConsumerWidget {
           await selectProject(ref, projectId);
 
           if (context.mounted) {
-            Navigator.push(
-              context,
+            // Use root navigator to push above the _HomeSelector
+            await Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(builder: (context) => const MainSettingsPage()),
             );
           }
@@ -72,8 +72,8 @@ class ProjectsPage extends ConsumerWidget {
       await selectProject(ref, projectId);
 
       if (context.mounted) {
-        Navigator.push(
-          context,
+        // Use root navigator to push above the _HomeSelector
+        await Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute(builder: (context) => const MainSettingsPage()),
         );
       }
@@ -146,26 +146,42 @@ class ProjectsPage extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    'fewshell will:\n1. get your host\'s IP address\n2. create new ssh keys\n3. select LLM provider and key',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
-                  ),
+                  // Text(
+                  //   'fewshell will:\n1. get your host\'s IP address\n2. create new ssh keys\n3. select LLM provider and key',
+                  //   textAlign: TextAlign.center,
+                  //   style: TextStyle(
+                  //     fontSize: 14,
+                  //     color: Theme.of(
+                  //       context,
+                  //     ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  //   ),
+                  // ),
                   const SizedBox(height: 24),
-                  ElevatedButton.icon(
+                  OutlinedButton.icon(
                     onPressed: () => _handleCreateProject(
                       context,
                       ref,
                       projects.map((p) => p.name).toList(),
                     ),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create Your First Project'),
-                    style: ElevatedButton.styleFrom(
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Scan QR Code'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () => _createProjectWithRandomName(
+                      context,
+                      ref,
+                      projects.map((p) => p.name).toList(),
+                    ),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Enter Manually'),
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
                         vertical: 16,
