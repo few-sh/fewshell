@@ -142,14 +142,6 @@ class ChatController extends StateNotifier<ChatState> {
     // Check if LLM is configured
     final isConfigured = await _llmService.isConfigured();
     if (!isConfigured) {
-      const configMessage =
-          "⚠️ No LLM configured. Please go to Settings → AI Models to configure an LLM provider.";
-      await _messageDao.insertMessageWithId(
-        sessionId: sessionId,
-        userId: _kAiUserId,
-        userName: _kAiUserName,
-        content: configMessage,
-      );
       return false;
     }
 
@@ -182,6 +174,7 @@ class ChatController extends StateNotifier<ChatState> {
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
     requestApproval,
+    void Function()? onNoConfig,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -194,6 +187,7 @@ class ChatController extends StateNotifier<ChatState> {
         );
         if (!isValid) {
           state = state.copyWith(isLoading: false);
+          onNoConfig?.call();
           return;
         }
       }
