@@ -78,10 +78,19 @@ class IsolateTransport implements AgentTransport {
   // Uses SendPort/ReceivePort for message passing
 }
 
-// WebSocket transport (remote mode only)
+// WebSocket transport (remote mode)
 class WebSocketTransport implements AgentTransport {
   WebSocketChannel? _channel;
   // Uses WebSocket for network communication
+}
+
+// E2EE transport (future - blind relay)
+class EncryptedWebSocketTransport implements AgentTransport {
+  WebSocketChannel? _channel;
+  CryptoKeys _keys;
+  // Encrypts/decrypts at transport layer
+  // Server sees only encrypted blobs, routes blindly
+  // Same message protocol, just encrypted
 }
 ```
 
@@ -89,75 +98,208 @@ class WebSocketTransport implements AgentTransport {
 
 ## 2. Communication Protocol
 
-### 2.1 Message Protocol (Transport-Agnostic)
+### 2.1 Message Envelope Structure
 
-**All messages are JSON maps** - same format whether sent via Isolates or WebSocket
+**All messages use a hierarchical envelope** for extensibility and future features:
 
-**Client → Server (3 types):**
-
-```json
-// Send user message (starts agent loop)
+```dart
+// Top-level envelope (always present)
 {
-  "type": "command",
-  "sessionId": "session_123",
-  "content": "deploy the app to production"
-}
-
-// Approve tool execution
-{
-  "type": "approve",
-  "sessionId": "session_123",
-  "toolIds": ["tool_1", "tool_2"]
-}
-
-// Reject/cancel tool execution  
-{
-  "type": "reject",
-  "sessionId": "session_123"
+  "v": 1,                          // Protocol version
+  "id": "msg_uuid",                // Unique message ID
+  "timestamp": "2025-11-24T...",   // ISO 8601
+  "sessionId": "session_123",      // Session context
+  "userId": "user_456",            // Sender (null for server)
+  "type": "event",                 // Envelope type: "command" | "event" | "sync"
+  "payload": { /* type-specific */ }
 }
 ```
 
-**Server → Client (4 types):**
+**Envelope types:**
+- `command` - Client requests action (send message, approve tools, etc.)
+- `event` - Server broadcasts state change (delta, approval needed, etc.)
+- `sync` - Bidirectional state sync (settings, presence, etc.)
+
+**Future-ready:**
+- Add `"encrypted": true` + `"encryptedPayload": "..."` for E2EE blind relay
+- Add `"replyTo": "msg_id"` for threading
+- Add `"priority": "high"` for urgent messages
+- Envelope unchanged, only payload varies
+
+### 2.2 Command Payloads (Client → Server)
 
 ```json
-// Streaming text delta
+// Send user message
 {
-  "type": "delta",
+  "v": 1,
+  "type": "command",
+  "userId": "user_456",
   "sessionId": "session_123",
-  "messageId": "msg_457",
-  "text": "Here is the deployment status..."
+  "payload": {
+    "action": "sendMessage",
+    "content": "deploy the app to production"
+  }
 }
 
-// Tool approval needed
+// Approve tools (single or multi-user)
 {
-  "type": "approval",
+  "v": 1,
+  "type": "command",
+  "userId": "user_456",
   "sessionId": "session_123",
-  "messageId": "msg_457",
-  "tools": [
-    {
-      "id": "tool_1",
-      "name": "execute_shell_command",
-      "params": {"command": "kubectl apply -f deploy.yaml"}
-    }
-  ]
+  "payload": {
+    "action": "approvTools",
+    "approvalId": "approval_789",
+    "toolIds": ["tool_1", "tool_2"]
+  }
+}
+
+// Typing indicator (future: multi-user)
+{
+  "v": 1,
+  "type": "sync",
+  "userId": "user_456",
+  "sessionId": "session_123",
+  "payload": {
+    "action": "typing",
+    "isTyping": true
+  }
+}
+```
+
+### 2.3 Event Payloads (Server → Client)
+
+```json
+// AI text streaming
+{
+  "v": 1,
+  "type": "event",
+  "sessionId": "session_123",
+  "payload": {
+    "event": "aiDelta",
+    "messageId": "msg_457",
+    "delta": "Here is the deployment status..."
+  }
+}
+
+// Tool output streaming (future requirement #1)
+{
+  "v": 1,
+  "type": "event",
+  "sessionId": "session_123",
+  "payload": {
+    "event": "toolOutput",
+    "toolId": "tool_1",
+    "stream": "stdout",  // or "stderr"
+    "delta": "Applying deployment.yaml...\n"
+  }
+}
+
+// Tool approval needed (supports multi-approval)
+{
+  "v": 1,
+  "type": "event",
+  "sessionId": "session_123",
+  "payload": {
+    "event": "approvalRequest",
+    "approvalId": "approval_789",
+    "messageId": "msg_457",
+    "requiredApprovals": 1,  // Future: set to 2+ for multi-person rule
+    "currentApprovals": 0,
+    "approvedBy": [],        // List of userIds who approved
+    "tools": [
+      {
+        "id": "tool_1",
+        "name": "execute_shell_command",
+        "params": {"command": "kubectl apply -f deploy.yaml"}
+      }
+    ]
+  }
+}
+
+// Approval status update (multi-user collaboration)
+{
+  "v": 1,
+  "type": "event",
+  "sessionId": "session_123",
+  "payload": {
+    "event": "approvalUpdate",
+    "approvalId": "approval_789",
+    "currentApprovals": 1,
+    "approvedBy": ["user_456"],
+    "requiresApprovals": 2,
+    "status": "pending"  // "pending" | "approved" | "rejected"
+  }
 }
 
 // Message completed
 {
-  "type": "done",
+  "v": 1,
+  "type": "event",
   "sessionId": "session_123",
-  "messageId": "msg_457"
+  "payload": {
+    "event": "messageComplete",
+    "messageId": "msg_457"
+  }
+}
+
+// User activity (typing, viewing, etc.)
+{
+  "v": 1,
+  "type": "event",
+  "sessionId": "session_123",
+  "payload": {
+    "event": "userActivity",
+    "userId": "user_789",
+    "activity": "typing",  // "typing" | "viewing" | "idle"
+    "userName": "Alice"
+  }
 }
 
 // Error occurred
 {
-  "type": "error",
+  "v": 1,
+  "type": "event",
   "sessionId": "session_123",
-  "message": "LLM API timeout"
+  "payload": {
+    "event": "error",
+    "error": "LLM API timeout",
+    "recoverable": true
+  }
 }
 ```
 
-### 2.2 Transport Implementation
+### 2.4 Protocol Versioning
+
+**Version field (`v`)** enables protocol evolution:
+- Clients and servers advertise supported versions
+- Negotiate highest common version on connect
+- Graceful degradation for older clients
+- Breaking changes = new version number
+
+### 2.5 Why Hierarchical Envelopes?
+
+**Supports all future requirements:**
+
+1. **Streaming command output:** Add `toolOutput` event type with `delta` field
+2. **Multi-user collaboration:** `userId` in envelope, `userActivity` events
+3. **Multi-person approval:** `requiredApprovals` + `approvedBy` array in approval events
+4. **Blind relay E2EE:** Handled at transport layer - `EncryptedWebSocketTransport`
+
+**Benefits over flat structure:**
+- **Extensible:** Add new envelope fields without breaking old clients
+- **Versionable:** Protocol version in every message
+- **Routable:** Server can route without parsing payload
+- **Type-safe:** Clear separation between envelope and payload schemas
+- **Debuggable:** Envelope metadata helps with tracing and logging
+
+**Cost:**
+- Slightly more verbose (~30 extra bytes per message)
+- Worth it for long-term flexibility
+
+**Note on E2EE:** Encryption is a transport concern, not a protocol concern. The `EncryptedWebSocketTransport` encrypts entire message envelopes before sending. Server routes opaque blobs without seeing content.
+
+### 2.6 Transport Implementation
 
 **IsolateTransport (Local - All Platforms):**
 ```dart
@@ -205,12 +347,12 @@ class WebSocketTransport implements AgentTransport {
 }
 ```
 
-### 2.3 Reconnection
+### 2.7 Reconnection
 
 **WebSocket only:**
 - Client stores last rendered `messageId`
 - On disconnect: exponential backoff reconnection (1s, 2s, 4s, 8s, max 30s)
-- On reconnect: server streams all deltas since last `messageId`
+- On reconnect: server streams all events since last `messageId`
 
 **Isolate (local):**
 - No reconnection needed (in-process)
@@ -357,28 +499,60 @@ class AgentTransportFactory {
 // Thin client controller - just UI logic
 class ChatController extends StateNotifier<ChatState> {
   final AgentTransport transport;
+  final String userId;
   
   void sendMessage(String content) {
-    transport.send({"type": "command", "sessionId": sessionId, "content": content});
+    final envelope = {
+      "v": 1,
+      "type": "command",
+      "userId": userId,
+      "sessionId": sessionId,
+      "timestamp": DateTime.now().toIso8601String(),
+      "payload": {
+        "action": "sendMessage",
+        "content": content
+      }
+    };
+    transport.send(envelope);
   }
   
-  void handleAgentEvent(Map<String, dynamic> event) {
-    switch (event['type']) {
-      case 'delta':
+  void handleAgentEvent(Map<String, dynamic> envelope) {
+    final payload = envelope['payload'];
+    
+    switch (payload['event']) {
+      case 'aiDelta':
         state = state.copyWith(
-          streamingText: (state.streamingText ?? '') + event['text']
+          streamingText: (state.streamingText ?? '') + payload['delta']
         );
-      case 'approval':
-        _showApprovalDialog(event['tools']);
-      case 'done':
+      case 'toolOutput':
+        _handleToolOutput(payload);
+      case 'approvalRequest':
+        _showApprovalDialog(payload['tools'], payload['approvalId']);
+      case 'approvalUpdate':
+        _updateApprovalStatus(payload);
+      case 'messageComplete':
         state = state.copyWith(streamingText: null);
+      case 'userActivity':
+        _handleUserActivity(envelope['userId'], payload);
       case 'error':
-        state = state.copyWith(error: event['message']);
+        state = state.copyWith(error: payload['error']);
     }
   }
   
-  Future<void> approveTools(List<String> toolIds) async {
-    transport.send({"type": "approve", "sessionId": sessionId, "toolIds": toolIds});
+  Future<void> approveTools(String approvalId, List<String> toolIds) async {
+    final envelope = {
+      "v": 1,
+      "type": "command",
+      "userId": userId,
+      "sessionId": sessionId,
+      "timestamp": DateTime.now().toIso8601String(),
+      "payload": {
+        "action": "approveTools",
+        "approvalId": approvalId,
+        "toolIds": toolIds
+      }
+    };
+    transport.send(envelope);
   }
 }
 
@@ -539,14 +713,25 @@ if (serverApiKey != null && requestApiKey != serverApiKey) {
 - localhost vs remote is just configuration
 - No migration complexity
 
-### 7.2 Minimal Protocol
+### 7.2 Hierarchical Message Protocol
 
-**Decision:** 7 message types (3 client→server, 4 server→client)
+**Decision:** Envelope + payload structure instead of flat messages
 
 **Rationale:**
-- Every message type is code to maintain
-- Complex protocols are hard to debug
-- Start simple, add only when needed
+- **Future-proof:** Supports streaming tool output, multi-user, multi-approval, E2EE
+- **Versionable:** Protocol version in every message for evolution
+- **Routable:** Server can route on envelope without parsing payload
+- **Encryptable:** Blind relay can encrypt payload while preserving routing metadata
+- **Extensible:** Add envelope fields (userId, replyTo, priority) without breaking clients
+
+**Trade-offs:**
+- ~30 bytes overhead per message
+- Slightly more complex parsing
+- Worth it for 10+ years of protocol stability
+
+**Message count:** Still minimal - just more structured
+- Commands: `sendMessage`, `approveTools`, `typing` (future)
+- Events: `aiDelta`, `toolOutput`, `approvalRequest`, `messageComplete`, `userActivity`, `error`
 
 ### 7.4 Database as Cache
 
@@ -634,6 +819,14 @@ if (serverApiKey != null && requestApiKey != serverApiKey) {
 - OAuth2 providers
 - Project-level access control
 
+### 8.5 End-to-End Encryption (Blind Relay)
+- New transport: `EncryptedWebSocketTransport`
+- Encrypt entire message envelopes at transport layer
+- Server routes opaque encrypted blobs
+- Zero-knowledge architecture
+- Client-to-client encryption keys
+- No protocol changes needed - transport layer concern
+
 ---
 
 ## 9. Success Criteria
@@ -686,9 +879,10 @@ decamp-app/                 # Client
 │   │   └── chat_controller.dart      # Simplified to UI logic
 │   ├── services/
 │   │   └── transport/
-│   │       ├── agent_transport.dart  # Abstract interface
-│   │       ├── isolate_transport.dart
-│   │       ├── websocket_transport.dart
+│   │       ├── agent_transport.dart          # Abstract interface
+│   │       ├── isolate_transport.dart        # Local mode
+│   │       ├── websocket_transport.dart      # Remote mode
+│   │       ├── encrypted_websocket_transport.dart  # E2EE (future)
 │   │       └── transport_factory.dart
 │   └── database/
 │       └── database.dart             # Cache only, no changes
@@ -731,19 +925,28 @@ dependencies:
 
 ## Conclusion
 
-This simplified architecture follows a single principle: **one agent loop, variable server location**. By eliminating dual execution modes and complex sync protocols, we achieve:
+This simplified architecture follows a single principle: **one agent loop, variable server location**. By using hierarchical message envelopes and project-level execution, we achieve:
 
-- **Simplicity:** ~7 message types instead of 13+, no mode switching, no sync metadata
+- **Simplicity:** Clear envelope + payload structure, project-level execution decision
+- **Future-proof:** Protocol supports streaming tool output, multi-user, multi-approval, E2EE blind relay
 - **Maintainability:** One agent loop to test and debug, shared between isolates and remote server
 - **Flexibility:** Project-level execution location (local or remote)
-- **Collaboration-ready:** Remote projects enable team sharing
+- **Collaboration-ready:** Remote projects enable team sharing with multi-user support built into protocol
 - **Optimized:** No network overhead for local projects on any platform
 - **Incremental migration:** Extract shared package first, then build transports, then optional remote server
 
 The key insights:
 1. **Client as pure UI layer** - it sends commands and renders events
 2. **Project-level execution** - all sessions in a project run in the same place (isolate or server)
-3. **Two transports only** - Isolates for local projects, WebSocket for remote projects
-4. **Settings follow the project** - remote projects sync settings from server
+3. **Hierarchical protocol** - envelope metadata + typed payloads for extensibility
+4. **Transports handle encryption** - E2EE is a transport concern, not a protocol concern
+5. **Settings follow the project** - remote projects sync settings from server
+
+**The hierarchical envelope structure is the critical decision** - it costs ~30 bytes per message but buys 10+ years of protocol evolution without breaking changes. Three of the four future requirements (streaming tool output, multi-user, multi-approval) are naturally supported by the protocol. The fourth (E2EE blind relay) is cleanly handled at the transport layer via `EncryptedWebSocketTransport`.
+
+**Separation of concerns:**
+- **Protocol layer:** Message structure, event types, business logic
+- **Transport layer:** How messages move (Isolates, WebSocket, encrypted WebSocket)
+- This separation means E2EE doesn't pollute the protocol with encryption-specific fields
 
 Start with Phase 1 (shared package extraction) to derisk the refactor without breaking the existing app.
