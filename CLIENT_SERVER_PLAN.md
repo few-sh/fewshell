@@ -29,26 +29,34 @@ while (true) {
 
 Everything else (DB, UI, streaming) is plumbing outside the loop.
 
-### 1.2 Session-Level Execution Location
+### 1.2 Project-Level Execution Location
 
-Each session has a `serverUrl` field:
-- `null` = local execution (current behavior)
-- `"https://server.com"` = remote execution
+Each project has a `serverUrl` field:
+- `null` = local project (all sessions run locally)
+- `"https://server.com"` = remote project (all sessions run on server)
 
-**Why session-level?** More flexible than project-level. User can have some local sessions for quick testing, some remote sessions for team collaboration.
+**Why project-level?** A project represents an infrastructure environment (prod servers, staging, dev machines). All sessions in that project should:
+- Use the same execution location
+- Share the same settings (SSH config, secrets, AGENTS.md)
+- Enable team collaboration (everyone sees the same remote project)
+
+**Simpler UX:** One decision per project, not per session. User creates "Production" project (remote) or "Local Testing" project (local).
 
 ### 1.3 Data Storage
 
-**Local sessions:**
+**Local projects:**
 - Source of truth: SQLite on device (current Drift database)
+- All settings, secrets, sessions in local DB + keychain
 - Works offline completely
+- Private to this device
 
-**Remote sessions:**
+**Remote projects:**
 - Source of truth: SQLite on server (same schema as client)
+- Server stores: projects, settings, secrets, sessions, messages
 - Client has simple cache (JSON file or single-table SQLite)
 - Cache is disposable - can refill from server anytime
 - Offline: read-only access to cached data
-- Online required for: new messages, edits, deletions
+- Online required for: new messages, edits, deletions, settings changes
 
 ---
 
@@ -201,62 +209,143 @@ class SessionConnection {
 
 ## 3. Storage Strategy
 
-### 3.1 Session Metadata
+### 3.1 Project Metadata
 
-Add `serverUrl` to Sessions table:
+Add `serverUrl` to Projects table:
 
 ```dart
-class Sessions extends Table {
+class Projects extends Table {
   TextColumn get id => text()();
-  TextColumn get projectId => text()();
-  TextColumn get description => text()();
+  TextColumn get name => text()();
+  TextColumn get description => text().nullable()();
   
-  // NEW: Where does this session run?
+  // NEW: Where do ALL sessions in this project run?
   TextColumn get serverUrl => text().nullable()();
-  // null = local execution, URL = remote execution
+  // null = local project, URL = remote project
   
-  // ... other fields
+  // ... other fields (createdAt, updatedAt, lastSessionDate)
 }
 ```
 
-### 3.2 Local Sessions
+**All sessions in a project share the same execution location.**
+
+### 3.2 Local Projects
 
 **Storage:** Existing Drift database on device
 
-**Execution:** Direct function calls (no WebSocket, no isolate)
+**Execution:** Direct function calls (no WebSocket)
 
 ```dart
 // Just call the agent loop directly
-await agentLoop.run(
+await runAgentLoop(
   conversation: messages,
-  onDelta: (text) => setState(() => streamingText += text),
-  onApproval: (tools) => showApprovalDialog(tools),
+  llm: llmClient,
+  tools: shellTools,
+  requestApproval: (tools) => showApprovalDialog(tools),
+  executeToolCall: (tc) => shellService.execute(tc),
+  onTextDelta: (text) => setState(() => streamingText += text),
+  onMessageComplete: (msg) => saveToDatabase(msg),
 );
 ```
 
+**Settings:** All in local database + device keychain
+
 **Offline:** Everything works (source of truth is on device)
 
-// Thin client controller - just UI logic
-class ChatController extends StateNotifier<ChatState> {
-### 3.3 Remote Sessions
+### 3.3 Remote Projects
 
 **Server storage:** SQLite database on server (same schema as client)
+- Projects, sessions, messages tables
+- Project settings (SSH config, AGENTS.md, snippets)
+- Secrets (with location metadata)
 
 **Client cache:** For offline read-only access
 
-**Cache implementation** (pick one based on need):
+**Cache implementation:** Single-table SQLite (disposable, no migrations)
 
-1. **Single-table SQLite** (if performance becomes an issue):
-   ```dart
-   // One disposable table, no migrations
-   CREATE TABLE cache(session_id TEXT PRIMARY KEY, data TEXT)
-   ```
+```dart
+// Simple cache database - separate from main app DB
+class RemoteProjectCache {
+  Database? _db;
+  
+  Future<void> init() async {
+    _db = await openDatabase('remote_cache.db', version: 1,
+      onCreate: (db, version) {
+        // Simple key-value store
+        db.execute('''
+          CREATE TABLE cache(
+            session_id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            data TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        ''');
+        db.execute('CREATE INDEX idx_project ON cache(project_id)');
+      },
+    );
+  }
+  
+  Future<void> cacheSession(String sessionId, String projectId, Map data) async {
+    await _db!.insert('cache', {
+      'session_id': sessionId,
+      'project_id': projectId,
+      'data': jsonEncode(data),
+      'updated_at': DateTime.now().millisecondsSinceEpoch,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+  
+  Future<Map?> getSession(String sessionId) async {
+    final result = await _db!.query('cache', 
+      where: 'session_id = ?', 
+      whereArgs: [sessionId]);
+    if (result.isEmpty) return null;
+    return jsonDecode(result.first['data'] as String);
+  }
+  
+  Future<void> clearProject(String projectId) async {
+    await _db!.delete('cache', where: 'project_id = ?', whereArgs: [projectId]);
+  }
+}
+```
+
+**Why SQLite for cache:**
+- Already using SQLite (no new dependency)
+- Atomic writes (crash-safe)
+- Efficient incremental updates (no re-serializing everything)
+- Easy queries (get sessions by project, prune old data)
+- Simple: one table, no migrations, disposable
+
+**Settings sync:** Fetch on project open, push on change
 
 **Offline behavior:**
 - **Reads:** Show cached data with "Offline" banner
 - **Writes:** Error message "Reconnect to send messages"
-- **Deletes:** Error message "Reconnect to delete sessions"
-- **On reconnect:** Clear cache, re-fetch from server
+- **Settings changes:** Error message "Reconnect to save settings"
+- **On reconnect:** Sync settings from server, refresh cache
+
+### 3.4 Secret Storage
+
+Secrets can be stored on device OR server (user choice per-secret):
+
+```dart
+enum SecretLocation {
+  device,  // Stored on device keychain only
+  server,  // Stored on server only
+}
+```
+
+**Device secrets:**
+- Never leave device
+- For remote projects: client sends value when server needs it (ephemeral)
+- More private, user controls access
+
+**Server secrets:**
+- Never sync to device
+- Server uses directly
+- Shared with team
+- Required for team collaboration
+
+**Default:** Device storage (more private). User explicitly chooses server for shared credentials.
 
 ---
 
@@ -324,7 +413,7 @@ Future<void> handleSession(WebSocket ws, String sid, Database db) async {
 
 **~80 lines total.**
 
-### 4.3 Client (SessionStore Interface)
+### 4.3 Client (Project-Based SessionStore)
 
 ```dart
 // Single interface, two implementations
@@ -333,21 +422,51 @@ abstract class SessionStore {
   Stream<ChatState> watchSession(String sessionId);
 }
 
+// Factory picks implementation based on project
+Provider.family<SessionStore, String>((ref, sessionId) {
+  final session = ref.watch(sessionProvider(sessionId));
+  final project = ref.watch(projectProvider(session.projectId));
+  
+  if (project.serverUrl == null) {
+    // Local project - use existing ChatController
+    return LocalSessionStore(
+      ref.watch(chatControllerProvider.notifier),
+    );
+  } else {
+    // Remote project - use WebSocket
+    return RemoteSessionStore(
+      serverUrl: project.serverUrl!,
+      projectId: project.id,
+    );
+  }
+});
+
 // Local: use existing ChatController (unchanged)
 class LocalSessionStore implements SessionStore {
-  // Uses ChatController.sendMessage() directly
+  final ChatController _controller;
+  
+  Future<void> sendMessage(String sessionId, String content) async {
+    // Just call existing code
+    await _controller.sendMessage(
+      content: content,
+      sessionId: sessionId,
+      requestApproval: showApprovalDialog,
+    );
+  }
 }
 
 // Remote: WebSocket communication
 class RemoteSessionStore implements SessionStore {
+  final String serverUrl;
+  final String projectId;
   WebSocket? _ws;
   
   Future<void> sendMessage(String sessionId, String content) async {
     if (_ws == null) {
-      _ws = await WebSocket.connect('$url?sid=$sessionId');
+      _ws = await WebSocket.connect('$serverUrl?sid=$sessionId&pid=$projectId');
       _listenForEvents();
     }
-    _ws!.send(jsonEncode({'cmd': 'run'}));
+    _ws!.send(jsonEncode({'cmd': 'run', 'content': content}));
   }
   
   void _listenForEvents() {
@@ -358,45 +477,57 @@ class RemoteSessionStore implements SessionStore {
         case 'approval': _onApprovalRequest(event['tools']);
         case 'done': _onMessageComplete();
         case 'error': _onError(event['msg']);
+        case 'secret_request': _provideSecret(event['id']);
       }
     });
+  }
+  
+  Future<void> _provideSecret(String secretId) async {
+    // Get from device keychain
+    final value = await deviceKeychain.get(projectId, secretId);
+    if (value != null) {
+      // Send ephemeral to server
+      _ws!.send(jsonEncode({'cmd': 'provide_secret', 'id': secretId, 'value': value}));
+    }
   }
 }
 ```
 
-**UI code doesn't change** - it uses `SessionStore` interface regardless of local/remote.
+**UI code doesn't change** - it uses `SessionStore` interface. Project determines local vs remote.
 
 ---
 
 ## 5. Migration Path
 
-### Phase 1: Extract Agent Loop
+### Week 1: Extract Agent Loop
 
 - Create `decamp_core` package
 - Extract 8-line loop to `runAgentLoop()` function
 - `ChatController` now calls `runAgentLoop()`
 - **Test:** App works identically
 
-### Phase 2: Basic Server
+### Week 2: Basic Server
 
 - Implement WebSocket handler
 - Wire up `runAgentLoop()` with WebSocket callbacks
 - SQLite on server (copy client schema)
 - **Test:** Manual with `websocat` tool
 
-### Phase 3: Client WebSocket
+### Week 3: Client WebSocket
 
-- Add `serverUrl` to Sessions table
+- Add `serverUrl` to Projects table
 - Implement `RemoteSessionStore`
-- UI checks `serverUrl`: null → local, URL → remote
-- JSON file cache (atomic writes)
+- Factory checks `project.serverUrl`: null → local, URL → remote
+- Simple SQLite cache (single table, disposable)
+- Settings sync on project open
 - **Test:** Local server connection
 
-### Phase 4: Polish
+### Week 4: Polish
 
 - Reconnection (exponential backoff)
 - Error messages
 - Connection status UI
+- Secret location UI (device vs server)
 - Deployment guide
 
 **Total: 4 weeks**
@@ -415,7 +546,8 @@ class RemoteSessionStore implements SessionStore {
 - ❌ E2EE (later)
 - ❌ Isolates (direct calls simpler)
 - ❌ Message envelopes (flat JSON works)
-- ❌ Complex caching (JSON file sufficient)
+- ❌ Cache migrations (disposable cache, just delete/rebuild)
+- ❌ Secret sync (device OR server, not both)
 
 Build the simplest thing. Add complexity only when users complain.
 
@@ -423,9 +555,9 @@ Build the simplest thing. Add complexity only when users complain.
 
 ## 7. Key Decisions
 
-### Session-Level Execution
+### Project-Level Execution
 
-Session has `serverUrl` field. More flexible than project-level (can mix local/remote within one project).
+Project has `serverUrl` field. All sessions in project run in same location. Simpler UX - one decision per project. Projects represent infrastructure environments that naturally belong together.
 
 ### No Isolates for Local
 
@@ -434,6 +566,10 @@ Direct function calls are simpler. Isolates add complexity without benefit (can'
 ### Simple Protocol
 
 Flat JSON messages. No envelopes, no versioning (yet). Add when first breaking change happens.
+
+### Secret Storage Choice
+
+User chooses per-secret: device OR server. Device = more private. Server = shared with team. No syncing between them - clear ownership.
 
 ### Disposable Cache
 
