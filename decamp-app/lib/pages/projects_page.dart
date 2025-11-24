@@ -35,14 +35,15 @@ class ProjectsPage extends ConsumerWidget {
         try {
           final importer = ref.read(projectImporterProvider);
           final projectId = await importer.importFromQrCode(jsonString);
+          
+          // Capture navigator before selecting project (which might unmount this widget)
+          final navigator = Navigator.of(context, rootNavigator: true);
+          
           await selectProject(ref, projectId);
 
-          if (context.mounted) {
-            // Use root navigator to push above the _HomeSelector
-            await Navigator.of(context, rootNavigator: true).push(
-              MaterialPageRoute(builder: (context) => const MainSettingsPage()),
-            );
-          }
+          await navigator.push(
+            MaterialPageRoute(builder: (context) => const MainSettingsPage()),
+          );
         } catch (e) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -69,14 +70,15 @@ class ProjectsPage extends ConsumerWidget {
 
     try {
       final projectId = await projectDao.createProjectWithId(name: name);
+      
+      // Capture navigator before selecting project (which might unmount this widget)
+      final navigator = Navigator.of(context, rootNavigator: true);
+      
       await selectProject(ref, projectId);
 
-      if (context.mounted) {
-        // Use root navigator to push above the _HomeSelector
-        await Navigator.of(context, rootNavigator: true).push(
-          MaterialPageRoute(builder: (context) => const MainSettingsPage()),
-        );
-      }
+      await navigator.push(
+        MaterialPageRoute(builder: (context) => const MainSettingsPage()),
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
