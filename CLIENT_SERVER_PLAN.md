@@ -499,21 +499,21 @@ class RemoteSessionStore implements SessionStore {
 
 ## 5. Migration Path
 
-### Week 1: Extract Agent Loop
+### Phase 1: Extract Agent Loop
 
 - Create `decamp_core` package
 - Extract 8-line loop to `runAgentLoop()` function
 - `ChatController` now calls `runAgentLoop()`
 - **Test:** App works identically
 
-### Week 2: Basic Server
+### Phase 2: Basic Server
 
 - Implement WebSocket handler
 - Wire up `runAgentLoop()` with WebSocket callbacks
 - SQLite on server (copy client schema)
 - **Test:** Manual with `websocat` tool
 
-### Week 3: Client WebSocket
+### Phase 3: Client WebSocket
 
 - Add `serverUrl` to Projects table
 - Implement `RemoteSessionStore`
@@ -522,15 +522,13 @@ class RemoteSessionStore implements SessionStore {
 - Settings sync on project open
 - **Test:** Local server connection
 
-### Week 4: Polish
+### Phase 4: Polish
 
 - Reconnection (exponential backoff)
 - Error messages
 - Connection status UI
 - Secret location UI (device vs server)
 - Deployment guide
-
-**Total: 4 weeks**
 
 ---
 
