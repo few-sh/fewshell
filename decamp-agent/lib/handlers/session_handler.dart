@@ -7,6 +7,8 @@ import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import 'connection_manager.dart';
+
 /// Handles a session's agent loop via WebSocket
 ///
 /// The server is a thin transport layer. It:
@@ -16,18 +18,33 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 ///
 /// Protocol:
 /// Client → Server:
-///   {"cmd": "run", "conversation": [...], "content": "user message"}
+///   {"cmd": "run", "projectId": "...", "conversation": [...], "content": "user message"}
 ///   {"cmd": "approve", "approved": [0, 1, 2]}  // indices to approve
 ///   {"cmd": "cancel"}
+///   {"cmd": "get_settings", "projectId": "..."}
+///   {"cmd": "set_settings", "projectId": "...", "settings": {...}}
+///   {"cmd": "get_snippets", "projectId": "..."}
+///   {"cmd": "set_snippet", "snippet": {...}}
+///   {"cmd": "delete_snippet", "id": "..."}
+///   {"cmd": "get_secrets", "projectId": "..."}
+///   {"cmd": "set_secret", "projectId": "...", "id": "...", "name": "...", "value": "..."}
+///   {"cmd": "delete_secret", "id": "..."}
 ///
 /// Server → Client:
 ///   {"t": "delta", "d": "streaming text..."}
 ///   {"t": "approval", "tools": [{index, id, name, args}, ...]}
 ///   {"t": "message", "msg": {...}}  // assistant or tool result message
 ///   {"t": "done"}
+///   {"t": "settings", "settings": {...}}
+///   {"t": "snippets", "snippets": [...]}
+///   {"t": "secrets", "secrets": [...]}  // metadata only, no values
 ///   {"t": "error", "msg": "..."}
 class SessionHandler {
   final WebSocketChannel _webSocket;
+  final ConnectionManager _connManager = ConnectionManager.instance;
+
+  /// Current project ID (set on first command that includes projectId)
+  String? _projectId;
 
   Completer<List<int>?>? _approvalCompleter;
   StreamSubscription<dynamic>? _subscription;
@@ -56,6 +73,20 @@ class SessionHandler {
   void _cleanup() {
     _subscription?.cancel();
     _approvalCompleter?.complete(null);
+    _connManager.unregisterClient(_webSocket);
+  }
+
+  /// Register this client for a project (call when projectId is first seen)
+  void _ensureRegistered(String projectId) {
+    if (_projectId != projectId) {
+      if (_projectId != null) {
+        _connManager.unregisterClient(_webSocket);
+      }
+      _projectId = projectId;
+      _connManager.registerClient(_webSocket, projectId);
+      developer.log('📋 Client registered for project: $projectId',
+          name: 'SessionHandler');
+    }
   }
 
   Future<void> _handleMessage(dynamic message) async {
@@ -68,6 +99,12 @@ class SessionHandler {
       final data = jsonDecode(message) as Map<String, dynamic>;
       final cmd = data['cmd'] as String?;
 
+      // Extract projectId if present
+      final projectId = data['projectId'] as String?;
+      if (projectId != null) {
+        _ensureRegistered(projectId);
+      }
+
       switch (cmd) {
         case 'run':
           await _handleRun(data);
@@ -77,6 +114,33 @@ class SessionHandler {
 
         case 'cancel':
           _handleCancel();
+
+        // Settings commands
+        case 'get_settings':
+          await _handleGetSettings(data);
+
+        case 'set_settings':
+          await _handleSetSettings(data);
+
+        // Snippets commands
+        case 'get_snippets':
+          await _handleGetSnippets(data);
+
+        case 'set_snippet':
+          await _handleSetSnippet(data);
+
+        case 'delete_snippet':
+          await _handleDeleteSnippet(data);
+
+        // Secrets commands
+        case 'get_secrets':
+          await _handleGetSecrets(data);
+
+        case 'set_secret':
+          await _handleSetSecret(data);
+
+        case 'delete_secret':
+          await _handleDeleteSecret(data);
 
         default:
           _sendError('Unknown command: $cmd');
@@ -360,5 +424,193 @@ class SessionHandler {
 
   String _generateId() {
     return '${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecond % 1000}';
+  }
+
+  // ============================================================
+  // Settings Handlers
+  // ============================================================
+
+  Future<void> _handleGetSettings(Map<String, dynamic> data) async {
+    final projectId = data['projectId'] as String?;
+    if (projectId == null) {
+      _sendError('projectId required');
+      return;
+    }
+
+    final settings = await _connManager.dataStore.getSettings(projectId);
+    if (settings != null) {
+      _send({'t': 'settings', 'settings': settings.toJson()});
+    } else {
+      // Send empty settings for new project
+      _send({
+        't': 'settings',
+        'settings': ProjectSettings(
+          projectId: projectId,
+          name: 'New Project',
+        ).toJson(),
+      });
+    }
+  }
+
+  Future<void> _handleSetSettings(Map<String, dynamic> data) async {
+    final projectId = data['projectId'] as String?;
+    final settingsJson = data['settings'] as Map<String, dynamic>?;
+
+    if (projectId == null || settingsJson == null) {
+      _sendError('projectId and settings required');
+      return;
+    }
+
+    try {
+      final settings = ProjectSettings.fromJson({
+        ...settingsJson,
+        'projectId': projectId,
+      });
+      await _connManager.dataStore.saveSettings(settings);
+
+      // Broadcast to all clients (including sender)
+      _connManager.broadcastToProjectAll(projectId, {
+        't': 'settings',
+        'settings': settings.toJson(),
+      });
+
+      developer.log('💾 Settings saved for project: $projectId',
+          name: 'SessionHandler');
+    } catch (e) {
+      _sendError('Failed to save settings: $e');
+    }
+  }
+
+  // ============================================================
+  // Snippets Handlers
+  // ============================================================
+
+  Future<void> _handleGetSnippets(Map<String, dynamic> data) async {
+    final projectId = data['projectId'] as String?;
+    if (projectId == null) {
+      _sendError('projectId required');
+      return;
+    }
+
+    final snippets = await _connManager.dataStore.getSnippets(projectId);
+    _send({
+      't': 'snippets',
+      'snippets': snippets.map((s) => s.toJson()).toList(),
+    });
+  }
+
+  Future<void> _handleSetSnippet(Map<String, dynamic> data) async {
+    final snippetJson = data['snippet'] as Map<String, dynamic>?;
+    if (snippetJson == null) {
+      _sendError('snippet required');
+      return;
+    }
+
+    try {
+      final snippet = Snippet.fromJson(snippetJson);
+      await _connManager.dataStore.saveSnippet(snippet);
+
+      final projectId = snippet.projectId ?? _projectId;
+      if (projectId != null) {
+        // Broadcast updated snippets list
+        final snippets = await _connManager.dataStore.getSnippets(projectId);
+        _connManager.broadcastToProjectAll(projectId, {
+          't': 'snippets',
+          'snippets': snippets.map((s) => s.toJson()).toList(),
+        });
+      }
+
+      developer.log('💾 Snippet saved: ${snippet.id}', name: 'SessionHandler');
+    } catch (e) {
+      _sendError('Failed to save snippet: $e');
+    }
+  }
+
+  Future<void> _handleDeleteSnippet(Map<String, dynamic> data) async {
+    final snippetId = data['id'] as String?;
+    if (snippetId == null) {
+      _sendError('id required');
+      return;
+    }
+
+    await _connManager.dataStore.deleteSnippet(snippetId);
+
+    // Broadcast deletion to current project
+    if (_projectId != null) {
+      final snippets = await _connManager.dataStore.getSnippets(_projectId!);
+      _connManager.broadcastToProjectAll(_projectId!, {
+        't': 'snippets',
+        'snippets': snippets.map((s) => s.toJson()).toList(),
+      });
+    }
+
+    developer.log('🗑️ Snippet deleted: $snippetId', name: 'SessionHandler');
+  }
+
+  // ============================================================
+  // Secrets Handlers
+  // ============================================================
+
+  Future<void> _handleGetSecrets(Map<String, dynamic> data) async {
+    final projectId = data['projectId'] as String?;
+    if (projectId == null) {
+      _sendError('projectId required');
+      return;
+    }
+
+    // Return metadata only, never values
+    final secrets = await _connManager.dataStore.getSecretMetadata(projectId);
+    _send({
+      't': 'secrets',
+      'secrets': secrets.map((s) => s.toJson()).toList(),
+    });
+  }
+
+  Future<void> _handleSetSecret(Map<String, dynamic> data) async {
+    final projectId = data['projectId'] as String?;
+    final secretId = data['id'] as String?;
+    final name = data['name'] as String?;
+    final value = data['value'] as String?;
+
+    if (projectId == null ||
+        secretId == null ||
+        name == null ||
+        value == null) {
+      _sendError('projectId, id, name, and value required');
+      return;
+    }
+
+    await _connManager.dataStore.saveSecret(projectId, secretId, name, value);
+
+    // Broadcast updated secrets metadata (not values!)
+    final secrets = await _connManager.dataStore.getSecretMetadata(projectId);
+    _connManager.broadcastToProjectAll(projectId, {
+      't': 'secrets',
+      'secrets': secrets.map((s) => s.toJson()).toList(),
+    });
+
+    developer.log('💾 Secret saved: $secretId', name: 'SessionHandler');
+  }
+
+  Future<void> _handleDeleteSecret(Map<String, dynamic> data) async {
+    final secretId = data['id'] as String?;
+    if (secretId == null) {
+      _sendError('id required');
+      return;
+    }
+
+    await _connManager.dataStore.deleteSecret(secretId);
+
+    // Broadcast deletion to current project
+    if (_projectId != null) {
+      final secrets =
+          await _connManager.dataStore.getSecretMetadata(_projectId!);
+      _connManager.broadcastToProjectAll(_projectId!, {
+        't': 'secrets',
+        'secrets': secrets.map((s) => s.toJson()).toList(),
+      });
+    }
+
+    developer.log('🗑️ Secret deleted: $secretId', name: 'SessionHandler');
   }
 }

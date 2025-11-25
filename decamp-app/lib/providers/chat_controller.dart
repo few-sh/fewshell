@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:agent_core/agent_core.dart';
+import 'package:agent_core/agent_core.dart' hide SshSettings;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
@@ -46,6 +46,9 @@ class ChatController extends StateNotifier<ChatState> {
   /// Server URL for remote execution (null = local project)
   final String? serverUrl;
 
+  /// Project ID for remote execution
+  final String? projectId;
+
   /// Remote session controller (lazy initialized when needed)
   RemoteSessionController? _remoteController;
 
@@ -58,6 +61,7 @@ class ChatController extends StateNotifier<ChatState> {
     SshSettings? sshSettings,
     this.sessionId,
     this.serverUrl,
+    this.projectId,
   }) : _messageDao = messageDao,
        _sessionDao = sessionDao,
        _llmService = llmService,
@@ -352,7 +356,10 @@ class ChatController extends StateNotifier<ChatState> {
     requestApproval,
   }) async {
     // Initialize remote controller if needed
-    _remoteController ??= RemoteSessionController(serverUrl: serverUrl!);
+    _remoteController ??= RemoteSessionController(
+      serverUrl: serverUrl!,
+      projectId: projectId!,
+    );
 
     // Connect if not connected
     if (!_remoteController!.isConnected) {
@@ -688,5 +695,6 @@ final chatControllerProvider =
         sshSettings: sshSettings,
         sessionId: sessionId,
         serverUrl: currentProject?.serverUrl,
+        projectId: projectId,
       );
     });

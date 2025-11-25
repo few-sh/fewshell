@@ -9,27 +9,21 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// Controller for remote session execution via WebSocket.
 ///
 /// Handles communication with decamp-agent server for remote projects.
-/// Sends conversation to server, receives streaming responses, handles
-/// tool approval flow via callbacks.
+/// Supports:
+/// - Agent loop execution (run, approve, cancel)
+/// - Settings sync (get_settings, set_settings)
+/// - Snippets sync (get_snippets, set_snippet, delete_snippet)
+/// - Secrets sync (get_secrets, set_secret, delete_secret)
 ///
-/// Protocol:
-/// Client → Server:
-///   {"cmd": "run", "conversation": [...], "content": "user message"}
-///   {"cmd": "approve", "approved": [0, 1, 2]}
-///   {"cmd": "cancel"}
-///
-/// Server → Client:
-///   {"t": "delta", "d": "streaming text..."}
-///   {"t": "approval", "tools": [{index, id, name, args}, ...]}
-///   {"t": "message", "role": "assistant"|"tool", "msg": {...}}
-///   {"t": "done"}
-///   {"t": "error", "msg": "..."}
+/// All data changes are broadcast by the server to all connected clients.
 class RemoteSessionController {
   final String serverUrl;
+  final String projectId;
+
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
 
-  // Callbacks set by sendMessage
+  // Agent loop callbacks
   Completer<void>? _runCompleter;
   void Function(String delta)? _onTextDelta;
   Future<void> Function(ChatMessage)? _onAssistantMessage;
@@ -37,7 +31,17 @@ class RemoteSessionController {
   Future<List<int>?> Function(List<Map<String, dynamic>>)? _requestApproval;
   void Function(String)? _onError;
 
-  RemoteSessionController({required this.serverUrl});
+  // Data sync callbacks (set these to receive updates)
+  void Function(ProjectSettings)? onSettingsChanged;
+  void Function(List<Snippet>)? onSnippetsChanged;
+  void Function(List<SecretMetadata>)? onSecretsChanged;
+
+  // Pending request completers
+  Completer<ProjectSettings?>? _settingsCompleter;
+  Completer<List<Snippet>>? _snippetsCompleter;
+  Completer<List<SecretMetadata>>? _secretsCompleter;
+
+  RemoteSessionController({required this.serverUrl, required this.projectId});
 
   /// Whether currently connected to server
   bool get isConnected => _channel != null;
@@ -112,8 +116,13 @@ class RemoteSessionController {
         .map((msg) => chatMessageToMap(msg, id: '', sessionId: ''))
         .toList();
 
-    // Send run command
-    _send({'cmd': 'run', 'conversation': conversationJson, 'content': content});
+    // Send run command with projectId
+    _send({
+      'cmd': 'run',
+      'projectId': projectId,
+      'conversation': conversationJson,
+      'content': content,
+    });
 
     developer.log('📤 Sent run command', name: 'RemoteSession');
 
@@ -129,6 +138,144 @@ class RemoteSessionController {
     } finally {
       _clearCallbacks();
     }
+  }
+
+  // ============================================================
+  // Settings API
+  // ============================================================
+
+  /// Get project settings from server
+  Future<ProjectSettings?> getSettings() async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return null;
+    }
+
+    _settingsCompleter = Completer<ProjectSettings?>();
+    _send({'cmd': 'get_settings', 'projectId': projectId});
+
+    try {
+      return await _settingsCompleter!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => null,
+      );
+    } finally {
+      _settingsCompleter = null;
+    }
+  }
+
+  /// Save project settings to server
+  Future<bool> saveSettings(ProjectSettings settings) async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return false;
+    }
+
+    _send({
+      'cmd': 'set_settings',
+      'projectId': projectId,
+      'settings': settings.toJson(),
+    });
+
+    return true;
+  }
+
+  // ============================================================
+  // Snippets API
+  // ============================================================
+
+  /// Get snippets from server
+  Future<List<Snippet>> getSnippets() async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return [];
+    }
+
+    _snippetsCompleter = Completer<List<Snippet>>();
+    _send({'cmd': 'get_snippets', 'projectId': projectId});
+
+    try {
+      return await _snippetsCompleter!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => [],
+      );
+    } finally {
+      _snippetsCompleter = null;
+    }
+  }
+
+  /// Save a snippet to server
+  Future<bool> saveSnippet(Snippet snippet) async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return false;
+    }
+
+    _send({'cmd': 'set_snippet', 'snippet': snippet.toJson()});
+    return true;
+  }
+
+  /// Delete a snippet from server
+  Future<bool> deleteSnippet(String snippetId) async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return false;
+    }
+
+    _send({'cmd': 'delete_snippet', 'id': snippetId});
+    return true;
+  }
+
+  // ============================================================
+  // Secrets API
+  // ============================================================
+
+  /// Get secret metadata from server (values not included)
+  Future<List<SecretMetadata>> getSecrets() async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return [];
+    }
+
+    _secretsCompleter = Completer<List<SecretMetadata>>();
+    _send({'cmd': 'get_secrets', 'projectId': projectId});
+
+    try {
+      return await _secretsCompleter!.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => [],
+      );
+    } finally {
+      _secretsCompleter = null;
+    }
+  }
+
+  /// Save a secret to server
+  Future<bool> saveSecret(String secretId, String name, String value) async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return false;
+    }
+
+    _send({
+      'cmd': 'set_secret',
+      'projectId': projectId,
+      'id': secretId,
+      'name': name,
+      'value': value,
+    });
+    return true;
+  }
+
+  /// Delete a secret from server
+  Future<bool> deleteSecret(String secretId) async {
+    if (_channel == null) {
+      final connected = await connect();
+      if (!connected) return false;
+    }
+
+    _send({'cmd': 'delete_secret', 'id': secretId});
+    return true;
   }
 
   /// Handle incoming WebSocket message
@@ -164,6 +311,16 @@ class RemoteSessionController {
           _onError?.call(errorMsg);
           _runCompleter?.completeError(Exception(errorMsg));
 
+        // Data sync events
+        case 'settings':
+          _handleSettingsReceived(data);
+
+        case 'snippets':
+          _handleSnippetsReceived(data);
+
+        case 'secrets':
+          _handleSecretsReceived(data);
+
         default:
           developer.log(
             '⚠️ Unknown message type: $type',
@@ -172,6 +329,85 @@ class RemoteSessionController {
       }
     } catch (e) {
       developer.log('❌ Error handling message: $e', name: 'RemoteSession');
+    }
+  }
+
+  /// Handle settings received from server
+  void _handleSettingsReceived(Map<String, dynamic> data) {
+    final settingsJson = data['settings'] as Map<String, dynamic>?;
+    if (settingsJson == null) return;
+
+    try {
+      final settings = ProjectSettings.fromJson(settingsJson);
+
+      // Complete pending request
+      if (_settingsCompleter != null && !_settingsCompleter!.isCompleted) {
+        _settingsCompleter!.complete(settings);
+      }
+
+      // Notify listeners (for real-time updates)
+      onSettingsChanged?.call(settings);
+
+      developer.log('📥 Settings received', name: 'RemoteSession');
+    } catch (e) {
+      developer.log('❌ Error parsing settings: $e', name: 'RemoteSession');
+      _settingsCompleter?.complete(null);
+    }
+  }
+
+  /// Handle snippets received from server
+  void _handleSnippetsReceived(Map<String, dynamic> data) {
+    final snippetsJson = data['snippets'] as List<dynamic>?;
+    if (snippetsJson == null) return;
+
+    try {
+      final snippets = snippetsJson
+          .map((s) => Snippet.fromJson(s as Map<String, dynamic>))
+          .toList();
+
+      // Complete pending request
+      if (_snippetsCompleter != null && !_snippetsCompleter!.isCompleted) {
+        _snippetsCompleter!.complete(snippets);
+      }
+
+      // Notify listeners
+      onSnippetsChanged?.call(snippets);
+
+      developer.log(
+        '📥 Snippets received: ${snippets.length}',
+        name: 'RemoteSession',
+      );
+    } catch (e) {
+      developer.log('❌ Error parsing snippets: $e', name: 'RemoteSession');
+      _snippetsCompleter?.complete([]);
+    }
+  }
+
+  /// Handle secrets metadata received from server
+  void _handleSecretsReceived(Map<String, dynamic> data) {
+    final secretsJson = data['secrets'] as List<dynamic>?;
+    if (secretsJson == null) return;
+
+    try {
+      final secrets = secretsJson
+          .map((s) => SecretMetadata.fromJson(s as Map<String, dynamic>))
+          .toList();
+
+      // Complete pending request
+      if (_secretsCompleter != null && !_secretsCompleter!.isCompleted) {
+        _secretsCompleter!.complete(secrets);
+      }
+
+      // Notify listeners
+      onSecretsChanged?.call(secrets);
+
+      developer.log(
+        '📥 Secrets received: ${secrets.length}',
+        name: 'RemoteSession',
+      );
+    } catch (e) {
+      developer.log('❌ Error parsing secrets: $e', name: 'RemoteSession');
+      _secretsCompleter?.complete([]);
     }
   }
 

@@ -15,6 +15,7 @@ dependencies:
     path: ../agent-core
   llm_dart:
     path: ../llm_dart
+  toml: ^0.17.0
 
 dev_dependencies:
   lints: ^4.0.0

@@ -517,82 +517,44 @@ class RemoteSessionStore implements SessionStore {
 - UI to configure server URL per project ✅
 - **Test:** WebSocket connects to server ✅
 
-### Phase 3.5: Server Data Storage (CURRENT)
+### Phase 3.5: Server Data Storage ✅
 
 Server needs to store project data (settings, snippets, secrets) to run agent loops.
 
+**Implemented:**
+
 **Models in agent-core:**
-```dart
-// agent-core/lib/src/models/
+- `ProjectSettings` (aggregate)
+- `LlmSettings` (provider, model, apiKey, baseUrl)
+- `SshSettings` (host, port, username, authMethod, credentials)
+- `Snippet` (id, name, content, description, tags, position, timestamps)
+- `SecretMetadata` (id, name - values never returned)
+- All have JSON serialization
 
-class ProjectSettings {
-  final String name;
-  final LlmSettings llm;
-  final SshSettings? ssh;
-  final String? systemPrompt;
-}
+**Server storage (decamp-agent):**
+- `TomlProjectDataStore` - stores in `~/.decamp/projects/{projectId}/`
+  - `settings.toml` - LLM, SSH, system prompt
+  - `snippets.toml` - All project snippets  
+  - `secrets/{id}.toml` - Each secret separately
+- `ConnectionManager` - tracks WebSocket connections per project for broadcast
 
-class LlmSettings {
-  final String provider;  // openai, anthropic, etc
-  final String model;
-  final String apiKey;
-  final String? baseUrl;
-}
+**Session handler commands:**
+- `get_settings`, `set_settings` 
+- `get_snippets`, `set_snippet`, `delete_snippet`
+- `get_secrets`, `set_secret`, `delete_secret`
+- Changes broadcast to all clients connected to same project
 
-class SshSettings {
-  final String host;
-  final int port;
-  final String username;
-  final String privateKeyPath;  // server-side path
-}
+**Client integration (decamp-app):**
+- `RemoteSessionController` - WebSocket client with all data methods
+- `remote_data_provider.dart` - Riverpod providers for remote data
+- `ChatController` passes `projectId` to `RemoteSessionController`
+- Conversion utilities between `Snippet` (agent-core) and `SnippetEntity` (local DB)
 
-class Snippet {
-  final String id;
-  final String name;
-  final String content;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-}
+**Still TODO:**
+- Wire up settings/snippets/secrets UI to detect remote and use appropriate source
+- End-to-end test: Configure LLM, add snippet, add secret, run agent loop, verify multi-client sync
 
-class SecretMetadata {
-  final String id;
-  final String name;
-  // Note: value never included in responses
-}
-```
-
-**Server storage:**
-```
-~/.decamp/projects/{projectId}/
-  settings.toml      # LLM, SSH, system prompt
-  snippets.toml      # All snippets
-  secrets.toml       # Secret values (restricted permissions)
-```
-
-**Real-time sync via WebSocket:**
-- Uses existing WebSocket connection (no separate HTTP endpoints)
-- `get_*` commands → server responds with current state
-- `set_*` / `delete_*` commands → server saves and broadcasts to all clients
-- All connected clients see changes immediately
-- No conflict dialogs needed (last write wins, but everyone sees it)
-- **Secrets:** Values are write-only (sent to server, never returned to clients)
-
-**Client integration:**
-- Send `get_settings`, `get_snippets`, `get_secrets` on WebSocket connect
-- Listen for update events, update local state via providers
-- Send commands when user saves/deletes
-- Same UI components, different data source (provider checks `isRemote`)
-
-**Steps:**
-1. Create models in agent-core (with JSON serialization)
-2. Add TOML storage in decamp-agent for settings, snippets, secrets
-3. Add command handlers to session_handler (get/set/delete for each)
-4. Track connected clients per project, broadcast changes
-5. Update RemoteSessionController to handle all commands
-6. Wire up settings/snippets/secrets UI to use remote when applicable
-- **Test:** Configure LLM, add snippet, add secret, run agent loop, verify multi-client sync
-
-### Phase 4: Cache & Offline
+### Phase 4: Cache & Offline (CURRENT)
 
 - Simple SQLite cache for offline viewing
 - Cache messages on receive
