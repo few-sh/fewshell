@@ -10,7 +10,36 @@ Enable remote execution for Decamp with minimal complexity. Keep local sessions 
 
 ## 1. Core Architecture
 
-### 1.1 The 8-Line Agent Loop
+### 1.1 Package Boundaries
+
+Three packages with clear responsibilities:
+
+**`agent-core`** (shared library):
+- Agent loop (`runAgentLoop()`)
+- Database layer (schema, DAOs) - same code for client and server
+- Tool definitions (`shellTools`)
+- Tool execution services (`ShellService`, `FetchService`)
+- Message converters (`ChatMessage` ↔ DB/JSON)
+- LLM client creation utilities
+
+**`decamp-agent`** (server):
+- WebSocket transport layer only
+- Server startup/config (port, env vars)
+- Imports and uses `agent-core` for all business logic
+
+**`decamp-app`** (Flutter client):
+- UI components and Flutter-specific code
+- For local projects: calls `agent-core` directly
+- For remote projects: WebSocket communication to server
+- Riverpod providers, navigation, themes
+
+**Why this split?** The same `agent-core` code runs whether you're:
+- Running locally (Flutter app calls `agent-core` directly)
+- Running remotely (server calls `agent-core`, client talks via WebSocket)
+
+This ensures identical behavior and avoids code duplication.
+
+### 1.2 The 8-Line Agent Loop
 
 ```dart
 // This is all the "agent loop" actually is:
@@ -29,7 +58,7 @@ while (true) {
 
 Everything else (DB, UI, streaming) is plumbing outside the loop.
 
-### 1.2 Project-Level Execution Location
+### 1.3 Project-Level Execution Location
 
 Each project has a `serverUrl` field:
 - `null` = local project (all sessions run locally)
@@ -42,7 +71,7 @@ Each project has a `serverUrl` field:
 
 **Simpler UX:** One decision per project, not per session. User creates "Production" project (remote) or "Local Testing" project (local).
 
-### 1.3 Data Storage
+### 1.4 Data Storage
 
 **Local projects:**
 - Source of truth: SQLite on device (current Drift database)
