@@ -444,24 +444,25 @@ class RemoteSessionStore implements SessionStore {
 
 ## 5. Migration Path
 
-### Phase 1: Extract Agent Loop
+### Phase 1: Extract Agent Loop ✅
 
-- Create `decamp_core` package
-- Extract 8-line loop to `runAgentLoop()` function
+- Create `agent-core` package
+- Extract loop to `runAgentLoop()` function
 - `ChatController` now calls `runAgentLoop()`
-- **Test:** App works identically
+- Move tool definitions, message converters, services to shared package
+- **Test:** App works identically ✅
 
-### Phase 2: Basic Server
+### Phase 2: Basic Server ✅
 
 - Implement WebSocket handler
 - Wire up `runAgentLoop()` with WebSocket callbacks
-- SQLite on server (copy client schema)
-- **Test:** Manual with `websocat` tool
+- Server uses `FetchExecutor` from agent-core
+- **Test:** Manual with `curl` health check ✅
 
 ### Phase 3: Client WebSocket
 
-- Add `serverUrl` to Projects table
-- Implement `RemoteSessionStore`
+- Add `serverUrl` to Projects table (Drift migration)
+- Implement `RemoteSessionController` (WebSocket client)
 - Factory checks `project.serverUrl`: null → local, URL → remote
 - Simple SQLite cache (single table, disposable)
 - Settings sync on project open
@@ -474,6 +475,49 @@ class RemoteSessionStore implements SessionStore {
 - Connection status UI
 - Secret location UI (device vs server)
 - Deployment guide
+
+### Phase 5: SSH Tunnel Mode (Future)
+
+Alternative connection method for power users who don't want a public server.
+
+**How it works:**
+```
+┌─────────────────┐     SSH Tunnel      ┌─────────────────────────────────┐
+│  Decamp App     │◄──────────────────►│  Remote Server                  │
+│  (Flutter)      │    (encrypted)      │                                 │
+│                 │                     │  decamp-agent (TCP localhost)   │
+│  SSH Client     │────────────────────►│  or Unix socket + socat         │
+│  (dartssh2)     │   Port forwarding   │                                 │
+└─────────────────┘                     └─────────────────────────────────┘
+```
+
+**Benefits:**
+- ✅ No public endpoint needed - works behind NAT/firewall
+- ✅ Uses existing SSH keys for auth
+- ✅ Familiar model (like VS Code Remote)
+- ✅ We already have SSH client (`dartssh2`)
+
+**Requirements:**
+- Agent bootstrap script (upload/run binary on remote)
+- SSH port forwarding (`directTcpIp` or `StreamLocal`)
+- Agent binary distribution (linux-x64, linux-arm64)
+- Process management on remote
+
+**Per-project connection method:**
+```dart
+enum ConnectionMethod { local, websocket, sshTunnel }
+
+// In Projects table:
+// - connectionMethod: ConnectionMethod
+// - serverUrl: String? (for websocket)
+// - sshHost/sshUser: String? (for sshTunnel - reuse SSH settings?)
+```
+
+**Deferred because:**
+- WebSocket is simpler to implement first
+- iOS SSH support is limited
+- Binary distribution adds complexity
+- Can reuse SSH settings we already have for shell execution
 
 ---
 
