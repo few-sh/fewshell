@@ -297,7 +297,7 @@ configure_ssh() {
         echo -e "${GREEN}✓${RESET} Using existing SSH key pair"
     fi
 
-    grep -qFf "${key_file}.pub" "$HOME/.ssh/authorized_keys" 2>/dev/null || cat "${key_file}.pub" >> "$HOME/.ssh/authorized_keys"
+    grep -qF "$(cat "${key_file}.pub")" "$HOME/.ssh/authorized_keys" 2>/dev/null || cat "${key_file}.pub" >> "$HOME/.ssh/authorized_keys"
     chmod 600 "$HOME/.ssh/authorized_keys"
     PRIV_KEY=$(cat "$key_file")
     echo ""
