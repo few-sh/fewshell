@@ -120,11 +120,14 @@ class ShellService {
   Future<Map<String, dynamic>> executeCommand(
     String command, {
     Map<String, String>? secrets,
+    // ignore: avoid_private_typedef_parameters
+    bool isRetry =
+        false, // Internal: prevents infinite recursion on connection retry
   }) async {
     developer.log('Executing command: $command', name: 'ShellService');
 
-    // Auto-connect if not connected
-    if (_client == null) {
+    // Auto-connect if not connected or connection is stale
+    if (!isConnected) {
       if (_sshSettings == null) {
         developer.log(
           'No SSH settings configured for this project',
@@ -136,6 +139,12 @@ class ShellService {
           'exitCode': -1,
           'executed': false,
         };
+      }
+
+      // Clean up stale client if it exists
+      if (_client != null) {
+        developer.log('Cleaning up stale connection...', name: 'ShellService');
+        _client = null;
       }
 
       developer.log('Auto-connecting to SSH server...', name: 'ShellService');
@@ -234,6 +243,26 @@ ${envExports}DECAMP_SECRETS
         'executed': true,
       };
     } catch (e) {
+      // Check if this is a connection-related error that we can retry
+      if (!isRetry && _isConnectionError(e) && _sshSettings != null) {
+        developer.log(
+          'Command failed due to connection error: $e. Attempting reconnect...',
+          name: 'ShellService',
+        );
+
+        // Clean up and try to reconnect
+        _client = null;
+        final reconnected = await connect(_sshSettings);
+        if (reconnected) {
+          developer.log(
+            'Reconnected, retrying command...',
+            name: 'ShellService',
+          );
+          // Retry the command once
+          return executeCommand(command, secrets: secrets, isRetry: true);
+        }
+      }
+
       developer.log('Command execution failed: $e', name: 'ShellService');
       return {
         'stdout': '',
@@ -247,14 +276,20 @@ ${envExports}DECAMP_SECRETS
   /// Execute a shell command with full control over stdin/stdout/stderr
   /// Returns a session that can be used for interactive commands
   Future<SSHSession?> createSession() async {
-    // Auto-connect if not connected
-    if (_client == null) {
+    // Auto-connect if not connected or connection is stale
+    if (!isConnected) {
       if (_sshSettings == null) {
         developer.log(
           'No SSH settings configured for this project',
           name: 'ShellService',
         );
         return null;
+      }
+
+      // Clean up stale client if it exists
+      if (_client != null) {
+        developer.log('Cleaning up stale connection...', name: 'ShellService');
+        _client = null;
       }
 
       developer.log('Auto-connecting to SSH server...', name: 'ShellService');
@@ -284,7 +319,22 @@ ${envExports}DECAMP_SECRETS
   }
 
   /// Check if currently connected to SSH server
-  bool get isConnected => _client != null;
+  /// Note: This checks if the client exists and hasn't been closed,
+  /// but the connection may still be stale. Connection errors are handled
+  /// automatically with retry logic in executeCommand and executeWithSudo.
+  bool get isConnected => _client != null && !_client!.isClosed;
+
+  /// Check if an exception indicates a connection problem that may be recoverable
+  /// by reconnecting
+  bool _isConnectionError(Object e) {
+    // SSHStateError with 'Transport is closed' indicates stale connection
+    if (e is SSHStateError) return true;
+    // SSHSocketError indicates network-level issues
+    if (e is SSHSocketError) return true;
+    // SSHChannelOpenError may indicate connection issues
+    if (e is SSHChannelOpenError) return true;
+    return false;
+  }
 
   /// Validate a shell command before execution
   /// Returns null if valid, error message if invalid
@@ -322,9 +372,12 @@ ${envExports}DECAMP_SECRETS
     required String command,
     String? sudoPasswordSecretId,
     Map<String, String>? secrets,
+    // ignore: avoid_private_typedef_parameters
+    bool isRetry =
+        false, // Internal: prevents infinite recursion on connection retry
   }) async {
-    // Auto-connect if not connected
-    if (_client == null) {
+    // Auto-connect if not connected or connection is stale
+    if (!isConnected) {
       if (_sshSettings == null) {
         developer.log(
           'No SSH settings configured for this project',
@@ -336,6 +389,12 @@ ${envExports}DECAMP_SECRETS
           'exitCode': -1,
           'executed': false,
         };
+      }
+
+      // Clean up stale client if it exists
+      if (_client != null) {
+        developer.log('Cleaning up stale connection...', name: 'ShellService');
+        _client = null;
       }
 
       developer.log('Auto-connecting to SSH server...', name: 'ShellService');
@@ -494,6 +553,31 @@ ${envExports}DECAMP_SECRETS
         'executed': true,
       };
     } catch (e) {
+      // Check if this is a connection-related error that we can retry
+      if (!isRetry && _isConnectionError(e) && _sshSettings != null) {
+        developer.log(
+          'Sudo command failed due to connection error: $e. Attempting reconnect...',
+          name: 'ShellService',
+        );
+
+        // Clean up and try to reconnect
+        _client = null;
+        final reconnected = await connect(_sshSettings);
+        if (reconnected) {
+          developer.log(
+            'Reconnected, retrying sudo command...',
+            name: 'ShellService',
+          );
+          // Retry the command once
+          return executeWithSudo(
+            command: command,
+            sudoPasswordSecretId: sudoPasswordSecretId,
+            secrets: secrets,
+            isRetry: true,
+          );
+        }
+      }
+
       developer.log('Sudo command execution failed: $e', name: 'ShellService');
       return {
         'stdout': '',
