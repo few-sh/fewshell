@@ -2,5 +2,7 @@
 
 export 'src/agent_loop.dart';
 export 'src/message_converter.dart';
+export 'src/services/fetch_executor.dart';
+export 'src/services/shell_executor.dart';
 export 'src/tools.dart';
 export 'src/types.dart';

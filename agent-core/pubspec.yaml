@@ -7,6 +7,8 @@ environment:
   sdk: ^3.5.0
 
 dependencies:
+  dartssh2: ^2.10.1
+  http: ^1.2.0
   llm_dart:
     path: ../llm_dart
 

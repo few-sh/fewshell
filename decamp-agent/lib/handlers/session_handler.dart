@@ -32,6 +32,13 @@ class SessionHandler {
   Completer<List<int>?>? _approvalCompleter;
   StreamSubscription<dynamic>? _subscription;
 
+  /// Shared fetch executor (stateless, can be reused)
+  final FetchExecutor _fetchExecutor = FetchExecutor();
+
+  /// SSH executor (per-session, maintains connection state)
+  /// Initialized when client provides SSH settings
+  ShellExecutor? _shellExecutor;
+
   SessionHandler(this._webSocket);
 
   /// Starts listening for commands on the WebSocket
@@ -99,8 +106,10 @@ class SessionHandler {
         try {
           conversation.add(mapToChatMessage(item as Map<String, dynamic>));
         } catch (e) {
-          developer.log('⚠️ Skipping invalid message: $e',
-              name: 'SessionHandler');
+          developer.log(
+            '⚠️ Skipping invalid message: $e',
+            name: 'SessionHandler',
+          );
         }
       }
     }
@@ -112,7 +121,8 @@ class SessionHandler {
     final llm = await _createLlmClient();
     if (llm == null) {
       _sendError(
-          'LLM not configured - set OPENAI_API_KEY environment variable');
+        'LLM not configured - please configure it via the LLM settings',
+      );
       return;
     }
 
@@ -238,19 +248,36 @@ class SessionHandler {
   }
 
   /// Executes a shell command
+  ///
+  /// Uses SSH if configured, otherwise falls back to local execution
   Future<String> _executeShell(Map<String, dynamic> args) async {
     final command = args['command'] as String? ?? '';
     final sudoRequired = args['sudo_required'] as bool? ?? false;
+    final secrets = args['secrets'] as Map<String, dynamic>?;
 
     if (command.isEmpty) {
       return jsonEncode({'error': 'Command is required'});
     }
 
+    // If SSH executor is configured, use it
+    if (_shellExecutor != null) {
+      final result = sudoRequired
+          ? await _shellExecutor!.executeWithSudo(
+              command: command,
+              secrets: secrets?.map((k, v) => MapEntry(k, v.toString())),
+            )
+          : await _shellExecutor!.executeCommand(
+              command: command,
+              secrets: secrets?.map((k, v) => MapEntry(k, v.toString())),
+            );
+
+      return jsonEncode(result);
+    }
+
+    // Fall back to local execution (no SSH)
     try {
-      // Build the actual command
       final actualCommand = sudoRequired ? 'sudo $command' : command;
 
-      // Execute via shell
       final result = await Process.run(
         '/bin/sh',
         ['-c', actualCommand],
@@ -271,7 +298,7 @@ class SessionHandler {
     }
   }
 
-  /// Executes an HTTP fetch request
+  /// Executes an HTTP fetch request using shared FetchExecutor
   Future<String> _executeFetch(Map<String, dynamic> args) async {
     final url = args['url'] as String?;
     if (url == null) {
@@ -283,43 +310,27 @@ class SessionHandler {
     final body = args['body'] as String?;
     final timeout = (args['timeout'] as num?)?.toInt() ?? 30;
 
-    try {
-      final client = HttpClient();
-      client.connectionTimeout = Duration(seconds: timeout);
+    final result = await _fetchExecutor.execute(
+      url: url,
+      method: method,
+      headers: headers?.map((k, v) => MapEntry(k, v.toString())),
+      body: body,
+      timeoutSeconds: timeout,
+    );
 
-      final uri = Uri.parse(url);
-      final request = await client.openUrl(method, uri);
-
-      // Add headers
-      if (headers != null) {
-        headers.forEach((key, value) {
-          request.headers.add(key, value.toString());
-        });
-      }
-
-      // Add body
-      if (body != null) {
-        request.write(body);
-      }
-
-      final response = await request.close();
-      final responseBody = await response.transform(utf8.decoder).join();
-
-      // Collect response headers
-      final responseHeaders = <String, String>{};
-      response.headers.forEach((name, values) {
-        responseHeaders[name] = values.join(', ');
-      });
-
-      client.close();
-
+    // Flatten the result for the tool response
+    final data = result['data'] as Map<String, dynamic>? ?? {};
+    if (result['success'] == true) {
       return jsonEncode({
-        'statusCode': response.statusCode,
-        'headers': responseHeaders,
-        'body': responseBody,
+        'statusCode': data['statusCode'],
+        'headers': data['headers'],
+        'body': data['body'],
       });
-    } catch (e) {
-      return jsonEncode({'error': 'Fetch failed: $e'});
+    } else {
+      return jsonEncode({
+        'error': result['error'] ?? 'Fetch failed',
+        'statusCode': data['statusCode'] ?? 0,
+      });
     }
   }
 

@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:shelf/shelf.dart' as shelf;
@@ -23,9 +22,9 @@ void main(List<String> args) async {
     port,
   );
 
-  developer.log(
+  // ignore: avoid_print
+  print(
     '🚀 Decamp Agent server running on http://${server.address.host}:${server.port}',
-    name: 'Server',
   );
 }
 

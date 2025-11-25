@@ -8,6 +8,14 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  asn1lib:
+    dependency: transitive
+    description:
+      name: asn1lib
+      sha256: "9a8f69025044eb466b9b60ef3bc3ac99b4dc6c158ae9c56d25eeccf5bc56d024"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.5"
   async:
     dependency: transitive
     description:
@@ -24,6 +32,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  convert:
+    dependency: transitive
+    description:
+      name: convert
+      sha256: b30acd5944035672bc15c6b7a8b47d773e41e2f17de064350988c5d02adb1c68
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.2"
   crypto:
     dependency: transitive
     description:
@@ -32,6 +48,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
+  dartssh2:
+    dependency: transitive
+    description:
+      name: dartssh2
+      sha256: bb242396c1d90f05c261b5eb8338cc67167e803c0948b0207029339cc568a66c
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.13.0"
   dio:
     dependency: transitive
     description:
@@ -48,6 +72,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.1"
+  http:
+    dependency: transitive
+    description:
+      name: http
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.6.0"
   http_methods:
     dependency: transitive
     description:
@@ -64,6 +96,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.2"
+  js:
+    dependency: transitive
+    description:
+      name: js
+      sha256: "53385261521cc4a0c4658fd0ad07a7d14591cf8fc33abbceae306ddb974888dc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.7.2"
   lints:
     dependency: "direct dev"
     description:
@@ -111,6 +151,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
+  pinenacl:
+    dependency: transitive
+    description:
+      name: pinenacl
+      sha256: "57e907beaacbc3c024a098910b6240758e899674de07d6949a67b52fd984cbdf"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.0"
+  pointycastle:
+    dependency: transitive
+    description:
+      name: pointycastle
+      sha256: "4be0097fcf3fd3e8449e53730c631200ebc7b88016acecab2b0da2f0149222fe"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.1"
   shelf:
     dependency: "direct main"
     description:
@@ -208,4 +264,4 @@ packages:
     source: hosted
     version: "3.0.3"
 sdks:
-  dart: ">=3.5.0 <4.0.0"
+  dart: ">=3.7.0-0 <4.0.0"
