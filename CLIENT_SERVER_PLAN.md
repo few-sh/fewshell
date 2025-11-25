@@ -16,28 +16,43 @@ Three packages with clear responsibilities:
 
 **`agent-core`** (shared library):
 - Agent loop (`runAgentLoop()`)
-- Database layer (schema, DAOs) - same code for client and server
 - Tool definitions (`shellTools`)
-- Tool execution services (`ShellService`, `FetchService`)
-- Message converters (`ChatMessage` ↔ DB/JSON)
-- LLM client creation utilities
+- Tool execution services (`ShellExecutor`, `FetchExecutor`)
+- Message converters (`ChatMessage` ↔ JSON)
+- **Settings models** (`ProjectSettings`, `LlmSettings`, `SshSettings`)
+- **Settings store interface** (`SettingsStore` abstract class)
 
 **`decamp-agent`** (server):
-- WebSocket transport layer only
-- Server startup/config (port, env vars)
+- WebSocket transport layer
+- REST API for settings (`GET/PUT /projects/:id/settings`)
+- **TOML settings store** (reads/writes `~/.decamp/projects/{id}.toml`)
+- Server startup/config (port, binding)
 - Imports and uses `agent-core` for all business logic
 
 **`decamp-app`** (Flutter client):
 - UI components and Flutter-specific code
 - For local projects: calls `agent-core` directly
-- For remote projects: WebSocket communication to server
+- For remote projects: WebSocket + REST communication to server
+- **Local settings store** (SharedPreferences for settings, Keychain for secrets)
+- **Remote settings client** (HTTP calls to server REST API)
 - Riverpod providers, navigation, themes
+- Drift database (projects, sessions, messages - local storage only)
 
-**Why this split?** The same `agent-core` code runs whether you're:
-- Running locally (Flutter app calls `agent-core` directly)
-- Running remotely (server calls `agent-core`, client talks via WebSocket)
+**Settings flow:**
 
-This ensures identical behavior and avoids code duplication.
+```
+Local Project:
+  UI ←→ LocalSettingsStore ←→ SharedPreferences/Keychain
+
+Remote Project:
+  UI ←→ RemoteSettingsClient ←→ HTTP ←→ Server ←→ TomlSettingsStore ←→ TOML files
+```
+
+**Why this split?** 
+- Same `agent-core` models ensure client and server speak the same language
+- Storage is platform-specific (SharedPrefs on mobile, TOML on server)
+- Secrets never leave their origin (device keychain or server files)
+- The `SettingsStore` interface allows testing with mocks
 
 ### 1.2 The 8-Line Agent Loop
 
@@ -101,6 +116,12 @@ Each project has a `serverUrl` field:
 
 // Approve tools
 {"cmd": "approve", "tools": [1, 2, 3]}
+
+// Update settings
+{"cmd": "set_settings", "settings": {...}}
+
+// Request current settings
+{"cmd": "get_settings"}
 ```
 
 **Server → Client:**
@@ -117,9 +138,18 @@ Each project has a `serverUrl` field:
 // Message complete
 {"t": "done"}
 
+// Settings (response to get_settings, or broadcast when another client changes them)
+{"t": "settings", "settings": {...}}
+
 // Error
 {"t": "error", "msg": "LLM timeout"}
 ```
+
+**Settings sync via WebSocket:**
+- Client sends `get_settings` on connect → server responds with `settings`
+- Client sends `set_settings` → server saves and broadcasts `settings` to all connected clients
+- Real-time sync: all clients see changes immediately, no conflict dialogs needed
+- Last write wins, but everyone sees it
 
 **That's it.** No versioning, no timestamps, no connection IDs, no nested payloads. Just the data you need.
 
@@ -459,16 +489,78 @@ class RemoteSessionStore implements SessionStore {
 - Server uses `FetchExecutor` from agent-core
 - **Test:** Manual with `curl` health check ✅
 
-### Phase 3: Client WebSocket
+### Phase 3: Client WebSocket ✅
 
-- Add `serverUrl` to Projects table (Drift migration)
-- Implement `RemoteSessionController` (WebSocket client)
-- Factory checks `project.serverUrl`: null → local, URL → remote
-- Simple SQLite cache (single table, disposable)
-- Settings sync on project open
-- **Test:** Local server connection
+- Add `serverUrl` to Projects table (Drift migration) ✅
+- Implement `RemoteSessionController` (WebSocket client) ✅
+- Factory checks `project.serverUrl`: null → local, URL → remote ✅
+- UI to configure server URL per project ✅
+- **Test:** WebSocket connects to server ✅
 
-### Phase 4: Polish
+### Phase 3.5: Server Settings Storage (CURRENT)
+
+Server needs to store project settings to run agent loops.
+
+**Settings models in agent-core:**
+```dart
+// agent-core/lib/src/models/
+class ProjectSettings {
+  final String name;
+  final LlmSettings llm;
+  final SshSettings? ssh;
+  final String? systemPrompt;
+}
+
+class LlmSettings {
+  final String provider;  // openai, anthropic, etc
+  final String model;
+  final String apiKey;
+  final String? baseUrl;
+}
+
+class SshSettings {
+  final String host;
+  final int port;
+  final String username;
+  final String privateKeyPath;  // server-side path
+}
+```
+
+**Server storage (TOML files):**
+```
+~/.decamp/projects/{projectId}.toml
+```
+
+**Settings sync via WebSocket (not REST):**
+- Uses existing WebSocket connection (no separate HTTP endpoints)
+- `get_settings` command → server responds with `settings` event
+- `set_settings` command → server saves and broadcasts `settings` to all clients
+- Real-time sync: all connected clients see changes immediately
+- No conflict dialogs needed (last write wins, but everyone sees it)
+
+**Client integration:**
+- Send `get_settings` on WebSocket connect
+- Listen for `settings` events, update local state
+- Send `set_settings` when user saves
+- Same UI components, different data source (provider checks `isRemote`)
+
+**Steps:**
+1. Create settings models in agent-core (with JSON serialization)
+2. Add TOML storage in decamp-agent (`TomlSettingsStore`)
+3. Add `get_settings`/`set_settings` handlers to session_handler
+4. Add settings broadcast to all connected clients on change
+5. Update RemoteSessionController to handle settings commands
+6. Wire up project settings UI to use remote when applicable
+- **Test:** Configure LLM via WebSocket, run agent loop, verify multi-client sync
+
+### Phase 4: Cache & Offline
+
+- Simple SQLite cache for offline viewing
+- Cache messages on receive
+- Show cached data with "Offline" banner when disconnected
+- **Test:** View cached sessions offline
+
+### Phase 5: Polish
 
 - Reconnection (exponential backoff)
 - Error messages
