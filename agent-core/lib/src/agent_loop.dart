@@ -55,99 +55,123 @@ Future<AgentLoopResult> runAgentLoop({
       ? List<ChatMessage>.from(conversation)
       : <ChatMessage>[];
 
-  while (true) {
-    // Get fresh conversation if provider is available (e.g., from database)
-    if (getConversation != null) {
-      messages = await getConversation();
-    }
-
-    // Stream from LLM
-    final streamResult = await _streamFromLlm(
-      llmStream: llmStream,
-      tools: tools,
-      conversation: messages,
-      onTextDelta: onTextDelta,
-    );
-
-    // Check for error
-    if (streamResult.error != null) {
-      return AgentLoopError(streamResult.error!);
-    }
-
-    // If no tool calls, we're done
-    if (streamResult.toolCalls.isEmpty) {
-      // Notify about final text message if there is one
-      if (streamResult.text.isNotEmpty && onAssistantMessage != null) {
-        await onAssistantMessage(ChatMessage.assistant(streamResult.text));
+  try {
+    while (true) {
+      // Get fresh conversation if provider is available (e.g., from database)
+      if (getConversation != null) {
+        messages = await getConversation();
       }
-      return const AgentLoopCompleted();
-    }
 
-    // Convert to pending tool calls for approval
-    final pendingCalls = streamResult.toolCalls.map((tc) {
-      final args = tc.function.arguments.isNotEmpty
-          ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
-          : <String, dynamic>{};
-      return PendingToolCall(
-        id: tc.id,
-        name: tc.function.name,
-        arguments: args,
-        originalToolCall: tc,
+      // Stream from LLM
+      final streamResult = await _streamFromLlm(
+        llmStream: llmStream,
+        tools: tools,
+        conversation: messages,
+        onTextDelta: onTextDelta,
       );
-    }).toList();
 
-    // Request approval
-    final approved = await requestApproval(pendingCalls);
+      // Check for error
+      if (streamResult.error != null) {
+        return AgentLoopError(streamResult.error!);
+      }
 
-    // User cancelled
-    if (approved == null) {
-      return const AgentLoopCancelled();
-    }
+      // If no tool calls, we're done
+      if (streamResult.toolCalls.isEmpty) {
+        // Notify about final text message if there is one
+        if (streamResult.text.isNotEmpty && onAssistantMessage != null) {
+          await onAssistantMessage(ChatMessage.assistant(streamResult.text));
+        }
+        return const AgentLoopCompleted();
+      }
 
-    // Get the approved ToolCalls
-    final approvedToolCalls = approved.map((p) => p.originalToolCall).toList();
-
-    // Build and save assistant message with tool use
-    final assistantMessage = ChatMessage.toolUse(
-      toolCalls: approvedToolCalls,
-      content: streamResult.text,
-    );
-    // Add to in-memory conversation (will be overwritten if using getConversation)
-    messages.add(assistantMessage);
-    if (onAssistantMessage != null) {
-      await onAssistantMessage(assistantMessage);
-    }
-
-    // Execute each approved tool call
-    final results = <ToolCall>[];
-    for (final toolCall in approvedToolCalls) {
-      final resultString = await executeToolCall(toolCall);
-      results.add(
-        ToolCall(
-          id: toolCall.id,
-          callType: toolCall.callType,
-          function: FunctionCall(
-            name: toolCall.function.name,
-            arguments: resultString,
+      // Convert to pending tool calls for approval
+      final pendingCalls = <PendingToolCall>[];
+      for (final tc in streamResult.toolCalls) {
+        Map<String, dynamic> args;
+        try {
+          args = tc.function.arguments.isNotEmpty
+              ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
+              : <String, dynamic>{};
+        } catch (e) {
+          return AgentLoopError(
+            'Failed to parse JSON arguments for tool ${tc.function.name}: $e',
+          );
+        }
+        pendingCalls.add(
+          PendingToolCall(
+            id: tc.id,
+            name: tc.function.name,
+            arguments: args,
+            originalToolCall: tc,
           ),
-        ),
+        );
+      }
+
+      // Request approval
+      final approved = await requestApproval(pendingCalls);
+
+      // User cancelled
+      if (approved == null) {
+        return const AgentLoopCancelled();
+      }
+
+      // Get the approved ToolCalls
+      final approvedToolCalls =
+          approved.map((p) => p.originalToolCall).toList();
+
+      // Build and save assistant message with tool use
+      final assistantMessage = ChatMessage.toolUse(
+        toolCalls: approvedToolCalls,
+        content: streamResult.text,
       );
-    }
+      // Add to in-memory conversation (will be overwritten if using getConversation)
+      messages.add(assistantMessage);
+      if (onAssistantMessage != null) {
+        await onAssistantMessage(assistantMessage);
+      }
 
-    // Build tool result message
-    final combinedContent =
-        results.map((r) => r.function.arguments).join('\n---\n');
-    final toolResultMessage = ChatMessage.toolResult(
-      results: results,
-      content: combinedContent,
-    );
-    // Add to in-memory conversation (will be overwritten if using getConversation)
-    messages.add(toolResultMessage);
-    if (onToolResultMessage != null) {
-      await onToolResultMessage(toolResultMessage);
-    }
+      // Execute each approved tool call
+      final results = <ToolCall>[];
+      for (final toolCall in approvedToolCalls) {
+        String resultString;
+        try {
+          resultString = await executeToolCall(toolCall);
+        } catch (e) {
+          // Return error as result so LLM can reason about it
+          resultString = jsonEncode({
+            'error': 'Tool "${toolCall.function.name}" failed to execute.',
+            'details': e.toString(),
+          });
+        }
+        results.add(
+          ToolCall(
+            id: toolCall.id,
+            callType: toolCall.callType,
+            function: FunctionCall(
+              name: toolCall.function.name,
+              arguments: resultString,
+            ),
+          ),
+        );
+      }
 
-    // Loop continues with updated conversation
+      // Build tool result message
+      final combinedContent =
+          results.map((r) => r.function.arguments).join('\n---\n');
+      final toolResultMessage = ChatMessage.toolResult(
+        results: results,
+        content: combinedContent,
+      );
+      // Add to in-memory conversation (will be overwritten if using getConversation)
+      messages.add(toolResultMessage);
+      if (onToolResultMessage != null) {
+        await onToolResultMessage(toolResultMessage);
+      }
+
+      // Loop continues with updated conversation
+    }
+  } catch (e) {
+    return AgentLoopError('Unexpected error in agent loop: $e');
   }
 }
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -6,36 +7,46 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 final websocketHandler = webSocketHandler(_handleWebSocket);
 
 void _handleWebSocket(WebSocketChannel webSocket) {
-  print('🔌 New WebSocket connection established');
+  developer.log('🔌 New WebSocket connection established', name: 'WebSocket');
 
   // Send welcome message
-  webSocket.sink.add(jsonEncode({
-    'type': 'connected',
-    'message': 'Connected to Decamp Agent',
-    'timestamp': DateTime.now().toIso8601String(),
-  }));
+  webSocket.sink.add(
+    jsonEncode({
+      'type': 'connected',
+      'message': 'Connected to Decamp Agent',
+      'timestamp': DateTime.now().toIso8601String(),
+    }),
+  );
 
   // Listen to incoming messages
   webSocket.stream.listen(
     (dynamic message) {
-      print('📨 Received: $message');
+      developer.log('📨 Received: $message', name: 'WebSocket');
 
       try {
-        final data = jsonDecode(message as String);
-        _handleMessage(webSocket, data);
+        // Validate message is a string before parsing
+        if (message is! String) {
+          throw const FormatException(
+            'Invalid message format: expected a string.',
+          );
+        }
+        final data = jsonDecode(message);
+        _handleMessage(webSocket, data as Map<String, dynamic>);
       } catch (e) {
-        print('❌ Error parsing message: $e');
-        webSocket.sink.add(jsonEncode({
-          'type': 'error',
-          'message': 'Invalid message format',
-        }));
+        developer.log('❌ Error parsing message: $e', name: 'WebSocket');
+        webSocket.sink.add(
+          jsonEncode({
+            'type': 'error',
+            'message': 'Invalid message format',
+          }),
+        );
       }
     },
     onDone: () {
-      print('🔌 WebSocket connection closed');
+      developer.log('🔌 WebSocket connection closed', name: 'WebSocket');
     },
     onError: (dynamic error) {
-      print('❌ WebSocket error: $error');
+      developer.log('❌ WebSocket error: $error', name: 'WebSocket');
     },
   );
 }
@@ -46,25 +57,31 @@ void _handleMessage(WebSocketChannel webSocket, Map<String, dynamic> data) {
   switch (type) {
     case 'ping':
       // Respond to ping with pong
-      webSocket.sink.add(jsonEncode({
-        'type': 'pong',
-        'timestamp': DateTime.now().toIso8601String(),
-      }));
+      webSocket.sink.add(
+        jsonEncode({
+          'type': 'pong',
+          'timestamp': DateTime.now().toIso8601String(),
+        }),
+      );
       break;
 
     case 'command':
       // Placeholder for future shell command execution
-      webSocket.sink.add(jsonEncode({
-        'type': 'command_response',
-        'message': 'Command execution not yet implemented',
-        'status': 'pending',
-      }));
+      webSocket.sink.add(
+        jsonEncode({
+          'type': 'command_response',
+          'message': 'Command execution not yet implemented',
+          'status': 'pending',
+        }),
+      );
       break;
 
     default:
-      webSocket.sink.add(jsonEncode({
-        'type': 'error',
-        'message': 'Unknown message type: $type',
-      }));
+      webSocket.sink.add(
+        jsonEncode({
+          'type': 'error',
+          'message': 'Unknown message type: $type',
+        }),
+      );
   }
 }

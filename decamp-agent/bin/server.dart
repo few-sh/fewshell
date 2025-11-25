@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:shelf/shelf.dart' as shelf;
@@ -13,7 +14,7 @@ void main(List<String> args) async {
   final handler = const shelf.Pipeline()
       .addMiddleware(shelf.logRequests())
       .addMiddleware(_corsMiddleware())
-      .addHandler(createRouter());
+      .addHandler(createRouter().call);
 
   // Start the server
   final server = await shelf_io.serve(
@@ -22,8 +23,10 @@ void main(List<String> args) async {
     port,
   );
 
-  print(
-      '🚀 Decamp Agent server running on http://${server.address.host}:${server.port}');
+  developer.log(
+    '🚀 Decamp Agent server running on http://${server.address.host}:${server.port}',
+    name: 'Server',
+  );
 }
 
 /// CORS middleware for cross-origin requests

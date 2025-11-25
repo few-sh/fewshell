@@ -10,6 +10,7 @@ dependencies:
   shelf: ^1.4.2
   shelf_router: ^1.1.4
   shelf_web_socket: ^2.0.0
+  web_socket_channel: ^3.0.0
   agent_core:
     path: ../agent-core
 
