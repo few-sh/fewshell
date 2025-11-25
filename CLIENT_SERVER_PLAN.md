@@ -117,11 +117,19 @@ Each project has a `serverUrl` field:
 // Approve tools
 {"cmd": "approve", "tools": [1, 2, 3]}
 
-// Update settings
+// Settings
+{"cmd": "get_settings"}
 {"cmd": "set_settings", "settings": {...}}
 
-// Request current settings
-{"cmd": "get_settings"}
+// Snippets
+{"cmd": "get_snippets"}
+{"cmd": "set_snippet", "snippet": {"id": "...", "name": "...", "content": "..."}}
+{"cmd": "delete_snippet", "id": "..."}
+
+// Secrets (value sent to server, never returned)
+{"cmd": "get_secrets"}
+{"cmd": "set_secret", "id": "...", "name": "...", "value": "..."}
+{"cmd": "delete_secret", "id": "..."}
 ```
 
 **Server → Client:**
@@ -138,18 +146,30 @@ Each project has a `serverUrl` field:
 // Message complete
 {"t": "done"}
 
-// Settings (response to get_settings, or broadcast when another client changes them)
+// Settings (response or broadcast)
 {"t": "settings", "settings": {...}}
+
+// Snippets (response or broadcast)
+{"t": "snippets", "snippets": [...]}
+{"t": "snippet_deleted", "id": "..."}
+
+// Secrets metadata only (never includes values)
+{"t": "secrets", "secrets": [
+  {"id": "abc", "name": "OPENAI_API_KEY"},
+  {"id": "def", "name": "SSH_PASSWORD"}
+]}
+{"t": "secret_deleted", "id": "..."}
 
 // Error
 {"t": "error", "msg": "LLM timeout"}
 ```
 
-**Settings sync via WebSocket:**
-- Client sends `get_settings` on connect → server responds with `settings`
-- Client sends `set_settings` → server saves and broadcasts `settings` to all connected clients
-- Real-time sync: all clients see changes immediately, no conflict dialogs needed
+**Real-time sync via WebSocket:**
+- Client sends `get_*` on connect → server responds with current state
+- Client sends `set_*` / `delete_*` → server saves and broadcasts to all connected clients
+- All clients see changes immediately, no conflict dialogs needed
 - Last write wins, but everyone sees it
+- **Secrets:** Values are write-only (sent to server, never returned)
 
 **That's it.** No versioning, no timestamps, no connection IDs, no nested payloads. Just the data you need.
 
@@ -497,13 +517,14 @@ class RemoteSessionStore implements SessionStore {
 - UI to configure server URL per project ✅
 - **Test:** WebSocket connects to server ✅
 
-### Phase 3.5: Server Settings Storage (CURRENT)
+### Phase 3.5: Server Data Storage (CURRENT)
 
-Server needs to store project settings to run agent loops.
+Server needs to store project data (settings, snippets, secrets) to run agent loops.
 
-**Settings models in agent-core:**
+**Models in agent-core:**
 ```dart
 // agent-core/lib/src/models/
+
 class ProjectSettings {
   final String name;
   final LlmSettings llm;
@@ -524,34 +545,52 @@ class SshSettings {
   final String username;
   final String privateKeyPath;  // server-side path
 }
+
+class Snippet {
+  final String id;
+  final String name;
+  final String content;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+class SecretMetadata {
+  final String id;
+  final String name;
+  // Note: value never included in responses
+}
 ```
 
-**Server storage (TOML files):**
+**Server storage:**
 ```
-~/.decamp/projects/{projectId}.toml
+~/.decamp/projects/{projectId}/
+  settings.toml      # LLM, SSH, system prompt
+  snippets.toml      # All snippets
+  secrets.toml       # Secret values (restricted permissions)
 ```
 
-**Settings sync via WebSocket (not REST):**
+**Real-time sync via WebSocket:**
 - Uses existing WebSocket connection (no separate HTTP endpoints)
-- `get_settings` command → server responds with `settings` event
-- `set_settings` command → server saves and broadcasts `settings` to all clients
-- Real-time sync: all connected clients see changes immediately
+- `get_*` commands → server responds with current state
+- `set_*` / `delete_*` commands → server saves and broadcasts to all clients
+- All connected clients see changes immediately
 - No conflict dialogs needed (last write wins, but everyone sees it)
+- **Secrets:** Values are write-only (sent to server, never returned to clients)
 
 **Client integration:**
-- Send `get_settings` on WebSocket connect
-- Listen for `settings` events, update local state
-- Send `set_settings` when user saves
+- Send `get_settings`, `get_snippets`, `get_secrets` on WebSocket connect
+- Listen for update events, update local state via providers
+- Send commands when user saves/deletes
 - Same UI components, different data source (provider checks `isRemote`)
 
 **Steps:**
-1. Create settings models in agent-core (with JSON serialization)
-2. Add TOML storage in decamp-agent (`TomlSettingsStore`)
-3. Add `get_settings`/`set_settings` handlers to session_handler
-4. Add settings broadcast to all connected clients on change
-5. Update RemoteSessionController to handle settings commands
-6. Wire up project settings UI to use remote when applicable
-- **Test:** Configure LLM via WebSocket, run agent loop, verify multi-client sync
+1. Create models in agent-core (with JSON serialization)
+2. Add TOML storage in decamp-agent for settings, snippets, secrets
+3. Add command handlers to session_handler (get/set/delete for each)
+4. Track connected clients per project, broadcast changes
+5. Update RemoteSessionController to handle all commands
+6. Wire up settings/snippets/secrets UI to use remote when applicable
+- **Test:** Configure LLM, add snippet, add secret, run agent loop, verify multi-client sync
 
 ### Phase 4: Cache & Offline
 
@@ -565,7 +604,6 @@ class SshSettings {
 - Reconnection (exponential backoff)
 - Error messages
 - Connection status UI
-- Secret location UI (device vs server)
 - Deployment guide
 
 ### Phase 5: SSH Tunnel Mode (Future)
