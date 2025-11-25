@@ -296,8 +296,6 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-
-
   Widget _buildAIModelsSection({required bool isGlobal}) {
     final theme = Theme.of(context);
 
@@ -560,6 +558,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   Widget _buildRemoteShellSection() {
     final theme = Theme.of(context);
     final currentProjectId = ref.watch(currentProjectIdProvider);
+    final currentProject = ref.watch(currentProjectProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -568,7 +567,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Remote Shell',
+              'Remote Execution',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -593,7 +592,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Select a project to configure remote shell connection.',
+                    'Select a project to configure remote execution settings.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                     ),
@@ -602,10 +601,165 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ],
             ),
           )
-        else
+        else ...[
+          // Server URL configuration
+          _buildServerUrlCard(currentProjectId, currentProject?.serverUrl),
+          const SizedBox(height: 16),
+          // SSH settings (for remote shell commands)
           _buildSshSettingsCard(currentProjectId),
+        ],
       ],
     );
+  }
+
+  Widget _buildServerUrlCard(String projectId, String? serverUrl) {
+    final theme = Theme.of(context);
+    final isRemote = serverUrl != null && serverUrl.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: isRemote
+              ? theme.colorScheme.primary.withValues(alpha: 0.5)
+              : theme.colorScheme.outline,
+        ),
+        borderRadius: BorderRadius.circular(8),
+        color: isRemote
+            ? theme.colorScheme.primary.withValues(alpha: 0.05)
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isRemote ? Icons.cloud : Icons.phone_android,
+                color: isRemote
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isRemote ? 'Remote Server' : 'Local Execution',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isRemote ? serverUrl : 'Agent runs on this device',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.8,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _showServerUrlDialog(projectId, serverUrl),
+                icon: Icon(isRemote ? Icons.edit : Icons.cloud_upload),
+                label: Text(isRemote ? 'Edit' : 'Connect'),
+              ),
+              if (isRemote)
+                IconButton(
+                  onPressed: () => _clearServerUrl(projectId),
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Switch to local execution',
+                ),
+            ],
+          ),
+          if (isRemote) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Commands execute on server, not this device',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showServerUrlDialog(String projectId, String? currentUrl) {
+    final controller = TextEditingController(text: currentUrl ?? '');
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Server URL'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the URL of your Decamp agent server. '
+              'Leave empty for local execution.',
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Server URL',
+                hintText: 'http://localhost:3123',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.url,
+              autofocus: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final url = controller.text.trim();
+              if (url.isEmpty) {
+                await updateProject(ref, id: projectId, clearServerUrl: true);
+              } else {
+                await updateProject(ref, id: projectId, serverUrl: url);
+              }
+              if (context.mounted) Navigator.of(context).pop();
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _clearServerUrl(String projectId) async {
+    await updateProject(ref, id: projectId, clearServerUrl: true);
   }
 
   Widget _buildSshSettingsCard(String projectId) {

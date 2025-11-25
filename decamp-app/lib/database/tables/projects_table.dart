@@ -13,6 +13,11 @@ class Projects extends Table {
   /// Optional project description
   TextColumn get description => text().nullable()();
 
+  /// Server URL for remote execution.
+  /// null = local project (runs on device)
+  /// URL = remote project (runs on server via WebSocket)
+  TextColumn get serverUrl => text().nullable()();
+
   /// Timestamp of the last session activity
   DateTimeColumn get lastSessionDate => dateTime()();
 

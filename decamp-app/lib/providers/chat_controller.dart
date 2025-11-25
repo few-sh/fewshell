@@ -9,9 +9,8 @@ import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
 import '../models/ssh_settings.dart';
 import '../services/llm_service.dart';
+import '../services/remote_session_controller.dart';
 import '../services/shell_service.dart';
-import '../services/shell_tools_provider.dart'
-    show shellTools, kExecuteShellCommand, kFetch;
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/ssh_settings_provider.dart';
@@ -32,6 +31,9 @@ const String _kAiUserName = 'Ops Agent';
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
 /// Directly calls DAOs and services without unnecessary repository layer
+///
+/// Supports both local execution (runAgentLoop) and remote execution (WebSocket to server)
+/// based on the project's serverUrl setting.
 class ChatController extends StateNotifier<ChatState> {
   final MessageDao _messageDao;
   final SessionDao _sessionDao;
@@ -41,6 +43,12 @@ class ChatController extends StateNotifier<ChatState> {
   final SshSettings? _sshSettings;
   final String? sessionId;
 
+  /// Server URL for remote execution (null = local project)
+  final String? serverUrl;
+
+  /// Remote session controller (lazy initialized when needed)
+  RemoteSessionController? _remoteController;
+
   ChatController({
     required MessageDao messageDao,
     required SessionDao sessionDao,
@@ -49,6 +57,7 @@ class ChatController extends StateNotifier<ChatState> {
     required SecretRedactor secretRedactor,
     SshSettings? sshSettings,
     this.sessionId,
+    this.serverUrl,
   }) : _messageDao = messageDao,
        _sessionDao = sessionDao,
        _llmService = llmService,
@@ -57,9 +66,15 @@ class ChatController extends StateNotifier<ChatState> {
        _sshSettings = sshSettings,
        super(const ChatState());
 
+  /// Whether this is a remote project
+  bool get isRemote => serverUrl != null;
+
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
     state = const ChatState();
+    // Disconnect remote controller if switching sessions
+    _remoteController?.disconnect();
+    _remoteController = null;
   }
 
   /// Build conversation history from database messages
@@ -189,89 +204,20 @@ class ChatController extends StateNotifier<ChatState> {
         }
       }
 
-      var aiMessageId = _messageDao.generateMessageId();
-      var hasStartedStreaming = false;
-      final streamingBuffer = StringBuffer();
-
-      // Run the agent loop using agent_core
-      final result = await runAgentLoop(
-        llmStream: (conversation, tools) =>
-            _llmService.streamChat(conversation, tools: tools),
-        tools: shellTools,
-        getConversation: () async {
-          // Rebuild conversation from database each iteration (single source of truth)
-          final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-          return _buildConversationHistory(dbMessages);
-        },
-        requestApproval: (pendingCalls) async {
-          // Convert to UI's ToolAction format
-          final actions = _pendingToolCallsToActions(pendingCalls);
-          final selectedActions = await requestApproval(actions);
-
-          if (selectedActions == null) {
-            return null; // User cancelled
-          }
-
-          developer.log(
-            '✅ User approved ${selectedActions.length} tool calls',
-            name: 'ChatController',
-          );
-
-          // Return the approved subset of PendingToolCalls
-          return pendingCalls
-              .where((pc) => selectedActions.any((a) => a.id == pc.id))
-              .toList();
-        },
-        executeToolCall: (toolCall) async {
-          // Execute and return result as JSON string
-          final result = await _executeToolCall(toolCall);
-          return jsonEncode(result);
-        },
-        onTextDelta: (delta) {
-          streamingBuffer.write(delta);
-          if (!hasStartedStreaming) {
-            startStreaming(aiMessageId);
-            hasStartedStreaming = true;
-          }
-          updateStreamingText(streamingBuffer.toString());
-        },
-        onAssistantMessage: (message) async {
-          if (hasStartedStreaming) {
-            stopStreaming();
-            hasStartedStreaming = false;
-            streamingBuffer.clear();
-          }
-
-          // Determine if this is a tool use message or a text message
-          final messageType = message.messageType;
-          if (messageType is ToolUseMessage) {
-            // Save tool use message
-            await _messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
-            );
-          } else {
-            // Save text message
-            final redactedContent = await _secretRedactor.redact(
-              message.content,
-            );
-            await _messageDao.insertMessageWithId(
-              id: aiMessageId,
-              sessionId: sessionId,
-              userId: _kAiUserId,
-              userName: _kAiUserName,
-              content: redactedContent,
-            );
-          }
-
-          // Generate new ID for next message
-          aiMessageId = _messageDao.generateMessageId();
-        },
-        onToolResultMessage: (message) async {
-          await _messageDao.insertMessage(
-            message.toMessageCompanion(sessionId: sessionId),
-          );
-        },
-      );
+      // Branch based on local vs remote execution
+      final AgentLoopResult result;
+      if (isRemote) {
+        result = await _sendMessageRemote(
+          sessionId: sessionId,
+          content: content ?? '',
+          requestApproval: requestApproval,
+        );
+      } else {
+        result = await _sendMessageLocal(
+          sessionId: sessionId,
+          requestApproval: requestApproval,
+        );
+      }
 
       // Handle result
       switch (result) {
@@ -305,8 +251,189 @@ class ChatController extends StateNotifier<ChatState> {
         userName: _kAiUserName,
         content: redactedError,
       );
+      developer.log('❌ Error: $e', name: 'ChatController');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
+  }
+
+  /// Send message using local execution (runAgentLoop)
+  Future<AgentLoopResult> _sendMessageLocal({
+    required String sessionId,
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
+    requestApproval,
+  }) async {
+    var aiMessageId = _messageDao.generateMessageId();
+    var hasStartedStreaming = false;
+    final streamingBuffer = StringBuffer();
+
+    return await runAgentLoop(
+      llmStream: (conversation, tools) =>
+          _llmService.streamChat(conversation, tools: tools),
+      tools: shellTools,
+      getConversation: () async {
+        // Rebuild conversation from database each iteration (single source of truth)
+        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+        return _buildConversationHistory(dbMessages);
+      },
+      requestApproval: (pendingCalls) async {
+        // Convert to UI's ToolAction format
+        final actions = _pendingToolCallsToActions(pendingCalls);
+        final selectedActions = await requestApproval(actions);
+
+        if (selectedActions == null) {
+          return null; // User cancelled
+        }
+
+        developer.log(
+          '✅ User approved ${selectedActions.length} tool calls',
+          name: 'ChatController',
+        );
+
+        // Return the approved subset of PendingToolCalls
+        return pendingCalls
+            .where((pc) => selectedActions.any((a) => a.id == pc.id))
+            .toList();
+      },
+      executeToolCall: (toolCall) async {
+        // Execute and return result as JSON string
+        final result = await _executeToolCall(toolCall);
+        return jsonEncode(result);
+      },
+      onTextDelta: (delta) {
+        streamingBuffer.write(delta);
+        if (!hasStartedStreaming) {
+          startStreaming(aiMessageId);
+          hasStartedStreaming = true;
+        }
+        updateStreamingText(streamingBuffer.toString());
+      },
+      onAssistantMessage: (message) async {
+        if (hasStartedStreaming) {
+          stopStreaming();
+          hasStartedStreaming = false;
+          streamingBuffer.clear();
+        }
+
+        // Determine if this is a tool use message or a text message
+        final messageType = message.messageType;
+        if (messageType is ToolUseMessage) {
+          // Save tool use message
+          await _messageDao.insertMessage(
+            message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
+          );
+        } else {
+          // Save text message
+          final redactedContent = await _secretRedactor.redact(message.content);
+          await _messageDao.insertMessageWithId(
+            id: aiMessageId,
+            sessionId: sessionId,
+            userId: _kAiUserId,
+            userName: _kAiUserName,
+            content: redactedContent,
+          );
+        }
+
+        // Generate new ID for next message
+        aiMessageId = _messageDao.generateMessageId();
+      },
+      onToolResultMessage: (message) async {
+        await _messageDao.insertMessage(
+          message.toMessageCompanion(sessionId: sessionId),
+        );
+      },
+    );
+  }
+
+  /// Send message using remote execution (WebSocket to server)
+  Future<AgentLoopResult> _sendMessageRemote({
+    required String sessionId,
+    required String content,
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
+    requestApproval,
+  }) async {
+    // Initialize remote controller if needed
+    _remoteController ??= RemoteSessionController(serverUrl: serverUrl!);
+
+    // Connect if not connected
+    if (!_remoteController!.isConnected) {
+      final connected = await _remoteController!.connect();
+      if (!connected) {
+        return AgentLoopError('Failed to connect to server');
+      }
+    }
+
+    var aiMessageId = _messageDao.generateMessageId();
+    var hasStartedStreaming = false;
+    final streamingBuffer = StringBuffer();
+
+    // Get conversation from database
+    final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+    final conversation = _buildConversationHistory(dbMessages);
+
+    return await _remoteController!.sendMessage(
+      conversation: conversation,
+      content: content,
+      onTextDelta: (delta) {
+        streamingBuffer.write(delta);
+        if (!hasStartedStreaming) {
+          startStreaming(aiMessageId);
+          hasStartedStreaming = true;
+        }
+        updateStreamingText(streamingBuffer.toString());
+      },
+      onAssistantMessage: (message) async {
+        if (hasStartedStreaming) {
+          stopStreaming();
+          hasStartedStreaming = false;
+          streamingBuffer.clear();
+        }
+
+        // Save message to local database (cache)
+        final messageType = message.messageType;
+        if (messageType is ToolUseMessage) {
+          await _messageDao.insertMessage(
+            message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
+          );
+        } else {
+          final redactedContent = await _secretRedactor.redact(message.content);
+          await _messageDao.insertMessageWithId(
+            id: aiMessageId,
+            sessionId: sessionId,
+            userId: _kAiUserId,
+            userName: _kAiUserName,
+            content: redactedContent,
+          );
+        }
+
+        aiMessageId = _messageDao.generateMessageId();
+      },
+      onToolResultMessage: (message) async {
+        await _messageDao.insertMessage(
+          message.toMessageCompanion(sessionId: sessionId),
+        );
+      },
+      requestApproval: (tools) async {
+        // Convert server tool format to UI ToolAction format
+        final actions = tools.map((t) {
+          return ToolAction(
+            id: t['id'] as String? ?? '',
+            toolName: t['name'] as String? ?? '',
+            params: t['args'] as Map<String, dynamic>? ?? {},
+          );
+        }).toList();
+
+        final selectedActions = await requestApproval(actions);
+        if (selectedActions == null) {
+          return null; // User cancelled
+        }
+
+        // Return indices of approved tools
+        return selectedActions
+            .map((a) => tools.indexWhere((t) => t['id'] == a.id))
+            .where((i) => i >= 0)
+            .toList();
+      },
+    );
   }
 
   /// Execute a single tool call and return result as Map
@@ -560,5 +687,6 @@ final chatControllerProvider =
         secretRedactor: secretRedactor,
         sshSettings: sshSettings,
         sessionId: sessionId,
+        serverUrl: currentProject?.serverUrl,
       );
     });

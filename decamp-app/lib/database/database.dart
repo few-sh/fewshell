@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   late final SnippetDao snippetDao = SnippetDao(this);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -133,6 +133,11 @@ class AppDatabase extends _$AppDatabase {
         // Migration from version 4 to 5: Add editedAt column to messages
         if (from < 5) {
           await m.addColumn(messages, messages.editedAt);
+        }
+
+        // Migration from version 5 to 6: Add serverUrl column to projects
+        if (from < 6) {
+          await m.addColumn(projects, projects.serverUrl);
         }
       },
       beforeOpen: (details) async {
