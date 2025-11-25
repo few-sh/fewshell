@@ -13,6 +13,8 @@ dependencies:
   web_socket_channel: ^3.0.0
   agent_core:
     path: ../agent-core
+  llm_dart:
+    path: ../llm_dart
 
 dev_dependencies:
   lints: ^4.0.0

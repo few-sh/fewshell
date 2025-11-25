@@ -73,7 +73,7 @@ packages:
     source: hosted
     version: "4.0.0"
   llm_dart:
-    dependency: transitive
+    dependency: "direct main"
     description:
       path: "../llm_dart"
       relative: true
