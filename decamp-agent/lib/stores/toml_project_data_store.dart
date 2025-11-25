@@ -96,14 +96,24 @@ class TomlProjectDataStore implements ProjectDataStore {
         host: map['host'] as String? ?? '',
         port: map['port'] as int? ?? 22,
         username: map['username'] as String? ?? '',
-        authMethod: SshAuthMethod.fromString(
-            map['auth_method'] as String? ?? 'password'),
+        authMethod:
+            _parseAuthMethod(map['auth_method'] as String? ?? 'password'),
         passwordSecretId: map['password_secret_id'] as String?,
         privateKeySecretId: map['private_key_secret_id'] as String?,
         passphraseSecretId: map['passphrase_secret_id'] as String?,
         sudoPasswordSecretId: map['sudo_password_secret_id'] as String?,
         enabled: map['enabled'] as bool? ?? true,
       );
+
+  SshAuthMethod _parseAuthMethod(String value) {
+    switch (value.toLowerCase()) {
+      case 'privatekey':
+      case 'private_key':
+        return SshAuthMethod.privateKey;
+      default:
+        return SshAuthMethod.password;
+    }
+  }
 
   String _settingsToToml(ProjectSettings settings) {
     final buffer = StringBuffer();

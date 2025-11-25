@@ -1,99 +1,40 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'snippet.freezed.dart';
+part 'snippet.g.dart';
+
 /// A reusable text snippet (code, command, prompt fragment).
-class Snippet {
-  /// Unique identifier
-  final String id;
+@freezed
+class Snippet with _$Snippet {
+  const factory Snippet({
+    /// Unique identifier
+    required String id,
 
-  /// Project ID (null for global snippets)
-  final String? projectId;
-
-  /// Snippet name/title
-  final String name;
-
-  /// Snippet content
-  final String content;
-
-  /// Optional description
-  final String? description;
-
-  /// Tags for categorization
-  final List<String> tags;
-
-  /// Position for ordering (lower = higher in list)
-  final int position;
-
-  /// Creation timestamp
-  final DateTime createdAt;
-
-  /// Last updated timestamp
-  final DateTime updatedAt;
-
-  const Snippet({
-    required this.id,
-    this.projectId,
-    required this.name,
-    required this.content,
-    this.description,
-    this.tags = const [],
-    this.position = 0,
-    required this.createdAt,
-    required this.updatedAt,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        if (projectId != null) 'projectId': projectId,
-        'name': name,
-        'content': content,
-        if (description != null) 'description': description,
-        'tags': tags,
-        'position': position,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
-
-  factory Snippet.fromJson(Map<String, dynamic> json) => Snippet(
-        id: json['id'] as String,
-        projectId: json['projectId'] as String?,
-        name: json['name'] as String,
-        content: json['content'] as String,
-        description: json['description'] as String?,
-        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
-        position: json['position'] as int? ?? 0,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-        updatedAt: DateTime.parse(json['updatedAt'] as String),
-      );
-
-  Snippet copyWith({
-    String? id,
+    /// Project ID (null for global snippets)
     String? projectId,
-    String? name,
-    String? content,
+
+    /// Snippet name/title
+    required String name,
+
+    /// Snippet content
+    required String content,
+
+    /// Optional description
     String? description,
-    List<String>? tags,
-    int? position,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) =>
-      Snippet(
-        id: id ?? this.id,
-        projectId: projectId ?? this.projectId,
-        name: name ?? this.name,
-        content: content ?? this.content,
-        description: description ?? this.description,
-        tags: tags ?? this.tags,
-        position: position ?? this.position,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Snippet && runtimeType == other.runtimeType && id == other.id;
+    /// Tags for categorization
+    @Default([]) List<String> tags,
 
-  @override
-  int get hashCode => id.hashCode;
+    /// Position for ordering (lower = higher in list)
+    @Default(0) int position,
 
-  @override
-  String toString() => 'Snippet(id: $id, name: $name)';
+    /// Creation timestamp
+    required DateTime createdAt,
+
+    /// Last updated timestamp
+    required DateTime updatedAt,
+  }) = _Snippet;
+
+  factory Snippet.fromJson(Map<String, dynamic> json) =>
+      _$SnippetFromJson(json);
 }

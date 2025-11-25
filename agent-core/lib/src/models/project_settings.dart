@@ -1,5 +1,10 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'llm_settings.dart';
 import 'ssh_settings.dart';
+
+part 'project_settings.freezed.dart';
+part 'project_settings.g.dart';
 
 /// Project-level settings for agent execution.
 ///
@@ -7,121 +12,48 @@ import 'ssh_settings.dart';
 /// - LLM configuration (which model to use)
 /// - SSH configuration (how to connect to remote shell)
 /// - System prompt (agent instructions)
-class ProjectSettings {
-  /// Project identifier
-  final String projectId;
+@freezed
+class ProjectSettings with _$ProjectSettings {
+  const ProjectSettings._();
 
-  /// Human-readable project name
-  final String name;
+  const factory ProjectSettings({
+    /// Project identifier
+    required String projectId,
 
-  /// List of configured LLM endpoints for this project
-  final List<LlmSettings> llmSettings;
+    /// Human-readable project name
+    required String name,
 
-  /// Default LLM identifier to use
-  final String? defaultLlmIdentifier;
+    /// List of configured LLM endpoints for this project
+    @Default([]) List<LlmSettings> llmSettings,
 
-  /// SSH/Remote shell configuration
-  final SshSettings? sshSettings;
+    /// Default LLM identifier to use
+    String? defaultLlmIdentifier,
 
-  /// System prompt / agent instructions
-  final String? systemPrompt;
+    /// SSH/Remote shell configuration
+    SshSettings? sshSettings,
 
-  /// Creation timestamp
-  final DateTime? createdAt;
+    /// System prompt / agent instructions
+    String? systemPrompt,
 
-  /// Last updated timestamp
-  final DateTime? updatedAt;
+    /// Creation timestamp
+    DateTime? createdAt,
 
-  const ProjectSettings({
-    required this.projectId,
-    required this.name,
-    this.llmSettings = const [],
-    this.defaultLlmIdentifier,
-    this.sshSettings,
-    this.systemPrompt,
-    this.createdAt,
-    this.updatedAt,
-  });
+    /// Last updated timestamp
+    DateTime? updatedAt,
+  }) = _ProjectSettings;
 
   /// Get the default LLM settings, or first enabled one
   LlmSettings? get defaultLlm {
     if (llmSettings.isEmpty) return null;
     if (defaultLlmIdentifier != null) {
       final found = llmSettings
-          .where(
-            (s) => s.identifier == defaultLlmIdentifier && s.enabled,
-          )
+          .where((s) => s.identifier == defaultLlmIdentifier && s.enabled)
           .firstOrNull;
       if (found != null) return found;
     }
     return llmSettings.where((s) => s.enabled).firstOrNull;
   }
 
-  Map<String, dynamic> toJson() => {
-        'projectId': projectId,
-        'name': name,
-        'llmSettings': llmSettings.map((s) => s.toJson()).toList(),
-        if (defaultLlmIdentifier != null)
-          'defaultLlmIdentifier': defaultLlmIdentifier,
-        if (sshSettings != null) 'sshSettings': sshSettings!.toJson(),
-        if (systemPrompt != null) 'systemPrompt': systemPrompt,
-        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
-        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
-      };
-
   factory ProjectSettings.fromJson(Map<String, dynamic> json) =>
-      ProjectSettings(
-        projectId: json['projectId'] as String,
-        name: json['name'] as String,
-        llmSettings: (json['llmSettings'] as List<dynamic>?)
-                ?.map((e) => LlmSettings.fromJson(e as Map<String, dynamic>))
-                .toList() ??
-            [],
-        defaultLlmIdentifier: json['defaultLlmIdentifier'] as String?,
-        sshSettings: json['sshSettings'] != null
-            ? SshSettings.fromJson(json['sshSettings'] as Map<String, dynamic>)
-            : null,
-        systemPrompt: json['systemPrompt'] as String?,
-        createdAt: json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'] as String)
-            : null,
-        updatedAt: json['updatedAt'] != null
-            ? DateTime.parse(json['updatedAt'] as String)
-            : null,
-      );
-
-  ProjectSettings copyWith({
-    String? projectId,
-    String? name,
-    List<LlmSettings>? llmSettings,
-    String? defaultLlmIdentifier,
-    SshSettings? sshSettings,
-    String? systemPrompt,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) =>
-      ProjectSettings(
-        projectId: projectId ?? this.projectId,
-        name: name ?? this.name,
-        llmSettings: llmSettings ?? this.llmSettings,
-        defaultLlmIdentifier: defaultLlmIdentifier ?? this.defaultLlmIdentifier,
-        sshSettings: sshSettings ?? this.sshSettings,
-        systemPrompt: systemPrompt ?? this.systemPrompt,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is ProjectSettings &&
-          runtimeType == other.runtimeType &&
-          projectId == other.projectId &&
-          name == other.name;
-
-  @override
-  int get hashCode => Object.hash(projectId, name);
-
-  @override
-  String toString() => 'ProjectSettings(projectId: $projectId, name: $name)';
+      _$ProjectSettingsFromJson(json);
 }
