@@ -2,6 +2,7 @@
 
 # get.few.sh
 # This bash script is intentionally stored as index.html
+# Cloudflare build command converts index.html.sh to index.html
 # Install: curl -LsSf get.few.sh | bash
 
 set -u
