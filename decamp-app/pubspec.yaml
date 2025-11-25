@@ -67,6 +67,10 @@ dependencies:
   llm_dart:
     path: ../llm_dart
 
+  # Agent Core
+  agent_core:
+    path: ../agent-core
+
   # HTTP Client
   dio: ^5.4.0
 

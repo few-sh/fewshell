@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'package:agent_core/agent_core.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
@@ -148,14 +149,10 @@ class ChatController extends StateNotifier<ChatState> {
     return true;
   }
 
-  /// Convert tool calls to tool actions for approval
-  List<ToolAction> _toolCallsToActions(List<ToolCall> toolCalls) {
+  /// Convert PendingToolCall to ToolAction for UI approval
+  List<ToolAction> _pendingToolCallsToActions(List<PendingToolCall> toolCalls) {
     return toolCalls.map((tc) {
-      final argumentsJson = tc.function.arguments;
-      final params = argumentsJson.isNotEmpty
-          ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-          : <String, dynamic>{};
-      return ToolAction(id: tc.id, toolName: tc.function.name, params: params);
+      return ToolAction(id: tc.id, toolName: tc.name, params: tc.arguments);
     }).toList();
   }
 
@@ -193,21 +190,100 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       var aiMessageId = _messageDao.generateMessageId();
+      var hasStartedStreaming = false;
+      final streamingBuffer = StringBuffer();
 
-      while (true) {
-        // Rebuild conversation from database (single source of truth)
-        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-        final currentConversation = _buildConversationHistory(dbMessages);
+      // Run the agent loop using agent_core
+      final result = await runAgentLoop(
+        llmStream: (conversation, tools) =>
+            _llmService.streamChat(conversation, tools: tools),
+        tools: shellTools,
+        getConversation: () async {
+          // Rebuild conversation from database each iteration (single source of truth)
+          final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+          return _buildConversationHistory(dbMessages);
+        },
+        requestApproval: (pendingCalls) async {
+          // Convert to UI's ToolAction format
+          final actions = _pendingToolCallsToActions(pendingCalls);
+          final selectedActions = await requestApproval(actions);
 
-        // Send message to AI
-        final result = await _sendMessageToAI(
-          conversation: currentConversation,
-          messageId: aiMessageId,
-        );
+          if (selectedActions == null) {
+            return null; // User cancelled
+          }
 
-        // Check for error
-        if (result.hasError) {
-          final errorMessage = 'Sorry, I encountered an error: ${result.error}';
+          developer.log(
+            '✅ User approved ${selectedActions.length} tool calls',
+            name: 'ChatController',
+          );
+
+          // Return the approved subset of PendingToolCalls
+          return pendingCalls
+              .where((pc) => selectedActions.any((a) => a.id == pc.id))
+              .toList();
+        },
+        executeToolCall: (toolCall) async {
+          // Execute and return result as JSON string
+          final result = await _executeToolCall(toolCall);
+          return jsonEncode(result);
+        },
+        onTextDelta: (delta) {
+          streamingBuffer.write(delta);
+          if (!hasStartedStreaming) {
+            startStreaming(aiMessageId);
+            hasStartedStreaming = true;
+          }
+          updateStreamingText(streamingBuffer.toString());
+        },
+        onAssistantMessage: (message) async {
+          if (hasStartedStreaming) {
+            stopStreaming();
+            hasStartedStreaming = false;
+            streamingBuffer.clear();
+          }
+
+          // Determine if this is a tool use message or a text message
+          final messageType = message.messageType;
+          if (messageType is ToolUseMessage) {
+            // Save tool use message
+            await _messageDao.insertMessage(
+              message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
+            );
+          } else {
+            // Save text message
+            final redactedContent = await _secretRedactor.redact(
+              message.content,
+            );
+            await _messageDao.insertMessageWithId(
+              id: aiMessageId,
+              sessionId: sessionId,
+              userId: _kAiUserId,
+              userName: _kAiUserName,
+              content: redactedContent,
+            );
+          }
+
+          // Generate new ID for next message
+          aiMessageId = _messageDao.generateMessageId();
+        },
+        onToolResultMessage: (message) async {
+          await _messageDao.insertMessage(
+            message.toMessageCompanion(sessionId: sessionId),
+          );
+        },
+      );
+
+      // Handle result
+      switch (result) {
+        case AgentLoopCompleted():
+          developer.log('✅ Agent loop completed', name: 'ChatController');
+        case AgentLoopCancelled():
+          developer.log(
+            '🚨 User cancelled tool execution',
+            name: 'ChatController',
+          );
+        case AgentLoopError(message: final errorMsg):
+          final errorMessage = 'Sorry, I encountered an error: $errorMsg';
           final redactedError = await _secretRedactor.redact(errorMessage);
           await _messageDao.insertMessageWithId(
             sessionId: sessionId,
@@ -215,80 +291,8 @@ class ChatController extends StateNotifier<ChatState> {
             userName: _kAiUserName,
             content: redactedError,
           );
-          state = state.copyWith(isLoading: false, error: result.error);
+          state = state.copyWith(isLoading: false, error: errorMsg);
           return;
-        }
-
-        // If no tool calls, save text response and exit loop
-        if (!result.hasToolCalls) {
-          if (result.hasTextResponse) {
-            final redactedResponse = await _secretRedactor.redact(
-              result.textResponse!,
-            );
-            await _messageDao.insertMessageWithId(
-              id: aiMessageId,
-              sessionId: sessionId,
-              userId: _kAiUserId,
-              userName: _kAiUserName,
-              content: redactedResponse,
-            );
-          }
-          break;
-        }
-
-        // Has tool calls - request approval
-        final actions = _toolCallsToActions(result.toolCalls!);
-        final selectedActions = await requestApproval(actions);
-
-        // User cancelled
-        if (selectedActions == null) {
-          developer.log(
-            '🚨 User cancelled tool execution',
-            name: 'ChatController',
-          );
-          break;
-        }
-
-        developer.log(
-          '✅ User approved ${selectedActions.length} tool calls',
-          name: 'ChatController',
-        );
-
-        // Get selected tool calls
-        final selectedToolCalls = selectedActions
-            .map(
-              (action) =>
-                  result.toolCalls!.firstWhere((tc) => tc.id == action.id),
-            )
-            .toList();
-
-        // Execute tools and get results
-        final toolExecutionResult = await _executeToolCalls(
-          toolCalls: selectedToolCalls,
-        );
-
-        // Save assistant's tool use message
-        final assistantMessage = ChatMessage.toolUse(
-          toolCalls: selectedToolCalls,
-          content: result.textResponse ?? '',
-        );
-        await _messageDao.insertMessage(
-          assistantMessage.toMessageCompanion(
-            sessionId: sessionId,
-            id: aiMessageId,
-          ),
-        );
-
-        // Save tool results message
-        await _messageDao.insertMessage(
-          toolExecutionResult.toolResultMessage.toMessageCompanion(
-            sessionId: sessionId,
-          ),
-        );
-
-        aiMessageId = _messageDao.generateMessageId();
-
-        // Loop continues - next iteration will rebuild conversation from DB
       }
 
       state = state.copyWith(isLoading: false);
@@ -305,145 +309,18 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  /// Send a message to the AI and get response
-  /// Handles streaming, tool calls, and conversation state
-  Future<_MessageResult> _sendMessageToAI({
-    required List<ChatMessage> conversation,
-    required String messageId,
-  }) async {
-    try {
-      developer.log(
-        '📤 Sending to LLM with ${conversation.length} messages in conversation',
-        name: 'ChatController',
-      );
+  /// Execute a single tool call and return result as Map
+  Future<Map<String, dynamic>> _executeToolCall(ToolCall toolCall) async {
+    final argumentsJson = toolCall.function.arguments;
+    final params = argumentsJson.isNotEmpty
+        ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+        : <String, dynamic>{};
 
-      // Log conversation summary for debugging
-      for (var i = 0; i < conversation.length; i++) {
-        final msg = conversation[i];
-        final messageType = msg.messageType;
-        if (messageType is ToolUseMessage) {
-          developer.log(
-            '  [$i] ${msg.role.name}: Tool calls (${messageType.toolCalls.length})',
-            name: 'ChatController',
-          );
-        } else if (messageType is ToolResultMessage) {
-          developer.log(
-            '  [$i] ${msg.role.name}: Tool results (${messageType.results.length})',
-            name: 'ChatController',
-          );
-        } else {
-          final preview = msg.content.length > 50
-              ? '${msg.content.substring(0, 50)}...'
-              : msg.content;
-          developer.log(
-            '  [$i] ${msg.role.name}: $preview',
-            name: 'ChatController',
-          );
-        }
-      }
-
-      // Get shell tools
-      final tools = shellTools;
-
-      // Stream from service
-      final buffer = StringBuffer();
-      final collectedToolCalls = <ToolCall>[];
-      var hasStartedStreaming = false;
-
-      await for (final event in _llmService.streamChat(
-        conversation,
-        tools: tools,
-      )) {
-        switch (event) {
-          case TextDeltaEvent(delta: final delta):
-            buffer.write(delta);
-            if (!hasStartedStreaming) {
-              startStreaming(messageId);
-              hasStartedStreaming = true;
-            }
-            updateStreamingText(buffer.toString());
-
-          case ToolCallDeltaEvent(toolCall: final toolCall):
-            collectedToolCalls.add(toolCall);
-
-          case CompletionEvent():
-            break;
-
-          case ErrorEvent(error: final error):
-            if (hasStartedStreaming) stopStreaming();
-            return _MessageResult(error: error.message);
-
-          case ThinkingDeltaEvent():
-            break;
-        }
-      }
-
-      if (hasStartedStreaming) stopStreaming();
-
-      // Build result
-      if (collectedToolCalls.isNotEmpty) {
-        return _MessageResult(
-          textResponse: buffer.toString(),
-          toolCalls: collectedToolCalls,
-        );
-      }
-
-      return _MessageResult(textResponse: buffer.toString());
-    } catch (e, stackTrace) {
-      developer.log(
-        '❌ Error sending message to AI: $e',
-        name: 'ChatController',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
-      return _MessageResult(error: e.toString());
-    }
+    final result = await _executeAction(toolCall.function.name, params);
+    return result['data'] as Map<String, dynamic>;
   }
 
-  /// Execute tool calls and return results
-  Future<_ToolExecutionResult> _executeToolCalls({
-    required List<ToolCall> toolCalls,
-  }) async {
-    final toolResults = <String, String>{};
-
-    // Execute each tool call
-    for (final toolCall in toolCalls) {
-      final argumentsJson = toolCall.function.arguments;
-      final params = argumentsJson.isNotEmpty
-          ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-          : <String, dynamic>{};
-
-      // Execute the action
-      final result = await _executeAction(toolCall.function.name, params);
-
-      // Map result for LLM
-      toolResults[toolCall.id] = jsonEncode(result['data']);
-    }
-
-    // Build consolidated tool result message
-    final allResults = toolCalls.map((toolCall) {
-      final result = toolResults[toolCall.id] ?? 'No result';
-      return ToolCall(
-        id: toolCall.id,
-        callType: toolCall.callType,
-        function: FunctionCall(name: toolCall.function.name, arguments: result),
-      );
-    }).toList();
-
-    final combinedContent = toolCalls
-        .map((toolCall) => toolResults[toolCall.id] ?? 'No result')
-        .join('\n---\n');
-
-    final toolResultMessage = ChatMessage.toolResult(
-      results: allResults,
-      content: combinedContent,
-    );
-
-    return _ToolExecutionResult(toolResultMessage: toolResultMessage);
-  }
-
-  /// Execute a single action (shell command)
+  /// Execute a single action (shell command or fetch)
   Future<Map<String, dynamic>> _executeAction(
     String actionName,
     Map<String, dynamic> params,
@@ -685,25 +562,3 @@ final chatControllerProvider =
         sessionId: sessionId,
       );
     });
-
-// Internal helper classes
-
-/// Result of sending a message to the AI
-class _MessageResult {
-  final String? textResponse;
-  final List<ToolCall>? toolCalls;
-  final String? error;
-
-  const _MessageResult({this.textResponse, this.toolCalls, this.error});
-
-  bool get hasError => error != null;
-  bool get hasToolCalls => toolCalls != null && toolCalls!.isNotEmpty;
-  bool get hasTextResponse => textResponse != null && textResponse!.isNotEmpty;
-}
-
-/// Result of tool execution
-class _ToolExecutionResult {
-  final ChatMessage toolResultMessage;
-
-  _ToolExecutionResult({required this.toolResultMessage});
-}
