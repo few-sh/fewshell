@@ -1,11 +1,6 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/project_provider.dart';
-import 'package:decamp/providers/database_provider.dart';
-import 'package:decamp/themes/terminal_theme.dart';
-import 'package:decamp/components/expandable_code_block.dart';
 import '../utils/date_formatter.dart';
 import '../utils/project_utils.dart';
 import 'project_setup_page.dart';
@@ -20,7 +15,6 @@ class ProjectsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch the projects stream
     final projectsAsync = ref.watch(projectsStreamProvider);
-    final terminalTheme = Theme.of(context).extension<TerminalTheme>()!;
 
     return Scaffold(
       appBar: AppBar(

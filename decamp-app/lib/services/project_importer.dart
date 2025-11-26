@@ -1,15 +1,11 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/database_provider.dart';
-import 'package:decamp/providers/settings_provider.dart';
-import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/providers/ssh_settings_provider.dart';
 import 'package:decamp/providers/llm_settings_provider.dart';
 import 'package:decamp/utils/project_utils.dart';
-import 'package:decamp/models/settings.dart';
 import 'package:decamp/models/ssh_settings.dart';
 import 'package:decamp/models/llm_api_settings.dart';
-import 'package:decamp/services/keychain_service.dart';
 
 final projectImporterProvider = Provider<ProjectImporter>((ref) {
   return ProjectImporter(ref);
