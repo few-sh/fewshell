@@ -512,6 +512,13 @@ generate_qr_code() {
             qr_host="$USER@$EXTERNAL_IP"
         fi
 
+        # Export variables for jq BEFORE building the filter
+        export QR_HOST="$qr_host"
+        export QR_LABEL="$qr_label"
+        export SEL_VAL
+        export QR_SSH="$qr_ssh"
+        export PROJECT_NAME
+
         # Build JSON with only non-empty fields
         local jq_filter='{}'
         [ -n "$PROJECT_NAME" ] && jq_filter=$(echo "$jq_filter" | jq '. + {n: env.PROJECT_NAME}')
@@ -519,13 +526,6 @@ generate_qr_code() {
         [ -n "$qr_label" ] && jq_filter=$(echo "$jq_filter" | jq '. + {l: env.QR_LABEL}')
         [ -n "$SEL_VAL" ] && jq_filter=$(echo "$jq_filter" | jq '. + {k: env.SEL_VAL}')
         [ -n "$qr_ssh" ] && jq_filter=$(echo "$jq_filter" | jq '. + {s: env.QR_SSH}')
-
-        # Export variables for jq
-        export QR_HOST="$qr_host"
-        export QR_LABEL="$qr_label"
-        export SEL_VAL
-        export QR_SSH="$qr_ssh"
-        export PROJECT_NAME
 
         echo -e "${CYAN}╔════════════════════════════════════════════════════════════╗"
         echo -e "║                         ${BOLD}SCAN QR CODE${RESET}${CYAN}                       ║"
