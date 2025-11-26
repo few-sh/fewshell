@@ -238,7 +238,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           snippet: snippet,
           isGlobal: isGlobal,
           onDelete: () async {
-            await deleteSnippet(ref, snippet.id);
+            await deleteSnippet(ref, snippet.id, projectId: snippet.projectId);
           },
         );
       }).toList(),
@@ -554,6 +554,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
       await updateSnippet(
         ref,
         id: widget.snippet.id,
+        projectId: widget.snippet.projectId,
         name: _descriptionController.text.trim(),
         content: _contentController.text.trim(),
         description: _descriptionController.text.trim(),

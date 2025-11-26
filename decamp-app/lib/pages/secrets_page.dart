@@ -1,7 +1,9 @@
+import 'package:agent_core/agent_core.dart' show SecretMetadata;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/keychain_service.dart';
 import '../providers/project_provider.dart';
+import '../providers/remote_data_provider.dart';
 import '../components/secret_dialog.dart';
 import '../components/project_title_bar.dart';
 
@@ -111,53 +113,78 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
   Widget _buildProjectSecretsTab() {
     final currentProjectId = ref.watch(currentProjectIdProvider);
+    final isRemote = ref.watch(isRemoteProjectProvider);
 
     return Column(
       children: [
-        _buildSecurityInfoBanner(),
-            Expanded(
-              child: currentProjectId == null
-                  ? _buildEmptyState('Please select a project')
-                  : FutureBuilder<Map<String, String>>(
-                      future: _keychainService.listProjectSecrets(
-                        currentProjectId,
-                      ),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
+        _buildSecurityInfoBanner(isRemote: isRemote),
+        Expanded(
+          child: currentProjectId == null
+              ? _buildEmptyState('Please select a project')
+              : isRemote
+              ? _buildRemoteSecretsList(currentProjectId)
+              : FutureBuilder<Map<String, String>>(
+                  future: _keychainService.listProjectSecrets(currentProjectId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text('Error loading secrets: ${snapshot.error}'),
+                      );
+                    }
+
+                    final secrets = snapshot.data ?? {};
+
+                    return secrets.isEmpty
+                        ? _buildEmptyState('No project secrets yet')
+                        : _buildSecretsList(
+                            secrets,
+                            isGlobal: false,
+                            projectId: currentProjectId,
                           );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text(
-                              'Error loading secrets: ${snapshot.error}',
-                            ),
-                          );
-                        }
-
-                        final secrets = snapshot.data ?? {};
-
-                        return secrets.isEmpty
-                            ? _buildEmptyState('No project secrets yet')
-                            : _buildSecretsList(
-                                secrets,
-                                isGlobal: false,
-                                projectId: currentProjectId,
-                              );
-                      },
-                    ),
-            ),
-            if (currentProjectId != null)
-              _buildAddButton(
-                onPressed: () => _showAddSecretDialog(
-                  isGlobal: false,
-                  projectId: currentProjectId,
+                  },
                 ),
-              ),
+        ),
+        if (currentProjectId != null)
+          _buildAddButton(
+            onPressed: () => _showAddSecretDialog(
+              isGlobal: false,
+              projectId: currentProjectId,
+              isRemote: isRemote,
+            ),
+          ),
       ],
+    );
+  }
+
+  /// Build secrets list for remote projects
+  Widget _buildRemoteSecretsList(String projectId) {
+    final secretsAsync = ref.watch(remoteSecretsProvider);
+
+    return secretsAsync.when(
+      data: (secrets) {
+        if (secrets.isEmpty) {
+          return _buildEmptyState('No project secrets yet');
+        }
+        // Convert SecretMetadata list to Map for display
+        final secretsMap = <String, String>{};
+        for (final secret in secrets) {
+          secretsMap[secret.name] = '••••••••'; // Masked value
+        }
+        return _buildSecretsList(
+          secretsMap,
+          isGlobal: false,
+          projectId: projectId,
+          isRemote: true,
+          remoteSecrets: secrets,
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stack) =>
+          Center(child: Text('Error loading secrets: $error')),
     );
   }
 
@@ -244,6 +271,8 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     Map<String, String> secrets, {
     required bool isGlobal,
     String? projectId,
+    bool isRemote = false,
+    List<SecretMetadata>? remoteSecrets,
   }) {
     final sortedKeys = secrets.keys.toList()..sort();
 
@@ -253,12 +282,19 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       itemBuilder: (context, index) {
         final key = sortedKeys[index];
         final value = secrets[key]!;
+        // Find remote secret ID if applicable
+        final remoteSecretId = remoteSecrets
+            ?.where((s) => s.name == key)
+            .map((s) => s.id)
+            .firstOrNull;
 
         return _buildSecretCard(
           key: key,
           value: value,
           isGlobal: isGlobal,
           projectId: projectId,
+          isRemote: isRemote,
+          remoteSecretId: remoteSecretId,
         );
       },
     );
@@ -269,6 +305,8 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     required String value,
     required bool isGlobal,
     String? projectId,
+    bool isRemote = false,
+    String? remoteSecretId,
   }) {
     final theme = Theme.of(context);
     bool isObscured = true;
@@ -300,6 +338,8 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                         value: value,
                         isGlobal: isGlobal,
                         projectId: projectId,
+                        isRemote: isRemote,
+                        remoteSecretId: remoteSecretId,
                       ),
                       tooltip: 'Edit',
                     ),
@@ -309,6 +349,8 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                         key: key,
                         isGlobal: isGlobal,
                         projectId: projectId,
+                        isRemote: isRemote,
+                        remoteSecretId: remoteSecretId,
                       ),
                       tooltip: 'Delete',
                     ),
@@ -375,7 +417,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     );
   }
 
-  Widget _buildSecurityInfoBanner() {
+  Widget _buildSecurityInfoBanner({bool isRemote = false}) {
     final theme = Theme.of(context);
 
     return Container(
@@ -398,7 +440,9 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '• All secrets are stored using secure system keychain',
+                  isRemote
+                      ? '• Secrets are stored on the remote server'
+                      : '• All secrets are stored using secure system keychain',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                   ),
@@ -433,12 +477,22 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   Future<void> _showAddSecretDialog({
     required bool isGlobal,
     String? projectId,
+    bool isRemote = false,
   }) async {
     await SecretDialog.show(
       context,
       onSave: (key, value) async {
         try {
-          if (isGlobal) {
+          if (isRemote && projectId != null) {
+            // Save to remote server
+            final controller = ref.read(remoteControllerProvider);
+            if (controller != null) {
+              final secretId =
+                  'secret_${DateTime.now().millisecondsSinceEpoch}';
+              await controller.saveSecret(secretId, key, value);
+              ref.invalidate(remoteSecretsProvider);
+            }
+          } else if (isGlobal) {
             await _keychainService.saveGlobalSecret(key, value);
           } else {
             if (projectId != null) {
@@ -471,14 +525,25 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     required String value,
     required bool isGlobal,
     String? projectId,
+    bool isRemote = false,
+    String? remoteSecretId,
   }) async {
     await SecretDialog.show(
       context,
       existingKey: key,
-      existingValue: value,
+      existingValue: isRemote
+          ? ''
+          : value, // Don't show masked value for remote
       onSave: (_, newValue) async {
         try {
-          if (isGlobal) {
+          if (isRemote && projectId != null && remoteSecretId != null) {
+            // Update on remote server
+            final controller = ref.read(remoteControllerProvider);
+            if (controller != null) {
+              await controller.saveSecret(remoteSecretId, key, newValue);
+              ref.invalidate(remoteSecretsProvider);
+            }
+          } else if (isGlobal) {
             await _keychainService.saveGlobalSecret(key, newValue);
           } else {
             if (projectId != null) {
@@ -514,6 +579,8 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     required String key,
     required bool isGlobal,
     String? projectId,
+    bool isRemote = false,
+    String? remoteSecretId,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -535,7 +602,14 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
     if (confirmed == true) {
       try {
-        if (isGlobal) {
+        if (isRemote && remoteSecretId != null) {
+          // Delete from remote server
+          final controller = ref.read(remoteControllerProvider);
+          if (controller != null) {
+            await controller.deleteSecret(remoteSecretId);
+            ref.invalidate(remoteSecretsProvider);
+          }
+        } else if (isGlobal) {
           await _keychainService.deleteGlobalSecret(key);
         } else {
           if (projectId != null) {
