@@ -307,6 +307,25 @@ class LlmService {
     }
   }
 
+  /// Create a ChatCapability client with the active configuration.
+  ///
+  /// Returns null if no LLM is configured.
+  /// This is used by SessionController for agent loop execution.
+  Future<ChatCapability?> createClient() async {
+    final activeConfig = await _getActiveConfig();
+    if (activeConfig == null) return null;
+
+    final agentInstruction = await getAgentInstruction(
+      activeConfig.config.identifier,
+    );
+
+    return _createProvider(
+      activeConfig.config,
+      activeConfig.apiKey,
+      systemInstruction: agentInstruction,
+    );
+  }
+
   /// Check if LLM is configured and ready
   Future<bool> isConfigured() async {
     final config = await _getActiveConfig();

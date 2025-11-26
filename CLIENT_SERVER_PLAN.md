@@ -611,19 +611,19 @@ Server needs to store project data (settings, snippets, secrets) to run agent lo
 
 **Key insight:** No Drift needed! `StreamController` fires on writes for reactive updates. Same pattern works for both local (direct) and remote (WebSocket push).
 
-### Phase 5: Client Integration (TODO)
+### Phase 5: Client Integration (IN PROGRESS)
 
 Wire up decamp-app to use the new architecture:
 
-**5.1 Add sqlite3 to Flutter app:**
+**5.1 Add sqlite3 to Flutter app:** ✅
 ```yaml
-# pubspec.yaml
+# pubspec.yaml - already had sqlite3_flutter_libs
 dependencies:
   sqlite3: ^2.4.0
   sqlite3_flutter_libs: ^0.5.0  # Native SQLite for iOS/Android/macOS
 ```
 
-**5.2 Create LocalSessionController instance:**
+**5.2 Create LocalSessionController instance:** ✅
 ```dart
 // For local projects, use agent-core directly
 final controller = LocalSessionController(
@@ -634,25 +634,33 @@ final controller = LocalSessionController(
 );
 ```
 
-**5.3 Create RemoteSessionController:**
-Implement `SessionController` interface with WebSocket transport:
+**5.3 Create RemoteSessionController:** ✅
+Implemented `SessionController` interface with WebSocket transport in agent-core:
 - `watchSessions()` → Subscribe to server, fire stream on push
 - `watchMessages()` → Subscribe to server, fire stream on push  
 - `sendMessage()` → Send via WebSocket, handle streaming response
 - Handle `delta`, `approval`, `message`, `done` events
 
-**5.4 Update UI to use SessionController:**
+**5.4 Create SessionController provider:** ✅
+Created `session_controller_provider.dart` in decamp-app:
+- `sessionControllerProvider` - Returns `LocalSessionController` or `RemoteSessionController` based on project's `serverUrl`
+- `controllerSessionsProvider` - Watch sessions via controller
+- `controllerArchivedSessionsProvider` - Watch archived sessions  
+- `controllerMessagesProvider` - Watch messages via controller
+- Added `createClient()` method to `LlmService` for agent-core integration
+
+**5.5 Update UI to use SessionController:** (TODO)
 - Replace direct Drift/database calls with `SessionController` methods
 - UI doesn't know/care if local or remote
 - Same reactive streams work either way
 
-**5.5 Settings/Snippets/Secrets UI:**
+**5.6 Settings/Snippets/Secrets UI:** (TODO)
 - Detect if project is remote
 - Use `RemoteSessionController` for remote data
 - Use local database for local data
 - Keep existing UI components
 
-**5.6 Remove Drift (optional, after migration):**
+**5.7 Remove Drift (optional, after migration):** (Future)
 - Once `SqliteSessionStore` is working for local
 - Remove Drift dependency and code generation
 - Simpler build, single SQLite implementation
