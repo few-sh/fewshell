@@ -5,6 +5,24 @@ import 'database_provider.dart';
 import 'project_provider.dart';
 import 'session_controller_provider.dart';
 
+/// Provider for local (Drift) non-archived sessions.
+/// This is a family provider keyed by projectId.
+final _localSessionsProvider = StreamProvider.family<List<dynamic>, String>((
+  ref,
+  projectId,
+) {
+  final sessionDao = ref.watch(databaseProvider).sessionDao;
+  return sessionDao.watchNonArchivedSessionsByProject(projectId);
+});
+
+/// Provider for local (Drift) archived sessions.
+/// This is a family provider keyed by projectId.
+final _localArchivedSessionsProvider =
+    StreamProvider.family<List<dynamic>, String>((ref, projectId) {
+      final sessionDao = ref.watch(databaseProvider).sessionDao;
+      return sessionDao.watchArchivedSessionsByProject(projectId);
+    });
+
 /// Provider for sessions of the currently selected project.
 ///
 /// This is a hybrid provider that uses:
@@ -30,11 +48,8 @@ final currentProjectSessionsProvider = Provider<AsyncValue<List<dynamic>>>((
     return sessionsAsync.whenData((sessions) => sessions.cast<dynamic>());
   }
 
-  // For local projects, use Drift DAO (for now - will migrate to SessionController)
-  final sessionDao = ref.watch(databaseProvider).sessionDao;
-  final stream = sessionDao.watchNonArchivedSessionsByProject(projectId);
-  // Create a StreamProvider inline and watch it
-  return ref.watch(StreamProvider((ref) => stream));
+  // For local projects, use Drift DAO via family provider
+  return ref.watch(_localSessionsProvider(projectId));
 });
 
 /// Provider for archived sessions of the currently selected project
@@ -52,10 +67,8 @@ final archivedSessionsProvider = Provider<AsyncValue<List<dynamic>>>((ref) {
     return sessionsAsync.whenData((sessions) => sessions.cast<dynamic>());
   }
 
-  // For local projects, use Drift DAO
-  final sessionDao = ref.watch(databaseProvider).sessionDao;
-  final stream = sessionDao.watchArchivedSessionsByProject(projectId);
-  return ref.watch(StreamProvider((ref) => stream));
+  // For local projects, use Drift DAO via family provider
+  return ref.watch(_localArchivedSessionsProvider(projectId));
 });
 
 /// StateProvider for the currently selected session ID
