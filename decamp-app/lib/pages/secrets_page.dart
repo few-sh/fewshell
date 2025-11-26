@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/keychain_service.dart';
 import '../providers/project_provider.dart';
+import '../providers/secret_provider.dart';
 import '../components/secret_dialog.dart';
 import '../components/project_title_bar.dart';
 
@@ -16,7 +16,6 @@ class SecretsPage extends ConsumerStatefulWidget {
 class _SecretsPageState extends ConsumerState<SecretsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final KeychainService _keychainService = KeychainService();
 
   @override
   void initState() {
@@ -78,7 +77,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
   Widget _buildUserSecretsTab() {
     return FutureBuilder<Map<String, String>>(
-      future: _keychainService.listGlobalSecrets(),
+      future: ref.watch(keychainServiceProvider).listGlobalSecrets(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -115,48 +114,43 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     return Column(
       children: [
         _buildSecurityInfoBanner(),
-            Expanded(
-              child: currentProjectId == null
-                  ? _buildEmptyState('Please select a project')
-                  : FutureBuilder<Map<String, String>>(
-                      future: _keychainService.listProjectSecrets(
-                        currentProjectId,
-                      ),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
+        Expanded(
+          child: currentProjectId == null
+              ? _buildEmptyState('Please select a project')
+              : FutureBuilder<Map<String, String>>(
+                  future: ref
+                      .watch(keychainServiceProvider)
+                      .listProjectSecrets(currentProjectId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Text('Error loading secrets: ${snapshot.error}'),
+                      );
+                    }
+
+                    final secrets = snapshot.data ?? {};
+
+                    return secrets.isEmpty
+                        ? _buildEmptyState('No project secrets yet')
+                        : _buildSecretsList(
+                            secrets,
+                            isGlobal: false,
+                            projectId: currentProjectId,
                           );
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(
-                            child: Text(
-                              'Error loading secrets: ${snapshot.error}',
-                            ),
-                          );
-                        }
-
-                        final secrets = snapshot.data ?? {};
-
-                        return secrets.isEmpty
-                            ? _buildEmptyState('No project secrets yet')
-                            : _buildSecretsList(
-                                secrets,
-                                isGlobal: false,
-                                projectId: currentProjectId,
-                              );
-                      },
-                    ),
-            ),
-            if (currentProjectId != null)
-              _buildAddButton(
-                onPressed: () => _showAddSecretDialog(
-                  isGlobal: false,
-                  projectId: currentProjectId,
+                  },
                 ),
-              ),
+        ),
+        if (currentProjectId != null)
+          _buildAddButton(
+            onPressed: () => _showAddSecretDialog(
+              isGlobal: false,
+              projectId: currentProjectId,
+            ),
+          ),
       ],
     );
   }
@@ -439,10 +433,14 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       onSave: (key, value) async {
         try {
           if (isGlobal) {
-            await _keychainService.saveGlobalSecret(key, value);
+            await ref
+                .read(keychainServiceProvider)
+                .saveGlobalSecret(key, value);
           } else {
             if (projectId != null) {
-              await _keychainService.saveProjectSecret(projectId, key, value);
+              await ref
+                  .read(keychainServiceProvider)
+                  .saveProjectSecret(projectId, key, value);
             }
           }
 
@@ -479,14 +477,14 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       onSave: (_, newValue) async {
         try {
           if (isGlobal) {
-            await _keychainService.saveGlobalSecret(key, newValue);
+            await ref
+                .read(keychainServiceProvider)
+                .saveGlobalSecret(key, newValue);
           } else {
             if (projectId != null) {
-              await _keychainService.saveProjectSecret(
-                projectId,
-                key,
-                newValue,
-              );
+              await ref
+                  .read(keychainServiceProvider)
+                  .saveProjectSecret(projectId, key, newValue);
             }
           }
 
@@ -536,10 +534,12 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     if (confirmed == true) {
       try {
         if (isGlobal) {
-          await _keychainService.deleteGlobalSecret(key);
+          await ref.read(keychainServiceProvider).deleteGlobalSecret(key);
         } else {
           if (projectId != null) {
-            await _keychainService.deleteProjectSecret(projectId, key);
+            await ref
+                .read(keychainServiceProvider)
+                .deleteProjectSecret(projectId, key);
           }
         }
 

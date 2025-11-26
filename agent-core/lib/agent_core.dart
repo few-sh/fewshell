@@ -17,6 +17,10 @@ export 'src/utils/id_generator.dart';
 export 'src/utils/template_processor.dart';
 export 'src/utils/tool_result_formatter.dart';
 
+// Secrets Storage
+export 'src/secrets_storage/secure_storage.dart';
+export 'src/secrets_storage/file_secure_storage_impl.dart';
+
 // Services
 export 'src/services/shell_tools_provider.dart';
 

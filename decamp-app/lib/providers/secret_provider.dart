@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/keychain_service.dart';
+import '../services/storage/flutter_secure_storage_impl.dart';
 
 /// Provider for KeychainService singleton
 /// Access directly: ref.watch(keychainServiceProvider).saveProjectSecret(...)
 final keychainServiceProvider = Provider<KeychainService>((ref) {
-  return KeychainService();
+  return KeychainService(FlutterSecureStorageImpl());
 });
 
 /// Provider to get all secrets (global and project merged)

@@ -4,6 +4,7 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/services/keychain_service.dart';
 import 'package:decamp/services/llm_service.dart';
+import 'package:decamp/services/storage/flutter_secure_storage_impl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,7 +25,9 @@ void main() {
       // 1. Mock Secure Storage
       FlutterSecureStorage.setMockInitialValues({});
       const storage = FlutterSecureStorage();
-      keychainService = KeychainService(storage: storage);
+      keychainService = KeychainService(
+        FlutterSecureStorageImpl(storage: storage),
+      );
 
       // 2. Mock Shared Preferences (required by settings providers)
       SharedPreferences.setMockInitialValues({});

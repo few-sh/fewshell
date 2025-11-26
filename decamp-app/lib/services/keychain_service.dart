@@ -1,60 +1,40 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:agent_core/agent_core.dart';
 
 /// Service for securely storing and retrieving secrets using platform keychain.
 /// Uses iOS Keychain on iOS and Android Keystore on Android.
 class KeychainService {
-  final FlutterSecureStorage _storage;
+  final SecureStorage _storage;
 
-  KeychainService({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+  KeychainService(this._storage);
 
   /// Save a secret value with the given key.
   /// Overwrites existing value if key already exists.
   Future<void> saveSecret(String key, String value) async {
-    await _storage.write(
-      key: key,
-      value: value,
-      aOptions: _getAndroidOptions(),
-      iOptions: _getIOSOptions(),
-    );
+    await _storage.write(key: key, value: value);
   }
 
   /// Retrieve a secret value by key.
   /// Returns null if key doesn't exist.
   Future<String?> getSecret(String key) async {
-    return await _storage.read(
-      key: key,
-      aOptions: _getAndroidOptions(),
-      iOptions: _getIOSOptions(),
-    );
+    return await _storage.read(key: key);
   }
 
   /// Delete a secret by key.
   /// No-op if key doesn't exist.
   Future<void> deleteSecret(String key) async {
-    await _storage.delete(
-      key: key,
-      aOptions: _getAndroidOptions(),
-      iOptions: _getIOSOptions(),
-    );
+    await _storage.delete(key: key);
   }
 
   /// List all secret keys stored.
   /// Returns empty map if no secrets exist.
   Future<Map<String, String>> listAllSecrets() async {
-    return await _storage.readAll(
-      aOptions: _getAndroidOptions(),
-      iOptions: _getIOSOptions(),
-    );
+    return await _storage.readAll();
   }
 
   /// Delete all secrets.
   /// Use with caution - this cannot be undone.
   Future<void> deleteAllSecrets() async {
-    await _storage.deleteAll(
-      aOptions: _getAndroidOptions(),
-      iOptions: _getIOSOptions(),
-    );
+    await _storage.deleteAll();
   }
 
   /// Check if a secret exists for the given key.
@@ -156,13 +136,5 @@ class KeychainService {
 
   String _buildGlobalSecretKey(String secretName) {
     return 'global:$secretName';
-  }
-
-  AndroidOptions _getAndroidOptions() {
-    return const AndroidOptions(encryptedSharedPreferences: true);
-  }
-
-  IOSOptions _getIOSOptions() {
-    return const IOSOptions(accessibility: KeychainAccessibility.first_unlock);
   }
 }
