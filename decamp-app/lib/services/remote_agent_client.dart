@@ -6,7 +6,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-/// Controller for remote session execution via WebSocket.
+/// Client for remote agent execution via WebSocket.
 ///
 /// Handles communication with decamp-agent server for remote projects.
 /// Supports:
@@ -16,7 +16,11 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// - Secrets sync (get_secrets, set_secret, delete_secret)
 ///
 /// All data changes are broadcast by the server to all connected clients.
-class RemoteSessionController {
+///
+/// Note: This is separate from agent-core's RemoteSessionController which
+/// implements the SessionController interface for session/message CRUD.
+/// This class focuses on agent loop execution and project data sync.
+class RemoteAgentClient {
   final String serverUrl;
   final String projectId;
 
@@ -41,7 +45,7 @@ class RemoteSessionController {
   Completer<List<Snippet>>? _snippetsCompleter;
   Completer<List<SecretMetadata>>? _secretsCompleter;
 
-  RemoteSessionController({required this.serverUrl, required this.projectId});
+  RemoteAgentClient({required this.serverUrl, required this.projectId});
 
   /// Whether currently connected to server
   bool get isConnected => _channel != null;

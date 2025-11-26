@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/llm_api_settings.dart';
 import '../models/settings.dart';
 import '../services/keychain_service.dart';
-import '../services/remote_session_controller.dart';
+import '../services/remote_agent_client.dart';
 import 'project_provider.dart';
 import 'remote_data_provider.dart';
 import 'settings_provider.dart';
@@ -255,14 +255,14 @@ class GlobalLlmSettingsNotifier extends BaseLlmSettingsNotifier {
 class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
   final String _projectId;
   final ProjectSettingsNotifier _settingsNotifier;
-  final RemoteSessionController? _remoteController;
+  final RemoteAgentClient? _remoteController;
   final void Function()? _onRemoteSync;
 
   ProjectLlmSettingsNotifier(
     this._projectId,
     this._settingsNotifier,
     KeychainService keychainService, {
-    RemoteSessionController? remoteController,
+    RemoteAgentClient? remoteController,
     void Function()? onRemoteSync,
   }) : _remoteController = remoteController,
        _onRemoteSync = onRemoteSync,

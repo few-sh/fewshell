@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:agent_core/agent_core.dart'
-    hide SshSettings, RemoteSessionController;
+import 'package:agent_core/agent_core.dart' hide SshSettings;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
@@ -10,7 +9,7 @@ import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
 import '../models/ssh_settings.dart';
 import '../services/llm_service.dart';
-import '../services/remote_session_controller.dart';
+import '../services/remote_agent_client.dart';
 import '../services/shell_service.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
@@ -50,8 +49,8 @@ class ChatController extends StateNotifier<ChatState> {
   /// Project ID for remote execution
   final String? projectId;
 
-  /// Remote session controller (lazy initialized when needed)
-  RemoteSessionController? _remoteController;
+  /// Remote agent client (lazy initialized when needed)
+  RemoteAgentClient? _remoteController;
 
   ChatController({
     required MessageDao messageDao,
@@ -362,7 +361,7 @@ class ChatController extends StateNotifier<ChatState> {
     requestApproval,
   }) async {
     // Initialize remote controller if needed
-    _remoteController ??= RemoteSessionController(
+    _remoteController ??= RemoteAgentClient(
       serverUrl: serverUrl!,
       projectId: projectId!,
     );

@@ -1,22 +1,21 @@
-import 'package:agent_core/agent_core.dart'
-    hide SshSettings, RemoteSessionController;
+import 'package:agent_core/agent_core.dart' hide SshSettings;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database.dart';
-import '../services/remote_session_controller.dart';
+import '../services/remote_agent_client.dart';
 import 'project_provider.dart';
 
-/// Provider for a shared RemoteSessionController for the current project.
+/// Provider for a shared RemoteAgentClient for the current project.
 ///
 /// Returns null if the current project is not remote (no serverUrl).
-/// This controller is reused across the app for the same project.
-final remoteControllerProvider = Provider<RemoteSessionController?>((ref) {
+/// This client handles agent loop execution and settings sync.
+final remoteControllerProvider = Provider<RemoteAgentClient?>((ref) {
   final currentProject = ref.watch(currentProjectProvider);
 
   if (currentProject == null || currentProject.serverUrl == null) {
     return null;
   }
 
-  return RemoteSessionController(
+  return RemoteAgentClient(
     serverUrl: currentProject.serverUrl!,
     projectId: currentProject.id,
   );
