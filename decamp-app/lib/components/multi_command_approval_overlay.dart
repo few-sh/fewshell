@@ -29,10 +29,6 @@ class ToolAction {
 
   String get explanation => params['explanation']?.toString() ?? '';
   bool get requiresPrivileges => params['sudo_required'] as bool? ?? false;
-
-  // Legacy getters for backwards compatibility
-  String get command => primaryDisplay;
-  bool get isSudoRequired => requiresPrivileges;
 }
 
 /// Overlay widget that shows multiple tool action approvals in a scrollable list

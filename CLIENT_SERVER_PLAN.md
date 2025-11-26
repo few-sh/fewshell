@@ -670,6 +670,31 @@ Added all message editing commands to decamp-agent:
 - `get_message`, `update_message`, `delete_messages_after`
 - `continue` - Resume agent loop (for edit/resend operations)
 
+### Phase 5.8: Remove Legacy Code ✅
+
+Now that SessionController handles both local and remote uniformly, legacy compatibility layers have been removed:
+
+**Deleted files:**
+- ✅ `lib/extensions/chat_message_extensions.dart` - Not used anywhere
+- ✅ `lib/services/shell_tools_provider.dart` - Re-export shim, now imports from agent_core
+- ✅ `lib/extensions/` directory - Empty, removed
+
+**Legacy getters removed:**
+- ✅ `ToolAction.command` and `ToolAction.isSudoRequired` in `multi_command_approval_overlay.dart`
+
+**Providers migrated to SessionController:**
+- ✅ `lib/providers/message_provider.dart` - Now uses SessionController for both local and remote
+- ✅ `lib/providers/session_provider.dart` - Now uses SessionController for both local and remote
+
+**Pages migrated to use SessionController:**
+- ✅ `lib/pages/chat_session.dart` - Uses SessionController instead of direct DAO
+- ✅ `lib/pages/sessions_history.dart` - Uses SessionController instead of direct DAO
+
+**Future cleanup (Phase 9: Drift Removal):**
+- Remove Drift dependency entirely
+- Delete `lib/database/` folder (DAOs, migrations, database.dart)
+- Simpler build (no code generation)
+
 ### Phase 6: Cache & Offline (TODO)
 
 - Simple SQLite cache for offline viewing

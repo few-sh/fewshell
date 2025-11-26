@@ -1,7 +1,6 @@
 import 'dart:convert';
+import 'package:agent_core/agent_core.dart' show kExecuteShellCommand, kFetch;
 import 'package:llm_dart/llm_dart.dart';
-import '../services/shell_tools_provider.dart'
-    show kExecuteShellCommand, kFetch;
 
 /// Formats tool execution results with pretty markdown templates
 ///

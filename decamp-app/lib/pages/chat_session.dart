@@ -12,7 +12,7 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller.dart';
-import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/providers/session_controller_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'dart:developer' as developer;
@@ -107,11 +107,19 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProject = ref.read(currentProjectProvider);
     if (currentProject == null) return;
 
+    // Get the session controller
+    final controllerAsync = ref.read(sessionControllerProvider);
+    final controller = controllerAsync.when(
+      data: (c) => c,
+      loading: () => null,
+      error: (_, __) => null,
+    );
+    if (controller == null) return;
+
     // Check if current session has messages
     final currentSessionId = ref.read(currentSessionIdProvider);
     if (currentSessionId != null) {
-      final messageDao = ref.read(databaseProvider).messageDao;
-      final messages = await messageDao.getMessagesBySession(currentSessionId);
+      final messages = await controller.getMessages(currentSessionId);
 
       // If current session is empty, don't create a new one
       if (messages.isEmpty) {
@@ -119,19 +127,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       }
     }
 
-    // Create new session
-    final sessionDao = ref.read(databaseProvider).sessionDao;
-    final projectDao = ref.read(databaseProvider).projectDao;
-
-    final newSessionId = await sessionDao.createSessionWithId(
-      projectId: currentProject.id,
-    );
-
-    // Update project's last session date
-    await projectDao.updateLastSessionDate(currentProject.id, DateTime.now());
+    // Create new session via SessionController
+    final newSession = await controller.createSession();
 
     // Switch to the new session
-    ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+    ref.read(currentSessionIdProvider.notifier).state = newSession.id;
   }
 
   /// Show session history page

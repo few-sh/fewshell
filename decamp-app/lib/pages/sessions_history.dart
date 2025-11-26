@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
-import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/providers/session_controller_provider.dart';
 import 'package:decamp/utils/date_formatter.dart';
 
 /// Enum for view mode in sessions history
@@ -260,19 +260,28 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
         ),
       ),
       confirmDismiss: (direction) async {
-        if (_viewMode == SessionsViewMode.active) {
-          // Archive the session
-          final sessionDao = ref.read(databaseProvider).sessionDao;
+        // Get session controller
+        final controllerAsync = ref.read(sessionControllerProvider);
+        final controller = controllerAsync.when(
+          data: (c) => c,
+          loading: () => null,
+          error: (_, __) => null,
+        );
+        if (controller == null) return false;
 
+        if (_viewMode == SessionsViewMode.active) {
           // Check if this is the currently active session
           final currentSessionId = ref.read(currentSessionIdProvider);
           if (currentSessionId == session.id) {
             // Get all non-archived sessions for this project
-            final sessions = await sessionDao.getSessionsByProject(
-              session.projectId,
+            // We watch this via provider, get current state
+            final sessionsAsync = ref.read(currentProjectSessionsProvider);
+            final sessions = sessionsAsync.maybeWhen(
+              data: (s) => s,
+              orElse: () => <dynamic>[],
             );
             final otherSessions = sessions
-                .where((s) => s.id != session.id && !s.isArchived)
+                .where((s) => s.id != session.id)
                 .toList();
 
             if (otherSessions.isNotEmpty) {
@@ -281,14 +290,13 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
                   otherSessions.first.id;
             } else {
               // No other sessions - create a new one
-              final newSessionId = await sessionDao.createSessionWithId(
-                projectId: session.projectId,
-              );
-              ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+              final newSession = await controller.createSession();
+              ref.read(currentSessionIdProvider.notifier).state = newSession.id;
             }
           }
 
-          await sessionDao.archiveSession(session.id);
+          // Archive the session
+          await controller.setSessionArchived(session.id, true);
 
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -296,9 +304,11 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
                 content: Text('Archived: ${session.description}'),
                 action: SnackBarAction(
                   label: 'Undo',
-                  onPressed: () {
-                    final sessionDao = ref.read(databaseProvider).sessionDao;
-                    sessionDao.unarchiveSession(session.id);
+                  onPressed: () async {
+                    final controllerAsync = ref.read(sessionControllerProvider);
+                    controllerAsync.whenData((controller) {
+                      controller?.setSessionArchived(session.id, false);
+                    });
                   },
                 ),
                 duration: const Duration(seconds: 3),
@@ -307,8 +317,7 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
           }
         } else {
           // Unarchive the session
-          final sessionDao = ref.read(databaseProvider).sessionDao;
-          await sessionDao.unarchiveSession(session.id);
+          await controller.setSessionArchived(session.id, false);
 
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -477,42 +486,43 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
               onPressed: () async {
                 Navigator.of(dialogContext).pop();
 
-                final projectId = ref.read(currentProjectIdProvider);
-                if (projectId != null) {
-                  final sessionDao = ref.read(databaseProvider).sessionDao;
-                  final messageDao = ref.read(databaseProvider).messageDao;
+                // Get controller
+                final controllerAsync = ref.read(sessionControllerProvider);
+                final controller = controllerAsync.when(
+                  data: (c) => c,
+                  loading: () => null,
+                  error: (_, __) => null,
+                );
+                if (controller == null) return;
 
-                  // Get all archived sessions first
-                  final archivedSessions = await sessionDao
-                      .getSessionsByProject(projectId);
-                  final archivedSessionsFiltered = archivedSessions
-                      .where((s) => s.isArchived)
-                      .toList();
+                // Get archived sessions from provider
+                final archivedAsync = ref.read(archivedSessionsProvider);
+                final archivedSessions = archivedAsync.maybeWhen(
+                  data: (s) => s,
+                  orElse: () => <dynamic>[],
+                );
 
-                  // Delete messages for each archived session
-                  for (final session in archivedSessionsFiltered) {
-                    await messageDao.deleteMessagesBySession(session.id);
-                  }
+                // Delete each archived session (deleteSession also deletes messages)
+                var deletedCount = 0;
+                for (final session in archivedSessions) {
+                  await controller.deleteSession(session.id);
+                  deletedCount++;
+                }
 
-                  // Now delete the archived sessions themselves
-                  final deletedCount = await sessionDao
-                      .deleteArchivedSessionsByProject(projectId);
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Deleted $deletedCount archived ${deletedCount == 1 ? 'session' : 'sessions'}',
-                        ),
-                        duration: const Duration(seconds: 2),
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Deleted $deletedCount archived ${deletedCount == 1 ? 'session' : 'sessions'}',
                       ),
-                    );
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
 
-                    // Switch back to active view
-                    setState(() {
-                      _viewMode = SessionsViewMode.active;
-                    });
-                  }
+                  // Switch back to active view
+                  setState(() {
+                    _viewMode = SessionsViewMode.active;
+                  });
                 }
               },
               style: TextButton.styleFrom(
