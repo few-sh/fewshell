@@ -1,7 +1,5 @@
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
-import '../database/database.dart';
-import '../database/tables/messages_table.dart';
 import 'package:agent_core/agent_core.dart';
 
 /// Extensions for ChatMessage to support conversion to database entities

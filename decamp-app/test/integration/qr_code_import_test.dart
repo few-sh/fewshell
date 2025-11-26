@@ -10,7 +10,6 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/providers/theme_provider.dart';
 import 'package:decamp/services/keychain_service.dart';
-import 'package:decamp/database/database.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

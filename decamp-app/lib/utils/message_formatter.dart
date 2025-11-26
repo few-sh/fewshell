@@ -1,5 +1,3 @@
-import 'package:decamp/database/database.dart';
-import 'package:decamp/database/tables/messages_table.dart';
 import 'package:agent_core/agent_core.dart';
 
 /// Utility for formatting message content consistently

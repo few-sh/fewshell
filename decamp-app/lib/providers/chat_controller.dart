@@ -12,9 +12,6 @@ import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/secret_provider.dart';
-import '../database/daos/message_dao.dart';
-import '../database/daos/session_dao.dart';
-import '../database/database.dart';
 import '../components/multi_command_approval_overlay.dart';
 import '../utils/secret_redactor.dart';
 

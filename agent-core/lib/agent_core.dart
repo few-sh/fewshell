@@ -19,3 +19,15 @@ export 'src/utils/tool_result_formatter.dart';
 
 // Services
 export 'src/services/shell_tools_provider.dart';
+
+// Database
+export 'src/database/database.dart';
+export 'src/database/tables/messages_table.dart';
+export 'src/database/tables/projects_table.dart';
+export 'src/database/tables/sessions_table.dart';
+export 'src/database/tables/snippets_table.dart';
+export 'src/database/daos/message_dao.dart';
+export 'src/database/daos/project_dao.dart';
+export 'src/database/daos/session_dao.dart';
+export 'src/database/daos/snippet_dao.dart';
+export 'src/database/converters/tool_call_converter.dart';

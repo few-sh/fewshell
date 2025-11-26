@@ -1,4 +1,4 @@
-import 'package:decamp/database/database.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:decamp/utils/message_formatter.dart';
 
 /// Highlight range for search matches

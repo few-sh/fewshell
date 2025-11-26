@@ -9,7 +9,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:decamp/providers/theme_provider.dart';
-import 'package:decamp/database/database.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
