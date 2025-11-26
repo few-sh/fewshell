@@ -9,8 +9,6 @@ import '../components/project_setup_view.dart';
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});
 
-
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch the projects stream

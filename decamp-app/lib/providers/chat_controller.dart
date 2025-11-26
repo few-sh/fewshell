@@ -15,6 +15,7 @@ import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/secret_provider.dart';
+import '../providers/session_controller_provider.dart';
 import '../database/daos/message_dao.dart';
 import '../database/daos/session_dao.dart';
 import '../database/database.dart';
@@ -30,10 +31,10 @@ const String _kAiUserName = 'Ops Agent';
 
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
-/// Directly calls DAOs and services without unnecessary repository layer
 ///
-/// Supports both local execution (runAgentLoop) and remote execution (WebSocket to server)
-/// based on the project's serverUrl setting.
+/// Supports both local execution (runAgentLoop) and remote execution (WebSocket to server).
+/// When a SessionController is provided, uses the unified Quake-style interface.
+/// Falls back to legacy code paths when SessionController is not available.
 class ChatController extends StateNotifier<ChatState> {
   final MessageDao _messageDao;
   final SessionDao _sessionDao;
@@ -49,7 +50,11 @@ class ChatController extends StateNotifier<ChatState> {
   /// Project ID for remote execution
   final String? projectId;
 
-  /// Remote agent client (lazy initialized when needed)
+  /// SessionController for unified local/remote execution (Quake-style)
+  /// When provided, this is used instead of the legacy code paths.
+  final SessionController? _sessionController;
+
+  /// Remote agent client (legacy - used when SessionController not available)
   RemoteAgentClient? _remoteController;
 
   ChatController({
@@ -59,6 +64,7 @@ class ChatController extends StateNotifier<ChatState> {
     required ShellService shellService,
     required SecretRedactor secretRedactor,
     SshSettings? sshSettings,
+    SessionController? sessionController,
     this.sessionId,
     this.serverUrl,
     this.projectId,
@@ -68,10 +74,14 @@ class ChatController extends StateNotifier<ChatState> {
        _shellService = shellService,
        _secretRedactor = secretRedactor,
        _sshSettings = sshSettings,
+       _sessionController = sessionController,
        super(const ChatState());
 
   /// Whether this is a remote project
   bool get isRemote => serverUrl != null;
+
+  /// Whether we're using the unified SessionController
+  bool get _useSessionController => _sessionController != null;
 
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
@@ -178,6 +188,90 @@ class ChatController extends StateNotifier<ChatState> {
     }).toList();
   }
 
+  // ============================================================
+  // Unified SessionController Path (Quake-style)
+  // ============================================================
+
+  /// Send message via SessionController (unified local/remote)
+  Future<AgentLoopResult> _sendMessageViaController({
+    required String sessionId,
+    required String content,
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
+    requestApproval,
+  }) async {
+    var hasStartedStreaming = false;
+    final streamingBuffer = StringBuffer();
+    String? currentMessageId;
+
+    return await _sessionController!.sendMessage(
+      sessionId: sessionId,
+      content: content,
+      onTextDelta: (delta) {
+        streamingBuffer.write(delta);
+        if (!hasStartedStreaming) {
+          currentMessageId = _messageDao.generateMessageId();
+          startStreaming(currentMessageId!);
+          hasStartedStreaming = true;
+        }
+        updateStreamingText(streamingBuffer.toString());
+      },
+      onMessage: (message) {
+        // Message has been persisted by SessionController
+        // Just update streaming state if needed
+        if (hasStartedStreaming) {
+          stopStreaming();
+          hasStartedStreaming = false;
+          streamingBuffer.clear();
+        }
+      },
+      requestApproval: (pendingCalls) async {
+        // Convert to UI's ToolAction format
+        final actions = _pendingToolCallsToActions(pendingCalls);
+        final selectedActions = await requestApproval(actions);
+
+        if (selectedActions == null) {
+          return null; // User cancelled
+        }
+
+        developer.log(
+          '✅ User approved ${selectedActions.length} tool calls',
+          name: 'ChatController',
+        );
+
+        // Return indices of approved tools
+        return pendingCalls.indexed
+            .where((e) => selectedActions.any((a) => a.id == e.$2.id))
+            .map((e) => e.$1)
+            .toList();
+      },
+    );
+  }
+
+  /// Handle agent loop result (shared between legacy and new paths)
+  Future<void> _handleAgentLoopResult(
+    AgentLoopResult result,
+    String sessionId,
+  ) async {
+    switch (result) {
+      case AgentLoopCompleted():
+        developer.log('✅ Agent loop completed', name: 'ChatController');
+        state = state.copyWith(isLoading: false);
+      case AgentLoopCancelled():
+        developer.log(
+          '🚨 User cancelled tool execution',
+          name: 'ChatController',
+        );
+        state = state.copyWith(isLoading: false);
+      case AgentLoopError(message: final errorMsg):
+        developer.log('❌ Agent loop error: $errorMsg', name: 'ChatController');
+        state = state.copyWith(isLoading: false, error: errorMsg);
+    }
+  }
+
+  // ============================================================
+  // Legacy Code Paths (to be deprecated)
+  // ============================================================
+
   /// Send a message to the AI
   /// Handles saving to database, getting AI response, and managing tool calls
   ///
@@ -198,7 +292,18 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // If content is provided, validate and save the new user message
+      // Use unified SessionController if available
+      if (_useSessionController && content != null) {
+        final result = await _sendMessageViaController(
+          sessionId: sessionId,
+          content: content,
+          requestApproval: requestApproval,
+        );
+        await _handleAgentLoopResult(result, sessionId);
+        return;
+      }
+
+      // Legacy path: validate and save user message first
       if (content != null) {
         final isValid = await _validateAndPrepare(
           sessionId: sessionId,
@@ -213,7 +318,7 @@ class ChatController extends StateNotifier<ChatState> {
         }
       }
 
-      // Branch based on local vs remote execution
+      // Legacy: Branch based on local vs remote execution
       final AgentLoopResult result;
       if (isRemote) {
         result = await _sendMessageRemote(
@@ -692,6 +797,10 @@ final chatControllerProvider =
       final keychain = ref.watch(keychainServiceProvider);
       final secretRedactor = SecretRedactor(keychain, projectId);
 
+      // Get SessionController if available (Quake-style unified interface)
+      final sessionControllerAsync = ref.watch(sessionControllerProvider);
+      final sessionController = sessionControllerAsync.valueOrNull;
+
       return ChatController(
         messageDao: ref.watch(databaseProvider).messageDao,
         sessionDao: ref.watch(databaseProvider).sessionDao,
@@ -702,5 +811,6 @@ final chatControllerProvider =
         sessionId: sessionId,
         serverUrl: currentProject?.serverUrl,
         projectId: projectId,
+        sessionController: sessionController,
       );
     });
