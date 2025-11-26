@@ -21,92 +21,96 @@ import 'project_provider.dart';
 ///
 /// The UI should use only this controller for sessions/messages operations.
 /// No direct DAO calls needed anymore.
-final sessionControllerProvider =
-    FutureProvider.autoDispose<SessionController?>((ref) async {
-      final project = ref.watch(currentProjectProvider);
-      if (project == null) return null;
+///
+/// Note: NOT autoDispose - we want this to persist while the project is selected.
+/// Disposing happens when project changes via ref.watch(currentProjectProvider).
+final sessionControllerProvider = FutureProvider<SessionController?>((
+  ref,
+) async {
+  final project = ref.watch(currentProjectProvider);
+  if (project == null) return null;
 
-      SessionController controller;
+  SessionController controller;
 
-      if (project.serverUrl != null && project.serverUrl!.isNotEmpty) {
-        // Remote project: Use RemoteSessionController
-        developer.log(
-          '🌐 Creating RemoteSessionController for ${project.name}',
-          name: 'SessionControllerProvider',
-        );
+  if (project.serverUrl != null && project.serverUrl!.isNotEmpty) {
+    // Remote project: Use RemoteSessionController
+    developer.log(
+      '🌐 Creating RemoteSessionController for ${project.name}',
+      name: 'SessionControllerProvider',
+    );
 
-        controller = RemoteSessionController(
-          serverUrl: project.serverUrl!,
-          projectId: project.id,
-        );
-      } else {
-        // Local project: Use LocalSessionController
-        developer.log(
-          '🏠 Creating LocalSessionController for ${project.name}',
-          name: 'SessionControllerProvider',
-        );
+    controller = RemoteSessionController(
+      serverUrl: project.serverUrl!,
+      projectId: project.id,
+    );
+  } else {
+    // Local project: Use LocalSessionController
+    developer.log(
+      '🏠 Creating LocalSessionController for ${project.name}',
+      name: 'SessionControllerProvider',
+    );
 
-        // Get database path
-        final appDir = await getApplicationDocumentsDirectory();
-        final dbPath = path.join(appDir.path, 'decamp', 'local.db');
-        final dbDir = Directory(path.dirname(dbPath));
-        if (!dbDir.existsSync()) {
-          dbDir.createSync(recursive: true);
-        }
+    // Get database path
+    final appDir = await getApplicationDocumentsDirectory();
+    final dbPath = path.join(appDir.path, 'decamp', 'local.db');
+    final dbDir = Directory(path.dirname(dbPath));
+    if (!dbDir.existsSync()) {
+      dbDir.createSync(recursive: true);
+    }
 
-        // Apply SQLite workaround for old Android (from sqlite3_flutter_libs)
-        await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
+    // Apply SQLite workaround for old Android (from sqlite3_flutter_libs)
+    await applyWorkaroundToOpenSqlite3OnOldAndroidVersions();
 
-        // Create store
-        final store = SqliteSessionStore.open(dbPath);
+    // Create store
+    final store = SqliteSessionStore.open(dbPath);
 
-        // Get LLM service and shell service for tool execution
-        final llmService = ref.watch(llmServiceProvider);
-        final shellService = ref.watch(shellServiceProvider(project.id));
+    // Get LLM service and shell service for tool execution
+    final llmService = ref.watch(llmServiceProvider);
+    final shellService = ref.watch(shellServiceProvider(project.id));
 
-        // Create LLM client factory
-        Future<ChatCapability?> createLlmClient() async {
-          return await llmService.createClient();
-        }
+    // Create LLM client factory
+    Future<ChatCapability?> createLlmClient() async {
+      return await llmService.createClient();
+    }
 
-        // Create tool executor
-        Future<String> executeToolCall(ToolCall toolCall) async {
-          final result = await _executeToolCallWithShellService(
-            toolCall,
-            shellService,
-          );
-          return result;
-        }
+    // Create tool executor
+    Future<String> executeToolCall(ToolCall toolCall) async {
+      final result = await _executeToolCallWithShellService(
+        toolCall,
+        shellService,
+      );
+      return result;
+    }
 
-        controller = LocalSessionController(
-          projectId: project.id,
-          store: store,
-          createLlmClient: createLlmClient,
-          executeToolCall: executeToolCall,
-        );
-      }
+    controller = LocalSessionController(
+      projectId: project.id,
+      store: store,
+      createLlmClient: createLlmClient,
+      executeToolCall: executeToolCall,
+    );
+  }
 
-      // Connect
-      final connected = await controller.connect();
-      if (!connected) {
-        developer.log(
-          '❌ Failed to connect SessionController',
-          name: 'SessionControllerProvider',
-        );
-        return null;
-      }
+  // Connect
+  final connected = await controller.connect();
+  if (!connected) {
+    developer.log(
+      '❌ Failed to connect SessionController',
+      name: 'SessionControllerProvider',
+    );
+    return null;
+  }
 
-      // Dispose on ref disposal
-      ref.onDispose(() {
-        developer.log(
-          '🗑️ Disposing SessionController',
-          name: 'SessionControllerProvider',
-        );
-        controller.dispose();
-      });
+  // Dispose on ref disposal
+  ref.onDispose(() {
+    developer.log(
+      '🗑️ Disposing SessionController',
+      name: 'SessionControllerProvider',
+    );
+    controller.dispose();
+  });
 
-      return controller;
-    });
+  return controller;
+});
 
 /// Execute a tool call using the shell service.
 /// Returns JSON string result.
@@ -149,9 +153,7 @@ Future<String> _executeToolCallWithShellService(
 
 /// Watch sessions for current project via SessionController.
 /// This replaces the old currentProjectSessionsProvider that used direct DAO.
-final controllerSessionsProvider = StreamProvider.autoDispose<List<Session>>((
-  ref,
-) async* {
+final controllerSessionsProvider = StreamProvider<List<Session>>((ref) async* {
   final controllerAsync = ref.watch(sessionControllerProvider);
 
   final controller = controllerAsync.when(
@@ -169,39 +171,41 @@ final controllerSessionsProvider = StreamProvider.autoDispose<List<Session>>((
 });
 
 /// Watch archived sessions via SessionController.
-final controllerArchivedSessionsProvider =
-    StreamProvider.autoDispose<List<Session>>((ref) async* {
-      final controllerAsync = ref.watch(sessionControllerProvider);
+final controllerArchivedSessionsProvider = StreamProvider<List<Session>>((
+  ref,
+) async* {
+  final controllerAsync = ref.watch(sessionControllerProvider);
 
-      final controller = controllerAsync.when(
-        data: (c) => c,
-        loading: () => null,
-        error: (_, __) => null,
-      );
+  final controller = controllerAsync.when(
+    data: (c) => c,
+    loading: () => null,
+    error: (_, __) => null,
+  );
 
-      if (controller == null) {
-        yield [];
-        return;
-      }
+  if (controller == null) {
+    yield [];
+    return;
+  }
 
-      yield* controller.watchArchivedSessions();
-    });
+  yield* controller.watchArchivedSessions();
+});
 
 /// Watch messages for current session via SessionController.
-final controllerMessagesProvider = StreamProvider.autoDispose
-    .family<List<Message>, String>((ref, sessionId) async* {
-      final controllerAsync = ref.watch(sessionControllerProvider);
+final controllerMessagesProvider = StreamProvider.family<List<Message>, String>(
+  (ref, sessionId) async* {
+    final controllerAsync = ref.watch(sessionControllerProvider);
 
-      final controller = controllerAsync.when(
-        data: (c) => c,
-        loading: () => null,
-        error: (_, __) => null,
-      );
+    final controller = controllerAsync.when(
+      data: (c) => c,
+      loading: () => null,
+      error: (_, __) => null,
+    );
 
-      if (controller == null) {
-        yield [];
-        return;
-      }
+    if (controller == null) {
+      yield [];
+      return;
+    }
 
-      yield* controller.watchMessages(sessionId);
-    });
+    yield* controller.watchMessages(sessionId);
+  },
+);

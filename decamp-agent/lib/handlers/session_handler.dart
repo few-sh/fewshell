@@ -209,6 +209,7 @@ class SessionHandler {
     final projectId = data['projectId'] as String?;
     final sessionId = data['sessionId'] as String?;
     final description = data['description'] as String? ?? '';
+    final reqId = data['reqId'] as String?;
 
     if (projectId == null) {
       _sendError('projectId required');
@@ -228,10 +229,14 @@ class SessionHandler {
 
     await _connManager.sessionStore.createSession(session);
 
-    // Return the created session
-    _send({'t': 'session_created', 'session': session.toJson()});
+    // Return the created session with reqId so client can match the response
+    _send({
+      't': 'session_created',
+      'session': session.toJson(),
+      if (reqId != null) 'reqId': reqId,
+    });
 
-    // Broadcast to other clients
+    // Broadcast to other clients (without reqId - they don't need it)
     _connManager.broadcastToProject(
       projectId,
       {'t': 'session_created', 'session': session.toJson()},

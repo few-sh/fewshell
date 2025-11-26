@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'database_provider.dart';
 import 'project_provider.dart';
@@ -11,41 +13,49 @@ import 'session_controller_provider.dart';
 ///
 /// The return type is `dynamic` to support both Session and SessionEntity
 /// during the migration period. UI uses duck-typing on id, description, etc.
-final currentProjectSessionsProvider = StreamProvider<List<dynamic>>((ref) {
+final currentProjectSessionsProvider = Provider<AsyncValue<List<dynamic>>>((
+  ref,
+) {
   final project = ref.watch(currentProjectProvider);
   final projectId = ref.watch(currentProjectIdProvider);
 
   if (projectId == null) {
-    return Stream.value([]);
+    return const AsyncValue.data([]);
   }
 
   // For remote projects, use SessionController
   if (project?.serverUrl != null && project!.serverUrl!.isNotEmpty) {
-    return ref.watch(controllerSessionsProvider.stream);
+    // Watch the controller sessions and convert to dynamic list
+    final sessionsAsync = ref.watch(controllerSessionsProvider);
+    return sessionsAsync.whenData((sessions) => sessions.cast<dynamic>());
   }
 
   // For local projects, use Drift DAO (for now - will migrate to SessionController)
   final sessionDao = ref.watch(databaseProvider).sessionDao;
-  return sessionDao.watchNonArchivedSessionsByProject(projectId);
+  final stream = sessionDao.watchNonArchivedSessionsByProject(projectId);
+  // Create a StreamProvider inline and watch it
+  return ref.watch(StreamProvider((ref) => stream));
 });
 
 /// Provider for archived sessions of the currently selected project
-final archivedSessionsProvider = StreamProvider<List<dynamic>>((ref) {
+final archivedSessionsProvider = Provider<AsyncValue<List<dynamic>>>((ref) {
   final project = ref.watch(currentProjectProvider);
   final projectId = ref.watch(currentProjectIdProvider);
 
   if (projectId == null) {
-    return Stream.value([]);
+    return const AsyncValue.data([]);
   }
 
   // For remote projects, use SessionController
   if (project?.serverUrl != null && project!.serverUrl!.isNotEmpty) {
-    return ref.watch(controllerArchivedSessionsProvider.stream);
+    final sessionsAsync = ref.watch(controllerArchivedSessionsProvider);
+    return sessionsAsync.whenData((sessions) => sessions.cast<dynamic>());
   }
 
   // For local projects, use Drift DAO
   final sessionDao = ref.watch(databaseProvider).sessionDao;
-  return sessionDao.watchArchivedSessionsByProject(projectId);
+  final stream = sessionDao.watchArchivedSessionsByProject(projectId);
+  return ref.watch(StreamProvider((ref) => stream));
 });
 
 /// StateProvider for the currently selected session ID
@@ -90,8 +100,17 @@ final sessionAutoSelectorProvider = Provider<void>((ref) {
         final controllerAsync = ref.read(sessionControllerProvider);
         controllerAsync.whenData((controller) async {
           if (controller != null) {
-            final newSession = await controller.createSession();
-            ref.read(currentSessionIdProvider.notifier).state = newSession.id;
+            try {
+              final newSession = await controller.createSession();
+              ref.read(currentSessionIdProvider.notifier).state = newSession.id;
+            } catch (e) {
+              // Log error but don't crash - session creation failed
+              // The user can manually create a session
+              developer.log(
+                '❌ Failed to auto-create session: $e',
+                name: 'SessionAutoSelector',
+              );
+            }
           }
         });
       } else {
