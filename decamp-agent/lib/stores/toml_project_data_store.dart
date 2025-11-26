@@ -273,8 +273,8 @@ class TomlProjectDataStore implements ProjectDataStore {
         description: map['description'] as String?,
         tags: (map['tags'] as List<dynamic>?)?.cast<String>() ?? [],
         position: map['position'] as int? ?? 0,
-        createdAt: DateTime.parse(map['created_at'] as String),
-        updatedAt: DateTime.parse(map['updated_at'] as String),
+        createdAt: _parseDateTime(map['created_at']),
+        updatedAt: _parseDateTime(map['updated_at']),
       );
 
   // === Secrets ===
@@ -407,9 +407,22 @@ class TomlProjectDataStore implements ProjectDataStore {
         name: map['name'] as String,
         value: map['value'] as String,
         description: map['description'] as String?,
-        createdAt: DateTime.parse(map['created_at'] as String),
-        updatedAt: DateTime.parse(map['updated_at'] as String),
+        createdAt: _parseDateTime(map['created_at']),
+        updatedAt: _parseDateTime(map['updated_at']),
       );
+
+  /// Parses a DateTime from either a String or a TOML DateTime type
+  DateTime _parseDateTime(dynamic value) {
+    if (value is DateTime) {
+      return value;
+    }
+    if (value is String) {
+      return DateTime.parse(value);
+    }
+    // TOML library returns TomlLocalDateTime which has a dateTime property
+    // But we can also just call toString() and parse it
+    return DateTime.parse(value.toString());
+  }
 
   // === TOML Helpers ===
 
