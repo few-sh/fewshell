@@ -12,8 +12,7 @@ part of 'chat_state.dart';
 T _$identity<T>(T value) => value;
 
 final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 /// @nodoc
 mixin _$ExecutionProgress {
@@ -31,9 +30,8 @@ mixin _$ExecutionProgress {
 /// @nodoc
 abstract class $ExecutionProgressCopyWith<$Res> {
   factory $ExecutionProgressCopyWith(
-    ExecutionProgress value,
-    $Res Function(ExecutionProgress) then,
-  ) = _$ExecutionProgressCopyWithImpl<$Res, ExecutionProgress>;
+          ExecutionProgress value, $Res Function(ExecutionProgress) then) =
+      _$ExecutionProgressCopyWithImpl<$Res, ExecutionProgress>;
   @useResult
   $Res call({int currentCommand, int totalCommands, String commandName});
 }
@@ -57,33 +55,29 @@ class _$ExecutionProgressCopyWithImpl<$Res, $Val extends ExecutionProgress>
     Object? totalCommands = null,
     Object? commandName = null,
   }) {
-    return _then(
-      _value.copyWith(
-            currentCommand: null == currentCommand
-                ? _value.currentCommand
-                : currentCommand // ignore: cast_nullable_to_non_nullable
-                      as int,
-            totalCommands: null == totalCommands
-                ? _value.totalCommands
-                : totalCommands // ignore: cast_nullable_to_non_nullable
-                      as int,
-            commandName: null == commandName
-                ? _value.commandName
-                : commandName // ignore: cast_nullable_to_non_nullable
-                      as String,
-          )
-          as $Val,
-    );
+    return _then(_value.copyWith(
+      currentCommand: null == currentCommand
+          ? _value.currentCommand
+          : currentCommand // ignore: cast_nullable_to_non_nullable
+              as int,
+      totalCommands: null == totalCommands
+          ? _value.totalCommands
+          : totalCommands // ignore: cast_nullable_to_non_nullable
+              as int,
+      commandName: null == commandName
+          ? _value.commandName
+          : commandName // ignore: cast_nullable_to_non_nullable
+              as String,
+    ) as $Val);
   }
 }
 
 /// @nodoc
 abstract class _$$ExecutionProgressImplCopyWith<$Res>
     implements $ExecutionProgressCopyWith<$Res> {
-  factory _$$ExecutionProgressImplCopyWith(
-    _$ExecutionProgressImpl value,
-    $Res Function(_$ExecutionProgressImpl) then,
-  ) = __$$ExecutionProgressImplCopyWithImpl<$Res>;
+  factory _$$ExecutionProgressImplCopyWith(_$ExecutionProgressImpl value,
+          $Res Function(_$ExecutionProgressImpl) then) =
+      __$$ExecutionProgressImplCopyWithImpl<$Res>;
   @override
   @useResult
   $Res call({int currentCommand, int totalCommands, String commandName});
@@ -93,10 +87,9 @@ abstract class _$$ExecutionProgressImplCopyWith<$Res>
 class __$$ExecutionProgressImplCopyWithImpl<$Res>
     extends _$ExecutionProgressCopyWithImpl<$Res, _$ExecutionProgressImpl>
     implements _$$ExecutionProgressImplCopyWith<$Res> {
-  __$$ExecutionProgressImplCopyWithImpl(
-    _$ExecutionProgressImpl _value,
-    $Res Function(_$ExecutionProgressImpl) _then,
-  ) : super(_value, _then);
+  __$$ExecutionProgressImplCopyWithImpl(_$ExecutionProgressImpl _value,
+      $Res Function(_$ExecutionProgressImpl) _then)
+      : super(_value, _then);
 
   /// Create a copy of ExecutionProgress
   /// with the given fields replaced by the non-null parameter values.
@@ -107,33 +100,30 @@ class __$$ExecutionProgressImplCopyWithImpl<$Res>
     Object? totalCommands = null,
     Object? commandName = null,
   }) {
-    return _then(
-      _$ExecutionProgressImpl(
-        currentCommand: null == currentCommand
-            ? _value.currentCommand
-            : currentCommand // ignore: cast_nullable_to_non_nullable
-                  as int,
-        totalCommands: null == totalCommands
-            ? _value.totalCommands
-            : totalCommands // ignore: cast_nullable_to_non_nullable
-                  as int,
-        commandName: null == commandName
-            ? _value.commandName
-            : commandName // ignore: cast_nullable_to_non_nullable
-                  as String,
-      ),
-    );
+    return _then(_$ExecutionProgressImpl(
+      currentCommand: null == currentCommand
+          ? _value.currentCommand
+          : currentCommand // ignore: cast_nullable_to_non_nullable
+              as int,
+      totalCommands: null == totalCommands
+          ? _value.totalCommands
+          : totalCommands // ignore: cast_nullable_to_non_nullable
+              as int,
+      commandName: null == commandName
+          ? _value.commandName
+          : commandName // ignore: cast_nullable_to_non_nullable
+              as String,
+    ));
   }
 }
 
 /// @nodoc
 
 class _$ExecutionProgressImpl implements _ExecutionProgress {
-  const _$ExecutionProgressImpl({
-    required this.currentCommand,
-    required this.totalCommands,
-    required this.commandName,
-  });
+  const _$ExecutionProgressImpl(
+      {required this.currentCommand,
+      required this.totalCommands,
+      required this.commandName});
 
   @override
   final int currentCommand;
@@ -171,17 +161,14 @@ class _$ExecutionProgressImpl implements _ExecutionProgress {
   @pragma('vm:prefer-inline')
   _$$ExecutionProgressImplCopyWith<_$ExecutionProgressImpl> get copyWith =>
       __$$ExecutionProgressImplCopyWithImpl<_$ExecutionProgressImpl>(
-        this,
-        _$identity,
-      );
+          this, _$identity);
 }
 
 abstract class _ExecutionProgress implements ExecutionProgress {
-  const factory _ExecutionProgress({
-    required final int currentCommand,
-    required final int totalCommands,
-    required final String commandName,
-  }) = _$ExecutionProgressImpl;
+  const factory _ExecutionProgress(
+      {required final int currentCommand,
+      required final int totalCommands,
+      required final String commandName}) = _$ExecutionProgressImpl;
 
   @override
   int get currentCommand;
@@ -200,7 +187,7 @@ abstract class _ExecutionProgress implements ExecutionProgress {
 
 /// @nodoc
 mixin _$ChatState {
-  // Loading state
+// Loading state
   bool get isLoading =>
       throw _privateConstructorUsedError; // Execution progress tracking
   ExecutionProgress? get executionProgress =>
@@ -221,13 +208,12 @@ abstract class $ChatStateCopyWith<$Res> {
   factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
       _$ChatStateCopyWithImpl<$Res, ChatState>;
   @useResult
-  $Res call({
-    bool isLoading,
-    ExecutionProgress? executionProgress,
-    String? streamingMessageId,
-    String streamingText,
-    String? error,
-  });
+  $Res call(
+      {bool isLoading,
+      ExecutionProgress? executionProgress,
+      String? streamingMessageId,
+      String streamingText,
+      String? error});
 
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
 }
@@ -253,31 +239,28 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
     Object? streamingText = null,
     Object? error = freezed,
   }) {
-    return _then(
-      _value.copyWith(
-            isLoading: null == isLoading
-                ? _value.isLoading
-                : isLoading // ignore: cast_nullable_to_non_nullable
-                      as bool,
-            executionProgress: freezed == executionProgress
-                ? _value.executionProgress
-                : executionProgress // ignore: cast_nullable_to_non_nullable
-                      as ExecutionProgress?,
-            streamingMessageId: freezed == streamingMessageId
-                ? _value.streamingMessageId
-                : streamingMessageId // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            streamingText: null == streamingText
-                ? _value.streamingText
-                : streamingText // ignore: cast_nullable_to_non_nullable
-                      as String,
-            error: freezed == error
-                ? _value.error
-                : error // ignore: cast_nullable_to_non_nullable
-                      as String?,
-          )
-          as $Val,
-    );
+    return _then(_value.copyWith(
+      isLoading: null == isLoading
+          ? _value.isLoading
+          : isLoading // ignore: cast_nullable_to_non_nullable
+              as bool,
+      executionProgress: freezed == executionProgress
+          ? _value.executionProgress
+          : executionProgress // ignore: cast_nullable_to_non_nullable
+              as ExecutionProgress?,
+      streamingMessageId: freezed == streamingMessageId
+          ? _value.streamingMessageId
+          : streamingMessageId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      streamingText: null == streamingText
+          ? _value.streamingText
+          : streamingText // ignore: cast_nullable_to_non_nullable
+              as String,
+      error: freezed == error
+          ? _value.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ) as $Val);
   }
 
   /// Create a copy of ChatState
@@ -299,18 +282,16 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
 abstract class _$$ChatStateImplCopyWith<$Res>
     implements $ChatStateCopyWith<$Res> {
   factory _$$ChatStateImplCopyWith(
-    _$ChatStateImpl value,
-    $Res Function(_$ChatStateImpl) then,
-  ) = __$$ChatStateImplCopyWithImpl<$Res>;
+          _$ChatStateImpl value, $Res Function(_$ChatStateImpl) then) =
+      __$$ChatStateImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    bool isLoading,
-    ExecutionProgress? executionProgress,
-    String? streamingMessageId,
-    String streamingText,
-    String? error,
-  });
+  $Res call(
+      {bool isLoading,
+      ExecutionProgress? executionProgress,
+      String? streamingMessageId,
+      String streamingText,
+      String? error});
 
   @override
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
@@ -321,9 +302,8 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     extends _$ChatStateCopyWithImpl<$Res, _$ChatStateImpl>
     implements _$$ChatStateImplCopyWith<$Res> {
   __$$ChatStateImplCopyWithImpl(
-    _$ChatStateImpl _value,
-    $Res Function(_$ChatStateImpl) _then,
-  ) : super(_value, _then);
+      _$ChatStateImpl _value, $Res Function(_$ChatStateImpl) _then)
+      : super(_value, _then);
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -336,58 +316,56 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     Object? streamingText = null,
     Object? error = freezed,
   }) {
-    return _then(
-      _$ChatStateImpl(
-        isLoading: null == isLoading
-            ? _value.isLoading
-            : isLoading // ignore: cast_nullable_to_non_nullable
-                  as bool,
-        executionProgress: freezed == executionProgress
-            ? _value.executionProgress
-            : executionProgress // ignore: cast_nullable_to_non_nullable
-                  as ExecutionProgress?,
-        streamingMessageId: freezed == streamingMessageId
-            ? _value.streamingMessageId
-            : streamingMessageId // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        streamingText: null == streamingText
-            ? _value.streamingText
-            : streamingText // ignore: cast_nullable_to_non_nullable
-                  as String,
-        error: freezed == error
-            ? _value.error
-            : error // ignore: cast_nullable_to_non_nullable
-                  as String?,
-      ),
-    );
+    return _then(_$ChatStateImpl(
+      isLoading: null == isLoading
+          ? _value.isLoading
+          : isLoading // ignore: cast_nullable_to_non_nullable
+              as bool,
+      executionProgress: freezed == executionProgress
+          ? _value.executionProgress
+          : executionProgress // ignore: cast_nullable_to_non_nullable
+              as ExecutionProgress?,
+      streamingMessageId: freezed == streamingMessageId
+          ? _value.streamingMessageId
+          : streamingMessageId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      streamingText: null == streamingText
+          ? _value.streamingText
+          : streamingText // ignore: cast_nullable_to_non_nullable
+              as String,
+      error: freezed == error
+          ? _value.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as String?,
+    ));
   }
 }
 
 /// @nodoc
 
 class _$ChatStateImpl extends _ChatState {
-  const _$ChatStateImpl({
-    this.isLoading = false,
-    this.executionProgress,
-    this.streamingMessageId,
-    this.streamingText = '',
-    this.error,
-  }) : super._();
+  const _$ChatStateImpl(
+      {this.isLoading = false,
+      this.executionProgress,
+      this.streamingMessageId,
+      this.streamingText = '',
+      this.error})
+      : super._();
 
-  // Loading state
+// Loading state
   @override
   @JsonKey()
   final bool isLoading;
-  // Execution progress tracking
+// Execution progress tracking
   @override
   final ExecutionProgress? executionProgress;
-  // Streaming state
+// Streaming state
   @override
   final String? streamingMessageId;
   @override
   @JsonKey()
   final String streamingText;
-  // Error state
+// Error state
   @override
   final String? error;
 
@@ -413,14 +391,8 @@ class _$ChatStateImpl extends _ChatState {
   }
 
   @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    isLoading,
-    executionProgress,
-    streamingMessageId,
-    streamingText,
-    error,
-  );
+  int get hashCode => Object.hash(runtimeType, isLoading, executionProgress,
+      streamingMessageId, streamingText, error);
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -432,16 +404,15 @@ class _$ChatStateImpl extends _ChatState {
 }
 
 abstract class _ChatState extends ChatState {
-  const factory _ChatState({
-    final bool isLoading,
-    final ExecutionProgress? executionProgress,
-    final String? streamingMessageId,
-    final String streamingText,
-    final String? error,
-  }) = _$ChatStateImpl;
+  const factory _ChatState(
+      {final bool isLoading,
+      final ExecutionProgress? executionProgress,
+      final String? streamingMessageId,
+      final String streamingText,
+      final String? error}) = _$ChatStateImpl;
   const _ChatState._() : super._();
 
-  // Loading state
+// Loading state
   @override
   bool get isLoading; // Execution progress tracking
   @override

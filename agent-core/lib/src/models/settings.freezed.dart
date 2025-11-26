@@ -12,8 +12,7 @@ part of 'settings.dart';
 T _$identity<T>(T value) => value;
 
 final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 AppSettings _$AppSettingsFromJson(Map<String, dynamic> json) {
   return _AppSettings.fromJson(json);
@@ -45,17 +44,15 @@ mixin _$AppSettings {
 /// @nodoc
 abstract class $AppSettingsCopyWith<$Res> {
   factory $AppSettingsCopyWith(
-    AppSettings value,
-    $Res Function(AppSettings) then,
-  ) = _$AppSettingsCopyWithImpl<$Res, AppSettings>;
+          AppSettings value, $Res Function(AppSettings) then) =
+      _$AppSettingsCopyWithImpl<$Res, AppSettings>;
   @useResult
-  $Res call({
-    List<LlmApiSettings> llmSettings,
-    String? defaultLlmIdentifier,
-    AgentInstruction? agentInstruction,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {List<LlmApiSettings> llmSettings,
+      String? defaultLlmIdentifier,
+      AgentInstruction? agentInstruction,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 
   $AgentInstructionCopyWith<$Res>? get agentInstruction;
 }
@@ -81,31 +78,28 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _value.copyWith(
-            llmSettings: null == llmSettings
-                ? _value.llmSettings
-                : llmSettings // ignore: cast_nullable_to_non_nullable
-                      as List<LlmApiSettings>,
-            defaultLlmIdentifier: freezed == defaultLlmIdentifier
-                ? _value.defaultLlmIdentifier
-                : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            agentInstruction: freezed == agentInstruction
-                ? _value.agentInstruction
-                : agentInstruction // ignore: cast_nullable_to_non_nullable
-                      as AgentInstruction?,
-            createdAt: freezed == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-            updatedAt: freezed == updatedAt
-                ? _value.updatedAt
-                : updatedAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-          )
-          as $Val,
-    );
+    return _then(_value.copyWith(
+      llmSettings: null == llmSettings
+          ? _value.llmSettings
+          : llmSettings // ignore: cast_nullable_to_non_nullable
+              as List<LlmApiSettings>,
+      defaultLlmIdentifier: freezed == defaultLlmIdentifier
+          ? _value.defaultLlmIdentifier
+          : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+              as String?,
+      agentInstruction: freezed == agentInstruction
+          ? _value.agentInstruction
+          : agentInstruction // ignore: cast_nullable_to_non_nullable
+              as AgentInstruction?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ) as $Val);
   }
 
   /// Create a copy of AppSettings
@@ -127,18 +121,16 @@ class _$AppSettingsCopyWithImpl<$Res, $Val extends AppSettings>
 abstract class _$$AppSettingsImplCopyWith<$Res>
     implements $AppSettingsCopyWith<$Res> {
   factory _$$AppSettingsImplCopyWith(
-    _$AppSettingsImpl value,
-    $Res Function(_$AppSettingsImpl) then,
-  ) = __$$AppSettingsImplCopyWithImpl<$Res>;
+          _$AppSettingsImpl value, $Res Function(_$AppSettingsImpl) then) =
+      __$$AppSettingsImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    List<LlmApiSettings> llmSettings,
-    String? defaultLlmIdentifier,
-    AgentInstruction? agentInstruction,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {List<LlmApiSettings> llmSettings,
+      String? defaultLlmIdentifier,
+      AgentInstruction? agentInstruction,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 
   @override
   $AgentInstructionCopyWith<$Res>? get agentInstruction;
@@ -149,9 +141,8 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
     extends _$AppSettingsCopyWithImpl<$Res, _$AppSettingsImpl>
     implements _$$AppSettingsImplCopyWith<$Res> {
   __$$AppSettingsImplCopyWithImpl(
-    _$AppSettingsImpl _value,
-    $Res Function(_$AppSettingsImpl) _then,
-  ) : super(_value, _then);
+      _$AppSettingsImpl _value, $Res Function(_$AppSettingsImpl) _then)
+      : super(_value, _then);
 
   /// Create a copy of AppSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -164,43 +155,41 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _$AppSettingsImpl(
-        llmSettings: null == llmSettings
-            ? _value._llmSettings
-            : llmSettings // ignore: cast_nullable_to_non_nullable
-                  as List<LlmApiSettings>,
-        defaultLlmIdentifier: freezed == defaultLlmIdentifier
-            ? _value.defaultLlmIdentifier
-            : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        agentInstruction: freezed == agentInstruction
-            ? _value.agentInstruction
-            : agentInstruction // ignore: cast_nullable_to_non_nullable
-                  as AgentInstruction?,
-        createdAt: freezed == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-        updatedAt: freezed == updatedAt
-            ? _value.updatedAt
-            : updatedAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-      ),
-    );
+    return _then(_$AppSettingsImpl(
+      llmSettings: null == llmSettings
+          ? _value._llmSettings
+          : llmSettings // ignore: cast_nullable_to_non_nullable
+              as List<LlmApiSettings>,
+      defaultLlmIdentifier: freezed == defaultLlmIdentifier
+          ? _value.defaultLlmIdentifier
+          : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+              as String?,
+      agentInstruction: freezed == agentInstruction
+          ? _value.agentInstruction
+          : agentInstruction // ignore: cast_nullable_to_non_nullable
+              as AgentInstruction?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
 class _$AppSettingsImpl implements _AppSettings {
-  const _$AppSettingsImpl({
-    final List<LlmApiSettings> llmSettings = const [],
-    this.defaultLlmIdentifier,
-    this.agentInstruction,
-    this.createdAt,
-    this.updatedAt,
-  }) : _llmSettings = llmSettings;
+  const _$AppSettingsImpl(
+      {final List<LlmApiSettings> llmSettings = const [],
+      this.defaultLlmIdentifier,
+      this.agentInstruction,
+      this.createdAt,
+      this.updatedAt})
+      : _llmSettings = llmSettings;
 
   factory _$AppSettingsImpl.fromJson(Map<String, dynamic> json) =>
       _$$AppSettingsImplFromJson(json);
@@ -239,10 +228,8 @@ class _$AppSettingsImpl implements _AppSettings {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$AppSettingsImpl &&
-            const DeepCollectionEquality().equals(
-              other._llmSettings,
-              _llmSettings,
-            ) &&
+            const DeepCollectionEquality()
+                .equals(other._llmSettings, _llmSettings) &&
             (identical(other.defaultLlmIdentifier, defaultLlmIdentifier) ||
                 other.defaultLlmIdentifier == defaultLlmIdentifier) &&
             (identical(other.agentInstruction, agentInstruction) ||
@@ -256,13 +243,12 @@ class _$AppSettingsImpl implements _AppSettings {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-    runtimeType,
-    const DeepCollectionEquality().hash(_llmSettings),
-    defaultLlmIdentifier,
-    agentInstruction,
-    createdAt,
-    updatedAt,
-  );
+      runtimeType,
+      const DeepCollectionEquality().hash(_llmSettings),
+      defaultLlmIdentifier,
+      agentInstruction,
+      createdAt,
+      updatedAt);
 
   /// Create a copy of AppSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -274,18 +260,19 @@ class _$AppSettingsImpl implements _AppSettings {
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$AppSettingsImplToJson(this);
+    return _$$AppSettingsImplToJson(
+      this,
+    );
   }
 }
 
 abstract class _AppSettings implements AppSettings {
-  const factory _AppSettings({
-    final List<LlmApiSettings> llmSettings,
-    final String? defaultLlmIdentifier,
-    final AgentInstruction? agentInstruction,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
-  }) = _$AppSettingsImpl;
+  const factory _AppSettings(
+      {final List<LlmApiSettings> llmSettings,
+      final String? defaultLlmIdentifier,
+      final AgentInstruction? agentInstruction,
+      final DateTime? createdAt,
+      final DateTime? updatedAt}) = _$AppSettingsImpl;
 
   factory _AppSettings.fromJson(Map<String, dynamic> json) =
       _$AppSettingsImpl.fromJson;
@@ -354,20 +341,18 @@ mixin _$ProjectSettings {
 /// @nodoc
 abstract class $ProjectSettingsCopyWith<$Res> {
   factory $ProjectSettingsCopyWith(
-    ProjectSettings value,
-    $Res Function(ProjectSettings) then,
-  ) = _$ProjectSettingsCopyWithImpl<$Res, ProjectSettings>;
+          ProjectSettings value, $Res Function(ProjectSettings) then) =
+      _$ProjectSettingsCopyWithImpl<$Res, ProjectSettings>;
   @useResult
-  $Res call({
-    String projectId,
-    List<LlmApiSettings> llmSettings,
-    String? defaultLlmIdentifier,
-    AgentInstruction? agentInstruction,
-    bool includeUserInstructions,
-    SshSettings? sshSettings,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {String projectId,
+      List<LlmApiSettings> llmSettings,
+      String? defaultLlmIdentifier,
+      AgentInstruction? agentInstruction,
+      bool includeUserInstructions,
+      SshSettings? sshSettings,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 
   $AgentInstructionCopyWith<$Res>? get agentInstruction;
   $SshSettingsCopyWith<$Res>? get sshSettings;
@@ -397,43 +382,40 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _value.copyWith(
-            projectId: null == projectId
-                ? _value.projectId
-                : projectId // ignore: cast_nullable_to_non_nullable
-                      as String,
-            llmSettings: null == llmSettings
-                ? _value.llmSettings
-                : llmSettings // ignore: cast_nullable_to_non_nullable
-                      as List<LlmApiSettings>,
-            defaultLlmIdentifier: freezed == defaultLlmIdentifier
-                ? _value.defaultLlmIdentifier
-                : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            agentInstruction: freezed == agentInstruction
-                ? _value.agentInstruction
-                : agentInstruction // ignore: cast_nullable_to_non_nullable
-                      as AgentInstruction?,
-            includeUserInstructions: null == includeUserInstructions
-                ? _value.includeUserInstructions
-                : includeUserInstructions // ignore: cast_nullable_to_non_nullable
-                      as bool,
-            sshSettings: freezed == sshSettings
-                ? _value.sshSettings
-                : sshSettings // ignore: cast_nullable_to_non_nullable
-                      as SshSettings?,
-            createdAt: freezed == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-            updatedAt: freezed == updatedAt
-                ? _value.updatedAt
-                : updatedAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-          )
-          as $Val,
-    );
+    return _then(_value.copyWith(
+      projectId: null == projectId
+          ? _value.projectId
+          : projectId // ignore: cast_nullable_to_non_nullable
+              as String,
+      llmSettings: null == llmSettings
+          ? _value.llmSettings
+          : llmSettings // ignore: cast_nullable_to_non_nullable
+              as List<LlmApiSettings>,
+      defaultLlmIdentifier: freezed == defaultLlmIdentifier
+          ? _value.defaultLlmIdentifier
+          : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+              as String?,
+      agentInstruction: freezed == agentInstruction
+          ? _value.agentInstruction
+          : agentInstruction // ignore: cast_nullable_to_non_nullable
+              as AgentInstruction?,
+      includeUserInstructions: null == includeUserInstructions
+          ? _value.includeUserInstructions
+          : includeUserInstructions // ignore: cast_nullable_to_non_nullable
+              as bool,
+      sshSettings: freezed == sshSettings
+          ? _value.sshSettings
+          : sshSettings // ignore: cast_nullable_to_non_nullable
+              as SshSettings?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ) as $Val);
   }
 
   /// Create a copy of ProjectSettings
@@ -468,22 +450,20 @@ class _$ProjectSettingsCopyWithImpl<$Res, $Val extends ProjectSettings>
 /// @nodoc
 abstract class _$$ProjectSettingsImplCopyWith<$Res>
     implements $ProjectSettingsCopyWith<$Res> {
-  factory _$$ProjectSettingsImplCopyWith(
-    _$ProjectSettingsImpl value,
-    $Res Function(_$ProjectSettingsImpl) then,
-  ) = __$$ProjectSettingsImplCopyWithImpl<$Res>;
+  factory _$$ProjectSettingsImplCopyWith(_$ProjectSettingsImpl value,
+          $Res Function(_$ProjectSettingsImpl) then) =
+      __$$ProjectSettingsImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    String projectId,
-    List<LlmApiSettings> llmSettings,
-    String? defaultLlmIdentifier,
-    AgentInstruction? agentInstruction,
-    bool includeUserInstructions,
-    SshSettings? sshSettings,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {String projectId,
+      List<LlmApiSettings> llmSettings,
+      String? defaultLlmIdentifier,
+      AgentInstruction? agentInstruction,
+      bool includeUserInstructions,
+      SshSettings? sshSettings,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 
   @override
   $AgentInstructionCopyWith<$Res>? get agentInstruction;
@@ -496,9 +476,8 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
     extends _$ProjectSettingsCopyWithImpl<$Res, _$ProjectSettingsImpl>
     implements _$$ProjectSettingsImplCopyWith<$Res> {
   __$$ProjectSettingsImplCopyWithImpl(
-    _$ProjectSettingsImpl _value,
-    $Res Function(_$ProjectSettingsImpl) _then,
-  ) : super(_value, _then);
+      _$ProjectSettingsImpl _value, $Res Function(_$ProjectSettingsImpl) _then)
+      : super(_value, _then);
 
   /// Create a copy of ProjectSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -514,58 +493,56 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _$ProjectSettingsImpl(
-        projectId: null == projectId
-            ? _value.projectId
-            : projectId // ignore: cast_nullable_to_non_nullable
-                  as String,
-        llmSettings: null == llmSettings
-            ? _value._llmSettings
-            : llmSettings // ignore: cast_nullable_to_non_nullable
-                  as List<LlmApiSettings>,
-        defaultLlmIdentifier: freezed == defaultLlmIdentifier
-            ? _value.defaultLlmIdentifier
-            : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        agentInstruction: freezed == agentInstruction
-            ? _value.agentInstruction
-            : agentInstruction // ignore: cast_nullable_to_non_nullable
-                  as AgentInstruction?,
-        includeUserInstructions: null == includeUserInstructions
-            ? _value.includeUserInstructions
-            : includeUserInstructions // ignore: cast_nullable_to_non_nullable
-                  as bool,
-        sshSettings: freezed == sshSettings
-            ? _value.sshSettings
-            : sshSettings // ignore: cast_nullable_to_non_nullable
-                  as SshSettings?,
-        createdAt: freezed == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-        updatedAt: freezed == updatedAt
-            ? _value.updatedAt
-            : updatedAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-      ),
-    );
+    return _then(_$ProjectSettingsImpl(
+      projectId: null == projectId
+          ? _value.projectId
+          : projectId // ignore: cast_nullable_to_non_nullable
+              as String,
+      llmSettings: null == llmSettings
+          ? _value._llmSettings
+          : llmSettings // ignore: cast_nullable_to_non_nullable
+              as List<LlmApiSettings>,
+      defaultLlmIdentifier: freezed == defaultLlmIdentifier
+          ? _value.defaultLlmIdentifier
+          : defaultLlmIdentifier // ignore: cast_nullable_to_non_nullable
+              as String?,
+      agentInstruction: freezed == agentInstruction
+          ? _value.agentInstruction
+          : agentInstruction // ignore: cast_nullable_to_non_nullable
+              as AgentInstruction?,
+      includeUserInstructions: null == includeUserInstructions
+          ? _value.includeUserInstructions
+          : includeUserInstructions // ignore: cast_nullable_to_non_nullable
+              as bool,
+      sshSettings: freezed == sshSettings
+          ? _value.sshSettings
+          : sshSettings // ignore: cast_nullable_to_non_nullable
+              as SshSettings?,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
 class _$ProjectSettingsImpl implements _ProjectSettings {
-  const _$ProjectSettingsImpl({
-    required this.projectId,
-    final List<LlmApiSettings> llmSettings = const [],
-    this.defaultLlmIdentifier,
-    this.agentInstruction,
-    this.includeUserInstructions = false,
-    this.sshSettings,
-    this.createdAt,
-    this.updatedAt,
-  }) : _llmSettings = llmSettings;
+  const _$ProjectSettingsImpl(
+      {required this.projectId,
+      final List<LlmApiSettings> llmSettings = const [],
+      this.defaultLlmIdentifier,
+      this.agentInstruction,
+      this.includeUserInstructions = false,
+      this.sshSettings,
+      this.createdAt,
+      this.updatedAt})
+      : _llmSettings = llmSettings;
 
   factory _$ProjectSettingsImpl.fromJson(Map<String, dynamic> json) =>
       _$$ProjectSettingsImplFromJson(json);
@@ -621,18 +598,14 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
             other is _$ProjectSettingsImpl &&
             (identical(other.projectId, projectId) ||
                 other.projectId == projectId) &&
-            const DeepCollectionEquality().equals(
-              other._llmSettings,
-              _llmSettings,
-            ) &&
+            const DeepCollectionEquality()
+                .equals(other._llmSettings, _llmSettings) &&
             (identical(other.defaultLlmIdentifier, defaultLlmIdentifier) ||
                 other.defaultLlmIdentifier == defaultLlmIdentifier) &&
             (identical(other.agentInstruction, agentInstruction) ||
                 other.agentInstruction == agentInstruction) &&
             (identical(
-                  other.includeUserInstructions,
-                  includeUserInstructions,
-                ) ||
+                    other.includeUserInstructions, includeUserInstructions) ||
                 other.includeUserInstructions == includeUserInstructions) &&
             (identical(other.sshSettings, sshSettings) ||
                 other.sshSettings == sshSettings) &&
@@ -645,16 +618,15 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-    runtimeType,
-    projectId,
-    const DeepCollectionEquality().hash(_llmSettings),
-    defaultLlmIdentifier,
-    agentInstruction,
-    includeUserInstructions,
-    sshSettings,
-    createdAt,
-    updatedAt,
-  );
+      runtimeType,
+      projectId,
+      const DeepCollectionEquality().hash(_llmSettings),
+      defaultLlmIdentifier,
+      agentInstruction,
+      includeUserInstructions,
+      sshSettings,
+      createdAt,
+      updatedAt);
 
   /// Create a copy of ProjectSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -663,27 +635,26 @@ class _$ProjectSettingsImpl implements _ProjectSettings {
   @pragma('vm:prefer-inline')
   _$$ProjectSettingsImplCopyWith<_$ProjectSettingsImpl> get copyWith =>
       __$$ProjectSettingsImplCopyWithImpl<_$ProjectSettingsImpl>(
-        this,
-        _$identity,
-      );
+          this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$ProjectSettingsImplToJson(this);
+    return _$$ProjectSettingsImplToJson(
+      this,
+    );
   }
 }
 
 abstract class _ProjectSettings implements ProjectSettings {
-  const factory _ProjectSettings({
-    required final String projectId,
-    final List<LlmApiSettings> llmSettings,
-    final String? defaultLlmIdentifier,
-    final AgentInstruction? agentInstruction,
-    final bool includeUserInstructions,
-    final SshSettings? sshSettings,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
-  }) = _$ProjectSettingsImpl;
+  const factory _ProjectSettings(
+      {required final String projectId,
+      final List<LlmApiSettings> llmSettings,
+      final String? defaultLlmIdentifier,
+      final AgentInstruction? agentInstruction,
+      final bool includeUserInstructions,
+      final SshSettings? sshSettings,
+      final DateTime? createdAt,
+      final DateTime? updatedAt}) = _$ProjectSettingsImpl;
 
   factory _ProjectSettings.fromJson(Map<String, dynamic> json) =
       _$ProjectSettingsImpl.fromJson;

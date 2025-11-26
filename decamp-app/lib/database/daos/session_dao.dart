@@ -1,8 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/sessions_table.dart';
-import '../../utils/id_generator.dart';
-import '../../utils/constants.dart';
+import 'package:agent_core/agent_core.dart';
 
 part 'session_dao.g.dart';
 

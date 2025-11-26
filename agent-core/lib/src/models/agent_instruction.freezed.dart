@@ -12,8 +12,7 @@ part of 'agent_instruction.dart';
 T _$identity<T>(T value) => value;
 
 final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 AgentInstruction _$AgentInstructionFromJson(Map<String, dynamic> json) {
   return _AgentInstruction.fromJson(json);
@@ -44,16 +43,14 @@ mixin _$AgentInstruction {
 /// @nodoc
 abstract class $AgentInstructionCopyWith<$Res> {
   factory $AgentInstructionCopyWith(
-    AgentInstruction value,
-    $Res Function(AgentInstruction) then,
-  ) = _$AgentInstructionCopyWithImpl<$Res, AgentInstruction>;
+          AgentInstruction value, $Res Function(AgentInstruction) then) =
+      _$AgentInstructionCopyWithImpl<$Res, AgentInstruction>;
   @useResult
-  $Res call({
-    String defaultInstruction,
-    Map<String, String> modelOverrides,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {String defaultInstruction,
+      Map<String, String> modelOverrides,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -76,55 +73,49 @@ class _$AgentInstructionCopyWithImpl<$Res, $Val extends AgentInstruction>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _value.copyWith(
-            defaultInstruction: null == defaultInstruction
-                ? _value.defaultInstruction
-                : defaultInstruction // ignore: cast_nullable_to_non_nullable
-                      as String,
-            modelOverrides: null == modelOverrides
-                ? _value.modelOverrides
-                : modelOverrides // ignore: cast_nullable_to_non_nullable
-                      as Map<String, String>,
-            createdAt: freezed == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-            updatedAt: freezed == updatedAt
-                ? _value.updatedAt
-                : updatedAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-          )
-          as $Val,
-    );
+    return _then(_value.copyWith(
+      defaultInstruction: null == defaultInstruction
+          ? _value.defaultInstruction
+          : defaultInstruction // ignore: cast_nullable_to_non_nullable
+              as String,
+      modelOverrides: null == modelOverrides
+          ? _value.modelOverrides
+          : modelOverrides // ignore: cast_nullable_to_non_nullable
+              as Map<String, String>,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ) as $Val);
   }
 }
 
 /// @nodoc
 abstract class _$$AgentInstructionImplCopyWith<$Res>
     implements $AgentInstructionCopyWith<$Res> {
-  factory _$$AgentInstructionImplCopyWith(
-    _$AgentInstructionImpl value,
-    $Res Function(_$AgentInstructionImpl) then,
-  ) = __$$AgentInstructionImplCopyWithImpl<$Res>;
+  factory _$$AgentInstructionImplCopyWith(_$AgentInstructionImpl value,
+          $Res Function(_$AgentInstructionImpl) then) =
+      __$$AgentInstructionImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    String defaultInstruction,
-    Map<String, String> modelOverrides,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {String defaultInstruction,
+      Map<String, String> modelOverrides,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 }
 
 /// @nodoc
 class __$$AgentInstructionImplCopyWithImpl<$Res>
     extends _$AgentInstructionCopyWithImpl<$Res, _$AgentInstructionImpl>
     implements _$$AgentInstructionImplCopyWith<$Res> {
-  __$$AgentInstructionImplCopyWithImpl(
-    _$AgentInstructionImpl _value,
-    $Res Function(_$AgentInstructionImpl) _then,
-  ) : super(_value, _then);
+  __$$AgentInstructionImplCopyWithImpl(_$AgentInstructionImpl _value,
+      $Res Function(_$AgentInstructionImpl) _then)
+      : super(_value, _then);
 
   /// Create a copy of AgentInstruction
   /// with the given fields replaced by the non-null parameter values.
@@ -136,38 +127,36 @@ class __$$AgentInstructionImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _$AgentInstructionImpl(
-        defaultInstruction: null == defaultInstruction
-            ? _value.defaultInstruction
-            : defaultInstruction // ignore: cast_nullable_to_non_nullable
-                  as String,
-        modelOverrides: null == modelOverrides
-            ? _value._modelOverrides
-            : modelOverrides // ignore: cast_nullable_to_non_nullable
-                  as Map<String, String>,
-        createdAt: freezed == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-        updatedAt: freezed == updatedAt
-            ? _value.updatedAt
-            : updatedAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-      ),
-    );
+    return _then(_$AgentInstructionImpl(
+      defaultInstruction: null == defaultInstruction
+          ? _value.defaultInstruction
+          : defaultInstruction // ignore: cast_nullable_to_non_nullable
+              as String,
+      modelOverrides: null == modelOverrides
+          ? _value._modelOverrides
+          : modelOverrides // ignore: cast_nullable_to_non_nullable
+              as Map<String, String>,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
 class _$AgentInstructionImpl implements _AgentInstruction {
-  const _$AgentInstructionImpl({
-    this.defaultInstruction = '',
-    final Map<String, String> modelOverrides = const {},
-    this.createdAt,
-    this.updatedAt,
-  }) : _modelOverrides = modelOverrides;
+  const _$AgentInstructionImpl(
+      {this.defaultInstruction = '',
+      final Map<String, String> modelOverrides = const {},
+      this.createdAt,
+      this.updatedAt})
+      : _modelOverrides = modelOverrides;
 
   factory _$AgentInstructionImpl.fromJson(Map<String, dynamic> json) =>
       _$$AgentInstructionImplFromJson(json);
@@ -210,10 +199,8 @@ class _$AgentInstructionImpl implements _AgentInstruction {
             other is _$AgentInstructionImpl &&
             (identical(other.defaultInstruction, defaultInstruction) ||
                 other.defaultInstruction == defaultInstruction) &&
-            const DeepCollectionEquality().equals(
-              other._modelOverrides,
-              _modelOverrides,
-            ) &&
+            const DeepCollectionEquality()
+                .equals(other._modelOverrides, _modelOverrides) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -223,12 +210,11 @@ class _$AgentInstructionImpl implements _AgentInstruction {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
-    runtimeType,
-    defaultInstruction,
-    const DeepCollectionEquality().hash(_modelOverrides),
-    createdAt,
-    updatedAt,
-  );
+      runtimeType,
+      defaultInstruction,
+      const DeepCollectionEquality().hash(_modelOverrides),
+      createdAt,
+      updatedAt);
 
   /// Create a copy of AgentInstruction
   /// with the given fields replaced by the non-null parameter values.
@@ -237,23 +223,22 @@ class _$AgentInstructionImpl implements _AgentInstruction {
   @pragma('vm:prefer-inline')
   _$$AgentInstructionImplCopyWith<_$AgentInstructionImpl> get copyWith =>
       __$$AgentInstructionImplCopyWithImpl<_$AgentInstructionImpl>(
-        this,
-        _$identity,
-      );
+          this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$AgentInstructionImplToJson(this);
+    return _$$AgentInstructionImplToJson(
+      this,
+    );
   }
 }
 
 abstract class _AgentInstruction implements AgentInstruction {
-  const factory _AgentInstruction({
-    final String defaultInstruction,
-    final Map<String, String> modelOverrides,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
-  }) = _$AgentInstructionImpl;
+  const factory _AgentInstruction(
+      {final String defaultInstruction,
+      final Map<String, String> modelOverrides,
+      final DateTime? createdAt,
+      final DateTime? updatedAt}) = _$AgentInstructionImpl;
 
   factory _AgentInstruction.fromJson(Map<String, dynamic> json) =
       _$AgentInstructionImpl.fromJson;

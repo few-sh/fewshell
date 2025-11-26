@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 import '../database.dart';
 import '../tables/messages_table.dart';
-import '../../utils/id_generator.dart';
+import 'package:agent_core/agent_core.dart';
 
 part 'message_dao.g.dart';
 

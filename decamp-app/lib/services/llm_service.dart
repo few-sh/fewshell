@@ -1,12 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
-import '../models/llm_api_settings.dart';
+import 'package:agent_core/agent_core.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/secret_provider.dart';
 import '../services/keychain_service.dart';
-import '../utils/template_processor.dart';
 
 /// Provider for the LLM service
 final llmServiceProvider = Provider<LlmService>((ref) {

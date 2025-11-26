@@ -9,7 +9,17 @@ environment:
 dependencies:
   llm_dart:
     path: ../llm_dart
+  drift: ^2.20.0
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.9.0
+  uuid: ^4.5.1
+  intl: ^0.20.2
+  timeago: ^3.7.1
 
 dev_dependencies:
   lints: ^5.0.0
   test: ^1.25.0
+  build_runner: ^2.4.6
+  drift_dev: ^2.20.0
+  freezed: ^2.4.5
+  json_serializable: ^6.7.1

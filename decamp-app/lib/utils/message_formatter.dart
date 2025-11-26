@@ -1,6 +1,6 @@
 import 'package:decamp/database/database.dart';
 import 'package:decamp/database/tables/messages_table.dart';
-import 'package:decamp/utils/tool_result_formatter.dart';
+import 'package:agent_core/agent_core.dart';
 
 /// Utility for formatting message content consistently
 /// Used by both search and rendering to ensure offset alignment

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:decamp/themes/terminal_theme.dart';
-import 'package:decamp/utils/constants.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/full_screen_code_view.dart';
 import 'package:decamp/utils/highlight_injector.dart';
 
@@ -146,12 +146,14 @@ class ExpandableCodeBlock extends StatelessWidget {
       }
 
       // Add highlighted text
-      spans.add(TextSpan(
-        text: text.substring(start, end),
-        style: baseStyle.copyWith(
-          backgroundColor: highlight.isActive ? activeColor : inactiveColor,
+      spans.add(
+        TextSpan(
+          text: text.substring(start, end),
+          style: baseStyle.copyWith(
+            backgroundColor: highlight.isActive ? activeColor : inactiveColor,
+          ),
         ),
-      ));
+      );
 
       lastIndex = end;
     }

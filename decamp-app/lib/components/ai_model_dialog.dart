@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/llm_api_settings.dart';
+import 'package:agent_core/agent_core.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 
 import '../services/llm_service.dart';
-import '../utils/constants.dart';
 
 /// Reusable dialog for adding or editing AI model configurations
 class AIModelDialog {

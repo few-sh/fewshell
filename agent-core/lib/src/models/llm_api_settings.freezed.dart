@@ -12,8 +12,7 @@ part of 'llm_api_settings.dart';
 T _$identity<T>(T value) => value;
 
 final _privateConstructorUsedError = UnsupportedError(
-  'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
-);
+    'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models');
 
 LlmApiSettings _$LlmApiSettingsFromJson(Map<String, dynamic> json) {
   return _LlmApiSettings.fromJson(json);
@@ -62,21 +61,19 @@ mixin _$LlmApiSettings {
 /// @nodoc
 abstract class $LlmApiSettingsCopyWith<$Res> {
   factory $LlmApiSettingsCopyWith(
-    LlmApiSettings value,
-    $Res Function(LlmApiSettings) then,
-  ) = _$LlmApiSettingsCopyWithImpl<$Res, LlmApiSettings>;
+          LlmApiSettings value, $Res Function(LlmApiSettings) then) =
+      _$LlmApiSettingsCopyWithImpl<$Res, LlmApiSettings>;
   @useResult
-  $Res call({
-    String identifier,
-    LlmApiType apiType,
-    String baseUrl,
-    String? customHeaders,
-    int? maxTokens,
-    double? temperature,
-    bool enabled,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {String identifier,
+      LlmApiType apiType,
+      String baseUrl,
+      String? customHeaders,
+      int? maxTokens,
+      double? temperature,
+      bool enabled,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -104,70 +101,65 @@ class _$LlmApiSettingsCopyWithImpl<$Res, $Val extends LlmApiSettings>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _value.copyWith(
-            identifier: null == identifier
-                ? _value.identifier
-                : identifier // ignore: cast_nullable_to_non_nullable
-                      as String,
-            apiType: null == apiType
-                ? _value.apiType
-                : apiType // ignore: cast_nullable_to_non_nullable
-                      as LlmApiType,
-            baseUrl: null == baseUrl
-                ? _value.baseUrl
-                : baseUrl // ignore: cast_nullable_to_non_nullable
-                      as String,
-            customHeaders: freezed == customHeaders
-                ? _value.customHeaders
-                : customHeaders // ignore: cast_nullable_to_non_nullable
-                      as String?,
-            maxTokens: freezed == maxTokens
-                ? _value.maxTokens
-                : maxTokens // ignore: cast_nullable_to_non_nullable
-                      as int?,
-            temperature: freezed == temperature
-                ? _value.temperature
-                : temperature // ignore: cast_nullable_to_non_nullable
-                      as double?,
-            enabled: null == enabled
-                ? _value.enabled
-                : enabled // ignore: cast_nullable_to_non_nullable
-                      as bool,
-            createdAt: freezed == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-            updatedAt: freezed == updatedAt
-                ? _value.updatedAt
-                : updatedAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime?,
-          )
-          as $Val,
-    );
+    return _then(_value.copyWith(
+      identifier: null == identifier
+          ? _value.identifier
+          : identifier // ignore: cast_nullable_to_non_nullable
+              as String,
+      apiType: null == apiType
+          ? _value.apiType
+          : apiType // ignore: cast_nullable_to_non_nullable
+              as LlmApiType,
+      baseUrl: null == baseUrl
+          ? _value.baseUrl
+          : baseUrl // ignore: cast_nullable_to_non_nullable
+              as String,
+      customHeaders: freezed == customHeaders
+          ? _value.customHeaders
+          : customHeaders // ignore: cast_nullable_to_non_nullable
+              as String?,
+      maxTokens: freezed == maxTokens
+          ? _value.maxTokens
+          : maxTokens // ignore: cast_nullable_to_non_nullable
+              as int?,
+      temperature: freezed == temperature
+          ? _value.temperature
+          : temperature // ignore: cast_nullable_to_non_nullable
+              as double?,
+      enabled: null == enabled
+          ? _value.enabled
+          : enabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ) as $Val);
   }
 }
 
 /// @nodoc
 abstract class _$$LlmApiSettingsImplCopyWith<$Res>
     implements $LlmApiSettingsCopyWith<$Res> {
-  factory _$$LlmApiSettingsImplCopyWith(
-    _$LlmApiSettingsImpl value,
-    $Res Function(_$LlmApiSettingsImpl) then,
-  ) = __$$LlmApiSettingsImplCopyWithImpl<$Res>;
+  factory _$$LlmApiSettingsImplCopyWith(_$LlmApiSettingsImpl value,
+          $Res Function(_$LlmApiSettingsImpl) then) =
+      __$$LlmApiSettingsImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call({
-    String identifier,
-    LlmApiType apiType,
-    String baseUrl,
-    String? customHeaders,
-    int? maxTokens,
-    double? temperature,
-    bool enabled,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  });
+  $Res call(
+      {String identifier,
+      LlmApiType apiType,
+      String baseUrl,
+      String? customHeaders,
+      int? maxTokens,
+      double? temperature,
+      bool enabled,
+      DateTime? createdAt,
+      DateTime? updatedAt});
 }
 
 /// @nodoc
@@ -175,9 +167,8 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
     extends _$LlmApiSettingsCopyWithImpl<$Res, _$LlmApiSettingsImpl>
     implements _$$LlmApiSettingsImplCopyWith<$Res> {
   __$$LlmApiSettingsImplCopyWithImpl(
-    _$LlmApiSettingsImpl _value,
-    $Res Function(_$LlmApiSettingsImpl) _then,
-  ) : super(_value, _then);
+      _$LlmApiSettingsImpl _value, $Res Function(_$LlmApiSettingsImpl) _then)
+      : super(_value, _then);
 
   /// Create a copy of LlmApiSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -194,63 +185,60 @@ class __$$LlmApiSettingsImplCopyWithImpl<$Res>
     Object? createdAt = freezed,
     Object? updatedAt = freezed,
   }) {
-    return _then(
-      _$LlmApiSettingsImpl(
-        identifier: null == identifier
-            ? _value.identifier
-            : identifier // ignore: cast_nullable_to_non_nullable
-                  as String,
-        apiType: null == apiType
-            ? _value.apiType
-            : apiType // ignore: cast_nullable_to_non_nullable
-                  as LlmApiType,
-        baseUrl: null == baseUrl
-            ? _value.baseUrl
-            : baseUrl // ignore: cast_nullable_to_non_nullable
-                  as String,
-        customHeaders: freezed == customHeaders
-            ? _value.customHeaders
-            : customHeaders // ignore: cast_nullable_to_non_nullable
-                  as String?,
-        maxTokens: freezed == maxTokens
-            ? _value.maxTokens
-            : maxTokens // ignore: cast_nullable_to_non_nullable
-                  as int?,
-        temperature: freezed == temperature
-            ? _value.temperature
-            : temperature // ignore: cast_nullable_to_non_nullable
-                  as double?,
-        enabled: null == enabled
-            ? _value.enabled
-            : enabled // ignore: cast_nullable_to_non_nullable
-                  as bool,
-        createdAt: freezed == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-        updatedAt: freezed == updatedAt
-            ? _value.updatedAt
-            : updatedAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime?,
-      ),
-    );
+    return _then(_$LlmApiSettingsImpl(
+      identifier: null == identifier
+          ? _value.identifier
+          : identifier // ignore: cast_nullable_to_non_nullable
+              as String,
+      apiType: null == apiType
+          ? _value.apiType
+          : apiType // ignore: cast_nullable_to_non_nullable
+              as LlmApiType,
+      baseUrl: null == baseUrl
+          ? _value.baseUrl
+          : baseUrl // ignore: cast_nullable_to_non_nullable
+              as String,
+      customHeaders: freezed == customHeaders
+          ? _value.customHeaders
+          : customHeaders // ignore: cast_nullable_to_non_nullable
+              as String?,
+      maxTokens: freezed == maxTokens
+          ? _value.maxTokens
+          : maxTokens // ignore: cast_nullable_to_non_nullable
+              as int?,
+      temperature: freezed == temperature
+          ? _value.temperature
+          : temperature // ignore: cast_nullable_to_non_nullable
+              as double?,
+      enabled: null == enabled
+          ? _value.enabled
+          : enabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      createdAt: freezed == createdAt
+          ? _value.createdAt
+          : createdAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      updatedAt: freezed == updatedAt
+          ? _value.updatedAt
+          : updatedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+    ));
   }
 }
 
 /// @nodoc
 @JsonSerializable()
 class _$LlmApiSettingsImpl implements _LlmApiSettings {
-  const _$LlmApiSettingsImpl({
-    required this.identifier,
-    required this.apiType,
-    required this.baseUrl,
-    this.customHeaders,
-    this.maxTokens,
-    this.temperature,
-    this.enabled = true,
-    this.createdAt,
-    this.updatedAt,
-  });
+  const _$LlmApiSettingsImpl(
+      {required this.identifier,
+      required this.apiType,
+      required this.baseUrl,
+      this.customHeaders,
+      this.maxTokens,
+      this.temperature,
+      this.enabled = true,
+      this.createdAt,
+      this.updatedAt});
 
   factory _$LlmApiSettingsImpl.fromJson(Map<String, dynamic> json) =>
       _$$LlmApiSettingsImplFromJson(json);
@@ -322,18 +310,8 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-    runtimeType,
-    identifier,
-    apiType,
-    baseUrl,
-    customHeaders,
-    maxTokens,
-    temperature,
-    enabled,
-    createdAt,
-    updatedAt,
-  );
+  int get hashCode => Object.hash(runtimeType, identifier, apiType, baseUrl,
+      customHeaders, maxTokens, temperature, enabled, createdAt, updatedAt);
 
   /// Create a copy of LlmApiSettings
   /// with the given fields replaced by the non-null parameter values.
@@ -342,28 +320,27 @@ class _$LlmApiSettingsImpl implements _LlmApiSettings {
   @pragma('vm:prefer-inline')
   _$$LlmApiSettingsImplCopyWith<_$LlmApiSettingsImpl> get copyWith =>
       __$$LlmApiSettingsImplCopyWithImpl<_$LlmApiSettingsImpl>(
-        this,
-        _$identity,
-      );
+          this, _$identity);
 
   @override
   Map<String, dynamic> toJson() {
-    return _$$LlmApiSettingsImplToJson(this);
+    return _$$LlmApiSettingsImplToJson(
+      this,
+    );
   }
 }
 
 abstract class _LlmApiSettings implements LlmApiSettings {
-  const factory _LlmApiSettings({
-    required final String identifier,
-    required final LlmApiType apiType,
-    required final String baseUrl,
-    final String? customHeaders,
-    final int? maxTokens,
-    final double? temperature,
-    final bool enabled,
-    final DateTime? createdAt,
-    final DateTime? updatedAt,
-  }) = _$LlmApiSettingsImpl;
+  const factory _LlmApiSettings(
+      {required final String identifier,
+      required final LlmApiType apiType,
+      required final String baseUrl,
+      final String? customHeaders,
+      final int? maxTokens,
+      final double? temperature,
+      final bool enabled,
+      final DateTime? createdAt,
+      final DateTime? updatedAt}) = _$LlmApiSettingsImpl;
 
   factory _LlmApiSettings.fromJson(Map<String, dynamic> json) =
       _$LlmApiSettingsImpl.fromJson;

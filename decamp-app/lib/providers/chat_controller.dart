@@ -6,12 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import '../extensions/chat_message_extensions.dart';
-import '../models/chat_state.dart';
-import '../models/ssh_settings.dart';
 import '../services/llm_service.dart';
 import '../services/shell_service.dart';
-import '../services/shell_tools_provider.dart'
-    show shellTools, kExecuteShellCommand, kFetch;
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/ssh_settings_provider.dart';
@@ -21,7 +17,6 @@ import '../database/daos/session_dao.dart';
 import '../database/database.dart';
 import '../components/multi_command_approval_overlay.dart';
 import '../utils/secret_redactor.dart';
-import '../utils/constants.dart';
 
 // Constants for message user IDs
 const String _kUserUserId = 'user';
