@@ -133,6 +133,7 @@ class ChatController extends StateNotifier<ChatState> {
   Future<bool> _validateAndPrepare({
     required String sessionId,
     required String content,
+    required bool checkLlmConfig,
   }) async {
     // Redact and save user's message
     final redactedContent = await _secretRedactor.redact(content);
@@ -159,10 +160,12 @@ class ChatController extends StateNotifier<ChatState> {
       );
     }
 
-    // Check if LLM is configured
-    final isConfigured = await _llmService.isConfigured();
-    if (!isConfigured) {
-      return false;
+    // Check if LLM is configured (only for local execution)
+    if (checkLlmConfig) {
+      final isConfigured = await _llmService.isConfigured();
+      if (!isConfigured) {
+        return false;
+      }
     }
 
     return true;
@@ -200,6 +203,8 @@ class ChatController extends StateNotifier<ChatState> {
         final isValid = await _validateAndPrepare(
           sessionId: sessionId,
           content: content,
+          checkLlmConfig:
+              !isRemote, // Only check local LLM config for local execution
         );
         if (!isValid) {
           state = state.copyWith(isLoading: false);
