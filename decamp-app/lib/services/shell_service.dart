@@ -5,7 +5,6 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:agent_core/agent_core.dart';
-import '../services/keychain_service.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/secret_provider.dart';
 

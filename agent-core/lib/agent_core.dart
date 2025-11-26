@@ -23,6 +23,7 @@ export 'src/secrets_storage/file_secure_storage_impl.dart';
 
 // Services
 export 'src/services/shell_tools_provider.dart';
+export 'src/services/keychain_service.dart';
 
 // Database
 export 'src/database/database.dart';

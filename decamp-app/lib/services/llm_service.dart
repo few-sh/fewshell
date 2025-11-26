@@ -5,7 +5,6 @@ import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/secret_provider.dart';
-import '../services/keychain_service.dart';
 
 /// Provider for the LLM service
 final llmServiceProvider = Provider<LlmService>((ref) {
