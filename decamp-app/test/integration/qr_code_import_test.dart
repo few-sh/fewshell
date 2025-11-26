@@ -9,7 +9,7 @@ import 'package:decamp/providers/llm_settings_provider.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/providers/theme_provider.dart';
-import 'package:decamp/services/keychain_service.dart';
+import 'package:agent_core/src/services/keychain_service.dart';
 import 'package:decamp/services/storage/flutter_secure_storage_impl.dart';
 
 void main() {

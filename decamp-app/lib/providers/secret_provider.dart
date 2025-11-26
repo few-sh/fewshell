@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/keychain_service.dart';
+import 'package:agent_core/agent_core.dart';
 import '../services/storage/flutter_secure_storage_impl.dart';
 
 /// Provider for KeychainService singleton
