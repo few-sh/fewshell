@@ -13,5 +13,8 @@ export 'src/models/models.dart';
 // Stores
 export 'src/stores/stores.dart';
 
+// Controllers
+export 'src/controllers/controllers.dart';
+
 // Utils
 export 'src/utils/id_generator.dart';

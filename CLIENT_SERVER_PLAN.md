@@ -10,49 +10,58 @@ Enable remote execution for Decamp with minimal complexity. Keep local sessions 
 
 ## 1. Core Architecture
 
-### 1.1 Package Boundaries
+### 1.1 Package Boundaries (Quake-Style)
 
 Three packages with clear responsibilities:
 
-**`agent-core`** (shared library):
+**`agent-core`** (shared library - used by both client and server):
 - Agent loop (`runAgentLoop()`)
 - Tool definitions (`shellTools`)
 - Tool execution services (`ShellExecutor`, `FetchExecutor`)
 - Message converters (`ChatMessage` ↔ JSON)
-- **Settings models** (`ProjectSettings`, `LlmSettings`, `SshSettings`)
-- **Settings store interface** (`SettingsStore` abstract class)
+- **Models:** `ProjectSettings`, `LlmSettings`, `SshSettings`, `Session`, `Message`, `Snippet`, `Secret`
+- **Storage interfaces:** `SessionStore`, `ProjectDataStore`
+- **Storage implementations:** `SqliteSessionStore` (works on all platforms)
+- **Controllers:** `SessionController` (interface), `LocalSessionController` (local implementation)
+- **Utilities:** `IdGenerator`
 
-**`decamp-agent`** (server):
-- WebSocket transport layer
-- REST API for settings (`GET/PUT /projects/:id/settings`)
-- **TOML settings store** (reads/writes `~/.decamp/projects/{id}.toml`)
+**`decamp-agent`** (server - thin WebSocket transport):
+- WebSocket transport layer (routes commands to agent-core)
+- **TOML settings store** (reads/writes `~/.decamp/projects/{id}/`)
 - Server startup/config (port, binding)
+- Uses `SqliteSessionStore` from agent-core (no duplication!)
 - Imports and uses `agent-core` for all business logic
 
 **`decamp-app`** (Flutter client):
 - UI components and Flutter-specific code
-- For local projects: calls `agent-core` directly
-- For remote projects: WebSocket + REST communication to server
-- **Local settings store** (SharedPreferences for settings, Keychain for secrets)
-- **Remote settings client** (HTTP calls to server REST API)
+- For local projects: uses `LocalSessionController` from agent-core directly
+- For remote projects: uses `RemoteSessionController` (WebSocket to server)
+- **Both use same `SessionController` interface** - UI doesn't know/care
 - Riverpod providers, navigation, themes
-- Drift database (projects, sessions, messages - local storage only)
+- `sqlite3_flutter_libs` for native SQLite support
+
+**Key insight (Quake model):**
+- Same code runs "single-player" (local) and "multiplayer" (remote)
+- Only the transport differs
+- Zero code duplication between client and server
+- No Drift needed - manual `StreamController` for reactive updates
 
 **Settings flow:**
 
 ```
 Local Project:
-  UI ←→ LocalSettingsStore ←→ SharedPreferences/Keychain
+  UI ←→ SessionController ←→ LocalSessionController ←→ SqliteSessionStore ←→ SQLite
 
 Remote Project:
-  UI ←→ RemoteSettingsClient ←→ HTTP ←→ Server ←→ TomlSettingsStore ←→ TOML files
+  UI ←→ SessionController ←→ RemoteSessionController ←→ WebSocket ←→ Server ←→ SqliteSessionStore
 ```
 
-**Why this split?** 
-- Same `agent-core` models ensure client and server speak the same language
-- Storage is platform-specific (SharedPrefs on mobile, TOML on server)
-- Secrets never leave their origin (device keychain or server files)
-- The `SettingsStore` interface allows testing with mocks
+**Why this split (Quake model)?**
+- Same code paths for local and remote - only transport differs
+- Single `SqliteSessionStore` implementation works everywhere
+- No Drift code generation needed
+- Reactive streams via `StreamController` (fires on write)
+- Testing: mock `SessionController` interface, test once
 
 ### 1.2 The 8-Line Agent Loop
 
@@ -554,21 +563,115 @@ Server needs to store project data (settings, snippets, secrets) to run agent lo
 - Wire up settings/snippets/secrets UI to detect remote and use appropriate source
 - End-to-end test: Configure LLM, add snippet, add secret, run agent loop, verify multi-client sync
 
-### Phase 4: Cache & Offline (CURRENT)
+### Phase 4: Quake-Style Architecture (CURRENT) ✅
+
+**Problem:** We were heading toward code duplication between client (Drift) and server (SQLite).
+
+**Solution:** Adopt Quake-style architecture where local and remote use the same code, with only the transport differing:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        decamp-app                           │
+│  ┌─────────────────┐                                        │
+│  │       UI        │                                        │
+│  └────────┬────────┘                                        │
+│           │                                                 │
+│  ┌────────▼────────┐                                        │
+│  │SessionController│ ◄── unified interface                  │
+│  └────────┬────────┘                                        │
+│           │                                                 │
+│     ┌─────┴─────┐                                           │
+│     ▼           ▼                                           │
+│ ┌───────┐  ┌─────────┐                                      │
+│ │Local  │  │Remote   │                                      │
+│ │Ctrl   │  │Ctrl     │──────► WebSocket to decamp-agent     │
+│ └───┬───┘  └─────────┘                                      │
+│     │                                                       │
+│     ▼                                                       │
+│ ┌─────────────────┐                                         │
+│ │  agent-core     │ ◄── Same code as decamp-agent uses      │
+│ │  SessionStore   │                                         │
+│ │  AgentLoop      │                                         │
+│ └─────────────────┘                                         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Implemented (agent-core):**
+- `SessionController` - Abstract interface for session management
+- `LocalSessionController` - Local "single-player" mode implementation
+- `SessionStore` - Abstract interface for session/message storage
+- `SqliteSessionStore` - Shared SQLite implementation (works on all platforms)
+- `Session` and `Message` models with JSON serialization
+- `IdGenerator` - Centralized ID generation with prefixes
+
+**Implemented (decamp-agent):**
+- Server now uses `SqliteSessionStore` from agent-core (no duplication)
+- Session management commands: `get_sessions`, `create_session`, `update_session`, `delete_session`, `get_messages`
+- Server persists all messages to SQLite (server is source of truth)
+
+**Key insight:** No Drift needed! `StreamController` fires on writes for reactive updates. Same pattern works for both local (direct) and remote (WebSocket push).
+
+### Phase 5: Client Integration (TODO)
+
+Wire up decamp-app to use the new architecture:
+
+**5.1 Add sqlite3 to Flutter app:**
+```yaml
+# pubspec.yaml
+dependencies:
+  sqlite3: ^2.4.0
+  sqlite3_flutter_libs: ^0.5.0  # Native SQLite for iOS/Android/macOS
+```
+
+**5.2 Create LocalSessionController instance:**
+```dart
+// For local projects, use agent-core directly
+final controller = LocalSessionController(
+  projectId: project.id,
+  store: SqliteSessionStore.open(localDbPath),
+  createLlmClient: () => llmService.createClient(),
+  executeToolCall: (tc) => shellExecutor.execute(tc),
+);
+```
+
+**5.3 Create RemoteSessionController:**
+Implement `SessionController` interface with WebSocket transport:
+- `watchSessions()` → Subscribe to server, fire stream on push
+- `watchMessages()` → Subscribe to server, fire stream on push  
+- `sendMessage()` → Send via WebSocket, handle streaming response
+- Handle `delta`, `approval`, `message`, `done` events
+
+**5.4 Update UI to use SessionController:**
+- Replace direct Drift/database calls with `SessionController` methods
+- UI doesn't know/care if local or remote
+- Same reactive streams work either way
+
+**5.5 Settings/Snippets/Secrets UI:**
+- Detect if project is remote
+- Use `RemoteSessionController` for remote data
+- Use local database for local data
+- Keep existing UI components
+
+**5.6 Remove Drift (optional, after migration):**
+- Once `SqliteSessionStore` is working for local
+- Remove Drift dependency and code generation
+- Simpler build, single SQLite implementation
+
+### Phase 6: Cache & Offline (TODO)
 
 - Simple SQLite cache for offline viewing
 - Cache messages on receive
 - Show cached data with "Offline" banner when disconnected
 - **Test:** View cached sessions offline
 
-### Phase 5: Polish
+### Phase 7: Polish (TODO)
 
 - Reconnection (exponential backoff)
 - Error messages
 - Connection status UI
 - Deployment guide
 
-### Phase 5: SSH Tunnel Mode (Future)
+### Phase 8: SSH Tunnel Mode (Future)
 
 Alternative connection method for power users who don't want a public server.
 

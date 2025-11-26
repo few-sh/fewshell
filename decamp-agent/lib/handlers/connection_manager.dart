@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:agent_core/agent_core.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../database/server_database.dart';
 import '../stores/toml_project_data_store.dart';
 
 /// Manages WebSocket connections and broadcasts to clients.
@@ -14,7 +13,7 @@ class ConnectionManager {
   ConnectionManager._();
 
   /// SQLite session store for sessions and messages
-  late final SessionStore sessionStore = SqliteSessionStore.openDefault();
+  late final SessionStore sessionStore = SqliteSessionStore.openServerDefault();
 
   /// TOML-based data store for settings, snippets, secrets
   final TomlProjectDataStore dataStore = TomlProjectDataStore();

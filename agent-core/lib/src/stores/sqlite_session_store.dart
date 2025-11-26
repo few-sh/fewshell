@@ -1,11 +1,19 @@
 import 'dart:io';
 
-import 'package:agent_core/agent_core.dart';
 import 'package:sqlite3/sqlite3.dart' hide Session;
 
-/// SQLite implementation of SessionStore for the server.
+import '../models/message.dart';
+import '../models/session.dart';
+import 'session_store.dart';
+
+/// SQLite implementation of SessionStore.
 ///
-/// Stores sessions and messages in ~/.decamp/server.db
+/// This is used by both:
+/// - decamp-agent (server): stores in ~/.decamp/server.db
+/// - decamp-app (local projects): stores in app's documents directory
+///
+/// For Flutter apps, use the sqlite3_flutter_libs package to provide
+/// the native SQLite library.
 class SqliteSessionStore implements SessionStore {
   final Database _db;
 
@@ -25,8 +33,9 @@ class SqliteSessionStore implements SessionStore {
     return store;
   }
 
-  /// Open with default path (~/.decamp/server.db)
-  static SqliteSessionStore openDefault() {
+  /// Open with default server path (~/.decamp/server.db)
+  /// Use this for the decamp-agent server.
+  static SqliteSessionStore openServerDefault() {
     final home = Platform.environment['HOME'] ?? '/tmp';
     return open('$home/.decamp/server.db');
   }
@@ -66,13 +75,17 @@ class SqliteSessionStore implements SessionStore {
 
     // Indexes
     _db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)');
+      'CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id)',
+    );
     _db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(project_id, updated_at DESC)');
+      'CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(project_id, updated_at DESC)',
+    );
     _db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)');
+      'CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)',
+    );
     _db.execute(
-        'CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(session_id, created_at ASC)');
+      'CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(session_id, created_at ASC)',
+    );
   }
 
   /// Close the database
@@ -98,7 +111,8 @@ class SqliteSessionStore implements SessionStore {
 
   @override
   Future<List<Session>> getNonArchivedSessionsByProject(
-      String projectId) async {
+    String projectId,
+  ) async {
     final stmt = _db.prepare('''
       SELECT * FROM sessions 
       WHERE project_id = ? AND is_archived = 0 
@@ -158,7 +172,9 @@ class SqliteSessionStore implements SessionStore {
 
   @override
   Future<void> updateSessionDescription(
-      String sessionId, String description) async {
+    String sessionId,
+    String description,
+  ) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final stmt = _db.prepare('''
       UPDATE sessions SET description = ?, updated_at = ? WHERE id = ?
@@ -285,7 +301,9 @@ class SqliteSessionStore implements SessionStore {
 
   @override
   Future<void> deleteMessagesAfter(
-      String sessionId, DateTime afterTimestamp) async {
+    String sessionId,
+    DateTime afterTimestamp,
+  ) async {
     final stmt = _db.prepare('''
       DELETE FROM messages WHERE session_id = ? AND created_at > ?
     ''');
@@ -299,8 +317,9 @@ class SqliteSessionStore implements SessionStore {
 
   @override
   Future<int> getMessageCount(String sessionId) async {
-    final stmt = _db
-        .prepare('SELECT COUNT(*) as count FROM messages WHERE session_id = ?');
+    final stmt = _db.prepare(
+      'SELECT COUNT(*) as count FROM messages WHERE session_id = ?',
+    );
     try {
       final results = stmt.select([sessionId]);
       return results.first['count'] as int;
