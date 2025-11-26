@@ -5,9 +5,20 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:decamp_agent/router.dart';
 
 void main(List<String> args) async {
-  // Get port from environment or use default
-  final portEnv = Platform.environment['PORT'];
-  final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
+  // Parse --port argument or use environment/default
+  int port = 3123;
+
+  // Check command line args first
+  final portIndex = args.indexOf('--port');
+  if (portIndex != -1 && portIndex + 1 < args.length) {
+    port = int.tryParse(args[portIndex + 1]) ?? port;
+  } else {
+    // Fall back to environment variable
+    final portEnv = Platform.environment['PORT'];
+    if (portEnv != null) {
+      port = int.tryParse(portEnv) ?? port;
+    }
+  }
 
   // Add middleware for logging and CORS
   final handler = const shelf.Pipeline()
