@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import '../services/llm_service.dart';
-import '../services/shell_service.dart';
 import 'shell_service_provider.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';

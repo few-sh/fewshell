@@ -3,7 +3,8 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
-import 'package:agent_core/agent_core.dart';
+import '../models/ssh_settings.dart';
+import 'keychain_service.dart';
 
 /// Service for executing shell commands via SSH
 class ShellService {
@@ -169,8 +170,7 @@ class ShellService {
         }
 
         // Build secure command using process substitution
-        finalCommand =
-            '''
+        finalCommand = '''
 bash -c "source <(cat <<'DECAMP_SECRETS'
 ${envExports}DECAMP_SECRETS
 ) && ${_escapeForCommand(command)}"
@@ -452,8 +452,7 @@ ${envExports}DECAMP_SECRETS
       final askpassPath = '/tmp/decamp_askpass_\$\$';
       final encodedSudoPassword = base64.encode(utf8.encode(sudoPassword));
 
-      secureCommand =
-          '''
+      secureCommand = '''
 bash -c "
 # Create unique askpass helper for this execution with secure permissions
 # Use umask to ensure file is created with 600 permissions, then add execute
@@ -476,8 +475,7 @@ rm -f $askpassPath
 ''';
     } else {
       // No sudo password - use regular sudo (assumes passwordless or cached credentials)
-      secureCommand =
-          '''
+      secureCommand = '''
 bash -c "source <(cat <<'DECAMP_SECRETS'
 ${envExports}DECAMP_SECRETS
 ) && sudo bash -c '${_escapeForCommand(command)}'"

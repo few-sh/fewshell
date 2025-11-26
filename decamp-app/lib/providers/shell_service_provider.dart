@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/shell_service.dart';
+import 'package:agent_core/agent_core.dart';
 import 'ssh_settings_provider.dart';
 import 'secret_provider.dart';
 
