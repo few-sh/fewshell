@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
-import '../database/database.dart';
-import '../utils/id_generator.dart';
+import 'package:agent_core/agent_core.dart';
 import '../providers/database_provider.dart';
 
 /// Stream provider for global snippets

@@ -1,8 +1,4 @@
-import 'dart:io';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 import 'package:llm_dart/llm_dart.dart';
 
 import 'tables/projects_table.dart';
@@ -21,7 +17,7 @@ part 'database.g.dart';
 /// Uses Drift for type-safe SQL operations and reactive queries.
 @DriftDatabase(tables: [Projects, Sessions, Messages, Snippets])
 class AppDatabase extends _$AppDatabase {
-  AppDatabase() : super(_openConnection());
+  AppDatabase(super.e);
 
   // DAOs - lazy initialized
   late final ProjectDao projectDao = ProjectDao(this);
@@ -152,13 +148,4 @@ class AppDatabase extends _$AppDatabase {
     // This can be used to add sample data during development
     // Leave empty for production
   }
-}
-
-/// Opens a connection to the database file
-LazyDatabase _openConnection() {
-  return LazyDatabase(() async {
-    final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'decamp.db'));
-    return NativeDatabase(file);
-  });
 }

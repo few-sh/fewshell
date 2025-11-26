@@ -1,6 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agent_core/agent_core.dart';
 import '../services/project_importer.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
@@ -9,9 +9,6 @@ import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/settings_provider.dart';
-import '../models/llm_api_settings.dart';
-import '../models/ssh_settings.dart';
-import '../database/database.dart';
 import '../utils/project_utils.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
@@ -300,8 +297,6 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       ],
     );
   }
-
-
 
   Widget _buildAIModelsSection({required bool isGlobal}) {
     final theme = Theme.of(context);

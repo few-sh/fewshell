@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
-import '../models/ssh_settings.dart';
+import 'package:agent_core/agent_core.dart';
 import '../providers/ssh_settings_provider.dart';
 
 /// Reusable dialog for configuring SSH/Remote Shell settings

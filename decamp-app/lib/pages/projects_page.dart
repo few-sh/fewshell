@@ -1,20 +1,14 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/project_provider.dart';
-import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/themes/terminal_theme.dart';
-import 'package:decamp/components/expandable_code_block.dart';
-import '../utils/date_formatter.dart';
+import 'package:agent_core/agent_core.dart';
 import '../utils/project_utils.dart';
 import 'project_setup_page.dart';
 import '../components/project_setup_view.dart';
 
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});
-
-
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

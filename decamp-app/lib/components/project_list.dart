@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:decamp/utils/date_formatter.dart';
+import 'package:agent_core/agent_core.dart';
 
 class Project {
   final String id;

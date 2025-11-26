@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:decamp/database/database.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/rich_message_content.dart';
 import 'package:decamp/utils/search_utils.dart';
 

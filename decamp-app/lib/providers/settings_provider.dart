@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import '../models/settings.dart';
-import '../models/agent_instruction.dart';
+import 'package:agent_core/agent_core.dart';
 import '../utils/default_prompt_loader.dart';
 import 'theme_provider.dart';
 

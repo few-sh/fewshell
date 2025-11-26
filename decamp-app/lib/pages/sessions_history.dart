@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
-import 'package:decamp/utils/date_formatter.dart';
+import 'package:agent_core/agent_core.dart';
 
 /// Enum for view mode in sessions history
 enum SessionsViewMode { active, archived }

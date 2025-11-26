@@ -1,8 +1,6 @@
-import 'package:decamp/models/llm_api_settings.dart';
-import 'package:decamp/models/settings.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/llm_settings_provider.dart';
 import 'package:decamp/providers/project_provider.dart';
-import 'package:decamp/providers/settings_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/services/keychain_service.dart';
 import 'package:decamp/services/llm_service.dart';
@@ -11,7 +9,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:decamp/providers/theme_provider.dart';
-import 'package:decamp/database/database.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

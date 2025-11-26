@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
-import '../database/database.dart';
+import 'package:agent_core/agent_core.dart';
 import 'database_provider.dart';
 import 'theme_provider.dart';
 

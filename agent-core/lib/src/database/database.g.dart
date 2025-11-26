@@ -12,89 +12,51 @@ class $ProjectsTable extends Projects
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 1,
-      maxTextLength: 255,
-    ),
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _descriptionMeta = const VerificationMeta(
-    'description',
-  );
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 255),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
   @override
   late final GeneratedColumn<String> description = GeneratedColumn<String>(
-    'description',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _lastSessionDateMeta = const VerificationMeta(
-    'lastSessionDate',
-  );
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _lastSessionDateMeta =
+      const VerificationMeta('lastSessionDate');
   @override
   late final GeneratedColumn<DateTime> lastSessionDate =
-      GeneratedColumn<DateTime>(
-        'last_session_date',
-        aliasedName,
-        false,
-        type: DriftSqlType.dateTime,
-        requiredDuringInsert: true,
-      );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
+      GeneratedColumn<DateTime>('last_session_date', aliasedName, false,
+          type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
   @override
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    name,
-    description,
-    lastSessionDate,
-    createdAt,
-    updatedAt,
-  ];
+  List<GeneratedColumn> get $columns =>
+      [id, name, description, lastSessionDate, createdAt, updatedAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
   static const String $name = 'projects';
   @override
-  VerificationContext validateIntegrity(
-    Insertable<ProjectEntity> instance, {
-    bool isInserting = false,
-  }) {
+  VerificationContext validateIntegrity(Insertable<ProjectEntity> instance,
+      {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
@@ -104,45 +66,33 @@ class $ProjectsTable extends Projects
     }
     if (data.containsKey('name')) {
       context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
     if (data.containsKey('description')) {
       context.handle(
-        _descriptionMeta,
-        description.isAcceptableOrUnknown(
-          data['description']!,
           _descriptionMeta,
-        ),
-      );
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
     }
     if (data.containsKey('last_session_date')) {
       context.handle(
-        _lastSessionDateMeta,
-        lastSessionDate.isAcceptableOrUnknown(
-          data['last_session_date']!,
           _lastSessionDateMeta,
-        ),
-      );
+          lastSessionDate.isAcceptableOrUnknown(
+              data['last_session_date']!, _lastSessionDateMeta));
     } else if (isInserting) {
       context.missing(_lastSessionDateMeta);
     }
     if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
     if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
@@ -155,30 +105,18 @@ class $ProjectsTable extends Projects
   ProjectEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ProjectEntity(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      description: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}description'],
-      ),
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
       lastSessionDate: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}last_session_date'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
+          DriftSqlType.dateTime, data['${effectivePrefix}last_session_date'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
   }
 
@@ -206,14 +144,13 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
 
   /// Timestamp when the project was last updated
   final DateTime updatedAt;
-  const ProjectEntity({
-    required this.id,
-    required this.name,
-    this.description,
-    required this.lastSessionDate,
-    required this.createdAt,
-    required this.updatedAt,
-  });
+  const ProjectEntity(
+      {required this.id,
+      required this.name,
+      this.description,
+      required this.lastSessionDate,
+      required this.createdAt,
+      required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -241,10 +178,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
     );
   }
 
-  factory ProjectEntity.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
+  factory ProjectEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ProjectEntity(
       id: serializer.fromJson<String>(json['id']),
@@ -268,28 +203,27 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
     };
   }
 
-  ProjectEntity copyWith({
-    String? id,
-    String? name,
-    Value<String?> description = const Value.absent(),
-    DateTime? lastSessionDate,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) => ProjectEntity(
-    id: id ?? this.id,
-    name: name ?? this.name,
-    description: description.present ? description.value : this.description,
-    lastSessionDate: lastSessionDate ?? this.lastSessionDate,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-  );
+  ProjectEntity copyWith(
+          {String? id,
+          String? name,
+          Value<String?> description = const Value.absent(),
+          DateTime? lastSessionDate,
+          DateTime? createdAt,
+          DateTime? updatedAt}) =>
+      ProjectEntity(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        description: description.present ? description.value : this.description,
+        lastSessionDate: lastSessionDate ?? this.lastSessionDate,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
   ProjectEntity copyWithCompanion(ProjectEntityCompanion data) {
     return ProjectEntity(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
+      description:
+          data.description.present ? data.description.value : this.description,
       lastSessionDate: data.lastSessionDate.present
           ? data.lastSessionDate.value
           : this.lastSessionDate,
@@ -351,11 +285,11 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       lastSessionDate = Value(lastSessionDate),
-       createdAt = Value(createdAt),
-       updatedAt = Value(updatedAt);
+  })  : id = Value(id),
+        name = Value(name),
+        lastSessionDate = Value(lastSessionDate),
+        createdAt = Value(createdAt),
+        updatedAt = Value(updatedAt);
   static Insertable<ProjectEntity> custom({
     Expression<String>? id,
     Expression<String>? name,
@@ -376,15 +310,14 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     });
   }
 
-  ProjectEntityCompanion copyWith({
-    Value<String>? id,
-    Value<String>? name,
-    Value<String?>? description,
-    Value<DateTime>? lastSessionDate,
-    Value<DateTime>? createdAt,
-    Value<DateTime>? updatedAt,
-    Value<int>? rowid,
-  }) {
+  ProjectEntityCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? name,
+      Value<String?>? description,
+      Value<DateTime>? lastSessionDate,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
     return ProjectEntityCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
@@ -447,106 +380,62 @@ class $SessionsTable extends Sessions
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _projectIdMeta = const VerificationMeta(
-    'projectId',
-  );
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _projectIdMeta =
+      const VerificationMeta('projectId');
   @override
   late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
-    'project_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _descriptionMeta = const VerificationMeta(
-    'description',
-  );
+      'project_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
   @override
   late final GeneratedColumn<String> description = GeneratedColumn<String>(
-    'description',
-    aliasedName,
-    false,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 1,
-      maxTextLength: 500,
-    ),
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _timestampMeta = const VerificationMeta(
-    'timestamp',
-  );
+      'description', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 500),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _timestampMeta =
+      const VerificationMeta('timestamp');
   @override
   late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
-    'timestamp',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
+      'timestamp', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
   @override
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _isArchivedMeta = const VerificationMeta(
-    'isArchived',
-  );
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _isArchivedMeta =
+      const VerificationMeta('isArchived');
   @override
   late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
-    'is_archived',
-    aliasedName,
-    false,
-    type: DriftSqlType.bool,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'CHECK ("is_archived" IN (0, 1))',
-    ),
-    defaultValue: const Constant(false),
-  );
+      'is_archived', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_archived" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    projectId,
-    description,
-    timestamp,
-    createdAt,
-    updatedAt,
-    isArchived,
-  ];
+  List<GeneratedColumn> get $columns =>
+      [id, projectId, description, timestamp, createdAt, updatedAt, isArchived];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
   static const String $name = 'sessions';
   @override
-  VerificationContext validateIntegrity(
-    Insertable<SessionEntity> instance, {
-    bool isInserting = false,
-  }) {
+  VerificationContext validateIntegrity(Insertable<SessionEntity> instance,
+      {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
@@ -555,53 +444,42 @@ class $SessionsTable extends Sessions
       context.missing(_idMeta);
     }
     if (data.containsKey('project_id')) {
-      context.handle(
-        _projectIdMeta,
-        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
-      );
+      context.handle(_projectIdMeta,
+          projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta));
     } else if (isInserting) {
       context.missing(_projectIdMeta);
     }
     if (data.containsKey('description')) {
       context.handle(
-        _descriptionMeta,
-        description.isAcceptableOrUnknown(
-          data['description']!,
           _descriptionMeta,
-        ),
-      );
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
     } else if (isInserting) {
       context.missing(_descriptionMeta);
     }
     if (data.containsKey('timestamp')) {
-      context.handle(
-        _timestampMeta,
-        timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta),
-      );
+      context.handle(_timestampMeta,
+          timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta));
     } else if (isInserting) {
       context.missing(_timestampMeta);
     }
     if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
     if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
     if (data.containsKey('is_archived')) {
       context.handle(
-        _isArchivedMeta,
-        isArchived.isAcceptableOrUnknown(data['is_archived']!, _isArchivedMeta),
-      );
+          _isArchivedMeta,
+          isArchived.isAcceptableOrUnknown(
+              data['is_archived']!, _isArchivedMeta));
     }
     return context;
   }
@@ -612,34 +490,20 @@ class $SessionsTable extends Sessions
   SessionEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return SessionEntity(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      projectId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}project_id'],
-      )!,
-      description: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}description'],
-      )!,
-      timestamp: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}timestamp'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
-      isArchived: attachedDatabase.typeMapping.read(
-        DriftSqlType.bool,
-        data['${effectivePrefix}is_archived'],
-      )!,
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      projectId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}project_id'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description'])!,
+      timestamp: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}timestamp'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      isArchived: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
     );
   }
 
@@ -670,15 +534,14 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
 
   /// Whether the session is archived
   final bool isArchived;
-  const SessionEntity({
-    required this.id,
-    required this.projectId,
-    required this.description,
-    required this.timestamp,
-    required this.createdAt,
-    required this.updatedAt,
-    required this.isArchived,
-  });
+  const SessionEntity(
+      {required this.id,
+      required this.projectId,
+      required this.description,
+      required this.timestamp,
+      required this.createdAt,
+      required this.updatedAt,
+      required this.isArchived});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -704,10 +567,8 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
     );
   }
 
-  factory SessionEntity.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
+  factory SessionEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return SessionEntity(
       id: serializer.fromJson<String>(json['id']),
@@ -733,36 +594,34 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
     };
   }
 
-  SessionEntity copyWith({
-    String? id,
-    String? projectId,
-    String? description,
-    DateTime? timestamp,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    bool? isArchived,
-  }) => SessionEntity(
-    id: id ?? this.id,
-    projectId: projectId ?? this.projectId,
-    description: description ?? this.description,
-    timestamp: timestamp ?? this.timestamp,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-    isArchived: isArchived ?? this.isArchived,
-  );
+  SessionEntity copyWith(
+          {String? id,
+          String? projectId,
+          String? description,
+          DateTime? timestamp,
+          DateTime? createdAt,
+          DateTime? updatedAt,
+          bool? isArchived}) =>
+      SessionEntity(
+        id: id ?? this.id,
+        projectId: projectId ?? this.projectId,
+        description: description ?? this.description,
+        timestamp: timestamp ?? this.timestamp,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        isArchived: isArchived ?? this.isArchived,
+      );
   SessionEntity copyWithCompanion(SessionEntityCompanion data) {
     return SessionEntity(
       id: data.id.present ? data.id.value : this.id,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
+      description:
+          data.description.present ? data.description.value : this.description,
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
-      isArchived: data.isArchived.present
-          ? data.isArchived.value
-          : this.isArchived,
+      isArchived:
+          data.isArchived.present ? data.isArchived.value : this.isArchived,
     );
   }
 
@@ -782,14 +641,7 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
 
   @override
   int get hashCode => Object.hash(
-    id,
-    projectId,
-    description,
-    timestamp,
-    createdAt,
-    updatedAt,
-    isArchived,
-  );
+      id, projectId, description, timestamp, createdAt, updatedAt, isArchived);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -831,12 +683,12 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
     required DateTime updatedAt,
     this.isArchived = const Value.absent(),
     this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       projectId = Value(projectId),
-       description = Value(description),
-       timestamp = Value(timestamp),
-       createdAt = Value(createdAt),
-       updatedAt = Value(updatedAt);
+  })  : id = Value(id),
+        projectId = Value(projectId),
+        description = Value(description),
+        timestamp = Value(timestamp),
+        createdAt = Value(createdAt),
+        updatedAt = Value(updatedAt);
   static Insertable<SessionEntity> custom({
     Expression<String>? id,
     Expression<String>? projectId,
@@ -859,16 +711,15 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
     });
   }
 
-  SessionEntityCompanion copyWith({
-    Value<String>? id,
-    Value<String>? projectId,
-    Value<String>? description,
-    Value<DateTime>? timestamp,
-    Value<DateTime>? createdAt,
-    Value<DateTime>? updatedAt,
-    Value<bool>? isArchived,
-    Value<int>? rowid,
-  }) {
+  SessionEntityCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? projectId,
+      Value<String>? description,
+      Value<DateTime>? timestamp,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<bool>? isArchived,
+      Value<int>? rowid}) {
     return SessionEntityCompanion(
       id: id ?? this.id,
       projectId: projectId ?? this.projectId,
@@ -936,151 +787,99 @@ class $MessagesTable extends Messages
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
-    'sessionId',
-  );
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sessionIdMeta =
+      const VerificationMeta('sessionId');
   @override
   late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
-    'session_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
+      'session_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
   static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
   @override
   late final GeneratedColumn<String> userId = GeneratedColumn<String>(
-    'user_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _userNameMeta = const VerificationMeta(
-    'userName',
-  );
+      'user_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _userNameMeta =
+      const VerificationMeta('userName');
   @override
   late final GeneratedColumn<String> userName = GeneratedColumn<String>(
-    'user_name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _contentMeta = const VerificationMeta(
-    'content',
-  );
+      'user_name', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
   @override
   late final GeneratedColumn<String> content = GeneratedColumn<String>(
-    'content',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _timestampMeta = const VerificationMeta(
-    'timestamp',
-  );
+      'content', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _timestampMeta =
+      const VerificationMeta('timestamp');
   @override
   late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
-    'timestamp',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
+      'timestamp', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _editedAtMeta = const VerificationMeta(
-    'editedAt',
-  );
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _editedAtMeta =
+      const VerificationMeta('editedAt');
   @override
   late final GeneratedColumn<DateTime> editedAt = GeneratedColumn<DateTime>(
-    'edited_at',
-    aliasedName,
-    true,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-  );
+      'edited_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   @override
   late final GeneratedColumnWithTypeConverter<MessageKind, int> messageKind =
-      GeneratedColumn<int>(
-        'message_kind',
-        aliasedName,
-        false,
-        type: DriftSqlType.int,
-        requiredDuringInsert: false,
-        defaultValue: const Constant(0),
-      ).withConverter<MessageKind>($MessagesTable.$convertermessageKind);
-  static const VerificationMeta _imageUrlMeta = const VerificationMeta(
-    'imageUrl',
-  );
+      GeneratedColumn<int>('message_kind', aliasedName, false,
+              type: DriftSqlType.int,
+              requiredDuringInsert: false,
+              defaultValue: const Constant(0))
+          .withConverter<MessageKind>($MessagesTable.$convertermessageKind);
+  static const VerificationMeta _imageUrlMeta =
+      const VerificationMeta('imageUrl');
   @override
   late final GeneratedColumn<String> imageUrl = GeneratedColumn<String>(
-    'image_url',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
+      'image_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   late final GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
-  toolCallsJson = GeneratedColumn<String>(
-    'tool_calls_json',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  ).withConverter<List<ToolCall>?>($MessagesTable.$convertertoolCallsJson);
+      toolCallsJson = GeneratedColumn<String>(
+              'tool_calls_json', aliasedName, true,
+              type: DriftSqlType.string, requiredDuringInsert: false)
+          .withConverter<List<ToolCall>?>(
+              $MessagesTable.$convertertoolCallsJson);
   @override
   late final GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
-  toolResultsJson = GeneratedColumn<String>(
-    'tool_results_json',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  ).withConverter<List<ToolCall>?>($MessagesTable.$convertertoolResultsJson);
+      toolResultsJson = GeneratedColumn<String>(
+              'tool_results_json', aliasedName, true,
+              type: DriftSqlType.string, requiredDuringInsert: false)
+          .withConverter<List<ToolCall>?>(
+              $MessagesTable.$convertertoolResultsJson);
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    sessionId,
-    userId,
-    userName,
-    content,
-    timestamp,
-    createdAt,
-    editedAt,
-    messageKind,
-    imageUrl,
-    toolCallsJson,
-    toolResultsJson,
-  ];
+        id,
+        sessionId,
+        userId,
+        userName,
+        content,
+        timestamp,
+        createdAt,
+        editedAt,
+        messageKind,
+        imageUrl,
+        toolCallsJson,
+        toolResultsJson
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
   static const String $name = 'messages';
   @override
-  VerificationContext validateIntegrity(
-    Insertable<MessageEntity> instance, {
-    bool isInserting = false,
-  }) {
+  VerificationContext validateIntegrity(Insertable<MessageEntity> instance,
+      {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
@@ -1089,64 +888,48 @@ class $MessagesTable extends Messages
       context.missing(_idMeta);
     }
     if (data.containsKey('session_id')) {
-      context.handle(
-        _sessionIdMeta,
-        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
-      );
+      context.handle(_sessionIdMeta,
+          sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta));
     } else if (isInserting) {
       context.missing(_sessionIdMeta);
     }
     if (data.containsKey('user_id')) {
-      context.handle(
-        _userIdMeta,
-        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
-      );
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
     } else if (isInserting) {
       context.missing(_userIdMeta);
     }
     if (data.containsKey('user_name')) {
-      context.handle(
-        _userNameMeta,
-        userName.isAcceptableOrUnknown(data['user_name']!, _userNameMeta),
-      );
+      context.handle(_userNameMeta,
+          userName.isAcceptableOrUnknown(data['user_name']!, _userNameMeta));
     } else if (isInserting) {
       context.missing(_userNameMeta);
     }
     if (data.containsKey('content')) {
-      context.handle(
-        _contentMeta,
-        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
-      );
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
     } else if (isInserting) {
       context.missing(_contentMeta);
     }
     if (data.containsKey('timestamp')) {
-      context.handle(
-        _timestampMeta,
-        timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta),
-      );
+      context.handle(_timestampMeta,
+          timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta));
     } else if (isInserting) {
       context.missing(_timestampMeta);
     }
     if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
     if (data.containsKey('edited_at')) {
-      context.handle(
-        _editedAtMeta,
-        editedAt.isAcceptableOrUnknown(data['edited_at']!, _editedAtMeta),
-      );
+      context.handle(_editedAtMeta,
+          editedAt.isAcceptableOrUnknown(data['edited_at']!, _editedAtMeta));
     }
     if (data.containsKey('image_url')) {
-      context.handle(
-        _imageUrlMeta,
-        imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta),
-      );
+      context.handle(_imageUrlMeta,
+          imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta));
     }
     return context;
   }
@@ -1157,60 +940,33 @@ class $MessagesTable extends Messages
   MessageEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return MessageEntity(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      sessionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}session_id'],
-      )!,
-      userId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}user_id'],
-      )!,
-      userName: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}user_name'],
-      )!,
-      content: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}content'],
-      )!,
-      timestamp: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}timestamp'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      editedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}edited_at'],
-      ),
-      messageKind: $MessagesTable.$convertermessageKind.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.int,
-          data['${effectivePrefix}message_kind'],
-        )!,
-      ),
-      imageUrl: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}image_url'],
-      ),
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      sessionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}session_id'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id'])!,
+      userName: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_name'])!,
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content'])!,
+      timestamp: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}timestamp'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      editedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}edited_at']),
+      messageKind: $MessagesTable.$convertermessageKind.fromSql(attachedDatabase
+          .typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}message_kind'])!),
+      imageUrl: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}image_url']),
       toolCallsJson: $MessagesTable.$convertertoolCallsJson.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}tool_calls_json'],
-        ),
-      ),
+          attachedDatabase.typeMapping.read(
+              DriftSqlType.string, data['${effectivePrefix}tool_calls_json'])),
       toolResultsJson: $MessagesTable.$convertertoolResultsJson.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}tool_results_json'],
-        ),
-      ),
+          attachedDatabase.typeMapping.read(DriftSqlType.string,
+              data['${effectivePrefix}tool_results_json'])),
     );
   }
 
@@ -1259,20 +1015,19 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
   final String? imageUrl;
   final List<ToolCall>? toolCallsJson;
   final List<ToolCall>? toolResultsJson;
-  const MessageEntity({
-    required this.id,
-    required this.sessionId,
-    required this.userId,
-    required this.userName,
-    required this.content,
-    required this.timestamp,
-    required this.createdAt,
-    this.editedAt,
-    required this.messageKind,
-    this.imageUrl,
-    this.toolCallsJson,
-    this.toolResultsJson,
-  });
+  const MessageEntity(
+      {required this.id,
+      required this.sessionId,
+      required this.userId,
+      required this.userName,
+      required this.content,
+      required this.timestamp,
+      required this.createdAt,
+      this.editedAt,
+      required this.messageKind,
+      this.imageUrl,
+      this.toolCallsJson,
+      this.toolResultsJson});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1288,21 +1043,18 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     }
     {
       map['message_kind'] = Variable<int>(
-        $MessagesTable.$convertermessageKind.toSql(messageKind),
-      );
+          $MessagesTable.$convertermessageKind.toSql(messageKind));
     }
     if (!nullToAbsent || imageUrl != null) {
       map['image_url'] = Variable<String>(imageUrl);
     }
     if (!nullToAbsent || toolCallsJson != null) {
       map['tool_calls_json'] = Variable<String>(
-        $MessagesTable.$convertertoolCallsJson.toSql(toolCallsJson),
-      );
+          $MessagesTable.$convertertoolCallsJson.toSql(toolCallsJson));
     }
     if (!nullToAbsent || toolResultsJson != null) {
       map['tool_results_json'] = Variable<String>(
-        $MessagesTable.$convertertoolResultsJson.toSql(toolResultsJson),
-      );
+          $MessagesTable.$convertertoolResultsJson.toSql(toolResultsJson));
     }
     return map;
   }
@@ -1332,10 +1084,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     );
   }
 
-  factory MessageEntity.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
+  factory MessageEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return MessageEntity(
       id: serializer.fromJson<String>(json['id']),
@@ -1346,16 +1096,13 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       editedAt: serializer.fromJson<DateTime?>(json['editedAt']),
-      messageKind: $MessagesTable.$convertermessageKind.fromJson(
-        serializer.fromJson<int>(json['messageKind']),
-      ),
+      messageKind: $MessagesTable.$convertermessageKind
+          .fromJson(serializer.fromJson<int>(json['messageKind'])),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
-      toolCallsJson: serializer.fromJson<List<ToolCall>?>(
-        json['toolCallsJson'],
-      ),
-      toolResultsJson: serializer.fromJson<List<ToolCall>?>(
-        json['toolResultsJson'],
-      ),
+      toolCallsJson:
+          serializer.fromJson<List<ToolCall>?>(json['toolCallsJson']),
+      toolResultsJson:
+          serializer.fromJson<List<ToolCall>?>(json['toolResultsJson']),
     );
   }
   @override
@@ -1371,45 +1118,43 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'editedAt': serializer.toJson<DateTime?>(editedAt),
       'messageKind': serializer.toJson<int>(
-        $MessagesTable.$convertermessageKind.toJson(messageKind),
-      ),
+          $MessagesTable.$convertermessageKind.toJson(messageKind)),
       'imageUrl': serializer.toJson<String?>(imageUrl),
       'toolCallsJson': serializer.toJson<List<ToolCall>?>(toolCallsJson),
       'toolResultsJson': serializer.toJson<List<ToolCall>?>(toolResultsJson),
     };
   }
 
-  MessageEntity copyWith({
-    String? id,
-    String? sessionId,
-    String? userId,
-    String? userName,
-    String? content,
-    DateTime? timestamp,
-    DateTime? createdAt,
-    Value<DateTime?> editedAt = const Value.absent(),
-    MessageKind? messageKind,
-    Value<String?> imageUrl = const Value.absent(),
-    Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
-    Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
-  }) => MessageEntity(
-    id: id ?? this.id,
-    sessionId: sessionId ?? this.sessionId,
-    userId: userId ?? this.userId,
-    userName: userName ?? this.userName,
-    content: content ?? this.content,
-    timestamp: timestamp ?? this.timestamp,
-    createdAt: createdAt ?? this.createdAt,
-    editedAt: editedAt.present ? editedAt.value : this.editedAt,
-    messageKind: messageKind ?? this.messageKind,
-    imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
-    toolCallsJson: toolCallsJson.present
-        ? toolCallsJson.value
-        : this.toolCallsJson,
-    toolResultsJson: toolResultsJson.present
-        ? toolResultsJson.value
-        : this.toolResultsJson,
-  );
+  MessageEntity copyWith(
+          {String? id,
+          String? sessionId,
+          String? userId,
+          String? userName,
+          String? content,
+          DateTime? timestamp,
+          DateTime? createdAt,
+          Value<DateTime?> editedAt = const Value.absent(),
+          MessageKind? messageKind,
+          Value<String?> imageUrl = const Value.absent(),
+          Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
+          Value<List<ToolCall>?> toolResultsJson = const Value.absent()}) =>
+      MessageEntity(
+        id: id ?? this.id,
+        sessionId: sessionId ?? this.sessionId,
+        userId: userId ?? this.userId,
+        userName: userName ?? this.userName,
+        content: content ?? this.content,
+        timestamp: timestamp ?? this.timestamp,
+        createdAt: createdAt ?? this.createdAt,
+        editedAt: editedAt.present ? editedAt.value : this.editedAt,
+        messageKind: messageKind ?? this.messageKind,
+        imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
+        toolCallsJson:
+            toolCallsJson.present ? toolCallsJson.value : this.toolCallsJson,
+        toolResultsJson: toolResultsJson.present
+            ? toolResultsJson.value
+            : this.toolResultsJson,
+      );
   MessageEntity copyWithCompanion(MessageEntityCompanion data) {
     return MessageEntity(
       id: data.id.present ? data.id.value : this.id,
@@ -1420,9 +1165,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
-      messageKind: data.messageKind.present
-          ? data.messageKind.value
-          : this.messageKind,
+      messageKind:
+          data.messageKind.present ? data.messageKind.value : this.messageKind,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       toolCallsJson: data.toolCallsJson.present
           ? data.toolCallsJson.value
@@ -1454,19 +1198,18 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
 
   @override
   int get hashCode => Object.hash(
-    id,
-    sessionId,
-    userId,
-    userName,
-    content,
-    timestamp,
-    createdAt,
-    editedAt,
-    messageKind,
-    imageUrl,
-    toolCallsJson,
-    toolResultsJson,
-  );
+      id,
+      sessionId,
+      userId,
+      userName,
+      content,
+      timestamp,
+      createdAt,
+      editedAt,
+      messageKind,
+      imageUrl,
+      toolCallsJson,
+      toolResultsJson);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1528,13 +1271,13 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.toolCallsJson = const Value.absent(),
     this.toolResultsJson = const Value.absent(),
     this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       sessionId = Value(sessionId),
-       userId = Value(userId),
-       userName = Value(userName),
-       content = Value(content),
-       timestamp = Value(timestamp),
-       createdAt = Value(createdAt);
+  })  : id = Value(id),
+        sessionId = Value(sessionId),
+        userId = Value(userId),
+        userName = Value(userName),
+        content = Value(content),
+        timestamp = Value(timestamp),
+        createdAt = Value(createdAt);
   static Insertable<MessageEntity> custom({
     Expression<String>? id,
     Expression<String>? sessionId,
@@ -1567,21 +1310,20 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     });
   }
 
-  MessageEntityCompanion copyWith({
-    Value<String>? id,
-    Value<String>? sessionId,
-    Value<String>? userId,
-    Value<String>? userName,
-    Value<String>? content,
-    Value<DateTime>? timestamp,
-    Value<DateTime>? createdAt,
-    Value<DateTime?>? editedAt,
-    Value<MessageKind>? messageKind,
-    Value<String?>? imageUrl,
-    Value<List<ToolCall>?>? toolCallsJson,
-    Value<List<ToolCall>?>? toolResultsJson,
-    Value<int>? rowid,
-  }) {
+  MessageEntityCompanion copyWith(
+      {Value<String>? id,
+      Value<String>? sessionId,
+      Value<String>? userId,
+      Value<String>? userName,
+      Value<String>? content,
+      Value<DateTime>? timestamp,
+      Value<DateTime>? createdAt,
+      Value<DateTime?>? editedAt,
+      Value<MessageKind>? messageKind,
+      Value<String?>? imageUrl,
+      Value<List<ToolCall>?>? toolCallsJson,
+      Value<List<ToolCall>?>? toolResultsJson,
+      Value<int>? rowid}) {
     return MessageEntityCompanion(
       id: id ?? this.id,
       sessionId: sessionId ?? this.sessionId,
@@ -1628,21 +1370,19 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     }
     if (messageKind.present) {
       map['message_kind'] = Variable<int>(
-        $MessagesTable.$convertermessageKind.toSql(messageKind.value),
-      );
+          $MessagesTable.$convertermessageKind.toSql(messageKind.value));
     }
     if (imageUrl.present) {
       map['image_url'] = Variable<String>(imageUrl.value);
     }
     if (toolCallsJson.present) {
       map['tool_calls_json'] = Variable<String>(
-        $MessagesTable.$convertertoolCallsJson.toSql(toolCallsJson.value),
-      );
+          $MessagesTable.$convertertoolCallsJson.toSql(toolCallsJson.value));
     }
     if (toolResultsJson.present) {
-      map['tool_results_json'] = Variable<String>(
-        $MessagesTable.$convertertoolResultsJson.toSql(toolResultsJson.value),
-      );
+      map['tool_results_json'] = Variable<String>($MessagesTable
+          .$convertertoolResultsJson
+          .toSql(toolResultsJson.value));
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -1680,124 +1420,81 @@ class $SnippetsTable extends Snippets
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _projectIdMeta = const VerificationMeta(
-    'projectId',
-  );
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _projectIdMeta =
+      const VerificationMeta('projectId');
   @override
   late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
-    'project_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
+      'project_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
-    'name',
-    aliasedName,
-    false,
-    additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 1,
-      maxTextLength: 255,
-    ),
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _contentMeta = const VerificationMeta(
-    'content',
-  );
+      'name', aliasedName, false,
+      additionalChecks:
+          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 255),
+      type: DriftSqlType.string,
+      requiredDuringInsert: true);
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
   @override
   late final GeneratedColumn<String> content = GeneratedColumn<String>(
-    'content',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _descriptionMeta = const VerificationMeta(
-    'description',
-  );
+      'content', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
   @override
   late final GeneratedColumn<String> description = GeneratedColumn<String>(
-    'description',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
   @override
   late final GeneratedColumn<String> tags = GeneratedColumn<String>(
-    'tags',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(''),
-  );
-  static const VerificationMeta _positionMeta = const VerificationMeta(
-    'position',
-  );
+      'tags', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _positionMeta =
+      const VerificationMeta('position');
   @override
   late final GeneratedColumn<int> position = GeneratedColumn<int>(
-    'position',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(0),
-  );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
+      'position', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
   @override
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
   @override
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
   @override
   List<GeneratedColumn> get $columns => [
-    id,
-    projectId,
-    name,
-    content,
-    description,
-    tags,
-    position,
-    createdAt,
-    updatedAt,
-  ];
+        id,
+        projectId,
+        name,
+        content,
+        description,
+        tags,
+        position,
+        createdAt,
+        updatedAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
   static const String $name = 'snippets';
   @override
-  VerificationContext validateIntegrity(
-    Insertable<SnippetEntity> instance, {
-    bool isInserting = false,
-  }) {
+  VerificationContext validateIntegrity(Insertable<SnippetEntity> instance,
+      {bool isInserting = false}) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
@@ -1806,61 +1503,44 @@ class $SnippetsTable extends Snippets
       context.missing(_idMeta);
     }
     if (data.containsKey('project_id')) {
-      context.handle(
-        _projectIdMeta,
-        projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta),
-      );
+      context.handle(_projectIdMeta,
+          projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta));
     }
     if (data.containsKey('name')) {
       context.handle(
-        _nameMeta,
-        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
-      );
+          _nameMeta, name.isAcceptableOrUnknown(data['name']!, _nameMeta));
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
     if (data.containsKey('content')) {
-      context.handle(
-        _contentMeta,
-        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
-      );
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
     } else if (isInserting) {
       context.missing(_contentMeta);
     }
     if (data.containsKey('description')) {
       context.handle(
-        _descriptionMeta,
-        description.isAcceptableOrUnknown(
-          data['description']!,
           _descriptionMeta,
-        ),
-      );
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
     }
     if (data.containsKey('tags')) {
       context.handle(
-        _tagsMeta,
-        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
-      );
+          _tagsMeta, tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta));
     }
     if (data.containsKey('position')) {
-      context.handle(
-        _positionMeta,
-        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
-      );
+      context.handle(_positionMeta,
+          position.isAcceptableOrUnknown(data['position']!, _positionMeta));
     }
     if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
     if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
@@ -1873,42 +1553,24 @@ class $SnippetsTable extends Snippets
   SnippetEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return SnippetEntity(
-      id: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}id'],
-      )!,
-      projectId: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}project_id'],
-      ),
-      name: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}name'],
-      )!,
-      content: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}content'],
-      )!,
-      description: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}description'],
-      ),
-      tags: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}tags'],
-      )!,
-      position: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}position'],
-      )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      projectId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}project_id']),
+      name: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      tags: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tags'])!,
+      position: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}position'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
     );
   }
 
@@ -1945,17 +1607,16 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
 
   /// Timestamp when the snippet was last updated
   final DateTime updatedAt;
-  const SnippetEntity({
-    required this.id,
-    this.projectId,
-    required this.name,
-    required this.content,
-    this.description,
-    required this.tags,
-    required this.position,
-    required this.createdAt,
-    required this.updatedAt,
-  });
+  const SnippetEntity(
+      {required this.id,
+      this.projectId,
+      required this.name,
+      required this.content,
+      this.description,
+      required this.tags,
+      required this.position,
+      required this.createdAt,
+      required this.updatedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1993,10 +1654,8 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
     );
   }
 
-  factory SnippetEntity.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
+  factory SnippetEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return SnippetEntity(
       id: serializer.fromJson<String>(json['id']),
@@ -2026,36 +1685,35 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
     };
   }
 
-  SnippetEntity copyWith({
-    String? id,
-    Value<String?> projectId = const Value.absent(),
-    String? name,
-    String? content,
-    Value<String?> description = const Value.absent(),
-    String? tags,
-    int? position,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) => SnippetEntity(
-    id: id ?? this.id,
-    projectId: projectId.present ? projectId.value : this.projectId,
-    name: name ?? this.name,
-    content: content ?? this.content,
-    description: description.present ? description.value : this.description,
-    tags: tags ?? this.tags,
-    position: position ?? this.position,
-    createdAt: createdAt ?? this.createdAt,
-    updatedAt: updatedAt ?? this.updatedAt,
-  );
+  SnippetEntity copyWith(
+          {String? id,
+          Value<String?> projectId = const Value.absent(),
+          String? name,
+          String? content,
+          Value<String?> description = const Value.absent(),
+          String? tags,
+          int? position,
+          DateTime? createdAt,
+          DateTime? updatedAt}) =>
+      SnippetEntity(
+        id: id ?? this.id,
+        projectId: projectId.present ? projectId.value : this.projectId,
+        name: name ?? this.name,
+        content: content ?? this.content,
+        description: description.present ? description.value : this.description,
+        tags: tags ?? this.tags,
+        position: position ?? this.position,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
   SnippetEntity copyWithCompanion(SnippetEntityCompanion data) {
     return SnippetEntity(
       id: data.id.present ? data.id.value : this.id,
       projectId: data.projectId.present ? data.projectId.value : this.projectId,
       name: data.name.present ? data.name.value : this.name,
       content: data.content.present ? data.content.value : this.content,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
+      description:
+          data.description.present ? data.description.value : this.description,
       tags: data.tags.present ? data.tags.value : this.tags,
       position: data.position.present ? data.position.value : this.position,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -2080,17 +1738,8 @@ class SnippetEntity extends DataClass implements Insertable<SnippetEntity> {
   }
 
   @override
-  int get hashCode => Object.hash(
-    id,
-    projectId,
-    name,
-    content,
-    description,
-    tags,
-    position,
-    createdAt,
-    updatedAt,
-  );
+  int get hashCode => Object.hash(id, projectId, name, content, description,
+      tags, position, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2140,11 +1789,11 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
-  }) : id = Value(id),
-       name = Value(name),
-       content = Value(content),
-       createdAt = Value(createdAt),
-       updatedAt = Value(updatedAt);
+  })  : id = Value(id),
+        name = Value(name),
+        content = Value(content),
+        createdAt = Value(createdAt),
+        updatedAt = Value(updatedAt);
   static Insertable<SnippetEntity> custom({
     Expression<String>? id,
     Expression<String>? projectId,
@@ -2171,18 +1820,17 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     });
   }
 
-  SnippetEntityCompanion copyWith({
-    Value<String>? id,
-    Value<String?>? projectId,
-    Value<String>? name,
-    Value<String>? content,
-    Value<String?>? description,
-    Value<String>? tags,
-    Value<int>? position,
-    Value<DateTime>? createdAt,
-    Value<DateTime>? updatedAt,
-    Value<int>? rowid,
-  }) {
+  SnippetEntityCompanion copyWith(
+      {Value<String>? id,
+      Value<String?>? projectId,
+      Value<String>? name,
+      Value<String>? content,
+      Value<String?>? description,
+      Value<String>? tags,
+      Value<int>? position,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
     return SnippetEntityCompanion(
       id: id ?? this.id,
       projectId: projectId ?? this.projectId,
@@ -2262,34 +1910,30 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [
-    projects,
-    sessions,
-    messages,
-    snippets,
-  ];
+  List<DatabaseSchemaEntity> get allSchemaEntities =>
+      [projects, sessions, messages, snippets];
 }
 
-typedef $$ProjectsTableCreateCompanionBuilder =
-    ProjectEntityCompanion Function({
-      required String id,
-      required String name,
-      Value<String?> description,
-      required DateTime lastSessionDate,
-      required DateTime createdAt,
-      required DateTime updatedAt,
-      Value<int> rowid,
-    });
-typedef $$ProjectsTableUpdateCompanionBuilder =
-    ProjectEntityCompanion Function({
-      Value<String> id,
-      Value<String> name,
-      Value<String?> description,
-      Value<DateTime> lastSessionDate,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<int> rowid,
-    });
+typedef $$ProjectsTableCreateCompanionBuilder = ProjectEntityCompanion
+    Function({
+  required String id,
+  required String name,
+  Value<String?> description,
+  required DateTime lastSessionDate,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$ProjectsTableUpdateCompanionBuilder = ProjectEntityCompanion
+    Function({
+  Value<String> id,
+  Value<String> name,
+  Value<String?> description,
+  Value<DateTime> lastSessionDate,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
 
 class $$ProjectsTableFilterComposer
     extends Composer<_$AppDatabase, $ProjectsTable> {
@@ -2301,34 +1945,23 @@ class $$ProjectsTableFilterComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.id, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.name, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.description, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get lastSessionDate => $composableBuilder(
-    column: $table.lastSessionDate,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.lastSessionDate,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 }
 
 class $$ProjectsTableOrderingComposer
@@ -2341,34 +1974,23 @@ class $$ProjectsTableOrderingComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.id, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.name, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.description, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get lastSessionDate => $composableBuilder(
-    column: $table.lastSessionDate,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.lastSessionDate,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ProjectsTableAnnotationComposer
@@ -2387,14 +2009,10 @@ class $$ProjectsTableAnnotationComposer
       $composableBuilder(column: $table.name, builder: (column) => column);
 
   GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
+      column: $table.description, builder: (column) => column);
 
   GeneratedColumn<DateTime> get lastSessionDate => $composableBuilder(
-    column: $table.lastSessionDate,
-    builder: (column) => column,
-  );
+      column: $table.lastSessionDate, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2403,27 +2021,23 @@ class $$ProjectsTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$ProjectsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $ProjectsTable,
-          ProjectEntity,
-          $$ProjectsTableFilterComposer,
-          $$ProjectsTableOrderingComposer,
-          $$ProjectsTableAnnotationComposer,
-          $$ProjectsTableCreateCompanionBuilder,
-          $$ProjectsTableUpdateCompanionBuilder,
-          (
-            ProjectEntity,
-            BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntity>,
-          ),
-          ProjectEntity,
-          PrefetchHooks Function()
-        > {
+class $$ProjectsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ProjectsTable,
+    ProjectEntity,
+    $$ProjectsTableFilterComposer,
+    $$ProjectsTableOrderingComposer,
+    $$ProjectsTableAnnotationComposer,
+    $$ProjectsTableCreateCompanionBuilder,
+    $$ProjectsTableUpdateCompanionBuilder,
+    (
+      ProjectEntity,
+      BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntity>
+    ),
+    ProjectEntity,
+    PrefetchHooks Function()> {
   $$ProjectsTableTableManager(_$AppDatabase db, $ProjectsTable table)
-    : super(
-        TableManagerState(
+      : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
@@ -2432,89 +2046,86 @@ class $$ProjectsTableTableManager
               $$ProjectsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$ProjectsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String?> description = const Value.absent(),
-                Value<DateTime> lastSessionDate = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => ProjectEntityCompanion(
-                id: id,
-                name: name,
-                description: description,
-                lastSessionDate: lastSessionDate,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String name,
-                Value<String?> description = const Value.absent(),
-                required DateTime lastSessionDate,
-                required DateTime createdAt,
-                required DateTime updatedAt,
-                Value<int> rowid = const Value.absent(),
-              }) => ProjectEntityCompanion.insert(
-                id: id,
-                name: name,
-                description: description,
-                lastSessionDate: lastSessionDate,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<DateTime> lastSessionDate = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProjectEntityCompanion(
+            id: id,
+            name: name,
+            description: description,
+            lastSessionDate: lastSessionDate,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String name,
+            Value<String?> description = const Value.absent(),
+            required DateTime lastSessionDate,
+            required DateTime createdAt,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProjectEntityCompanion.insert(
+            id: id,
+            name: name,
+            description: description,
+            lastSessionDate: lastSessionDate,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: null,
-        ),
-      );
+        ));
 }
 
-typedef $$ProjectsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $ProjectsTable,
+typedef $$ProjectsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ProjectsTable,
+    ProjectEntity,
+    $$ProjectsTableFilterComposer,
+    $$ProjectsTableOrderingComposer,
+    $$ProjectsTableAnnotationComposer,
+    $$ProjectsTableCreateCompanionBuilder,
+    $$ProjectsTableUpdateCompanionBuilder,
+    (
       ProjectEntity,
-      $$ProjectsTableFilterComposer,
-      $$ProjectsTableOrderingComposer,
-      $$ProjectsTableAnnotationComposer,
-      $$ProjectsTableCreateCompanionBuilder,
-      $$ProjectsTableUpdateCompanionBuilder,
-      (
-        ProjectEntity,
-        BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntity>,
-      ),
-      ProjectEntity,
-      PrefetchHooks Function()
-    >;
-typedef $$SessionsTableCreateCompanionBuilder =
-    SessionEntityCompanion Function({
-      required String id,
-      required String projectId,
-      required String description,
-      required DateTime timestamp,
-      required DateTime createdAt,
-      required DateTime updatedAt,
-      Value<bool> isArchived,
-      Value<int> rowid,
-    });
-typedef $$SessionsTableUpdateCompanionBuilder =
-    SessionEntityCompanion Function({
-      Value<String> id,
-      Value<String> projectId,
-      Value<String> description,
-      Value<DateTime> timestamp,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<bool> isArchived,
-      Value<int> rowid,
-    });
+      BaseReferences<_$AppDatabase, $ProjectsTable, ProjectEntity>
+    ),
+    ProjectEntity,
+    PrefetchHooks Function()>;
+typedef $$SessionsTableCreateCompanionBuilder = SessionEntityCompanion
+    Function({
+  required String id,
+  required String projectId,
+  required String description,
+  required DateTime timestamp,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<bool> isArchived,
+  Value<int> rowid,
+});
+typedef $$SessionsTableUpdateCompanionBuilder = SessionEntityCompanion
+    Function({
+  Value<String> id,
+  Value<String> projectId,
+  Value<String> description,
+  Value<DateTime> timestamp,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<bool> isArchived,
+  Value<int> rowid,
+});
 
 class $$SessionsTableFilterComposer
     extends Composer<_$AppDatabase, $SessionsTable> {
@@ -2526,39 +2137,25 @@ class $$SessionsTableFilterComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.id, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get projectId => $composableBuilder(
-    column: $table.projectId,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.projectId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.description, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get timestamp => $composableBuilder(
-    column: $table.timestamp,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.timestamp, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.isArchived, builder: (column) => ColumnFilters(column));
 }
 
 class $$SessionsTableOrderingComposer
@@ -2571,39 +2168,25 @@ class $$SessionsTableOrderingComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.id, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get projectId => $composableBuilder(
-    column: $table.projectId,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.projectId, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.description, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get timestamp => $composableBuilder(
-    column: $table.timestamp,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.timestamp, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.isArchived, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SessionsTableAnnotationComposer
@@ -2622,9 +2205,7 @@ class $$SessionsTableAnnotationComposer
       $composableBuilder(column: $table.projectId, builder: (column) => column);
 
   GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
+      column: $table.description, builder: (column) => column);
 
   GeneratedColumn<DateTime> get timestamp =>
       $composableBuilder(column: $table.timestamp, builder: (column) => column);
@@ -2636,32 +2217,26 @@ class $$SessionsTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<bool> get isArchived => $composableBuilder(
-    column: $table.isArchived,
-    builder: (column) => column,
-  );
+      column: $table.isArchived, builder: (column) => column);
 }
 
-class $$SessionsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $SessionsTable,
-          SessionEntity,
-          $$SessionsTableFilterComposer,
-          $$SessionsTableOrderingComposer,
-          $$SessionsTableAnnotationComposer,
-          $$SessionsTableCreateCompanionBuilder,
-          $$SessionsTableUpdateCompanionBuilder,
-          (
-            SessionEntity,
-            BaseReferences<_$AppDatabase, $SessionsTable, SessionEntity>,
-          ),
-          SessionEntity,
-          PrefetchHooks Function()
-        > {
+class $$SessionsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SessionsTable,
+    SessionEntity,
+    $$SessionsTableFilterComposer,
+    $$SessionsTableOrderingComposer,
+    $$SessionsTableAnnotationComposer,
+    $$SessionsTableCreateCompanionBuilder,
+    $$SessionsTableUpdateCompanionBuilder,
+    (
+      SessionEntity,
+      BaseReferences<_$AppDatabase, $SessionsTable, SessionEntity>
+    ),
+    SessionEntity,
+    PrefetchHooks Function()> {
   $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
-    : super(
-        TableManagerState(
+      : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
@@ -2670,103 +2245,100 @@ class $$SessionsTableTableManager
               $$SessionsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$SessionsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> projectId = const Value.absent(),
-                Value<String> description = const Value.absent(),
-                Value<DateTime> timestamp = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<bool> isArchived = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SessionEntityCompanion(
-                id: id,
-                projectId: projectId,
-                description: description,
-                timestamp: timestamp,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                isArchived: isArchived,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String projectId,
-                required String description,
-                required DateTime timestamp,
-                required DateTime createdAt,
-                required DateTime updatedAt,
-                Value<bool> isArchived = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SessionEntityCompanion.insert(
-                id: id,
-                projectId: projectId,
-                description: description,
-                timestamp: timestamp,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                isArchived: isArchived,
-                rowid: rowid,
-              ),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> projectId = const Value.absent(),
+            Value<String> description = const Value.absent(),
+            Value<DateTime> timestamp = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionEntityCompanion(
+            id: id,
+            projectId: projectId,
+            description: description,
+            timestamp: timestamp,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            isArchived: isArchived,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String projectId,
+            required String description,
+            required DateTime timestamp,
+            required DateTime createdAt,
+            required DateTime updatedAt,
+            Value<bool> isArchived = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionEntityCompanion.insert(
+            id: id,
+            projectId: projectId,
+            description: description,
+            timestamp: timestamp,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            isArchived: isArchived,
+            rowid: rowid,
+          ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: null,
-        ),
-      );
+        ));
 }
 
-typedef $$SessionsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $SessionsTable,
+typedef $$SessionsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SessionsTable,
+    SessionEntity,
+    $$SessionsTableFilterComposer,
+    $$SessionsTableOrderingComposer,
+    $$SessionsTableAnnotationComposer,
+    $$SessionsTableCreateCompanionBuilder,
+    $$SessionsTableUpdateCompanionBuilder,
+    (
       SessionEntity,
-      $$SessionsTableFilterComposer,
-      $$SessionsTableOrderingComposer,
-      $$SessionsTableAnnotationComposer,
-      $$SessionsTableCreateCompanionBuilder,
-      $$SessionsTableUpdateCompanionBuilder,
-      (
-        SessionEntity,
-        BaseReferences<_$AppDatabase, $SessionsTable, SessionEntity>,
-      ),
-      SessionEntity,
-      PrefetchHooks Function()
-    >;
-typedef $$MessagesTableCreateCompanionBuilder =
-    MessageEntityCompanion Function({
-      required String id,
-      required String sessionId,
-      required String userId,
-      required String userName,
-      required String content,
-      required DateTime timestamp,
-      required DateTime createdAt,
-      Value<DateTime?> editedAt,
-      Value<MessageKind> messageKind,
-      Value<String?> imageUrl,
-      Value<List<ToolCall>?> toolCallsJson,
-      Value<List<ToolCall>?> toolResultsJson,
-      Value<int> rowid,
-    });
-typedef $$MessagesTableUpdateCompanionBuilder =
-    MessageEntityCompanion Function({
-      Value<String> id,
-      Value<String> sessionId,
-      Value<String> userId,
-      Value<String> userName,
-      Value<String> content,
-      Value<DateTime> timestamp,
-      Value<DateTime> createdAt,
-      Value<DateTime?> editedAt,
-      Value<MessageKind> messageKind,
-      Value<String?> imageUrl,
-      Value<List<ToolCall>?> toolCallsJson,
-      Value<List<ToolCall>?> toolResultsJson,
-      Value<int> rowid,
-    });
+      BaseReferences<_$AppDatabase, $SessionsTable, SessionEntity>
+    ),
+    SessionEntity,
+    PrefetchHooks Function()>;
+typedef $$MessagesTableCreateCompanionBuilder = MessageEntityCompanion
+    Function({
+  required String id,
+  required String sessionId,
+  required String userId,
+  required String userName,
+  required String content,
+  required DateTime timestamp,
+  required DateTime createdAt,
+  Value<DateTime?> editedAt,
+  Value<MessageKind> messageKind,
+  Value<String?> imageUrl,
+  Value<List<ToolCall>?> toolCallsJson,
+  Value<List<ToolCall>?> toolResultsJson,
+  Value<int> rowid,
+});
+typedef $$MessagesTableUpdateCompanionBuilder = MessageEntityCompanion
+    Function({
+  Value<String> id,
+  Value<String> sessionId,
+  Value<String> userId,
+  Value<String> userName,
+  Value<String> content,
+  Value<DateTime> timestamp,
+  Value<DateTime> createdAt,
+  Value<DateTime?> editedAt,
+  Value<MessageKind> messageKind,
+  Value<String?> imageUrl,
+  Value<List<ToolCall>?> toolCallsJson,
+  Value<List<ToolCall>?> toolResultsJson,
+  Value<int> rowid,
+});
 
 class $$MessagesTableFilterComposer
     extends Composer<_$AppDatabase, $MessagesTable> {
@@ -2778,67 +2350,46 @@ class $$MessagesTableFilterComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.id, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get sessionId => $composableBuilder(
-    column: $table.sessionId,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.sessionId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get userId => $composableBuilder(
-    column: $table.userId,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.userId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get userName => $composableBuilder(
-    column: $table.userName,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.userName, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get content => $composableBuilder(
-    column: $table.content,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.content, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get timestamp => $composableBuilder(
-    column: $table.timestamp,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.timestamp, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get editedAt => $composableBuilder(
-    column: $table.editedAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.editedAt, builder: (column) => ColumnFilters(column));
 
   ColumnWithTypeConverterFilters<MessageKind, MessageKind, int>
-  get messageKind => $composableBuilder(
-    column: $table.messageKind,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
+      get messageKind => $composableBuilder(
+          column: $table.messageKind,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnFilters<String> get imageUrl => $composableBuilder(
-    column: $table.imageUrl,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.imageUrl, builder: (column) => ColumnFilters(column));
 
   ColumnWithTypeConverterFilters<List<ToolCall>?, List<ToolCall>, String>
-  get toolCallsJson => $composableBuilder(
-    column: $table.toolCallsJson,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
+      get toolCallsJson => $composableBuilder(
+          column: $table.toolCallsJson,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
 
   ColumnWithTypeConverterFilters<List<ToolCall>?, List<ToolCall>, String>
-  get toolResultsJson => $composableBuilder(
-    column: $table.toolResultsJson,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
+      get toolResultsJson => $composableBuilder(
+          column: $table.toolResultsJson,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
 }
 
 class $$MessagesTableOrderingComposer
@@ -2851,64 +2402,42 @@ class $$MessagesTableOrderingComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.id, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get sessionId => $composableBuilder(
-    column: $table.sessionId,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.sessionId, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get userId => $composableBuilder(
-    column: $table.userId,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get userName => $composableBuilder(
-    column: $table.userName,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.userName, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get content => $composableBuilder(
-    column: $table.content,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.content, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get timestamp => $composableBuilder(
-    column: $table.timestamp,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.timestamp, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get editedAt => $composableBuilder(
-    column: $table.editedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.editedAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<int> get messageKind => $composableBuilder(
-    column: $table.messageKind,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.messageKind, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get imageUrl => $composableBuilder(
-    column: $table.imageUrl,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.imageUrl, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get toolCallsJson => $composableBuilder(
-    column: $table.toolCallsJson,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.toolCallsJson,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get toolResultsJson => $composableBuilder(
-    column: $table.toolResultsJson,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.toolResultsJson,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$MessagesTableAnnotationComposer
@@ -2946,47 +2475,37 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumnWithTypeConverter<MessageKind, int> get messageKind =>
       $composableBuilder(
-        column: $table.messageKind,
-        builder: (column) => column,
-      );
+          column: $table.messageKind, builder: (column) => column);
 
   GeneratedColumn<String> get imageUrl =>
       $composableBuilder(column: $table.imageUrl, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<List<ToolCall>?, String> get toolCallsJson =>
       $composableBuilder(
-        column: $table.toolCallsJson,
-        builder: (column) => column,
-      );
+          column: $table.toolCallsJson, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
-  get toolResultsJson => $composableBuilder(
-    column: $table.toolResultsJson,
-    builder: (column) => column,
-  );
+      get toolResultsJson => $composableBuilder(
+          column: $table.toolResultsJson, builder: (column) => column);
 }
 
-class $$MessagesTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $MessagesTable,
-          MessageEntity,
-          $$MessagesTableFilterComposer,
-          $$MessagesTableOrderingComposer,
-          $$MessagesTableAnnotationComposer,
-          $$MessagesTableCreateCompanionBuilder,
-          $$MessagesTableUpdateCompanionBuilder,
-          (
-            MessageEntity,
-            BaseReferences<_$AppDatabase, $MessagesTable, MessageEntity>,
-          ),
-          MessageEntity,
-          PrefetchHooks Function()
-        > {
+class $$MessagesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $MessagesTable,
+    MessageEntity,
+    $$MessagesTableFilterComposer,
+    $$MessagesTableOrderingComposer,
+    $$MessagesTableAnnotationComposer,
+    $$MessagesTableCreateCompanionBuilder,
+    $$MessagesTableUpdateCompanionBuilder,
+    (
+      MessageEntity,
+      BaseReferences<_$AppDatabase, $MessagesTable, MessageEntity>
+    ),
+    MessageEntity,
+    PrefetchHooks Function()> {
   $$MessagesTableTableManager(_$AppDatabase db, $MessagesTable table)
-    : super(
-        TableManagerState(
+      : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
@@ -2995,117 +2514,114 @@ class $$MessagesTableTableManager
               $$MessagesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$MessagesTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String> sessionId = const Value.absent(),
-                Value<String> userId = const Value.absent(),
-                Value<String> userName = const Value.absent(),
-                Value<String> content = const Value.absent(),
-                Value<DateTime> timestamp = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime?> editedAt = const Value.absent(),
-                Value<MessageKind> messageKind = const Value.absent(),
-                Value<String?> imageUrl = const Value.absent(),
-                Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
-                Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => MessageEntityCompanion(
-                id: id,
-                sessionId: sessionId,
-                userId: userId,
-                userName: userName,
-                content: content,
-                timestamp: timestamp,
-                createdAt: createdAt,
-                editedAt: editedAt,
-                messageKind: messageKind,
-                imageUrl: imageUrl,
-                toolCallsJson: toolCallsJson,
-                toolResultsJson: toolResultsJson,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                required String sessionId,
-                required String userId,
-                required String userName,
-                required String content,
-                required DateTime timestamp,
-                required DateTime createdAt,
-                Value<DateTime?> editedAt = const Value.absent(),
-                Value<MessageKind> messageKind = const Value.absent(),
-                Value<String?> imageUrl = const Value.absent(),
-                Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
-                Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => MessageEntityCompanion.insert(
-                id: id,
-                sessionId: sessionId,
-                userId: userId,
-                userName: userName,
-                content: content,
-                timestamp: timestamp,
-                createdAt: createdAt,
-                editedAt: editedAt,
-                messageKind: messageKind,
-                imageUrl: imageUrl,
-                toolCallsJson: toolCallsJson,
-                toolResultsJson: toolResultsJson,
-                rowid: rowid,
-              ),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String> sessionId = const Value.absent(),
+            Value<String> userId = const Value.absent(),
+            Value<String> userName = const Value.absent(),
+            Value<String> content = const Value.absent(),
+            Value<DateTime> timestamp = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime?> editedAt = const Value.absent(),
+            Value<MessageKind> messageKind = const Value.absent(),
+            Value<String?> imageUrl = const Value.absent(),
+            Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
+            Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MessageEntityCompanion(
+            id: id,
+            sessionId: sessionId,
+            userId: userId,
+            userName: userName,
+            content: content,
+            timestamp: timestamp,
+            createdAt: createdAt,
+            editedAt: editedAt,
+            messageKind: messageKind,
+            imageUrl: imageUrl,
+            toolCallsJson: toolCallsJson,
+            toolResultsJson: toolResultsJson,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required String sessionId,
+            required String userId,
+            required String userName,
+            required String content,
+            required DateTime timestamp,
+            required DateTime createdAt,
+            Value<DateTime?> editedAt = const Value.absent(),
+            Value<MessageKind> messageKind = const Value.absent(),
+            Value<String?> imageUrl = const Value.absent(),
+            Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
+            Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MessageEntityCompanion.insert(
+            id: id,
+            sessionId: sessionId,
+            userId: userId,
+            userName: userName,
+            content: content,
+            timestamp: timestamp,
+            createdAt: createdAt,
+            editedAt: editedAt,
+            messageKind: messageKind,
+            imageUrl: imageUrl,
+            toolCallsJson: toolCallsJson,
+            toolResultsJson: toolResultsJson,
+            rowid: rowid,
+          ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: null,
-        ),
-      );
+        ));
 }
 
-typedef $$MessagesTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $MessagesTable,
+typedef $$MessagesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $MessagesTable,
+    MessageEntity,
+    $$MessagesTableFilterComposer,
+    $$MessagesTableOrderingComposer,
+    $$MessagesTableAnnotationComposer,
+    $$MessagesTableCreateCompanionBuilder,
+    $$MessagesTableUpdateCompanionBuilder,
+    (
       MessageEntity,
-      $$MessagesTableFilterComposer,
-      $$MessagesTableOrderingComposer,
-      $$MessagesTableAnnotationComposer,
-      $$MessagesTableCreateCompanionBuilder,
-      $$MessagesTableUpdateCompanionBuilder,
-      (
-        MessageEntity,
-        BaseReferences<_$AppDatabase, $MessagesTable, MessageEntity>,
-      ),
-      MessageEntity,
-      PrefetchHooks Function()
-    >;
-typedef $$SnippetsTableCreateCompanionBuilder =
-    SnippetEntityCompanion Function({
-      required String id,
-      Value<String?> projectId,
-      required String name,
-      required String content,
-      Value<String?> description,
-      Value<String> tags,
-      Value<int> position,
-      required DateTime createdAt,
-      required DateTime updatedAt,
-      Value<int> rowid,
-    });
-typedef $$SnippetsTableUpdateCompanionBuilder =
-    SnippetEntityCompanion Function({
-      Value<String> id,
-      Value<String?> projectId,
-      Value<String> name,
-      Value<String> content,
-      Value<String?> description,
-      Value<String> tags,
-      Value<int> position,
-      Value<DateTime> createdAt,
-      Value<DateTime> updatedAt,
-      Value<int> rowid,
-    });
+      BaseReferences<_$AppDatabase, $MessagesTable, MessageEntity>
+    ),
+    MessageEntity,
+    PrefetchHooks Function()>;
+typedef $$SnippetsTableCreateCompanionBuilder = SnippetEntityCompanion
+    Function({
+  required String id,
+  Value<String?> projectId,
+  required String name,
+  required String content,
+  Value<String?> description,
+  Value<String> tags,
+  Value<int> position,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$SnippetsTableUpdateCompanionBuilder = SnippetEntityCompanion
+    Function({
+  Value<String> id,
+  Value<String?> projectId,
+  Value<String> name,
+  Value<String> content,
+  Value<String?> description,
+  Value<String> tags,
+  Value<int> position,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
 
 class $$SnippetsTableFilterComposer
     extends Composer<_$AppDatabase, $SnippetsTable> {
@@ -3117,49 +2633,31 @@ class $$SnippetsTableFilterComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnFilters<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.id, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get projectId => $composableBuilder(
-    column: $table.projectId,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.projectId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.name, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get content => $composableBuilder(
-    column: $table.content,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.content, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.description, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get tags => $composableBuilder(
-    column: $table.tags,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.tags, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get position => $composableBuilder(
-    column: $table.position,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.position, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
 }
 
 class $$SnippetsTableOrderingComposer
@@ -3172,49 +2670,31 @@ class $$SnippetsTableOrderingComposer
     super.$removeJoinBuilderFromRootComposer,
   });
   ColumnOrderings<String> get id => $composableBuilder(
-    column: $table.id,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.id, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get projectId => $composableBuilder(
-    column: $table.projectId,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.projectId, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get name => $composableBuilder(
-    column: $table.name,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.name, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get content => $composableBuilder(
-    column: $table.content,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.content, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.description, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get tags => $composableBuilder(
-    column: $table.tags,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.tags, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<int> get position => $composableBuilder(
-    column: $table.position,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.position, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnOrderings(column),
-  );
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SnippetsTableAnnotationComposer
@@ -3239,9 +2719,7 @@ class $$SnippetsTableAnnotationComposer
       $composableBuilder(column: $table.content, builder: (column) => column);
 
   GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
+      column: $table.description, builder: (column) => column);
 
   GeneratedColumn<String> get tags =>
       $composableBuilder(column: $table.tags, builder: (column) => column);
@@ -3256,27 +2734,23 @@ class $$SnippetsTableAnnotationComposer
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
 
-class $$SnippetsTableTableManager
-    extends
-        RootTableManager<
-          _$AppDatabase,
-          $SnippetsTable,
-          SnippetEntity,
-          $$SnippetsTableFilterComposer,
-          $$SnippetsTableOrderingComposer,
-          $$SnippetsTableAnnotationComposer,
-          $$SnippetsTableCreateCompanionBuilder,
-          $$SnippetsTableUpdateCompanionBuilder,
-          (
-            SnippetEntity,
-            BaseReferences<_$AppDatabase, $SnippetsTable, SnippetEntity>,
-          ),
-          SnippetEntity,
-          PrefetchHooks Function()
-        > {
+class $$SnippetsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $SnippetsTable,
+    SnippetEntity,
+    $$SnippetsTableFilterComposer,
+    $$SnippetsTableOrderingComposer,
+    $$SnippetsTableAnnotationComposer,
+    $$SnippetsTableCreateCompanionBuilder,
+    $$SnippetsTableUpdateCompanionBuilder,
+    (
+      SnippetEntity,
+      BaseReferences<_$AppDatabase, $SnippetsTable, SnippetEntity>
+    ),
+    SnippetEntity,
+    PrefetchHooks Function()> {
   $$SnippetsTableTableManager(_$AppDatabase db, $SnippetsTable table)
-    : super(
-        TableManagerState(
+      : super(TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
@@ -3285,79 +2759,76 @@ class $$SnippetsTableTableManager
               $$SnippetsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
               $$SnippetsTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback:
-              ({
-                Value<String> id = const Value.absent(),
-                Value<String?> projectId = const Value.absent(),
-                Value<String> name = const Value.absent(),
-                Value<String> content = const Value.absent(),
-                Value<String?> description = const Value.absent(),
-                Value<String> tags = const Value.absent(),
-                Value<int> position = const Value.absent(),
-                Value<DateTime> createdAt = const Value.absent(),
-                Value<DateTime> updatedAt = const Value.absent(),
-                Value<int> rowid = const Value.absent(),
-              }) => SnippetEntityCompanion(
-                id: id,
-                projectId: projectId,
-                name: name,
-                content: content,
-                description: description,
-                tags: tags,
-                position: position,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
-          createCompanionCallback:
-              ({
-                required String id,
-                Value<String?> projectId = const Value.absent(),
-                required String name,
-                required String content,
-                Value<String?> description = const Value.absent(),
-                Value<String> tags = const Value.absent(),
-                Value<int> position = const Value.absent(),
-                required DateTime createdAt,
-                required DateTime updatedAt,
-                Value<int> rowid = const Value.absent(),
-              }) => SnippetEntityCompanion.insert(
-                id: id,
-                projectId: projectId,
-                name: name,
-                content: content,
-                description: description,
-                tags: tags,
-                position: position,
-                createdAt: createdAt,
-                updatedAt: updatedAt,
-                rowid: rowid,
-              ),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String?> projectId = const Value.absent(),
+            Value<String> name = const Value.absent(),
+            Value<String> content = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String> tags = const Value.absent(),
+            Value<int> position = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SnippetEntityCompanion(
+            id: id,
+            projectId: projectId,
+            name: name,
+            content: content,
+            description: description,
+            tags: tags,
+            position: position,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            Value<String?> projectId = const Value.absent(),
+            required String name,
+            required String content,
+            Value<String?> description = const Value.absent(),
+            Value<String> tags = const Value.absent(),
+            Value<int> position = const Value.absent(),
+            required DateTime createdAt,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SnippetEntityCompanion.insert(
+            id: id,
+            projectId: projectId,
+            name: name,
+            content: content,
+            description: description,
+            tags: tags,
+            position: position,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
           prefetchHooksCallback: null,
-        ),
-      );
+        ));
 }
 
-typedef $$SnippetsTableProcessedTableManager =
-    ProcessedTableManager<
-      _$AppDatabase,
-      $SnippetsTable,
+typedef $$SnippetsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $SnippetsTable,
+    SnippetEntity,
+    $$SnippetsTableFilterComposer,
+    $$SnippetsTableOrderingComposer,
+    $$SnippetsTableAnnotationComposer,
+    $$SnippetsTableCreateCompanionBuilder,
+    $$SnippetsTableUpdateCompanionBuilder,
+    (
       SnippetEntity,
-      $$SnippetsTableFilterComposer,
-      $$SnippetsTableOrderingComposer,
-      $$SnippetsTableAnnotationComposer,
-      $$SnippetsTableCreateCompanionBuilder,
-      $$SnippetsTableUpdateCompanionBuilder,
-      (
-        SnippetEntity,
-        BaseReferences<_$AppDatabase, $SnippetsTable, SnippetEntity>,
-      ),
-      SnippetEntity,
-      PrefetchHooks Function()
-    >;
+      BaseReferences<_$AppDatabase, $SnippetsTable, SnippetEntity>
+    ),
+    SnippetEntity,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;

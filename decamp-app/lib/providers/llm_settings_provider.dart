@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/llm_api_settings.dart';
-import '../models/settings.dart';
+import 'package:agent_core/agent_core.dart';
 import '../services/keychain_service.dart';
 import 'settings_provider.dart';
 import 'secret_provider.dart';
