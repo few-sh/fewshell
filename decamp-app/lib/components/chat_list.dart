@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:decamp/database/database.dart';
 import 'package:decamp/components/rich_message_content.dart';
 import 'package:decamp/utils/search_utils.dart';
 
 /// Simple chat message list widget
 /// Displays messages from database with streaming support and search highlighting
+/// The message type is dynamic to support both MessageEntity (Drift) and Message (agent-core)
 class ChatList extends StatefulWidget {
-  final List<MessageEntity> messages;
+  final List<dynamic> messages;
   final bool isLoading;
   final String? streamingMessageId;
   final String streamingText;

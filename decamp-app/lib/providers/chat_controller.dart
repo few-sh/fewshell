@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:agent_core/agent_core.dart' hide SshSettings;
+import 'package:agent_core/agent_core.dart'
+    hide SshSettings, RemoteSessionController;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';

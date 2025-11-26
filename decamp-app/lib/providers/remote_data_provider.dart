@@ -1,4 +1,5 @@
-import 'package:agent_core/agent_core.dart' hide SshSettings;
+import 'package:agent_core/agent_core.dart'
+    hide SshSettings, RemoteSessionController;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../database/database.dart';
 import '../services/remote_session_controller.dart';

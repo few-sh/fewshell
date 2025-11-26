@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
-import 'package:decamp/database/database.dart';
 import 'package:decamp/utils/message_formatter.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
@@ -14,7 +13,8 @@ import 'package:decamp/utils/highlight_injector.dart';
 /// Renders message content as markdown with text selection support
 /// Supports inline editing with context menu and search highlighting
 class RichMessageContent extends StatefulWidget {
-  final MessageEntity message;
+  /// The message to display. Can be MessageEntity (Drift) or Message (agent-core).
+  final dynamic message;
   final String? displayText; // Override for streaming
   final bool isUser;
   final Function(String messageId, String newContent)? onEdit;

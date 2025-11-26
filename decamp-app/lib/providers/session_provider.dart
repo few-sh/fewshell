@@ -1,26 +1,49 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../database/database.dart';
 import 'database_provider.dart';
 import 'project_provider.dart';
+import 'session_controller_provider.dart';
 
-/// Provider for sessions of the currently selected project
-final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>(((
-  ref,
-) {
+/// Provider for sessions of the currently selected project.
+///
+/// This is a hybrid provider that uses:
+/// - SessionController (agent-core) for remote projects
+/// - Direct Drift DAO for local projects (fallback while migrating)
+///
+/// The return type is `dynamic` to support both Session and SessionEntity
+/// during the migration period. UI uses duck-typing on id, description, etc.
+final currentProjectSessionsProvider = StreamProvider<List<dynamic>>((ref) {
+  final project = ref.watch(currentProjectProvider);
   final projectId = ref.watch(currentProjectIdProvider);
+
   if (projectId == null) {
     return Stream.value([]);
   }
+
+  // For remote projects, use SessionController
+  if (project?.serverUrl != null && project!.serverUrl!.isNotEmpty) {
+    return ref.watch(controllerSessionsProvider.stream);
+  }
+
+  // For local projects, use Drift DAO (for now - will migrate to SessionController)
   final sessionDao = ref.watch(databaseProvider).sessionDao;
   return sessionDao.watchNonArchivedSessionsByProject(projectId);
-}));
+});
 
 /// Provider for archived sessions of the currently selected project
-final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
+final archivedSessionsProvider = StreamProvider<List<dynamic>>((ref) {
+  final project = ref.watch(currentProjectProvider);
   final projectId = ref.watch(currentProjectIdProvider);
+
   if (projectId == null) {
     return Stream.value([]);
   }
+
+  // For remote projects, use SessionController
+  if (project?.serverUrl != null && project!.serverUrl!.isNotEmpty) {
+    return ref.watch(controllerArchivedSessionsProvider.stream);
+  }
+
+  // For local projects, use Drift DAO
   final sessionDao = ref.watch(databaseProvider).sessionDao;
   return sessionDao.watchArchivedSessionsByProject(projectId);
 });
@@ -31,8 +54,10 @@ final currentSessionIdProvider = StateProvider<String?>((ref) => null);
 /// Session auto-selector that runs after build
 /// Watches project and sessions to ensure a valid session is always selected
 final sessionAutoSelectorProvider = Provider<void>((ref) {
+  final project = ref.watch(currentProjectProvider);
   final projectId = ref.watch(currentProjectIdProvider);
   final sessionsAsync = ref.watch(currentProjectSessionsProvider);
+  final isRemote = project?.serverUrl != null && project!.serverUrl!.isNotEmpty;
 
   // Schedule session selection for after the current build
   ref.listenSelf((_, __) {
@@ -60,13 +85,27 @@ final sessionAutoSelectorProvider = Provider<void>((ref) {
 
     if (sessions.isEmpty) {
       // Create new session
-      final sessionDao = ref.read(databaseProvider).sessionDao;
-      final projectDao = ref.read(databaseProvider).projectDao;
+      if (isRemote) {
+        // For remote projects, use SessionController
+        final controllerAsync = ref.read(sessionControllerProvider);
+        controllerAsync.whenData((controller) async {
+          if (controller != null) {
+            final newSession = await controller.createSession();
+            ref.read(currentSessionIdProvider.notifier).state = newSession.id;
+          }
+        });
+      } else {
+        // For local projects, use Drift DAO
+        final sessionDao = ref.read(databaseProvider).sessionDao;
+        final projectDao = ref.read(databaseProvider).projectDao;
 
-      sessionDao.createSessionWithId(projectId: projectId).then((newSessionId) {
-        ref.read(currentSessionIdProvider.notifier).state = newSessionId;
-        projectDao.updateLastSessionDate(projectId, DateTime.now());
-      });
+        sessionDao.createSessionWithId(projectId: projectId).then((
+          newSessionId,
+        ) {
+          ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+          projectDao.updateLastSessionDate(projectId, DateTime.now());
+        });
+      }
     } else {
       // Select most recent session
       ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
@@ -74,9 +113,11 @@ final sessionAutoSelectorProvider = Provider<void>((ref) {
   });
 });
 
-/// Provider for the currently selected session
-/// Returns null if no session is selected or session doesn't exist
-final currentSessionProvider = Provider<SessionEntity?>((ref) {
+/// Provider for the currently selected session.
+/// Returns null if no session is selected or session doesn't exist.
+/// The return type is dynamic to support both Session (agent-core) and
+/// SessionEntity (Drift) during the migration period.
+final currentSessionProvider = Provider<dynamic>((ref) {
   final sessionId = ref.watch(currentSessionIdProvider);
   if (sessionId == null) return null;
 
