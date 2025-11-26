@@ -1,7 +1,11 @@
+import 'package:agent_core/agent_core.dart' as core;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/llm_api_settings.dart';
 import '../models/settings.dart';
 import '../services/keychain_service.dart';
+import '../services/remote_session_controller.dart';
+import 'project_provider.dart';
+import 'remote_data_provider.dart';
 import 'settings_provider.dart';
 import 'secret_provider.dart';
 
@@ -16,6 +20,7 @@ final globalLlmSettingsProvider =
     });
 
 /// Provider for managing project-specific LLM settings (family provider)
+/// Automatically routes to remote server for remote projects
 final projectLlmSettingsProvider =
     StateNotifierProvider.family<
       ProjectLlmSettingsNotifier,
@@ -26,10 +31,23 @@ final projectLlmSettingsProvider =
         projectSettingsProvider(projectId).notifier,
       );
       final keychainService = ref.watch(keychainServiceProvider);
+
+      // Check if this is a remote project
+      final currentProject = ref.watch(currentProjectProvider);
+      final isRemote =
+          currentProject?.id == projectId && currentProject?.serverUrl != null;
+      final remoteController = isRemote
+          ? ref.watch(remoteControllerProvider)
+          : null;
+
       return ProjectLlmSettingsNotifier(
         projectId,
         settingsNotifier,
         keychainService,
+        remoteController: remoteController,
+        onRemoteSync: isRemote
+            ? () => ref.invalidate(remoteSettingsProvider)
+            : null,
       );
     });
 
@@ -233,24 +251,40 @@ class GlobalLlmSettingsNotifier extends BaseLlmSettingsNotifier {
 }
 
 /// StateNotifier for project-specific LLM settings
+/// Supports both local storage and remote server sync
 class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
   final String _projectId;
   final ProjectSettingsNotifier _settingsNotifier;
+  final RemoteSessionController? _remoteController;
+  final void Function()? _onRemoteSync;
 
   ProjectLlmSettingsNotifier(
     this._projectId,
     this._settingsNotifier,
-    KeychainService keychainService,
-  ) : super(keychainService) {
+    KeychainService keychainService, {
+    RemoteSessionController? remoteController,
+    void Function()? onRemoteSync,
+  }) : _remoteController = remoteController,
+       _onRemoteSync = onRemoteSync,
+       super(keychainService) {
     state = _settingsNotifier.state?.llmSettings ?? [];
   }
+
+  bool get _isRemote => _remoteController != null;
 
   @override
   String? get _currentDefaultIdentifier =>
       _settingsNotifier.state?.defaultLlmIdentifier;
 
   @override
-  Future<void> _saveSecret(String identifier, String key) {
+  Future<void> _saveSecret(String identifier, String key) async {
+    if (_isRemote) {
+      // Save to remote server
+      final secretId = 'llm_api_key_$identifier';
+      await _remoteController!.saveSecret(secretId, identifier, key);
+      return;
+    }
+    // Local storage
     return _keychainService.saveProjectSecret(
       _projectId,
       LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
@@ -259,7 +293,10 @@ class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
   }
 
   @override
-  Future<String?> _getSecret(String identifier) {
+  Future<String?> _getSecret(String identifier) async {
+    // For remote, we don't fetch secrets back (they're masked)
+    // Only local keychain access
+    if (_isRemote) return null;
     return _keychainService.getProjectSecret(
       _projectId,
       LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
@@ -267,7 +304,12 @@ class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
   }
 
   @override
-  Future<void> _deleteSecret(String identifier) {
+  Future<void> _deleteSecret(String identifier) async {
+    if (_isRemote) {
+      final secretId = 'llm_api_key_$identifier';
+      await _remoteController!.deleteSecret(secretId);
+      return;
+    }
     return _keychainService.deleteProjectSecret(
       _projectId,
       LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
@@ -288,6 +330,7 @@ class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
           updatedAt: DateTime.now(),
         );
 
+    // Update local state
     await _settingsNotifier.updateSettings(
       currentSettings.copyWith(
         llmSettings: settings,
@@ -297,5 +340,44 @@ class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
         updatedAt: DateTime.now(),
       ),
     );
+
+    // Sync to remote server if this is a remote project
+    if (_isRemote) {
+      await _syncToRemote(settings, newDefaultIdentifier);
+      _onRemoteSync?.call();
+    }
+  }
+
+  /// Convert local LlmApiSettings to server's core.LlmSettings and sync
+  Future<void> _syncToRemote(
+    List<LlmApiSettings> settings,
+    String? defaultIdentifier,
+  ) async {
+    // Convert app's LlmApiSettings to server's LlmSettings
+    final coreLlmSettings = settings.map((s) {
+      return core.LlmSettings(
+        identifier: s.identifier,
+        provider: s.apiType.name, // enum name matches provider string
+        model: s.identifier, // Use identifier as model for now
+        baseUrl: s.baseUrl,
+        apiKeySecretId: 'llm_api_key_${s.identifier}',
+        maxTokens: s.maxTokens,
+        temperature: s.temperature,
+        enabled: s.enabled,
+      );
+    }).toList();
+
+    // Build the core.ProjectSettings to send to server
+    final projectName = _settingsNotifier.state?.projectId ?? _projectId;
+    final coreSettings = core.ProjectSettings(
+      projectId: _projectId,
+      name: projectName,
+      llmSettings: coreLlmSettings,
+      defaultLlmIdentifier: defaultIdentifier,
+      systemPrompt:
+          _settingsNotifier.state?.agentInstruction?.defaultInstruction,
+    );
+
+    await _remoteController!.saveSettings(coreSettings);
   }
 }
