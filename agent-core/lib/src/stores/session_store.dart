@@ -60,8 +60,9 @@ abstract class SessionStore {
   /// Delete a message
   Future<void> deleteMessage(String messageId);
 
-  /// Delete all messages after a timestamp in a session
-  Future<void> deleteMessagesAfter(String sessionId, DateTime afterTimestamp);
+  /// Delete all messages after a timestamp in a session.
+  /// Returns the number of deleted messages.
+  Future<int> deleteMessagesAfter(String sessionId, DateTime afterTimestamp);
 
   /// Get message count for a session
   Future<int> getMessageCount(String sessionId);

@@ -300,19 +300,38 @@ class SqliteSessionStore implements SessionStore {
   }
 
   @override
-  Future<void> deleteMessagesAfter(
+  Future<int> deleteMessagesAfter(
     String sessionId,
     DateTime afterTimestamp,
   ) async {
-    final stmt = _db.prepare('''
+    // First count how many we'll delete
+    final countStmt = _db.prepare('''
+      SELECT COUNT(*) as count FROM messages 
+      WHERE session_id = ? AND created_at > ?
+    ''');
+    int deleted;
+    try {
+      final results = countStmt.select([
+        sessionId,
+        afterTimestamp.millisecondsSinceEpoch,
+      ]);
+      deleted = results.first['count'] as int;
+    } finally {
+      countStmt.dispose();
+    }
+
+    // Now delete
+    final deleteStmt = _db.prepare('''
       DELETE FROM messages WHERE session_id = ? AND created_at > ?
     ''');
     try {
-      stmt.execute([sessionId, afterTimestamp.millisecondsSinceEpoch]);
+      deleteStmt.execute([sessionId, afterTimestamp.millisecondsSinceEpoch]);
       await touchSession(sessionId);
     } finally {
-      stmt.dispose();
+      deleteStmt.dispose();
     }
+
+    return deleted;
   }
 
   @override

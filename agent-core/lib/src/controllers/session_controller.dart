@@ -95,6 +95,16 @@ abstract class SessionController {
   /// Get message count for a session
   Future<int> getMessageCount(String sessionId);
 
+  /// Get a single message by ID
+  Future<Message?> getMessage(String messageId);
+
+  /// Update a message's content (for editing)
+  Future<void> updateMessageContent(String messageId, String newContent);
+
+  /// Delete all messages after a given timestamp in a session
+  /// Returns the number of deleted messages
+  Future<int> deleteMessagesAfter(String sessionId, DateTime afterTimestamp);
+
   // ============================================================
   // Agent Loop Execution
   // ============================================================
@@ -114,6 +124,20 @@ abstract class SessionController {
   Future<AgentLoopResult> sendMessage({
     required String sessionId,
     required String content,
+    required void Function(String delta) onTextDelta,
+    required void Function(Message message) onMessage,
+    required Future<List<int>?> Function(List<PendingToolCall> tools)
+        requestApproval,
+  });
+
+  /// Continue the conversation without adding a user message.
+  ///
+  /// Used for resend/edit operations where the conversation has been modified
+  /// and we want to re-run the agent loop from the current state.
+  ///
+  /// Parameters are the same as [sendMessage] except no content is provided.
+  Future<AgentLoopResult> continueConversation({
+    required String sessionId,
     required void Function(String delta) onTextDelta,
     required void Function(Message message) onMessage,
     required Future<List<int>?> Function(List<PendingToolCall> tools)

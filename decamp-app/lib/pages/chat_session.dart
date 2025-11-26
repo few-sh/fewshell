@@ -15,7 +15,6 @@ import 'package:decamp/providers/chat_controller.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';
-import 'package:decamp/components/no_llm_configured_overlay.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -164,7 +163,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       sessionId: currentSessionId,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
-      onNoConfig: () => NoLlmConfiguredOverlay.show(context),
     );
   }
 

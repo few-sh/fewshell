@@ -1,223 +1,82 @@
-import 'dart:convert';
 import 'dart:developer' as developer;
-import 'package:agent_core/agent_core.dart' hide SshSettings;
-import 'package:dio/dio.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:llm_dart/llm_dart.dart';
-import 'package:drift/drift.dart';
-import '../extensions/chat_message_extensions.dart';
 import '../models/chat_state.dart';
-import '../models/ssh_settings.dart';
-import '../services/llm_service.dart';
-import '../services/remote_agent_client.dart';
-import '../services/shell_service.dart';
-import '../providers/database_provider.dart';
-import '../providers/project_provider.dart';
-import '../providers/ssh_settings_provider.dart';
-import '../providers/secret_provider.dart';
 import '../providers/session_controller_provider.dart';
-import '../database/daos/message_dao.dart';
-import '../database/daos/session_dao.dart';
-import '../database/database.dart';
 import '../components/multi_command_approval_overlay.dart';
-import '../utils/secret_redactor.dart';
-import '../utils/constants.dart';
 
-// Constants for message user IDs
-const String _kUserUserId = 'user';
-const String _kUserUserName = 'You';
-const String _kAiUserId = 'ai';
-const String _kAiUserName = 'Ops Agent';
-
-/// Controller for chat session state management
-/// Handles all business logic for chat interactions, tool execution, and message syncing
+/// Controller for chat session UI state management.
 ///
-/// Supports both local execution (runAgentLoop) and remote execution (WebSocket to server).
-/// When a SessionController is provided, uses the unified Quake-style interface.
-/// Falls back to legacy code paths when SessionController is not available.
+/// This is a thin layer over SessionController that manages UI-specific state
+/// like loading indicators and streaming text. All persistence and execution
+/// is delegated to SessionController (Quake-style unified interface).
 class ChatController extends StateNotifier<ChatState> {
-  final MessageDao _messageDao;
-  final SessionDao _sessionDao;
-  final LlmService _llmService;
-  final ShellService _shellService;
-  final SecretRedactor _secretRedactor;
-  final SshSettings? _sshSettings;
-  final String? sessionId;
+  final SessionController _sessionController;
 
-  /// Server URL for remote execution (null = local project)
-  final String? serverUrl;
+  ChatController({required SessionController sessionController})
+    : _sessionController = sessionController,
+      super(const ChatState());
 
-  /// Project ID for remote execution
-  final String? projectId;
-
-  /// SessionController for unified local/remote execution (Quake-style)
-  /// When provided, this is used instead of the legacy code paths.
-  final SessionController? _sessionController;
-
-  /// Remote agent client (legacy - used when SessionController not available)
-  RemoteAgentClient? _remoteController;
-
-  ChatController({
-    required MessageDao messageDao,
-    required SessionDao sessionDao,
-    required LlmService llmService,
-    required ShellService shellService,
-    required SecretRedactor secretRedactor,
-    SshSettings? sshSettings,
-    SessionController? sessionController,
-    this.sessionId,
-    this.serverUrl,
-    this.projectId,
-  }) : _messageDao = messageDao,
-       _sessionDao = sessionDao,
-       _llmService = llmService,
-       _shellService = shellService,
-       _secretRedactor = secretRedactor,
-       _sshSettings = sshSettings,
-       _sessionController = sessionController,
-       super(const ChatState());
-
-  /// Whether this is a remote project
-  bool get isRemote => serverUrl != null;
-
-  /// Whether we're using the unified SessionController
-  bool get _useSessionController => _sessionController != null;
-
-  /// Reset state when session changes (called by provider when session changes)
+  /// Reset state when session changes
   void resetForNewSession() {
     state = const ChatState();
-    // Disconnect remote controller if switching sessions
-    _remoteController?.disconnect();
-    _remoteController = null;
   }
 
-  /// Build conversation history from database messages
-  /// Reconstructs proper ChatMessage objects including tool use and tool results
-  List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
-    final conversation = <ChatMessage>[];
+  // ============================================================
+  // Message Sending
+  // ============================================================
 
-    developer.log(
-      '🔄 Building conversation history from ${dbMessages.length} messages',
-      name: 'ChatController',
-    );
-
-    for (final msg in dbMessages) {
-      // Cast to MessageEntity for type-safe access
-      final messageEntity = msg as MessageEntity;
-
-      // Use the extension method to convert to ChatMessage
-      final chatMessage = messageEntity.toChatMessage();
-
-      developer.log(
-        '✅ Reconstructed ${chatMessage.role.name} message with kind: ${messageEntity.messageKind.name}',
-        name: 'ChatController',
-      );
-
-      // Log tool calls and results for debugging
-      if (chatMessage.messageType is ToolUseMessage) {
-        final toolUse = chatMessage.messageType as ToolUseMessage;
-        developer.log(
-          '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
-          name: 'ChatController',
-        );
-      } else if (chatMessage.messageType is ToolResultMessage) {
-        final toolResult = chatMessage.messageType as ToolResultMessage;
-        developer.log(
-          '  📊 Tool results: ${toolResult.results.length} result(s)',
-          name: 'ChatController',
-        );
-      }
-
-      conversation.add(chatMessage);
-    }
-
-    developer.log(
-      '✅ Built conversation with ${conversation.length} messages',
-      name: 'ChatController',
-    );
-
-    return conversation;
-  }
-
-  /// Validate and prepare for sending a message
-  Future<bool> _validateAndPrepare({
-    required String sessionId,
+  /// Send a message to the AI.
+  ///
+  /// The SessionController handles:
+  /// - Persisting the user message
+  /// - Running the agent loop
+  /// - Persisting AI responses and tool results
+  ///
+  /// This controller just manages UI state (loading, streaming, errors).
+  Future<void> sendMessage({
     required String content,
-    required bool checkLlmConfig,
+    required String sessionId,
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
+        requestApproval,
   }) async {
-    // Redact and save user's message
-    final redactedContent = await _secretRedactor.redact(content);
-    await _messageDao.insertMessageWithId(
-      sessionId: sessionId,
-      userId: _kUserUserId,
-      userName: _kUserUserName,
-      content: redactedContent,
-    );
+    state = state.copyWith(isLoading: true, error: null);
 
-    // Update session description if it's empty or default (first message)
-    final session = await _sessionDao.getSession(sessionId);
-    final currentDescription = session?.description ?? '';
-    if (currentDescription.isEmpty ||
-        currentDescription == kDefaultSessionDescription) {
-      final description = content.length > 495
-          ? '${content.substring(0, 495)}...'
-          : content;
-      await _sessionDao.updateSession(
-        SessionEntityCompanion(
-          id: Value(sessionId),
-          description: Value(description),
-        ),
+    try {
+      final result = await _runAgentLoop(
+        sessionId: sessionId,
+        content: content,
+        requestApproval: requestApproval,
       );
+      _handleResult(result);
+    } catch (e) {
+      developer.log('❌ Error: $e', name: 'ChatController');
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
-
-    // Check if LLM is configured (only for local execution)
-    if (checkLlmConfig) {
-      final isConfigured = await _llmService.isConfigured();
-      if (!isConfigured) {
-        return false;
-      }
-    }
-
-    return true;
   }
 
-  /// Convert PendingToolCall to ToolAction for UI approval
-  List<ToolAction> _pendingToolCallsToActions(List<PendingToolCall> toolCalls) {
-    return toolCalls.map((tc) {
-      return ToolAction(id: tc.id, toolName: tc.name, params: tc.arguments);
-    }).toList();
-  }
-
-  // ============================================================
-  // Unified SessionController Path (Quake-style)
-  // ============================================================
-
-  /// Send message via SessionController (unified local/remote)
-  Future<AgentLoopResult> _sendMessageViaController({
+  /// Run agent loop with new content
+  Future<AgentLoopResult> _runAgentLoop({
     required String sessionId,
     required String content,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
-    requestApproval,
+        requestApproval,
   }) async {
     var hasStartedStreaming = false;
     final streamingBuffer = StringBuffer();
-    String? currentMessageId;
 
-    return await _sessionController!.sendMessage(
+    return await _sessionController.sendMessage(
       sessionId: sessionId,
       content: content,
       onTextDelta: (delta) {
         streamingBuffer.write(delta);
         if (!hasStartedStreaming) {
-          currentMessageId = _messageDao.generateMessageId();
-          startStreaming(currentMessageId!);
+          startStreaming('streaming');
           hasStartedStreaming = true;
         }
         updateStreamingText(streamingBuffer.toString());
       },
       onMessage: (message) {
-        // Message has been persisted by SessionController
-        // Just update streaming state if needed
         if (hasStartedStreaming) {
           stopStreaming();
           hasStartedStreaming = false;
@@ -225,20 +84,11 @@ class ChatController extends StateNotifier<ChatState> {
         }
       },
       requestApproval: (pendingCalls) async {
-        // Convert to UI's ToolAction format
         final actions = _pendingToolCallsToActions(pendingCalls);
         final selectedActions = await requestApproval(actions);
 
-        if (selectedActions == null) {
-          return null; // User cancelled
-        }
+        if (selectedActions == null) return null;
 
-        developer.log(
-          '✅ User approved ${selectedActions.length} tool calls',
-          name: 'ChatController',
-        );
-
-        // Return indices of approved tools
         return pendingCalls.indexed
             .where((e) => selectedActions.any((a) => a.id == e.$2.id))
             .map((e) => e.$1)
@@ -247,20 +97,54 @@ class ChatController extends StateNotifier<ChatState> {
     );
   }
 
-  /// Handle agent loop result (shared between legacy and new paths)
-  Future<void> _handleAgentLoopResult(
-    AgentLoopResult result,
-    String sessionId,
-  ) async {
+  /// Continue conversation without adding a user message.
+  /// Used for edit/resend operations.
+  Future<AgentLoopResult> _continueConversation({
+    required String sessionId,
+    required Future<List<ToolAction>?> Function(List<ToolAction>)
+        requestApproval,
+  }) async {
+    var hasStartedStreaming = false;
+    final streamingBuffer = StringBuffer();
+
+    return await _sessionController.continueConversation(
+      sessionId: sessionId,
+      onTextDelta: (delta) {
+        streamingBuffer.write(delta);
+        if (!hasStartedStreaming) {
+          startStreaming('streaming');
+          hasStartedStreaming = true;
+        }
+        updateStreamingText(streamingBuffer.toString());
+      },
+      onMessage: (message) {
+        if (hasStartedStreaming) {
+          stopStreaming();
+          hasStartedStreaming = false;
+          streamingBuffer.clear();
+        }
+      },
+      requestApproval: (pendingCalls) async {
+        final actions = _pendingToolCallsToActions(pendingCalls);
+        final selectedActions = await requestApproval(actions);
+
+        if (selectedActions == null) return null;
+
+        return pendingCalls.indexed
+            .where((e) => selectedActions.any((a) => a.id == e.$2.id))
+            .map((e) => e.$1)
+            .toList();
+      },
+    );
+  }
+
+  void _handleResult(AgentLoopResult result) {
     switch (result) {
       case AgentLoopCompleted():
         developer.log('✅ Agent loop completed', name: 'ChatController');
         state = state.copyWith(isLoading: false);
       case AgentLoopCancelled():
-        developer.log(
-          '🚨 User cancelled tool execution',
-          name: 'ChatController',
-        );
+        developer.log('🚨 User cancelled', name: 'ChatController');
         state = state.copyWith(isLoading: false);
       case AgentLoopError(message: final errorMsg):
         developer.log('❌ Agent loop error: $errorMsg', name: 'ChatController');
@@ -268,549 +152,161 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
+  List<ToolAction> _pendingToolCallsToActions(List<PendingToolCall> toolCalls) {
+    return toolCalls.map((tc) {
+      return ToolAction(id: tc.id, toolName: tc.name, params: tc.arguments);
+    }).toList();
+  }
+
   // ============================================================
-  // Legacy Code Paths (to be deprecated)
+  // Edit & Resend
   // ============================================================
 
-  /// Send a message to the AI
-  /// Handles saving to database, getting AI response, and managing tool calls
-  ///
-  /// If content is null, resends the last user message in the conversation.
-  /// This is used for resend/edit operations.
-  ///
-  /// Streaming is managed internally through ChatState:
-  /// - startStreaming: Sets streamingMessageId in state
-  /// - updateStreamingText: Updates streamingText in state
-  /// - stopStreaming: Clears streaming state
-  Future<void> sendMessage({
-    String? content,
-    required String sessionId,
-    required Future<List<ToolAction>?> Function(List<ToolAction>)
-    requestApproval,
-    void Function()? onNoConfig,
-  }) async {
-    state = state.copyWith(isLoading: true, error: null);
-
-    try {
-      // Use unified SessionController if available
-      if (_useSessionController && content != null) {
-        final result = await _sendMessageViaController(
-          sessionId: sessionId,
-          content: content,
-          requestApproval: requestApproval,
-        );
-        await _handleAgentLoopResult(result, sessionId);
-        return;
-      }
-
-      // Legacy path: validate and save user message first
-      if (content != null) {
-        final isValid = await _validateAndPrepare(
-          sessionId: sessionId,
-          content: content,
-          checkLlmConfig:
-              !isRemote, // Only check local LLM config for local execution
-        );
-        if (!isValid) {
-          state = state.copyWith(isLoading: false);
-          onNoConfig?.call();
-          return;
-        }
-      }
-
-      // Legacy: Branch based on local vs remote execution
-      final AgentLoopResult result;
-      if (isRemote) {
-        result = await _sendMessageRemote(
-          sessionId: sessionId,
-          content: content ?? '',
-          requestApproval: requestApproval,
-        );
-      } else {
-        result = await _sendMessageLocal(
-          sessionId: sessionId,
-          requestApproval: requestApproval,
-        );
-      }
-
-      // Handle result
-      switch (result) {
-        case AgentLoopCompleted():
-          developer.log('✅ Agent loop completed', name: 'ChatController');
-        case AgentLoopCancelled():
-          developer.log(
-            '🚨 User cancelled tool execution',
-            name: 'ChatController',
-          );
-        case AgentLoopError(message: final errorMsg):
-          final errorMessage = 'Sorry, I encountered an error: $errorMsg';
-          final redactedError = await _secretRedactor.redact(errorMessage);
-          await _messageDao.insertMessageWithId(
-            sessionId: sessionId,
-            userId: _kAiUserId,
-            userName: _kAiUserName,
-            content: redactedError,
-          );
-          state = state.copyWith(isLoading: false, error: errorMsg);
-          return;
-      }
-
-      state = state.copyWith(isLoading: false);
-    } catch (e) {
-      final errorMessage = 'Sorry, I encountered an error: $e';
-      final redactedError = await _secretRedactor.redact(errorMessage);
-      await _messageDao.insertMessageWithId(
-        sessionId: sessionId,
-        userId: _kAiUserId,
-        userName: _kAiUserName,
-        content: redactedError,
-      );
-      developer.log('❌ Error: $e', name: 'ChatController');
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
-  }
-
-  /// Send message using local execution (runAgentLoop)
-  Future<AgentLoopResult> _sendMessageLocal({
-    required String sessionId,
-    required Future<List<ToolAction>?> Function(List<ToolAction>)
-    requestApproval,
-  }) async {
-    var aiMessageId = _messageDao.generateMessageId();
-    var hasStartedStreaming = false;
-    final streamingBuffer = StringBuffer();
-
-    return await runAgentLoop(
-      llmStream: (conversation, tools) =>
-          _llmService.streamChat(conversation, tools: tools),
-      tools: shellTools,
-      getConversation: () async {
-        // Rebuild conversation from database each iteration (single source of truth)
-        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-        return _buildConversationHistory(dbMessages);
-      },
-      requestApproval: (pendingCalls) async {
-        // Convert to UI's ToolAction format
-        final actions = _pendingToolCallsToActions(pendingCalls);
-        final selectedActions = await requestApproval(actions);
-
-        if (selectedActions == null) {
-          return null; // User cancelled
-        }
-
-        developer.log(
-          '✅ User approved ${selectedActions.length} tool calls',
-          name: 'ChatController',
-        );
-
-        // Return the approved subset of PendingToolCalls
-        return pendingCalls
-            .where((pc) => selectedActions.any((a) => a.id == pc.id))
-            .toList();
-      },
-      executeToolCall: (toolCall) async {
-        // Execute and return result as JSON string
-        final result = await _executeToolCall(toolCall);
-        return jsonEncode(result);
-      },
-      onTextDelta: (delta) {
-        streamingBuffer.write(delta);
-        if (!hasStartedStreaming) {
-          startStreaming(aiMessageId);
-          hasStartedStreaming = true;
-        }
-        updateStreamingText(streamingBuffer.toString());
-      },
-      onAssistantMessage: (message) async {
-        if (hasStartedStreaming) {
-          stopStreaming();
-          hasStartedStreaming = false;
-          streamingBuffer.clear();
-        }
-
-        // Determine if this is a tool use message or a text message
-        final messageType = message.messageType;
-        if (messageType is ToolUseMessage) {
-          // Save tool use message
-          await _messageDao.insertMessage(
-            message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
-          );
-        } else {
-          // Save text message
-          final redactedContent = await _secretRedactor.redact(message.content);
-          await _messageDao.insertMessageWithId(
-            id: aiMessageId,
-            sessionId: sessionId,
-            userId: _kAiUserId,
-            userName: _kAiUserName,
-            content: redactedContent,
-          );
-        }
-
-        // Generate new ID for next message
-        aiMessageId = _messageDao.generateMessageId();
-      },
-      onToolResultMessage: (message) async {
-        await _messageDao.insertMessage(
-          message.toMessageCompanion(sessionId: sessionId),
-        );
-      },
-    );
-  }
-
-  /// Send message using remote execution (WebSocket to server)
-  Future<AgentLoopResult> _sendMessageRemote({
-    required String sessionId,
-    required String content,
-    required Future<List<ToolAction>?> Function(List<ToolAction>)
-    requestApproval,
-  }) async {
-    // Initialize remote controller if needed
-    _remoteController ??= RemoteAgentClient(
-      serverUrl: serverUrl!,
-      projectId: projectId!,
-    );
-
-    // Connect if not connected
-    if (!_remoteController!.isConnected) {
-      final connected = await _remoteController!.connect();
-      if (!connected) {
-        return AgentLoopError('Failed to connect to server');
-      }
-    }
-
-    var aiMessageId = _messageDao.generateMessageId();
-    var hasStartedStreaming = false;
-    final streamingBuffer = StringBuffer();
-
-    // Get conversation from database
-    final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-    final conversation = _buildConversationHistory(dbMessages);
-
-    return await _remoteController!.sendMessage(
-      sessionId: sessionId,
-      conversation: conversation,
-      content: content,
-      onTextDelta: (delta) {
-        streamingBuffer.write(delta);
-        if (!hasStartedStreaming) {
-          startStreaming(aiMessageId);
-          hasStartedStreaming = true;
-        }
-        updateStreamingText(streamingBuffer.toString());
-      },
-      onAssistantMessage: (message) async {
-        if (hasStartedStreaming) {
-          stopStreaming();
-          hasStartedStreaming = false;
-          streamingBuffer.clear();
-        }
-
-        // Save message to local database (cache)
-        final messageType = message.messageType;
-        if (messageType is ToolUseMessage) {
-          await _messageDao.insertMessage(
-            message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
-          );
-        } else {
-          final redactedContent = await _secretRedactor.redact(message.content);
-          await _messageDao.insertMessageWithId(
-            id: aiMessageId,
-            sessionId: sessionId,
-            userId: _kAiUserId,
-            userName: _kAiUserName,
-            content: redactedContent,
-          );
-        }
-
-        aiMessageId = _messageDao.generateMessageId();
-      },
-      onToolResultMessage: (message) async {
-        await _messageDao.insertMessage(
-          message.toMessageCompanion(sessionId: sessionId),
-        );
-      },
-      requestApproval: (tools) async {
-        // Convert server tool format to UI ToolAction format
-        final actions = tools.map((t) {
-          return ToolAction(
-            id: t['id'] as String? ?? '',
-            toolName: t['name'] as String? ?? '',
-            params: t['args'] as Map<String, dynamic>? ?? {},
-          );
-        }).toList();
-
-        final selectedActions = await requestApproval(actions);
-        if (selectedActions == null) {
-          return null; // User cancelled
-        }
-
-        // Return indices of approved tools
-        return selectedActions
-            .map((a) => tools.indexWhere((t) => t['id'] == a.id))
-            .where((i) => i >= 0)
-            .toList();
-      },
-    );
-  }
-
-  /// Execute a single tool call and return result as Map
-  Future<Map<String, dynamic>> _executeToolCall(ToolCall toolCall) async {
-    final argumentsJson = toolCall.function.arguments;
-    final params = argumentsJson.isNotEmpty
-        ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-        : <String, dynamic>{};
-
-    final result = await _executeAction(toolCall.function.name, params);
-    return result['data'] as Map<String, dynamic>;
-  }
-
-  /// Execute a single action (shell command or fetch)
-  Future<Map<String, dynamic>> _executeAction(
-    String actionName,
-    Map<String, dynamic> params,
-  ) async {
-    if (actionName == kExecuteShellCommand) {
-      final command = params['command'] as String;
-      final sudoRequired = params['sudo_required'] as bool? ?? false;
-
-      final Map<String, dynamic> result;
-
-      if (sudoRequired) {
-        result = await _shellService.executeWithSudo(
-          command: command,
-          sudoPasswordSecretId:
-              _sshSettings?.sudoPasswordSecretId ??
-              _sshSettings?.passwordSecretId,
-        );
-      } else {
-        result = await _shellService.executeCommand(command);
-      }
-
-      return {
-        'success': (result['exitCode'] as int? ?? -1) == 0,
-        'data': result,
-        'error': result['stderr'] as String?,
-      };
-    }
-
-    if (actionName == kFetch) {
-      final url = params['url'] as String;
-      final method = (params['method'] as String?)?.toUpperCase() ?? 'GET';
-      final headers = params['headers'] as Map<String, dynamic>?;
-      final body = params['body'] as String?;
-      final timeoutSeconds = params['timeout'] as int? ?? 30;
-
-      try {
-        final dio = Dio();
-        final response = await dio
-            .request(
-              url,
-              data: body,
-              options: Options(
-                method: method,
-                headers: headers,
-                responseType: ResponseType.plain,
-                validateStatus: (status) => true, // Accept all status codes
-              ),
-            )
-            .timeout(Duration(seconds: timeoutSeconds));
-
-        final isSuccess =
-            response.statusCode != null &&
-            response.statusCode! >= 200 &&
-            response.statusCode! < 300;
-
-        return {
-          'success': isSuccess,
-          'data': {
-            'statusCode': response.statusCode ?? 0,
-            'headers': response.headers.map,
-            'body': response.data?.toString() ?? '',
-            'url': url,
-            'method': method,
-          },
-          'error': isSuccess ? null : 'HTTP ${response.statusCode}',
-        };
-      } catch (e) {
-        return {
-          'success': false,
-          'data': {
-            'statusCode': 0,
-            'headers': {},
-            'body': '',
-            'url': url,
-            'method': method,
-          },
-          'error': e.toString(),
-        };
-      }
-    }
-
-    throw Exception('Unknown action: $actionName');
-  }
-
-  /// Edit a message and resend from that point
-  /// Updates the message content, deletes all messages after it, then resends
+  /// Edit a message and resend from that point.
+  /// Updates the message content, deletes all messages after it, then resends.
   Future<void> editMessage({
     required String messageId,
     required String newContent,
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
-    requestApproval,
+        requestApproval,
   }) async {
     developer.log('✏️ Editing message: $messageId', name: 'ChatController');
+    state = state.copyWith(isLoading: true, error: null);
 
-    // Get the message to find its timestamp
-    final message = await _messageDao.getMessage(messageId);
-    if (message == null) {
-      developer.log('❌ Message not found: $messageId', name: 'ChatController');
-      return;
+    try {
+      // Get the message to find its timestamp
+      final message = await _sessionController.getMessage(messageId);
+      if (message == null) {
+        developer.log(
+          '❌ Message not found: $messageId',
+          name: 'ChatController',
+        );
+        state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      // Update the message content
+      await _sessionController.updateMessageContent(messageId, newContent);
+      developer.log('💾 Updated message content', name: 'ChatController');
+
+      // Delete all messages AFTER this one
+      final deletedCount = await _sessionController.deleteMessagesAfter(
+        sessionId,
+        message.createdAt,
+      );
+      developer.log(
+        '🗑️ Deleted $deletedCount messages after edit',
+        name: 'ChatController',
+      );
+
+      // Continue from the edited message
+      final result = await _continueConversation(
+        sessionId: sessionId,
+        requestApproval: requestApproval,
+      );
+      _handleResult(result);
+    } catch (e) {
+      developer.log('❌ Edit error: $e', name: 'ChatController');
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
-
-    // Update the message content
-    await _messageDao.updateMessageContent(
-      messageId: messageId,
-      newContent: newContent,
-    );
-
-    developer.log('💾 Updated message content', name: 'ChatController');
-
-    // Delete all messages AFTER this one (keep the edited message)
-    final deletedCount = await _messageDao.deleteMessagesAfter(
-      sessionId: sessionId,
-      afterTimestamp: message.timestamp,
-    );
-
-    developer.log(
-      '🗑️ Deleted $deletedCount messages after edit, now resending',
-      name: 'ChatController',
-    );
-
-    // Resend from the edited message
-    await sendMessage(
-      content: null, // Use existing conversation (now with edited message)
-      sessionId: sessionId,
-      requestApproval: requestApproval,
-    );
   }
 
-  /// Resend a message: delete all messages after it, then resend from that point
+  /// Resend from a message: delete all messages after it, then resend.
   Future<void> resendMessage({
     required String messageId,
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
-    requestApproval,
+        requestApproval,
   }) async {
-    developer.log(
-      '🔄 Resending from message: $messageId',
-      name: 'ChatController',
-    );
+    developer.log('🔄 Resending from: $messageId', name: 'ChatController');
+    state = state.copyWith(isLoading: true, error: null);
 
-    // Get the message to find its timestamp
-    final message = await _messageDao.getMessage(messageId);
-    if (message == null) {
-      developer.log('❌ Message not found: $messageId', name: 'ChatController');
-      return;
+    try {
+      // Get the message to find its timestamp
+      final message = await _sessionController.getMessage(messageId);
+      if (message == null) {
+        developer.log(
+          '❌ Message not found: $messageId',
+          name: 'ChatController',
+        );
+        state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      // Delete all messages AFTER this one
+      final deletedCount = await _sessionController.deleteMessagesAfter(
+        sessionId,
+        message.createdAt,
+      );
+      developer.log(
+        '🗑️ Deleted $deletedCount messages',
+        name: 'ChatController',
+      );
+
+      // Continue from that point
+      final result = await _continueConversation(
+        sessionId: sessionId,
+        requestApproval: requestApproval,
+      );
+      _handleResult(result);
+    } catch (e) {
+      developer.log('❌ Resend error: $e', name: 'ChatController');
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
-
-    // Delete all messages AFTER this one (keep the message itself)
-    final deletedCount = await _messageDao.deleteMessagesAfter(
-      sessionId: sessionId,
-      afterTimestamp: message.timestamp,
-    );
-
-    developer.log(
-      '🗑️ Deleted $deletedCount messages after target, now resending',
-      name: 'ChatController',
-    );
-
-    // Resend - conversation will include the message we're resending from
-    await sendMessage(
-      content: null, // Use existing conversation
-      sessionId: sessionId,
-      requestApproval: requestApproval,
-    );
   }
 
-  /// Branch the session by creating a copy up to a specific message
-  /// Returns the new session ID
-  Future<String> branchSession({
+  /// Branch the session by creating a copy up to a specific message.
+  /// Returns the new session ID.
+  Future<String?> branchSession({
     required String messageId,
     required String sessionId,
   }) async {
+    // TODO: Implement via SessionController when branch support is added
     developer.log(
-      '🌿 Branching session at message: $messageId',
+      '⚠️ Branch not yet implemented via SessionController',
       name: 'ChatController',
     );
-
-    final newSessionId = await _sessionDao.branchSession(
-      sessionId: sessionId,
-      upToMessageId: messageId,
-    );
-
-    developer.log(
-      '✅ Created new session: $newSessionId',
-      name: 'ChatController',
-    );
-
-    return newSessionId;
+    return null;
   }
 
-  /// Start streaming for a message
+  // ============================================================
+  // Streaming State
+  // ============================================================
+
   void startStreaming(String messageId) {
     state = state.copyWith(streamingMessageId: messageId, streamingText: '');
   }
 
-  /// Update streaming text for a message
   void updateStreamingText(String text) {
     state = state.copyWith(streamingText: text);
   }
 
-  /// Stop streaming
   void stopStreaming() {
     state = state.copyWith(streamingMessageId: null, streamingText: '');
   }
 
-  /// Clear error state
   void clearError() {
     state = state.copyWith(error: null);
   }
 }
 
-/// Provider for ChatController
-/// Uses family provider to scope controller to specific session
+/// Provider for ChatController.
+/// Requires SessionController to be available.
 final chatControllerProvider =
     StateNotifierProvider.family<ChatController, ChatState, String?>((
       ref,
       sessionId,
     ) {
-      // Get current project to access shell service and SSH settings
-      final currentProject = ref.watch(currentProjectProvider);
-      final projectId = currentProject?.id;
-
-      final sshSettings = projectId != null
-          ? ref.watch(projectSshSettingsProvider(projectId))
-          : null;
-
-      // Create secret redactor for this project
-      final keychain = ref.watch(keychainServiceProvider);
-      final secretRedactor = SecretRedactor(keychain, projectId);
-
-      // Get SessionController if available (Quake-style unified interface)
       final sessionControllerAsync = ref.watch(sessionControllerProvider);
-      final sessionController = sessionControllerAsync.valueOrNull;
 
-      return ChatController(
-        messageDao: ref.watch(databaseProvider).messageDao,
-        sessionDao: ref.watch(databaseProvider).sessionDao,
-        llmService: ref.watch(llmServiceProvider),
-        shellService: ref.watch(shellServiceProvider(projectId)),
-        secretRedactor: secretRedactor,
-        sshSettings: sshSettings,
-        sessionId: sessionId,
-        serverUrl: currentProject?.serverUrl,
-        projectId: projectId,
-        sessionController: sessionController,
-      );
+      // Return a "loading" controller if SessionController not ready
+      final sessionController = sessionControllerAsync.valueOrNull;
+      if (sessionController == null) {
+        // Return a dummy controller that shows loading state
+        // This shouldn't happen in practice since we wait for SessionController
+        throw Exception('SessionController not available');
+      }
+
+      return ChatController(sessionController: sessionController);
     });

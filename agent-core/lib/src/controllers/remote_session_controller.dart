@@ -263,6 +263,63 @@ class RemoteSessionController implements SessionController {
     return messages.length;
   }
 
+  @override
+  Future<Message?> getMessage(String messageId) async {
+    if (!isConnected) await connect();
+
+    final id = _nextRequestId();
+    final completer = Completer<Message?>();
+    _pendingRequests[id] = completer;
+
+    _send({'cmd': 'get_message', 'messageId': messageId, 'reqId': id});
+
+    return completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        _pendingRequests.remove(id);
+        return null;
+      },
+    );
+  }
+
+  @override
+  Future<void> updateMessageContent(String messageId, String newContent) async {
+    if (!isConnected) await connect();
+
+    _send({
+      'cmd': 'update_message',
+      'messageId': messageId,
+      'content': newContent,
+    });
+  }
+
+  @override
+  Future<int> deleteMessagesAfter(
+    String sessionId,
+    DateTime afterTimestamp,
+  ) async {
+    if (!isConnected) await connect();
+
+    final id = _nextRequestId();
+    final completer = Completer<int>();
+    _pendingRequests[id] = completer;
+
+    _send({
+      'cmd': 'delete_messages_after',
+      'sessionId': sessionId,
+      'afterTimestamp': afterTimestamp.millisecondsSinceEpoch,
+      'reqId': id,
+    });
+
+    return completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        _pendingRequests.remove(id);
+        return 0;
+      },
+    );
+  }
+
   // ============================================================
   // Agent Loop Execution
   // ============================================================
@@ -298,6 +355,39 @@ class RemoteSessionController implements SessionController {
     });
 
     developer.log('📤 Sent run command', name: 'RemoteSession');
+
+    return _runCompleter!.future;
+  }
+
+  @override
+  Future<AgentLoopResult> continueConversation({
+    required String sessionId,
+    required void Function(String delta) onTextDelta,
+    required void Function(Message message) onMessage,
+    required Future<List<int>?> Function(List<PendingToolCall> tools)
+        requestApproval,
+  }) async {
+    if (!isConnected) {
+      final connected = await connect();
+      if (!connected) {
+        return AgentLoopError('Failed to connect to server');
+      }
+    }
+
+    // Store callbacks
+    _onTextDelta = onTextDelta;
+    _onMessage = onMessage;
+    _requestApproval = requestApproval;
+    _runCompleter = Completer<AgentLoopResult>();
+
+    // Send continue command (no content)
+    _send({
+      'cmd': 'continue',
+      'projectId': projectId,
+      'sessionId': sessionId,
+    });
+
+    developer.log('📤 Sent continue command', name: 'RemoteSession');
 
     return _runCompleter!.future;
   }

@@ -136,9 +136,21 @@ class SessionHandler {
         case 'get_messages':
           await _handleGetMessages(data);
 
+        case 'get_message':
+          await _handleGetMessage(data);
+
+        case 'update_message':
+          await _handleUpdateMessage(data);
+
+        case 'delete_messages_after':
+          await _handleDeleteMessagesAfter(data);
+
         // Agent loop commands
         case 'run':
           await _handleRun(data);
+
+        case 'continue':
+          await _handleContinue(data);
 
         case 'approve':
           _handleApprove(data);
@@ -315,6 +327,73 @@ class SessionHandler {
     );
   }
 
+  Future<void> _handleGetMessage(Map<String, dynamic> data) async {
+    final messageId = data['messageId'] as String?;
+    final reqId = data['reqId'] as String?;
+
+    if (messageId == null) {
+      _sendError('messageId required');
+      return;
+    }
+
+    final message = await _connManager.sessionStore.getMessage(messageId);
+    _send({
+      't': 'message_result',
+      'message': message?.toJson(),
+      if (reqId != null) 'reqId': reqId,
+    });
+  }
+
+  Future<void> _handleUpdateMessage(Map<String, dynamic> data) async {
+    final messageId = data['messageId'] as String?;
+    final content = data['content'] as String?;
+
+    if (messageId == null) {
+      _sendError('messageId required');
+      return;
+    }
+
+    if (content == null) {
+      _sendError('content required');
+      return;
+    }
+
+    await _connManager.sessionStore.updateMessageContent(messageId, content);
+    _send({'t': 'message_updated', 'messageId': messageId});
+    developer.log('✏️ Updated message: $messageId', name: 'SessionHandler');
+  }
+
+  Future<void> _handleDeleteMessagesAfter(Map<String, dynamic> data) async {
+    final sessionId = data['sessionId'] as String?;
+    final afterTimestamp = data['afterTimestamp'] as int?;
+    final reqId = data['reqId'] as String?;
+
+    if (sessionId == null) {
+      _sendError('sessionId required');
+      return;
+    }
+
+    if (afterTimestamp == null) {
+      _sendError('afterTimestamp required');
+      return;
+    }
+
+    final deleted = await _connManager.sessionStore.deleteMessagesAfter(
+      sessionId,
+      DateTime.fromMillisecondsSinceEpoch(afterTimestamp),
+    );
+    _send({
+      't': 'messages_deleted',
+      'sessionId': sessionId,
+      'deleted': deleted,
+      if (reqId != null) 'reqId': reqId,
+    });
+    developer.log(
+      '🗑️ Deleted $deleted messages after $afterTimestamp',
+      name: 'SessionHandler',
+    );
+  }
+
   // ============================================================
   // Agent Loop Handler
   // ============================================================
@@ -436,6 +515,82 @@ class SessionHandler {
       case AgentLoopCancelled():
         _send({'t': 'cancelled'});
 
+      case AgentLoopError(message: final msg):
+        _sendError(msg);
+    }
+
+    _sessionId = null;
+  }
+
+  /// Handles the "continue" command
+  /// Like "run" but doesn't add a user message - continues from current conversation
+  Future<void> _handleContinue(Map<String, dynamic> data) async {
+    final sessionId = data['sessionId'] as String?;
+
+    if (sessionId == null) {
+      _sendError('sessionId required');
+      return;
+    }
+
+    _sessionId = sessionId;
+
+    // Session must exist
+    final session = await _connManager.sessionStore.getSession(sessionId);
+    if (session == null) {
+      _sendError('Session not found');
+      return;
+    }
+
+    // Load existing conversation from database
+    final dbMessages =
+        await _connManager.sessionStore.getMessagesBySession(sessionId);
+    final conversation = <ChatMessage>[];
+    for (final msg in dbMessages) {
+      try {
+        conversation.add(_messageToChat(msg));
+      } catch (e) {
+        developer.log('⚠️ Skipping invalid message: $e',
+            name: 'SessionHandler');
+      }
+    }
+
+    if (conversation.isEmpty) {
+      _sendError('No messages in conversation');
+      return;
+    }
+
+    // Get LLM client
+    final llm = await _createLlmClient();
+    if (llm == null) {
+      _sendError('LLM not configured - please configure it via LLM settings');
+      return;
+    }
+
+    // Run the agent loop (same as run, but no user message added)
+    final result = await runAgentLoop(
+      llmStream: (conv, tools) => llm.chatStream(conv, tools: tools),
+      tools: shellTools,
+      conversation: conversation,
+      requestApproval: _requestApproval,
+      executeToolCall: _executeToolCall,
+      onTextDelta: (delta) => _send({'t': 'delta', 'd': delta}),
+      onAssistantMessage: (msg) async {
+        final message = _chatToMessage(msg, sessionId: sessionId);
+        await _connManager.sessionStore.insertMessage(message);
+        _send({'t': 'message', 'role': 'assistant', 'msg': message.toJson()});
+      },
+      onToolResultMessage: (msg) async {
+        final message = _chatToMessage(msg, sessionId: sessionId);
+        await _connManager.sessionStore.insertMessage(message);
+        _send({'t': 'message', 'role': 'tool', 'msg': message.toJson()});
+      },
+    );
+
+    switch (result) {
+      case AgentLoopCompleted():
+        _send({'t': 'done'});
+      case AgentLoopCancelled():
+        _send({'t': 'cancelled'});
       case AgentLoopError(message: final msg):
         _sendError(msg);
     }

@@ -214,6 +214,26 @@ class LocalSessionController implements SessionController {
   Future<int> getMessageCount(String sessionId) =>
       _store.getMessageCount(sessionId);
 
+  @override
+  Future<Message?> getMessage(String messageId) => _store.getMessage(messageId);
+
+  @override
+  Future<void> updateMessageContent(String messageId, String newContent) async {
+    await _store.updateMessageContent(messageId, newContent);
+    // Note: We don't have the sessionId here, so we can't notify.
+    // The caller should handle refreshing as needed.
+  }
+
+  @override
+  Future<int> deleteMessagesAfter(
+    String sessionId,
+    DateTime afterTimestamp,
+  ) async {
+    final deleted = await _store.deleteMessagesAfter(sessionId, afterTimestamp);
+    await _notifyMessagesChanged(sessionId);
+    return deleted;
+  }
+
   // ============================================================
   // Agent Loop Execution
   // ============================================================
@@ -307,6 +327,76 @@ class LocalSessionController implements SessionController {
 
     // The result is already the right type
     return result;
+  }
+
+  @override
+  Future<AgentLoopResult> continueConversation({
+    required String sessionId,
+    required void Function(String delta) onTextDelta,
+    required void Function(Message message) onMessage,
+    required Future<List<int>?> Function(List<PendingToolCall> tools)
+        requestApproval,
+  }) async {
+    _isCancelled = false;
+
+    // Session must exist
+    final session = await _store.getSession(sessionId);
+    if (session == null) {
+      return AgentLoopError('Session not found');
+    }
+
+    // Load existing conversation
+    final dbMessages = await _store.getMessagesBySession(sessionId);
+    final conversation = <ChatMessage>[];
+    for (final msg in dbMessages) {
+      try {
+        conversation.add(_messageToChat(msg));
+      } catch (e) {
+        // Skip invalid messages
+      }
+    }
+
+    if (conversation.isEmpty) {
+      return AgentLoopError('No messages in conversation');
+    }
+
+    // Get LLM client
+    final llm = await _createLlmClient();
+    if (llm == null) {
+      return AgentLoopError('LLM not configured');
+    }
+
+    // Run the agent loop (same as sendMessage, but no user message added)
+    return await runAgentLoop(
+      llmStream: (conv, tools) => llm.chatStream(conv, tools: tools),
+      tools: shellTools,
+      conversation: conversation,
+      requestApproval: (pendingCalls) async {
+        if (_isCancelled) return null;
+
+        final approvedIndices = await requestApproval(pendingCalls);
+        if (approvedIndices == null) return null;
+
+        return approvedIndices
+            .where((i) => i >= 0 && i < pendingCalls.length)
+            .map((i) => pendingCalls[i])
+            .toList();
+      },
+      executeToolCall: _executeToolCall,
+      onTextDelta: onTextDelta,
+      onAssistantMessage: (chatMsg) async {
+        final message = _chatToMessage(chatMsg, sessionId: sessionId);
+        await _store.insertMessage(message);
+        onMessage(message);
+        await _notifyMessagesChanged(sessionId);
+      },
+      onToolResultMessage: (chatMsg) async {
+        final message = _chatToMessage(chatMsg, sessionId: sessionId);
+        await _store.insertMessage(message);
+        onMessage(message);
+        await _notifyMessagesChanged(sessionId);
+      },
+    );
   }
 
   @override
