@@ -2,26 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:agent_core/agent_core.dart';
-import '../providers/ssh_settings_provider.dart';
-import '../providers/secret_provider.dart';
-
-/// Provider for the shell service
-/// Now requires a project ID to access SSH settings
-final shellServiceProvider = Provider.family<ShellService, String?>((
-  ref,
-  projectId,
-) {
-  if (projectId == null) {
-    return ShellService(null, null, null);
-  }
-
-  final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
-  final keychain = ref.watch(keychainServiceProvider);
-  return ShellService(sshSettings, keychain, projectId);
-});
 
 /// Service for executing shell commands via SSH
 class ShellService {
