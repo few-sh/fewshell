@@ -384,6 +384,7 @@ class ChatController extends StateNotifier<ChatState> {
     final conversation = _buildConversationHistory(dbMessages);
 
     return await _remoteController!.sendMessage(
+      sessionId: sessionId,
       conversation: conversation,
       content: content,
       onTextDelta: (delta) {

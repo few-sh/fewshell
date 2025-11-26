@@ -18,7 +18,7 @@ void _handleWebSocket(WebSocketChannel webSocket) {
   // Send welcome message
   webSocket.sink.add(
     jsonEncode({
-      'type': 'connected',
+      't': 'connected',
       'message': 'Connected to Decamp Agent',
       'timestamp': DateTime.now().toIso8601String(),
     }),

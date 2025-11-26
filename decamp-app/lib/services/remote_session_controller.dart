@@ -92,6 +92,7 @@ class RemoteSessionController {
   ///
   /// Returns when the agent loop completes (done, cancelled, or error).
   Future<AgentLoopResult> sendMessage({
+    required String sessionId,
     required List<ChatMessage> conversation,
     required String content,
     required void Function(String delta) onTextDelta,
@@ -116,9 +117,10 @@ class RemoteSessionController {
         .map((msg) => chatMessageToMap(msg, id: '', sessionId: ''))
         .toList();
 
-    // Send run command with projectId
+    // Send run command with sessionId and projectId
     _send({
       'cmd': 'run',
+      'sessionId': sessionId,
       'projectId': projectId,
       'conversation': conversationJson,
       'content': content,
@@ -287,6 +289,9 @@ class RemoteSessionController {
       final type = data['t'] as String?;
 
       switch (type) {
+        case 'connected':
+          developer.log('🔌 Connected to server', name: 'RemoteSession');
+
         case 'delta':
           final delta = data['d'] as String? ?? '';
           _onTextDelta?.call(delta);

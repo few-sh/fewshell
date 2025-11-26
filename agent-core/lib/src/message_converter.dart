@@ -71,10 +71,12 @@ Map<String, dynamic> chatMessageToMap(
 }
 
 /// Converts a map (from database/JSON) to a ChatMessage
+/// Handles both snake_case (from old database) and camelCase (from server API)
 ChatMessage mapToChatMessage(Map<String, dynamic> map) {
-  final userId = map['user_id'] as String;
+  // Support both snake_case and camelCase keys
+  final userId = (map['user_id'] ?? map['userId']) as String;
   final content = map['content'] as String;
-  final kindIndex = map['message_kind'] as int;
+  final kindIndex = (map['message_kind'] ?? map['messageKind']) as int;
   final kind = MessageKind.values[kindIndex];
   final role = _roleFromUserId(userId);
 
@@ -85,17 +87,19 @@ ChatMessage mapToChatMessage(Map<String, dynamic> map) {
           : ChatMessage.assistant(content);
 
     case MessageKind.imageUrl:
-      final imageUrl = map['image_url'] as String;
+      final imageUrl = (map['image_url'] ?? map['imageUrl']) as String;
       return ChatMessage.imageUrl(role: role, url: imageUrl, content: content);
 
     case MessageKind.toolUse:
-      final toolCallsJson = map['tool_calls_json'] as String?;
+      final toolCallsJson =
+          (map['tool_calls_json'] ?? map['toolCallsJson']) as String?;
       final toolCalls =
           toolCallsJson != null ? _parseToolCalls(toolCallsJson) : <ToolCall>[];
       return ChatMessage.toolUse(toolCalls: toolCalls, content: content);
 
     case MessageKind.toolResult:
-      final toolResultsJson = map['tool_results_json'] as String?;
+      final toolResultsJson =
+          (map['tool_results_json'] ?? map['toolResultsJson']) as String?;
       final results = toolResultsJson != null
           ? _parseToolCalls(toolResultsJson)
           : <ToolCall>[];
