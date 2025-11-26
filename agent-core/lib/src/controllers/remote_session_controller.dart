@@ -453,6 +453,16 @@ class RemoteSessionController implements SessionController {
         // Message events
         case 'messages':
           _handleMessagesReceived(msg);
+
+        case 'message_result':
+          _handleMessageResult(msg);
+
+        case 'messages_deleted':
+          _handleMessagesDeleted(msg);
+
+        case 'message_updated':
+          // Acknowledgment only, no action needed
+          break;
       }
     } catch (e) {
       developer.log('❌ Error handling message: $e', name: 'RemoteSession');
@@ -574,6 +584,36 @@ class RemoteSessionController implements SessionController {
     if (reqId != null) {
       final completer = _pendingRequests.remove(reqId);
       completer?.complete(messages);
+    }
+  }
+
+  void _handleMessageResult(Map<String, dynamic> msg) {
+    final reqId = msg['reqId'] as String?;
+    if (reqId == null) return;
+
+    final completer = _pendingRequests.remove(reqId);
+    if (completer == null) return;
+
+    final msgData = msg['message'] as Map<String, dynamic>?;
+    if (msgData == null) {
+      completer.complete(null);
+    } else {
+      completer.complete(Message.fromJson(msgData));
+    }
+  }
+
+  void _handleMessagesDeleted(Map<String, dynamic> msg) {
+    final reqId = msg['reqId'] as String?;
+    if (reqId == null) return;
+
+    final completer = _pendingRequests.remove(reqId);
+    final deleted = msg['deleted'] as int? ?? 0;
+    completer?.complete(deleted);
+
+    // Refresh messages for this session
+    final sessionId = msg['sessionId'] as String?;
+    if (sessionId != null) {
+      _fetchAndEmitMessages(sessionId);
     }
   }
 
