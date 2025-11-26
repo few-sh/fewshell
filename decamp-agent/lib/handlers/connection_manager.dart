@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:agent_core/agent_core.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../database/server_database.dart';
 import '../stores/toml_project_data_store.dart';
 
 /// Manages WebSocket connections and broadcasts to clients.
@@ -11,7 +13,10 @@ class ConnectionManager {
   static final ConnectionManager instance = ConnectionManager._();
   ConnectionManager._();
 
-  /// Shared data store
+  /// SQLite session store for sessions and messages
+  late final SessionStore sessionStore = SqliteSessionStore.openDefault();
+
+  /// TOML-based data store for settings, snippets, secrets
   final TomlProjectDataStore dataStore = TomlProjectDataStore();
 
   /// Map of projectId -> list of connected WebSocket clients

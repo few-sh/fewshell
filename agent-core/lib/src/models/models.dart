@@ -7,9 +7,13 @@
 // - Snippet - Reusable text snippets
 // - SecretMetadata - Secret metadata (values stored separately)
 // - Secret - Secret with value (server-side only)
+// - Session - Chat session metadata
+// - Message - Chat message with tool call support
 
 export 'llm_settings.dart';
 export 'ssh_settings.dart';
 export 'project_settings.dart';
 export 'snippet.dart';
 export 'secret.dart';
+export 'session.dart';
+export 'message.dart';

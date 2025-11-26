@@ -2,13 +2,10 @@ import 'dart:convert';
 
 import 'package:llm_dart/llm_dart.dart';
 
-/// Message kind enum - matches the client database schema
-enum MessageKind {
-  text, // 0
-  imageUrl, // 1
-  toolUse, // 2
-  toolResult, // 3
-}
+import 'models/message.dart';
+
+// Re-export MessageKind for backwards compatibility
+export 'models/message.dart' show MessageKind;
 
 /// User ID constants
 const String kUserUserId = 'user';
