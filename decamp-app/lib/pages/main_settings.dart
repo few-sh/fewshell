@@ -137,6 +137,11 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           .read(projectImporterProvider)
           .importFromQrCode(result, targetProjectId: projectId);
 
+      // Force refresh of the providers to show newly imported settings
+      ref.invalidate(projectLlmSettingsProvider(projectId));
+      ref.invalidate(projectSshSettingsProvider(projectId));
+      ref.invalidate(projectSettingsProvider(projectId));
+
       if (mounted) _showSnack('Project configured successfully');
     } catch (e) {
       if (mounted) _showSnack('Error configuring project: $e');

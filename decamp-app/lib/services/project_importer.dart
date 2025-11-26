@@ -171,10 +171,15 @@ class ProjectImporter {
     final apiKey = _getValue<String>(source, ['k', 'key', 'api_key']);
     final baseUrl = _getValue<String>(source, ['url', 'base_url']);
 
-    if (providerCode == null || apiKey == null) return;
+    if (providerCode == null || apiKey == null) {
+      return;
+    }
 
     final apiType = LlmApiType.fromCode(providerCode);
-    if (apiType == null) return;
+    
+    if (apiType == null) {
+      throw Exception('Unknown provider code: $providerCode');
+    }
 
     final modelId = apiType.defaultModelId;
     final url = baseUrl ?? apiType.defaultBaseUrl;
