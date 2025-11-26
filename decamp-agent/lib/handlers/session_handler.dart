@@ -398,20 +398,87 @@ class SessionHandler {
     }
   }
 
-  /// Creates LLM client from environment
+  /// Creates LLM client from project settings
   Future<ChatCapability?> _createLlmClient() async {
-    final apiKey = Platform.environment['OPENAI_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
+    if (_projectId == null) {
+      developer.log('⚠️ No project ID set', name: 'SessionHandler');
+      return null;
+    }
+
+    // Get project settings from TOML store
+    final settings = await _connManager.dataStore.getSettings(_projectId!);
+    if (settings == null) {
       developer.log(
-        '⚠️ OPENAI_API_KEY not set',
+        '⚠️ No settings found for project: $_projectId',
         name: 'SessionHandler',
       );
       return null;
     }
 
-    final model = Platform.environment['OPENAI_MODEL'] ?? 'gpt-4o-mini';
+    // Get the default LLM configuration
+    final llmConfig = settings.defaultLlm;
+    if (llmConfig == null) {
+      developer.log(
+        '⚠️ No LLM configured for project: $_projectId',
+        name: 'SessionHandler',
+      );
+      return null;
+    }
 
-    return await LLMBuilder().openai().apiKey(apiKey).model(model).build();
+    // Get API key from secrets
+    String? apiKey;
+    if (llmConfig.apiKeySecretId != null) {
+      apiKey = await _connManager.dataStore.getSecretValue(
+        llmConfig.apiKeySecretId!,
+      );
+    }
+
+    if (apiKey == null || apiKey.isEmpty) {
+      developer.log(
+        '⚠️ No API key found for LLM: ${llmConfig.identifier}',
+        name: 'SessionHandler',
+      );
+      return null;
+    }
+
+    developer.log(
+      '🤖 Creating LLM client: ${llmConfig.provider}/${llmConfig.model}',
+      name: 'SessionHandler',
+    );
+
+    // Build LLM client based on provider
+    final builder = LLMBuilder();
+
+    switch (llmConfig.provider.toLowerCase()) {
+      case 'openai':
+        builder.openai();
+      case 'anthropic':
+        builder.anthropic();
+      case 'google':
+        builder.google();
+      case 'openrouter':
+        builder.openRouter();
+      default:
+        // Default to OpenAI-compatible with custom base URL
+        builder.openai();
+    }
+
+    builder.apiKey(apiKey).model(llmConfig.model);
+
+    // Set base URL if provided
+    if (llmConfig.baseUrl.isNotEmpty) {
+      builder.baseUrl(llmConfig.baseUrl);
+    }
+
+    // Set optional parameters
+    if (llmConfig.maxTokens != null) {
+      builder.maxTokens(llmConfig.maxTokens!);
+    }
+    if (llmConfig.temperature != null) {
+      builder.temperature(llmConfig.temperature!);
+    }
+
+    return await builder.build();
   }
 
   void _send(Map<String, dynamic> data) {
