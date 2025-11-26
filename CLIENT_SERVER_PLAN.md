@@ -563,7 +563,7 @@ Server needs to store project data (settings, snippets, secrets) to run agent lo
 - Wire up settings/snippets/secrets UI to detect remote and use appropriate source
 - End-to-end test: Configure LLM, add snippet, add secret, run agent loop, verify multi-client sync
 
-### Phase 4: Quake-Style Architecture (CURRENT) ✅
+### Phase 4: Quake-Style Architecture ✅
 
 **Problem:** We were heading toward code duplication between client (Drift) and server (SQLite).
 
@@ -611,7 +611,7 @@ Server needs to store project data (settings, snippets, secrets) to run agent lo
 
 **Key insight:** No Drift needed! `StreamController` fires on writes for reactive updates. Same pattern works for both local (direct) and remote (WebSocket push).
 
-### Phase 5: Client Integration (IN PROGRESS)
+### Phase 5: Client Integration ✅
 
 Wire up decamp-app to use the new architecture:
 
@@ -639,7 +639,9 @@ Implemented `SessionController` interface with WebSocket transport in agent-core
 - `watchSessions()` → Subscribe to server, fire stream on push
 - `watchMessages()` → Subscribe to server, fire stream on push  
 - `sendMessage()` → Send via WebSocket, handle streaming response
-- Handle `delta`, `approval`, `message`, `done` events
+- `continueConversation()` → Resume agent loop without adding user message (for edit/resend)
+- `getMessage()`, `updateMessageContent()`, `deleteMessagesAfter()` → Message editing support
+- Handle `delta`, `approval`, `message`, `done`, `message_result`, `messages_deleted` events
 
 **5.4 Create SessionController provider:** ✅
 Created `session_controller_provider.dart` in decamp-app:
@@ -649,21 +651,24 @@ Created `session_controller_provider.dart` in decamp-app:
 - `controllerMessagesProvider` - Watch messages via controller
 - Added `createClient()` method to `LlmService` for agent-core integration
 
-**5.5 Update UI to use SessionController:** (TODO)
-- Replace direct Drift/database calls with `SessionController` methods
-- UI doesn't know/care if local or remote
-- Same reactive streams work either way
+**5.5 Simplify ChatController to use SessionController:** ✅
+Refactored `ChatController` from 817 lines to ~280 lines:
+- Removed all legacy fields (`_messageDao`, `_sessionDao`, `_llmService`, `_shellService`, etc.)
+- Single constructor requiring only `SessionController`
+- `sendMessage()` delegates to `SessionController.sendMessage()`
+- `editMessage()` and `resendMessage()` use `SessionController.continueConversation()`
+- ChatController is now a thin UI state layer (loading, streaming text, errors)
+- Same code path works for both local and remote projects
 
-**5.6 Settings/Snippets/Secrets UI:** (TODO)
-- Detect if project is remote
-- Use `RemoteSessionController` for remote data
-- Use local database for local data
-- Keep existing UI components
+**5.6 Settings/Snippets/Secrets:** ✅
+- `RemoteAgentClient` handles settings/snippets/secrets sync for remote projects
+- Local projects use existing database/keychain
+- `ProjectLlmSettingsNotifier` detects remote and uses appropriate source
 
-**5.7 Remove Drift (optional, after migration):** (Future)
-- Once `SqliteSessionStore` is working for local
-- Remove Drift dependency and code generation
-- Simpler build, single SQLite implementation
+**5.7 Server command handlers:** ✅
+Added all message editing commands to decamp-agent:
+- `get_message`, `update_message`, `delete_messages_after`
+- `continue` - Resume agent loop (for edit/resend operations)
 
 ### Phase 6: Cache & Offline (TODO)
 
@@ -780,14 +785,94 @@ One active session = one WebSocket. Close old connection when switching sessions
 **Must have:**
 - ✅ Send message → get AI response (local and remote)
 - ✅ Tool approval flow works
-- ✅ Offline viewing of cached sessions
-- ✅ Reconnection recovers cleanly
+- ✅ Edit message and resend from that point
+- ✅ Settings/snippets/secrets sync for remote projects
+- ⏳ Offline viewing of cached sessions (Phase 6)
+- ⏳ Reconnection recovers cleanly (Phase 7)
 
 **Nice to have (later):**
+- Branch session (create copy of conversation at a point)
 - Team collaboration (shared remote sessions)
 - Real-time badges
 - Streaming tool output
 - Multi-person approvals
+
+---
+
+## Current Architecture (Post-Refactor)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           decamp-app                                     │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐   │
+│  │                           UI Layer                                │   │
+│  │  ChatSession, ProjectSettings, SnippetsPage, SecretsPage, etc.   │   │
+│  └──────────────────────────────────┬───────────────────────────────┘   │
+│                                     │                                    │
+│  ┌──────────────────────────────────▼───────────────────────────────┐   │
+│  │                      ChatController                               │   │
+│  │  - Thin UI state layer (~280 lines)                              │   │
+│  │  - Manages: isLoading, streamingText, error                      │   │
+│  │  - Delegates all execution to SessionController                   │   │
+│  └──────────────────────────────────┬───────────────────────────────┘   │
+│                                     │                                    │
+│  ┌──────────────────────────────────▼───────────────────────────────┐   │
+│  │              sessionControllerProvider                            │   │
+│  │  Returns LocalSessionController or RemoteSessionController        │   │
+│  │  based on project.serverUrl (null = local, URL = remote)         │   │
+│  └───────────┬─────────────────────────────────────┬────────────────┘   │
+│              │                                     │                     │
+│       Local Project                          Remote Project              │
+│              │                                     │                     │
+│  ┌───────────▼───────────┐           ┌─────────────▼─────────────┐     │
+│  │ LocalSessionController │           │ RemoteSessionController   │     │
+│  │ (agent-core)           │           │ (agent-core → WebSocket)  │     │
+│  └───────────┬───────────┘           └─────────────┬─────────────┘     │
+│              │                                     │                     │
+│  ┌───────────▼───────────┐                         │                     │
+│  │  SqliteSessionStore   │                         │                     │
+│  │  (agent-core)         │                         │                     │
+│  └───────────────────────┘                         │                     │
+│                                                    │                     │
+│  ┌─────────────────────────────────────────────────┼─────────────────┐  │
+│  │                   RemoteAgentClient             │                  │  │
+│  │  - Settings/Snippets/Secrets sync ◄────────────┘                  │  │
+│  │  - Separate from SessionController (different concerns)           │  │
+│  └───────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────┘
+
+                                    │
+                                    │ WebSocket
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          decamp-agent                                    │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                     SessionHandler                               │    │
+│  │  Commands: run, continue, approve, cancel                        │    │
+│  │  Commands: get/create/update/delete_session                     │    │
+│  │  Commands: get_messages, get_message, update_message,           │    │
+│  │            delete_messages_after                                 │    │
+│  │  Commands: get/set_settings, get/set/delete_snippet/secret      │    │
+│  └──────────────────────────────┬──────────────────────────────────┘    │
+│                                 │                                        │
+│  ┌──────────────────────────────▼──────────────────────────────────┐    │
+│  │                    agent-core                                    │    │
+│  │  - runAgentLoop() - The 8-line agent loop                       │    │
+│  │  - SqliteSessionStore - Same implementation as client           │    │
+│  │  - ShellExecutor, FetchExecutor - Tool execution                │    │
+│  │  - Models: Session, Message, ProjectSettings, etc.              │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                                                          │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                  TomlProjectDataStore                            │    │
+│  │  Stores settings/snippets/secrets in ~/.decamp/projects/{id}/   │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key insight (Quake model):** Same `SessionController` interface for both local and remote. UI doesn't know which transport is being used. Only ~280 lines of UI state management in ChatController - everything else is delegated to the unified interface.
 
 ---
 
