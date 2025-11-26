@@ -1,6 +1,9 @@
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
-import 'package:agent_core/agent_core.dart';
+
+import '../database/database.dart';
+import '../database/tables/messages_table.dart';
+import '../utils/id_generator.dart';
 
 /// Extensions for ChatMessage to support conversion to database entities
 extension ChatMessageToDB on ChatMessage {
@@ -92,22 +95,21 @@ extension MessageEntityToChat on MessageEntity {
 
     return switch (messageKind) {
       MessageKind.toolUse => ChatMessage.toolUse(
-        toolCalls: toolCallsJson ?? [],
-        content: content,
-      ),
+          toolCalls: toolCallsJson ?? [],
+          content: content,
+        ),
       MessageKind.toolResult => ChatMessage.toolResult(
-        results: toolResultsJson ?? [],
-        content: content,
-      ),
+          results: toolResultsJson ?? [],
+          content: content,
+        ),
       MessageKind.imageUrl => ChatMessage.imageUrl(
-        role: role,
-        url: imageUrl!,
-        content: content,
-      ),
-      MessageKind.text =>
-        role == ChatRole.user
-            ? ChatMessage.user(content)
-            : ChatMessage.assistant(content),
+          role: role,
+          url: imageUrl!,
+          content: content,
+        ),
+      MessageKind.text => role == ChatRole.user
+          ? ChatMessage.user(content)
+          : ChatMessage.assistant(content),
     };
   }
 

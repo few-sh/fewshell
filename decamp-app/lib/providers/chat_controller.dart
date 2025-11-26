@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
-import '../extensions/chat_message_extensions.dart';
 import '../services/llm_service.dart';
 import '../services/shell_service.dart';
 import '../providers/database_provider.dart';

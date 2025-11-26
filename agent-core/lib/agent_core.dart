@@ -31,3 +31,6 @@ export 'src/database/daos/project_dao.dart';
 export 'src/database/daos/session_dao.dart';
 export 'src/database/daos/snippet_dao.dart';
 export 'src/database/converters/tool_call_converter.dart';
+
+// Extensions
+export 'src/extensions/chat_message_extensions.dart';
