@@ -46,19 +46,18 @@ print_banner() {
     echo -e "Explanation of script at https://get.few.sh/explain"
     echo -e ""
     echo -e "${BOLD}Steps that follow:${RESET}"
-    echo -e "  ${GREEN}1.${RESET} Name your project"
-    echo -e "  ${GREEN}2.${RESET} Detect the public IP address"
-    echo -e "  ${GREEN}3.${RESET} Configure LLM provider and API keys"
-    echo -e "      ${DIM}Optionally you can search for API keys in this host${RESET}"
+    echo -e "  ${GREEN}1.${RESET} Name your project ${DIM}(auto-detect, manual, or skip)${RESET}"
+    echo -e "  ${GREEN}2.${RESET} Configure IP address ${DIM}(auto-detect, manual, or skip)${RESET}"
+    echo -e "  ${GREEN}3.${RESET} Configure LLM provider and API keys ${DIM}(search, manual, or skip)${RESET}"
     echo -e "      ${DIM}(Use --all-keys flag to search for more)${RESET}"
-    echo -e "  ${GREEN}4.${RESET} Create SSH key pair (few.sh)"
-    echo -e "  ${GREEN}5.${RESET} Generate QR codes with all information"
+    echo -e "  ${GREEN}4.${RESET} Configure SSH key ${DIM}(create, select, paste, or skip)${RESET}"
+    echo -e "  ${GREEN}5.${RESET} Generate QR code with selected information"
     echo -e ""
 }
 
 get_project_name() {
     # Determine default project name
-    local default_name="skip"
+    local default_name=""
 
     # Try to get GitHub repo name first
     if [ -d .git ]; then
@@ -66,12 +65,12 @@ get_project_name() {
         repo_url=$(git config --get remote.origin.url 2>/dev/null || echo "")
         if [ -n "$repo_url" ]; then
             # Extract repo name from various URL formats
-            default_name=$(basename "$repo_url" .git 2>/dev/null || echo "skip")
+            default_name=$(basename "$repo_url" .git 2>/dev/null || echo "")
         fi
     fi
 
     # Fallback to hostname if GitHub repo name not found
-    if [ "$default_name" = "skip" ]; then
+    if [ -z "$default_name" ]; then
         local hostname_val
         hostname_val=$(hostname 2>/dev/null || echo "")
         if [ -n "$hostname_val" ]; then
@@ -83,24 +82,86 @@ get_project_name() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo -e "${BOLD}📝 Project Name${RESET}"
     echo -e ""
-    read -p "$(echo -e "${YELLOW}Enter project name${RESET} [${GREEN}${default_name}${RESET}]: ")" input_name < /dev/tty
+    echo -e "  ${YELLOW}1.${RESET} Use auto-detected name: ${GREEN}${default_name:-N/A}${RESET}"
+    echo -e "  ${YELLOW}2.${RESET} Enter manually"
+    echo -e "  ${YELLOW}3.${RESET} Skip (no project name)"
+    echo -e ""
+    read -p "$(echo -e "${YELLOW}Select option${RESET} [${GREEN}1${RESET}]: ")" name_choice < /dev/tty
+    echo ""
 
-    # Use default if empty
-    if [ -z "$input_name" ]; then
-        PROJECT_NAME="$default_name"
-    else
-        PROJECT_NAME="$input_name"
-    fi
+    case "${name_choice:-1}" in
+        1)
+            PROJECT_NAME="$default_name"
+            if [ -n "$PROJECT_NAME" ]; then
+                echo -e "${GREEN}✓${RESET} Project name: ${BOLD}${PROJECT_NAME}${RESET}"
+            else
+                echo -e "${DIM}No auto-detected name available, skipping.${RESET}"
+            fi
+            ;;
+        2)
+            read -p "$(echo -e "${YELLOW}Enter project name${RESET}: ")" input_name < /dev/tty
+            PROJECT_NAME="$input_name"
+            if [ -n "$PROJECT_NAME" ]; then
+                echo -e "${GREEN}✓${RESET} Project name: ${BOLD}${PROJECT_NAME}${RESET}"
+            else
+                echo -e "${DIM}No name entered, skipping.${RESET}"
+            fi
+            ;;
+        3)
+            PROJECT_NAME=""
+            echo -e "${DIM}Skipping project name.${RESET}"
+            ;;
+        *)
+            echo -e "${DIM}Invalid option, skipping.${RESET}"
+            PROJECT_NAME=""
+            ;;
+    esac
 
-    echo -e "${GREEN}✓${RESET} Project name: ${BOLD}${PROJECT_NAME}${RESET}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
 }
 
 get_public_ip() {
-    echo -e "${BLUE}🌐 Detecting public IP address...${RESET}"
-    EXTERNAL_IP=$(curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://api.ipify.org || echo "Unavailable")
-    echo -e "${GREEN}✓${RESET} IP Address: ${BOLD}${EXTERNAL_IP}${RESET}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${BOLD}🌐 IP Address / Hostname${RESET}"
+    echo -e ""
+    echo -e "  ${YELLOW}1.${RESET} Auto-detect public IP"
+    echo -e "  ${YELLOW}2.${RESET} Enter manually (IP or hostname)"
+    echo -e "  ${YELLOW}3.${RESET} Skip (no IP/hostname)"
+    echo -e ""
+    read -p "$(echo -e "${YELLOW}Select option${RESET} [${GREEN}1${RESET}]: ")" ip_choice < /dev/tty
+    echo ""
+
+    case "${ip_choice:-1}" in
+        1)
+            echo -e "${BLUE}Detecting public IP address...${RESET}"
+            EXTERNAL_IP=$(curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://api.ipify.org || echo "")
+            if [ -n "$EXTERNAL_IP" ]; then
+                echo -e "${GREEN}✓${RESET} IP Address: ${BOLD}${EXTERNAL_IP}${RESET}"
+            else
+                echo -e "${YELLOW}⚠${RESET}  Could not detect IP address, skipping."
+            fi
+            ;;
+        2)
+            read -p "$(echo -e "${YELLOW}Enter IP address or hostname${RESET}: ")" manual_ip < /dev/tty
+            EXTERNAL_IP="$manual_ip"
+            if [ -n "$EXTERNAL_IP" ]; then
+                echo -e "${GREEN}✓${RESET} IP/Hostname: ${BOLD}${EXTERNAL_IP}${RESET}"
+            else
+                echo -e "${DIM}No IP/hostname entered, skipping.${RESET}"
+            fi
+            ;;
+        3)
+            EXTERNAL_IP=""
+            echo -e "${DIM}Skipping IP/hostname.${RESET}"
+            ;;
+        *)
+            echo -e "${DIM}Invalid option, skipping.${RESET}"
+            EXTERNAL_IP=""
+            ;;
+    esac
+
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
 }
 
@@ -287,20 +348,91 @@ select_provider() {
 }
 
 configure_ssh() {
-    echo -e "${BLUE}🔐 Configuring SSH keys...${RESET}"
-    local key_file="$HOME/.ssh/few.sh"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+    echo -e "${BOLD}🔐 SSH Key Configuration${RESET}"
+    echo -e ""
+    echo -e "  ${YELLOW}1.${RESET} Create/use few.sh key (recommended)"
+    echo -e "  ${YELLOW}2.${RESET} Select existing key from ~/.ssh/"
+    echo -e "  ${YELLOW}3.${RESET} Paste private key manually"
+    echo -e "  ${YELLOW}4.${RESET} Skip (no SSH key)"
+    echo -e ""
+    read -p "$(echo -e "${YELLOW}Select option${RESET} [${GREEN}1${RESET}]: ")" ssh_choice < /dev/tty
+    echo ""
+
     mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
 
-    if [ ! -f "$key_file" ]; then
-        ssh-keygen -t ed25519 -f "$key_file" -N "" -q
-        echo -e "${GREEN}✓${RESET} Created new SSH key pair"
-    else
-        echo -e "${GREEN}✓${RESET} Using existing SSH key pair"
-    fi
+    case "${ssh_choice:-1}" in
+        1)
+            local key_file="$HOME/.ssh/few.sh"
+            if [ ! -f "$key_file" ]; then
+                ssh-keygen -t ed25519 -f "$key_file" -N "" -q
+                echo -e "${GREEN}✓${RESET} Created new SSH key pair"
+            else
+                echo -e "${GREEN}✓${RESET} Using existing SSH key pair"
+            fi
+            grep -qF "$(cat "${key_file}.pub")" "$HOME/.ssh/authorized_keys" 2>/dev/null || cat "${key_file}.pub" >> "$HOME/.ssh/authorized_keys"
+            chmod 600 "$HOME/.ssh/authorized_keys"
+            PRIV_KEY=$(cat "$key_file")
+            ;;
+        2)
+            # List available private keys
+            local ssh_keys=()
+            while IFS= read -r key; do
+                # Only include files without .pub extension and that are actual private keys
+                if [[ ! "$key" =~ \.pub$ ]] && [ -f "$key" ]; then
+                    ssh_keys+=("$key")
+                fi
+            done < <(find "$HOME/.ssh" -maxdepth 1 -type f 2>/dev/null)
 
-    grep -qF "$(cat "${key_file}.pub")" "$HOME/.ssh/authorized_keys" 2>/dev/null || cat "${key_file}.pub" >> "$HOME/.ssh/authorized_keys"
-    chmod 600 "$HOME/.ssh/authorized_keys"
-    PRIV_KEY=$(cat "$key_file")
+            if [ ${#ssh_keys[@]} -eq 0 ]; then
+                echo -e "${YELLOW}⚠${RESET}  No SSH keys found in ~/.ssh/"
+                echo -e "${DIM}Skipping SSH configuration.${RESET}"
+                PRIV_KEY=""
+            else
+                echo -e "${BLUE}Available SSH keys:${RESET}"
+                echo ""
+                for i in "${!ssh_keys[@]}"; do
+                    echo -e "  ${YELLOW}[$((i+1))]${RESET} $(basename "${ssh_keys[$i]}")"
+                done
+                echo ""
+                read -p "$(echo -e "${YELLOW}Select key by number${RESET}: ")" key_num < /dev/tty
+                echo ""
+                if [[ "$key_num" =~ ^[0-9]+$ ]] && [ "$key_num" -ge 1 ] && [ "$key_num" -le "${#ssh_keys[@]}" ]; then
+                    local selected_key="${ssh_keys[$((key_num-1))]}"
+                    PRIV_KEY=$(cat "$selected_key")
+                    echo -e "${GREEN}✓${RESET} Selected: ${BOLD}$(basename "$selected_key")${RESET}"
+                    # Add to authorized_keys if public key exists
+                    if [ -f "${selected_key}.pub" ]; then
+                        grep -qF "$(cat "${selected_key}.pub")" "$HOME/.ssh/authorized_keys" 2>/dev/null || cat "${selected_key}.pub" >> "$HOME/.ssh/authorized_keys"
+                        chmod 600 "$HOME/.ssh/authorized_keys"
+                    fi
+                else
+                    echo -e "${DIM}Invalid selection, skipping.${RESET}"
+                    PRIV_KEY=""
+                fi
+            fi
+            ;;
+        3)
+            echo -e "${YELLOW}Paste your private key (Press Ctrl+D when done):${RESET}"
+            PRIV_KEY=$(cat < /dev/tty)
+            echo ""
+            if [ -n "$PRIV_KEY" ]; then
+                echo -e "${GREEN}✓${RESET} Using manually entered private key"
+            else
+                echo -e "${DIM}No key entered, skipping.${RESET}"
+            fi
+            ;;
+        4)
+            PRIV_KEY=""
+            echo -e "${DIM}Skipping SSH configuration.${RESET}"
+            ;;
+        *)
+            echo -e "${DIM}Invalid option, skipping.${RESET}"
+            PRIV_KEY=""
+            ;;
+    esac
+
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
 }
 
@@ -309,12 +441,19 @@ print_final_report() {
     echo -e "║                       ${BOLD}HOST INFORMATION${RESET}${CYAN}                     ║"
     echo -e "╚════════════════════════════════════════════════════════════╝${RESET}"
     echo -e ""
-    echo -e "${BOLD}${MAGENTA}📋 Project Name${RESET}"
-    echo -e "   ${PROJECT_NAME}"
-    echo -e ""
-    echo -e "${BOLD}${BLUE}🌐 External IP Address${RESET}"
-    echo -e "   ${EXTERNAL_IP}"
-    echo -e ""
+    
+    if [ -n "$PROJECT_NAME" ]; then
+        echo -e "${BOLD}${MAGENTA}📋 Project Name${RESET}"
+        echo -e "   ${PROJECT_NAME}"
+        echo -e ""
+    fi
+    
+    if [ -n "$EXTERNAL_IP" ]; then
+        echo -e "${BOLD}${BLUE}🌐 External IP Address${RESET}"
+        echo -e "   ${EXTERNAL_IP}"
+        echo -e ""
+    fi
+    
     echo -e "${BOLD}${YELLOW}🔑 API Key${RESET}"
     if [ -n "$SEL_LABEL" ]; then
         echo -e "   Source: ${SEL_LABEL}"
@@ -324,35 +463,62 @@ print_final_report() {
         echo -e "   Key:    ${DIM}N/A${RESET}"
     fi
     echo -e ""
-    echo -e "${BOLD}${GREEN}🔐 SSH Private Key${RESET}"
-    echo -e "   ${DIM}Copy the block below to your local machine to access this host${RESET}"
-    echo -e "   ${DIM}Usage: ssh -i <your-key-file> $USER@$EXTERNAL_IP${RESET}"
-    echo -e ""
-    echo -e "${DIM}$PRIV_KEY${RESET}"
-    echo -e ""
+    
+    if [ -n "$PRIV_KEY" ]; then
+        echo -e "${BOLD}${GREEN}🔐 SSH Private Key${RESET}"
+        if [ -n "$EXTERNAL_IP" ]; then
+            echo -e "   ${DIM}Copy the block below to your local machine to access this host${RESET}"
+            echo -e "   ${DIM}Usage: ssh -i <your-key-file> $USER@$EXTERNAL_IP${RESET}"
+        else
+            echo -e "   ${DIM}Copy the block below to your local machine${RESET}"
+        fi
+        echo -e ""
+        echo -e "${DIM}$PRIV_KEY${RESET}"
+        echo -e ""
+    fi
+    
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 }
 
 generate_qr_code() {
-    if command -v qrencode >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    if command -v qrencode > /dev/null 2>&1 && command -v jq > /dev/null 2>&1; then
         echo ""
         echo -e "${BLUE}📱 Generating QR Code...${RESET}"
         echo ""
 
+        # Build QR code data with only non-empty fields
         local qr_label=""
-        # Use provider label or extract from selected label and strip SSH headers for compact QR
+        local qr_ssh=""
+        local qr_host=""
+        
+        # Prepare label
         if [ -n "$PROVIDER_LABEL" ]; then
             qr_label="$PROVIDER_LABEL"
-        else
+        elif [ -n "$SEL_LABEL" ]; then
             qr_label="${SEL_LABEL%% *}"
             qr_label="${qr_label/OPENAI_API_KEY/openai}"
             qr_label="${qr_label/ANTHROPIC_API_KEY/anthropic}"
             qr_label="${qr_label/GEMINI_API_KEY/google}"
             qr_label="${qr_label/GOOGLE_API_KEY/google}"
         fi
-        local qr_ssh
-        qr_ssh=$(echo "$PRIV_KEY" | grep -v "^-----" | tr -d '\n')
-        local qr_host="$USER@$EXTERNAL_IP"
+        
+        # Prepare SSH key (strip headers for compact QR)
+        if [ -n "$PRIV_KEY" ]; then
+            qr_ssh=$(echo "$PRIV_KEY" | grep -v "^-----" | tr -d '\n')
+        fi
+        
+        # Prepare host
+        if [ -n "$EXTERNAL_IP" ]; then
+            qr_host="$USER@$EXTERNAL_IP"
+        fi
+
+        # Build JSON with only non-empty fields
+        local jq_filter='{}'
+        [ -n "$PROJECT_NAME" ] && jq_filter=$(echo "$jq_filter" | jq '. + {n: env.PROJECT_NAME}')
+        [ -n "$qr_host" ] && jq_filter=$(echo "$jq_filter" | jq '. + {i: env.QR_HOST}')
+        [ -n "$qr_label" ] && jq_filter=$(echo "$jq_filter" | jq '. + {l: env.QR_LABEL}')
+        [ -n "$SEL_VAL" ] && jq_filter=$(echo "$jq_filter" | jq '. + {k: env.SEL_VAL}')
+        [ -n "$qr_ssh" ] && jq_filter=$(echo "$jq_filter" | jq '. + {s: env.QR_SSH}')
 
         # Export variables for jq
         export QR_HOST="$qr_host"
@@ -365,10 +531,24 @@ generate_qr_code() {
         echo -e "║                         ${BOLD}SCAN QR CODE${RESET}${CYAN}                       ║"
         echo -e "╚════════════════════════════════════════════════════════════╝${RESET}"
         echo ""
-        jq -n '{n: env.PROJECT_NAME, i: env.QR_HOST, l: env.QR_LABEL, k: env.SEL_VAL, s: env.QR_SSH}' | qrencode -m 2 -t UTF8
+        echo "$jq_filter" | qrencode -m 2 -t UTF8
         echo ""
         echo -e "${GREEN}✓${RESET} QR Code generated successfully!"
-        echo -e "${DIM}  Fields: n=${PROJECT_NAME}, i=${QR_HOST}, l=${QR_LABEL}, k=<key>, s=<ssh>${RESET}"
+        
+        # Show which fields are included
+        local fields=""
+        [ -n "$PROJECT_NAME" ] && fields="${fields}n=${PROJECT_NAME}, "
+        [ -n "$qr_host" ] && fields="${fields}i=${qr_host}, "
+        [ -n "$qr_label" ] && fields="${fields}l=${qr_label}, "
+        [ -n "$SEL_VAL" ] && fields="${fields}k=<key>, "
+        [ -n "$qr_ssh" ] && fields="${fields}s=<ssh>, "
+        fields="${fields%, }"  # Remove trailing comma
+        
+        if [ -n "$fields" ]; then
+            echo -e "${DIM}  Fields: ${fields}${RESET}"
+        else
+            echo -e "${DIM}  No fields included (all steps were skipped)${RESET}"
+        fi
     else
         echo ""
         echo -e "${YELLOW}⚠${RESET}  Skipping QR code generation (missing dependencies)"
