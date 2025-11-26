@@ -196,7 +196,7 @@ Future<_StreamResult> _streamFromLlm({
   TextDeltaCallback? onTextDelta,
 }) async {
   final buffer = StringBuffer();
-  final toolCalls = <ToolCall>[];
+  final toolCallMap = <String, ToolCall>{};
 
   try {
     await for (final event in llmStream(conversation, tools)) {
@@ -205,8 +205,26 @@ Future<_StreamResult> _streamFromLlm({
           buffer.write(delta);
           onTextDelta?.call(delta);
 
-        case ToolCallDeltaEvent(toolCall: final toolCall):
-          toolCalls.add(toolCall);
+        case ToolCallDeltaEvent(toolCall: final delta):
+          final id = delta.id;
+          if (toolCallMap.containsKey(id)) {
+            // Aggregate arguments
+            final existing = toolCallMap[id]!;
+            final newArgs = existing.function.arguments + delta.function.arguments;
+            
+            // Create updated tool call
+            toolCallMap[id] = ToolCall(
+              id: id,
+              callType: existing.callType,
+              function: FunctionCall(
+                name: existing.function.name, // Name usually comes in first delta
+                arguments: newArgs,
+              ),
+            );
+          } else {
+            // New tool call
+            toolCallMap[id] = delta;
+          }
 
         case ThinkingDeltaEvent():
           // Ignore thinking events for now
@@ -227,7 +245,7 @@ Future<_StreamResult> _streamFromLlm({
 
     return _StreamResult(
       text: buffer.toString(),
-      toolCalls: toolCalls,
+      toolCalls: toolCallMap.values.toList(),
     );
   } catch (e) {
     return _StreamResult(
