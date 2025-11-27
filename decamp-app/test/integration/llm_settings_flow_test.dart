@@ -3,7 +3,7 @@ import 'package:decamp/providers/llm_settings_provider.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:agent_core/src/services/keychain_service.dart';
-import 'package:decamp/services/llm_service.dart';
+import 'package:decamp/providers/llm_service_provider.dart';
 import 'package:decamp/services/storage/flutter_secure_storage_impl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';

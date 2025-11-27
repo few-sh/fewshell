@@ -1,40 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:agent_core/agent_core.dart';
-import '../providers/llm_settings_provider.dart';
-import '../providers/project_provider.dart';
-import '../providers/settings_provider.dart';
-import '../providers/secret_provider.dart';
-
-/// Provider for the LLM service
-final llmServiceProvider = Provider<LlmService>((ref) {
-  final keychainService = ref.watch(keychainServiceProvider);
-  final currentProject = ref.watch(currentProjectProvider);
-
-  // Watch global settings
-  final globalLlmSettings = ref.watch(globalLlmSettingsProvider);
-  final globalSettings = ref.watch(globalSettingsProvider);
-
-  // Watch project settings if a project is active
-  List<LlmApiSettings> projectLlmSettings = [];
-  ProjectSettings? projectSettings;
-
-  if (currentProject != null) {
-    projectLlmSettings = ref.watch(
-      projectLlmSettingsProvider(currentProject.id),
-    );
-    projectSettings = ref.watch(projectSettingsProvider(currentProject.id));
-  }
-
-  return LlmService(
-    keychainService: keychainService,
-    currentProjectId: currentProject?.id,
-    projectLlmSettings: projectLlmSettings,
-    projectSettings: projectSettings,
-    globalLlmSettings: globalLlmSettings,
-    globalSettings: globalSettings,
-  );
-});
 
 /// Service for interacting with LLM APIs using llm_dart
 ///
