@@ -1,4 +1,10 @@
-import 'package:agent_core/agent_core.dart';
+import 'database.dart';
+import 'daos/project_dao.dart';
+import 'daos/session_dao.dart';
+import 'daos/message_dao.dart';
+import 'daos/snippet_dao.dart';
+import 'daos/project_snippet_dao.dart';
+import 'entities/snippet_entity.dart';
 
 /// Facade to unify access to GlobalDatabase and ProjectDatabase.
 /// Maintains API compatibility with the old AppDatabase where possible.
@@ -12,14 +18,16 @@ class DatabaseFacade {
   ProjectDao get projectDao => globalDatabase.projectDao;
 
   SessionDao get sessionDao {
-    if (projectDatabase == null)
+    if (projectDatabase == null) {
       throw Exception("No project selected or project database not loaded");
+    }
     return projectDatabase!.sessionDao;
   }
 
   MessageDao get messageDao {
-    if (projectDatabase == null)
+    if (projectDatabase == null) {
       throw Exception("No project selected or project database not loaded");
+    }
     return projectDatabase!.messageDao;
   }
 

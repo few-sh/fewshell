@@ -34,6 +34,7 @@ export 'src/services/toml_settings_service.dart';
 // Database
 export 'src/database/database.dart';
 export 'src/database/project_database.dart';
+export 'src/database/database_facade.dart';
 export 'src/database/entities/snippet_entity.dart';
 export 'src/database/tables/messages_table.dart';
 export 'src/database/tables/projects_table.dart';
