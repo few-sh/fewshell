@@ -11,10 +11,28 @@ final llmServiceProvider = Provider<LlmService>((ref) {
   final keychainService = ref.watch(keychainServiceProvider);
   final currentProject = ref.watch(currentProjectProvider);
 
+  // Watch global settings
+  final globalLlmSettings = ref.watch(globalLlmSettingsProvider);
+  final globalSettings = ref.watch(globalSettingsProvider);
+
+  // Watch project settings if a project is active
+  List<LlmApiSettings> projectLlmSettings = [];
+  ProjectSettings? projectSettings;
+
+  if (currentProject != null) {
+    projectLlmSettings = ref.watch(
+      projectLlmSettingsProvider(currentProject.id),
+    );
+    projectSettings = ref.watch(projectSettingsProvider(currentProject.id));
+  }
+
   return LlmService(
-    ref: ref,
     keychainService: keychainService,
     currentProjectId: currentProject?.id,
+    projectLlmSettings: projectLlmSettings,
+    projectSettings: projectSettings,
+    globalLlmSettings: globalLlmSettings,
+    globalSettings: globalSettings,
   );
 });
 
@@ -24,14 +42,21 @@ final llmServiceProvider = Provider<LlmService>((ref) {
 /// It provides a simple streaming interface for chat interactions.
 /// Conversation state management is handled by the ChatController.
 class LlmService {
-  final Ref ref;
   final KeychainService keychainService;
   final String? currentProjectId;
 
+  final List<LlmApiSettings> projectLlmSettings;
+  final ProjectSettings? projectSettings;
+  final List<LlmApiSettings> globalLlmSettings;
+  final AppSettings globalSettings;
+
   LlmService({
-    required this.ref,
     required this.keychainService,
     this.currentProjectId,
+    required this.projectLlmSettings,
+    required this.projectSettings,
+    required this.globalLlmSettings,
+    required this.globalSettings,
   });
 
   /// Get the active LLM configuration (project-specific or global)
@@ -42,20 +67,18 @@ class LlmService {
 
     // Try project-specific settings first if we have a project
     if (currentProjectId != null) {
-      settings = ref.read(projectLlmSettingsProvider(currentProjectId!));
+      settings = projectLlmSettings;
       projectId = currentProjectId;
-      defaultIdentifier = ref
-          .read(projectSettingsProvider(currentProjectId!))
-          ?.defaultLlmIdentifier;
+      defaultIdentifier = projectSettings?.defaultLlmIdentifier;
     } else {
       settings = [];
     }
 
     // Fall back to global settings if no project settings
     if (settings.isEmpty) {
-      settings = ref.read(globalLlmSettingsProvider);
+      settings = globalLlmSettings;
       projectId = null;
-      defaultIdentifier = ref.read(globalSettingsProvider).defaultLlmIdentifier;
+      defaultIdentifier = globalSettings.defaultLlmIdentifier;
     }
 
     // Try to use the default model if set and enabled
@@ -108,9 +131,6 @@ class LlmService {
 
     // Get project instruction if we have a project
     if (currentProjectId != null) {
-      final projectSettings = ref.read(
-        projectSettingsProvider(currentProjectId!),
-      );
       final projectInstruction = projectSettings?.agentInstruction;
 
       if (projectInstruction != null) {
@@ -148,7 +168,7 @@ class LlmService {
 
   /// Get global instruction for a model
   Future<String?> _getGlobalInstruction(String modelIdentifier) async {
-    final userInstruction = ref.read(globalSettingsProvider).agentInstruction;
+    final userInstruction = globalSettings.agentInstruction;
     if (userInstruction == null) return null;
 
     // Check model override first, then default
@@ -166,9 +186,16 @@ class LlmService {
     }
 
     // Fetch all secret names (global + project merged)
-    final secretsMap = await ref.read(
-      allSecretsProvider(currentProjectId).future,
-    );
+    final globalSecrets = await keychainService.listGlobalSecrets();
+    final Map<String, String> secretsMap = {...globalSecrets};
+
+    if (currentProjectId != null) {
+      final projectSecrets = await keychainService.listProjectSecrets(
+        currentProjectId!,
+      );
+      secretsMap.addAll(projectSecrets);
+    }
+
     final secretNames = secretsMap.keys.toList()..sort();
 
     // Process the template

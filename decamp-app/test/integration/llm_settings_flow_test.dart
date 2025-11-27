@@ -142,7 +142,9 @@ void main() {
 
       // Verify Service still works
       try {
-        isConfigured = await llmService.isConfigured();
+        // Re-read service to get updated settings
+        final updatedLlmService = container.read(llmServiceProvider);
+        isConfigured = await updatedLlmService.isConfigured();
       } catch (e) {
         fail('LlmService failed after rename: $e');
       }
