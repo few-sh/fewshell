@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:path_provider/path_provider.dart';
 import '../utils/default_prompt_loader.dart';
-import '../services/toml_settings_service.dart';
 
 /// Provider for TomlSettingsService
 final tomlSettingsServiceProvider = Provider<TomlSettingsService>((ref) {
-  return TomlSettingsService();
+  return TomlSettingsService(getApplicationDocumentsDirectory);
 });
 
 /// Provider for global app settings

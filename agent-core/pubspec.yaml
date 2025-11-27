@@ -19,6 +19,7 @@ dependencies:
   dartssh2: ^2.9.2
   state_notifier: ^1.0.0
   dio: ^5.9.0
+  toml: ^0.17.0
 
 dev_dependencies:
   lints: ^5.0.0

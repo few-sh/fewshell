@@ -29,6 +29,7 @@ export 'src/services/keychain_service.dart';
 export 'src/services/shell_service.dart';
 export 'src/services/shell_tools_provider.dart';
 export 'src/services/llm_service.dart';
+export 'src/services/toml_settings_service.dart';
 
 // Database
 export 'src/database/database.dart';

@@ -1,7 +1,6 @@
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:toml/toml.dart';
-import 'package:agent_core/agent_core.dart';
+import '../models/settings.dart';
 import 'package:path/path.dart' as p;
 import 'dart:convert';
 
@@ -9,7 +8,11 @@ class TomlSettingsService {
   static const String _globalSettingsFilename = 'settings.toml';
   static const String _projectSettingsFilename = 'settings.toml';
 
-  Future<Directory> get _documentsDir => getApplicationDocumentsDirectory();
+  final Future<Directory> Function() _getBaseDir;
+
+  TomlSettingsService(this._getBaseDir);
+
+  Future<Directory> get _documentsDir => _getBaseDir();
 
   /// Load global settings, migrating from SharedPreferences if necessary
   Future<AppSettings?> loadGlobalSettings() async {
