@@ -22,6 +22,7 @@ dependencies:
   toml: ^0.17.0
   crdt_sync: ^1.0.10
   sqlite_crdt: ^3.0.3
+  sql_crdt: ^3.0.3
 
 dev_dependencies:
   lints: ^5.0.0

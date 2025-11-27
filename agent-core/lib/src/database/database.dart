@@ -1,12 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:crdt/crdt.dart';
-import 'package:llm_dart/llm_dart.dart';
+import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 import 'tables/projects_table.dart';
 import 'tables/snippets_table.dart';
 import 'daos/project_dao.dart';
 import 'daos/snippet_dao.dart';
-import 'converters/tool_call_converter.dart';
 import 'entities/snippet_entity.dart';
 
 export 'project_database.dart';
@@ -59,6 +58,15 @@ class GlobalDatabase extends _$GlobalDatabase {
           'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE)',
         );
       },
+      beforeOpen: (details) async {
+        // Enable foreign keys
+        await customStatement('PRAGMA foreign_keys = ON');
+
+        if (details.wasCreated) {
+          // Seed initial data for development/testing
+          await _seedInitialData();
+        }
+      },
       onUpgrade: (Migrator m, int from, int to) async {
         // Migration from version 1 to 2: Add position column to snippets
         if (from < 2) {
@@ -82,15 +90,6 @@ class GlobalDatabase extends _$GlobalDatabase {
           await customStatement(
             'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
           );
-        }
-      },
-      beforeOpen: (details) async {
-        // Enable foreign keys
-        await customStatement('PRAGMA foreign_keys = ON');
-
-        if (details.wasCreated) {
-          // Seed initial data for development/testing
-          await _seedInitialData();
         }
       },
     );

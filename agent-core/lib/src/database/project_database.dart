@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:crdt/crdt.dart';
+import 'package:sqlite_crdt/sqlite_crdt.dart';
 import 'package:llm_dart/llm_dart.dart';
 
 import 'tables/sessions_table.dart';
@@ -64,6 +65,10 @@ class ProjectDatabase extends _$ProjectDatabase {
           'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE)',
         );
       },
+      beforeOpen: (details) async {
+        // Enable foreign keys
+        await customStatement('PRAGMA foreign_keys = ON');
+      },
       onUpgrade: (Migrator m, int from, int to) async {
         // Migration from version 1 to 2: Add position column to snippets
         if (from < 2) {
@@ -122,10 +127,6 @@ class ProjectDatabase extends _$ProjectDatabase {
         if (from < 5) {
           await m.addColumn(messages, messages.editedAt);
         }
-      },
-      beforeOpen: (details) async {
-        // Enable foreign keys
-        await customStatement('PRAGMA foreign_keys = ON');
       },
     );
   }

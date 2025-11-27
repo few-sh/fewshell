@@ -625,7 +625,7 @@ packages:
     source: hosted
     version: "1.0.1+1"
   sql_crdt:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: sql_crdt
       sha256: db0a4133a63a996d262d7e73b97e6ddc4550f4e3bd2449930627472d622bd946
