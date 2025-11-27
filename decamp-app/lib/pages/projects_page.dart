@@ -6,6 +6,7 @@ import 'package:agent_core/agent_core.dart';
 import '../utils/project_utils.dart';
 import 'project_setup_page.dart';
 import '../components/project_setup_view.dart';
+import '../providers/project_selection_provider.dart';
 
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});

@@ -1,10 +1,11 @@
 import 'package:drift/drift.dart';
-import '../entities/snippet_entity.dart';
 
-/// Snippets table definition for Drift database.
-/// Stores reusable code/command snippets.
-@UseRowClass(SnippetEntity)
-class Snippets extends Table {
+/// Snippets table definition for Project Database.
+/// Maps to the same 'snippets' table but generates a distinct companion class.
+class ProjectSnippets extends Table {
+  @override
+  String get tableName => 'snippets';
+
   /// Unique identifier for the snippet
   TextColumn get id => text()();
 
