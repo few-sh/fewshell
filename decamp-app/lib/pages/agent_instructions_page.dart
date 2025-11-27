@@ -125,34 +125,45 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
   }
 
   Future<void> _saveSettings() async {
-    final settings = ref.read(globalSettingsProvider);
-    final settingsNotifier = ref.read(globalSettingsProvider.notifier);
+    try {
+      final settings = ref.read(globalSettingsProvider);
+      final settingsNotifier = ref.read(globalSettingsProvider.notifier);
 
-    final modelOverrides = <String, String>{};
-    for (var entry in _modelControllers.entries) {
-      if (entry.value.text.trim().isNotEmpty) {
-        modelOverrides[entry.key] = entry.value.text;
+      final modelOverrides = <String, String>{};
+      for (var entry in _modelControllers.entries) {
+        if (entry.value.text.trim().isNotEmpty) {
+          modelOverrides[entry.key] = entry.value.text;
+        }
       }
-    }
 
-    final now = DateTime.now();
-    final newInstruction = AgentInstruction(
-      defaultInstruction: _defaultController.text,
-      modelOverrides: modelOverrides,
-      createdAt: settings.agentInstruction?.createdAt ?? now,
-      updatedAt: now,
-    );
-
-    await settingsNotifier.updateSettings(
-      settings.copyWith(agentInstruction: newInstruction, updatedAt: now),
-    );
-
-    setState(() => _hasChanges = false);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User-level instructions saved')),
+      final now = DateTime.now();
+      final newInstruction = AgentInstruction(
+        defaultInstruction: _defaultController.text,
+        modelOverrides: modelOverrides,
+        createdAt: settings.agentInstruction?.createdAt ?? now,
+        updatedAt: now,
       );
+
+      await settingsNotifier.updateSettings(
+        settings.copyWith(agentInstruction: newInstruction, updatedAt: now),
+      );
+
+      setState(() => _hasChanges = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User-level instructions saved')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving instructions: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -337,42 +348,53 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   }
 
   Future<void> _saveSettings(String projectId) async {
-    final settings = ref.read(projectSettingsProvider(projectId));
-    final settingsNotifier = ref.read(
-      projectSettingsProvider(projectId).notifier,
-    );
-
-    if (settings == null) return;
-
-    final modelOverrides = <String, String>{};
-    for (var entry in _modelControllers.entries) {
-      if (entry.value.text.trim().isNotEmpty) {
-        modelOverrides[entry.key] = entry.value.text;
-      }
-    }
-
-    final now = DateTime.now();
-    final newInstruction = AgentInstruction(
-      defaultInstruction: _defaultController.text,
-      modelOverrides: modelOverrides,
-      createdAt: settings.agentInstruction?.createdAt ?? now,
-      updatedAt: now,
-    );
-
-    await settingsNotifier.updateSettings(
-      settings.copyWith(
-        agentInstruction: newInstruction,
-        includeUserInstructions: _includeUserInstructions,
-        updatedAt: now,
-      ),
-    );
-
-    setState(() => _hasChanges = false);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Project-level instructions saved')),
+    try {
+      final settings = ref.read(projectSettingsProvider(projectId));
+      final settingsNotifier = ref.read(
+        projectSettingsProvider(projectId).notifier,
       );
+
+      if (settings == null) return;
+
+      final modelOverrides = <String, String>{};
+      for (var entry in _modelControllers.entries) {
+        if (entry.value.text.trim().isNotEmpty) {
+          modelOverrides[entry.key] = entry.value.text;
+        }
+      }
+
+      final now = DateTime.now();
+      final newInstruction = AgentInstruction(
+        defaultInstruction: _defaultController.text,
+        modelOverrides: modelOverrides,
+        createdAt: settings.agentInstruction?.createdAt ?? now,
+        updatedAt: now,
+      );
+
+      await settingsNotifier.updateSettings(
+        settings.copyWith(
+          agentInstruction: newInstruction,
+          includeUserInstructions: _includeUserInstructions,
+          updatedAt: now,
+        ),
+      );
+
+      setState(() => _hasChanges = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Project-level instructions saved')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving project instructions: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 

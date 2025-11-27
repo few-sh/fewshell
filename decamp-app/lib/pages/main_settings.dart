@@ -934,15 +934,31 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-  void _setDefaultModel(String identifier, {required bool isGlobal}) {
-    if (isGlobal) {
-      ref.read(globalLlmSettingsProvider.notifier).setDefaultLlm(identifier);
-    } else {
-      final currentProjectId = ref.read(currentProjectIdProvider);
-      if (currentProjectId != null) {
-        ref
-            .read(projectLlmSettingsProvider(currentProjectId).notifier)
+  Future<void> _setDefaultModel(
+    String identifier, {
+    required bool isGlobal,
+  }) async {
+    try {
+      if (isGlobal) {
+        await ref
+            .read(globalLlmSettingsProvider.notifier)
             .setDefaultLlm(identifier);
+      } else {
+        final currentProjectId = ref.read(currentProjectIdProvider);
+        if (currentProjectId != null) {
+          await ref
+              .read(projectLlmSettingsProvider(currentProjectId).notifier)
+              .setDefaultLlm(identifier);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error setting default model: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     }
   }
