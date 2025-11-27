@@ -76,6 +76,7 @@ dependencies:
 
   # SSH Client
   dartssh2: ^2.9.2
+  toml: ^0.17.0
 
 dev_dependencies:
   flutter_test:

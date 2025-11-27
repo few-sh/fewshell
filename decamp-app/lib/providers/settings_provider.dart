@@ -1,38 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:agent_core/agent_core.dart';
 import '../utils/default_prompt_loader.dart';
-import 'theme_provider.dart';
+import '../services/toml_settings_service.dart';
 
-/// Key for storing global settings in SharedPreferences
-const String _globalSettingsKey = 'app_settings';
-
-/// Key prefix for storing project settings in SharedPreferences
-const String _projectSettingsPrefix = 'project_settings_';
+/// Provider for TomlSettingsService
+final tomlSettingsServiceProvider = Provider<TomlSettingsService>((ref) {
+  return TomlSettingsService();
+});
 
 /// Provider for global app settings
 final globalSettingsProvider =
     StateNotifierProvider<GlobalSettingsNotifier, AppSettings>((ref) {
-      final prefs = ref.watch(sharedPreferencesProvider);
-      return GlobalSettingsNotifier(prefs);
+      final tomlService = ref.watch(tomlSettingsServiceProvider);
+      return GlobalSettingsNotifier(tomlService);
     });
 
 /// StateNotifier for global settings
 class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
-  final SharedPreferences _prefs;
+  final TomlSettingsService _tomlService;
 
-  GlobalSettingsNotifier(this._prefs) : super(const AppSettings()) {
+  GlobalSettingsNotifier(this._tomlService) : super(const AppSettings()) {
     _loadSettings();
   }
 
   /// Load settings from persistent storage
   Future<void> _loadSettings() async {
-    final json = _prefs.getString(_globalSettingsKey);
-    if (json != null) {
-      try {
-        final settings = AppSettings.fromJson(jsonDecode(json));
+    try {
+      final settings = await _tomlService.loadGlobalSettings();
 
+      if (settings != null) {
         // If no agent instruction exists, load the default one
         if (settings.agentInstruction == null) {
           final defaultPrompt = await loadDefaultSystemPrompt();
@@ -44,12 +40,12 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
         } else {
           state = settings;
         }
-      } catch (e) {
-        // If loading fails, initialize with default settings and default prompt
+      } else {
+        // No saved settings, initialize with default prompt
         await _initializeWithDefault();
       }
-    } else {
-      // No saved settings, initialize with default prompt
+    } catch (e) {
+      // If loading fails, initialize with default settings and default prompt
       await _initializeWithDefault();
     }
   }
@@ -65,7 +61,7 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
   /// Update settings and persist
   Future<void> updateSettings(AppSettings settings) async {
     state = settings;
-    await _prefs.setString(_globalSettingsKey, jsonEncode(settings.toJson()));
+    await _tomlService.saveGlobalSettings(settings);
   }
 }
 
@@ -76,32 +72,31 @@ final projectSettingsProvider =
       ProjectSettings?,
       String
     >((ref, projectId) {
-      final prefs = ref.watch(sharedPreferencesProvider);
-      return ProjectSettingsNotifier(prefs, projectId);
+      final tomlService = ref.watch(tomlSettingsServiceProvider);
+      return ProjectSettingsNotifier(tomlService, projectId);
     });
 
 /// StateNotifier for project settings
 class ProjectSettingsNotifier extends StateNotifier<ProjectSettings?> {
-  final SharedPreferences _prefs;
+  final TomlSettingsService _tomlService;
   final String _projectId;
 
-  ProjectSettingsNotifier(this._prefs, this._projectId) : super(null) {
+  ProjectSettingsNotifier(this._tomlService, this._projectId) : super(null) {
     _loadSettings();
   }
 
   /// Load settings from persistent storage
-  void _loadSettings() {
-    final key = '$_projectSettingsPrefix$_projectId';
-    final json = _prefs.getString(key);
-    if (json != null) {
-      try {
-        state = ProjectSettings.fromJson(jsonDecode(json));
-      } catch (e) {
-        // If loading fails, initialize with default
+  Future<void> _loadSettings() async {
+    try {
+      final settings = await _tomlService.loadProjectSettings(_projectId);
+      if (settings != null) {
+        state = settings;
+      } else {
+        // Initialize with default if not found
         state = ProjectSettings(projectId: _projectId);
       }
-    } else {
-      // Initialize with default if not found
+    } catch (e) {
+      // If loading fails, initialize with default
       state = ProjectSettings(projectId: _projectId);
     }
   }
@@ -109,14 +104,12 @@ class ProjectSettingsNotifier extends StateNotifier<ProjectSettings?> {
   /// Update settings and persist
   Future<void> updateSettings(ProjectSettings settings) async {
     state = settings;
-    final key = '$_projectSettingsPrefix$_projectId';
-    await _prefs.setString(key, jsonEncode(settings.toJson()));
+    await _tomlService.saveProjectSettings(settings);
   }
 
   /// Delete project settings
   Future<void> deleteSettings() async {
-    final key = '$_projectSettingsPrefix$_projectId';
-    await _prefs.remove(key);
+    await _tomlService.deleteProjectSettings(_projectId);
     state = null;
   }
 }

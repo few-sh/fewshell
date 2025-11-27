@@ -8,9 +8,14 @@ final globalLlmSettingsProvider =
     StateNotifierProvider<GlobalLlmSettingsNotifier, List<LlmApiSettings>>((
       ref,
     ) {
+      final settings = ref.watch(globalSettingsProvider);
       final settingsNotifier = ref.watch(globalSettingsProvider.notifier);
       final keychainService = ref.watch(keychainServiceProvider);
-      return GlobalLlmSettingsNotifier(settingsNotifier, keychainService);
+      return GlobalLlmSettingsNotifier(
+        settingsNotifier,
+        keychainService,
+        settings.llmSettings,
+      );
     });
 
 /// Provider for managing project-specific LLM settings (family provider)
@@ -20,6 +25,7 @@ final projectLlmSettingsProvider =
       List<LlmApiSettings>,
       String
     >((ref, projectId) {
+      final settings = ref.watch(projectSettingsProvider(projectId));
       final settingsNotifier = ref.watch(
         projectSettingsProvider(projectId).notifier,
       );
@@ -28,6 +34,7 @@ final projectLlmSettingsProvider =
         projectId,
         settingsNotifier,
         keychainService,
+        settings?.llmSettings ?? [],
       );
     });
 
@@ -36,7 +43,10 @@ abstract class BaseLlmSettingsNotifier
     extends StateNotifier<List<LlmApiSettings>> {
   final KeychainService _keychainService;
 
-  BaseLlmSettingsNotifier(this._keychainService) : super([]);
+  BaseLlmSettingsNotifier(
+    this._keychainService,
+    List<LlmApiSettings> initialSettings,
+  ) : super(initialSettings);
 
   // Abstract methods implemented by subclasses
   Future<void> _saveSecret(String identifier, String key);
@@ -182,9 +192,8 @@ class GlobalLlmSettingsNotifier extends BaseLlmSettingsNotifier {
   GlobalLlmSettingsNotifier(
     this._settingsNotifier,
     KeychainService keychainService,
-  ) : super(keychainService) {
-    state = _settingsNotifier.state.llmSettings;
-  }
+    List<LlmApiSettings> initialSettings,
+  ) : super(keychainService, initialSettings);
 
   @override
   String? get _currentDefaultIdentifier =>
@@ -239,9 +248,8 @@ class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
     this._projectId,
     this._settingsNotifier,
     KeychainService keychainService,
-  ) : super(keychainService) {
-    state = _settingsNotifier.state?.llmSettings ?? [];
-  }
+    List<LlmApiSettings> initialSettings,
+  ) : super(keychainService, initialSettings);
 
   @override
   String? get _currentDefaultIdentifier =>
