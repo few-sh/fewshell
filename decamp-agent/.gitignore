@@ -19,3 +19,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Data directory for decamp-agent
+data/
