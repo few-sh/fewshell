@@ -1,15 +1,38 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:agent_core/src/database/database.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
+import 'package:crdt/crdt.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'project_selection_provider.dart';
+import 'theme_provider.dart';
+import 'package:agent_core/src/database/database_facade.dart';
+
+// Registry to hold Crdt instances
+final crdtRegistry = <String, Crdt>{};
+
+final nodeIdProvider = Provider<String>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  var nodeId = prefs.getString('node_id');
+  if (nodeId == null) {
+    nodeId = const Uuid().v4();
+    prefs.setString('node_id', nodeId);
+  }
+  return nodeId;
+});
 
 /// Provider for the GlobalDatabase instance (decamp.db).
 final globalDatabaseProvider = Provider<GlobalDatabase>((ref) {
-  final database = GlobalDatabase(_openGlobalConnection());
+  final nodeId = ref.watch(nodeIdProvider);
+  final database = GlobalDatabase(
+    _openGlobalConnection(nodeId),
+    crdtProvider: () => crdtRegistry['global']!,
+  );
 
   // Dispose database when provider is disposed
   ref.onDispose(() {
@@ -19,11 +42,14 @@ final globalDatabaseProvider = Provider<GlobalDatabase>((ref) {
   return database;
 });
 
-LazyDatabase _openGlobalConnection() {
+LazyDatabase _openGlobalConnection(String nodeId) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'decamp.db'));
-    return NativeDatabase(file);
+    final path = p.join(dbFolder.path, 'decamp.db');
+
+    final result = await CrdtExecutorFactory.createExecutor(path, nodeId);
+    crdtRegistry['global'] = result.crdt;
+    return result.executor;
   });
 }
 
@@ -33,25 +59,34 @@ final projectDatabaseProvider = Provider<ProjectDatabase?>((ref) {
   final projectId = ref.watch(currentProjectIdProvider);
   if (projectId == null) return null;
 
-  final database = ProjectDatabase(_openProjectConnection(projectId));
+  final nodeId = ref.watch(nodeIdProvider);
+
+  final database = ProjectDatabase(
+    _openProjectConnection(projectId, nodeId),
+    crdtProvider: () => crdtRegistry[projectId]!,
+  );
 
   // Dispose database when provider is disposed (e.g. project changed)
   ref.onDispose(() {
     database.close();
+    crdtRegistry.remove(projectId);
   });
 
   return database;
 });
 
-LazyDatabase _openProjectConnection(String projectId) {
+LazyDatabase _openProjectConnection(String projectId, String nodeId) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final projectDir = Directory(p.join(dbFolder.path, 'projects', projectId));
     if (!await projectDir.exists()) {
       await projectDir.create(recursive: true);
     }
-    final file = File(p.join(projectDir.path, 'project.db'));
-    return NativeDatabase(file);
+    final path = p.join(projectDir.path, 'project.db');
+
+    final result = await CrdtExecutorFactory.createExecutor(path, nodeId);
+    crdtRegistry[projectId] = result.crdt;
+    return result.executor;
   });
 }
 

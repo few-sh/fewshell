@@ -33,7 +33,7 @@ class DatabaseFacade {
 
   late final SnippetDaoFacade snippetDao = SnippetDaoFacade(
     globalDatabase.snippetDao,
-    projectDatabase?.snippetDao,
+    projectDatabase?.projectSnippetDao,
   );
 
   Future<void> close() async {

@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:crdt/crdt.dart';
 import 'package:llm_dart/llm_dart.dart';
 
 import 'tables/sessions_table.dart';
@@ -15,12 +16,24 @@ part 'project_database.g.dart';
 /// Stores Sessions, Messages, and Project Snippets.
 @DriftDatabase(tables: [Sessions, Messages, ProjectSnippets])
 class ProjectDatabase extends _$ProjectDatabase {
-  ProjectDatabase(super.e);
+  final Crdt? _crdt;
+  final Crdt Function()? _crdtProvider;
+
+  ProjectDatabase(super.e, {Crdt? crdt, Crdt Function()? crdtProvider})
+      : _crdt = crdt,
+        _crdtProvider = crdtProvider;
 
   // DAOs - lazy initialized
   late final SessionDao sessionDao = SessionDao(this);
   late final MessageDao messageDao = MessageDao(this);
-  late final ProjectSnippetDao snippetDao = ProjectSnippetDao(this);
+  late final ProjectSnippetDao projectSnippetDao = ProjectSnippetDao(this);
+
+  /// Exposes the underlying CRDT store for sync.
+  Crdt get crdt {
+    if (_crdt != null) return _crdt;
+    if (_crdtProvider != null) return _crdtProvider();
+    throw StateError('Database is not running with CrdtQueryExecutor');
+  }
 
   @override
   int get schemaVersion => 5;

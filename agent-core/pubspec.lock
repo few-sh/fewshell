@@ -185,6 +185,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.15.0"
+  crdt:
+    dependency: transitive
+    description:
+      name: crdt
+      sha256: "5709bbb4bb6f1b7e08fa1a3896070adec870ed4029c5b5da6fb30fa3c501cb65"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.1.3"
+  crdt_sync:
+    dependency: "direct main"
+    description:
+      name: crdt_sync
+      sha256: df040df9e0e44b1e0e9155be22e3fc69d998f9fc20766c3c51960d7c33d6c46d
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.10"
   crypto:
     dependency: transitive
     description:
@@ -209,6 +225,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.0"
+  dev_build:
+    dependency: transitive
+    description:
+      name: dev_build
+      sha256: fda8a54458b2a873a84e0cd1513f4323a1fb0599ed5455245359bc0398bad9ee
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.2+11"
   dio:
     dependency: "direct main"
     description:
@@ -404,10 +428,10 @@ packages:
     dependency: transitive
     description:
       name: meta
-      sha256: "23f08335362185a5ea2ad3a4e597f1375e78bce8a040df5c600c8d3552ef2394"
+      sha256: e3641ec5d63ebf0d9b41bd43201a66e3fc79a65db5f61fc181f04cd27aab950c
       url: "https://pub.dev"
     source: hosted
-    version: "1.17.0"
+    version: "1.16.0"
   mime:
     dependency: transitive
     description:
@@ -472,6 +496,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.2"
+  process_run:
+    dependency: transitive
+    description:
+      name: process_run
+      sha256: "6ec839cdd3e6de4685318e7686cd4abb523c3d3a55af0e8d32a12ae19bc66622"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.4"
   pub_semver:
     dependency: transitive
     description:
@@ -568,6 +600,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.1"
+  sqflite_common:
+    dependency: transitive
+    description:
+      name: sqflite_common
+      sha256: "6ef422a4525ecc601db6c0a2233ff448c731307906e92cabc9ba292afaae16a6"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.5.6"
+  sqflite_common_ffi:
+    dependency: transitive
+    description:
+      name: sqflite_common_ffi
+      sha256: "9faa2fedc5385ef238ce772589f7718c24cdddd27419b609bb9c6f703ea27988"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.6"
+  sqflite_common_ffi_web:
+    dependency: transitive
+    description:
+      name: sqflite_common_ffi_web
+      sha256: "33495e9172c958d907c48fd43fbea0b9c0a2ec2e36a548ebd07672fde61b6497"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1+1"
+  sql_crdt:
+    dependency: transitive
+    description:
+      name: sql_crdt
+      sha256: db0a4133a63a996d262d7e73b97e6ddc4550f4e3bd2449930627472d622bd946
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.3"
   sqlite3:
     dependency: transitive
     description:
@@ -576,6 +640,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.9.4"
+  sqlite_crdt:
+    dependency: "direct main"
+    description:
+      name: sqlite_crdt
+      sha256: d424ad71651896c652fd051ce5f28c7b5562c7a5b5ac1737b313f78b27489043
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.3"
   sqlparser:
     dependency: transitive
     description:
@@ -624,6 +696,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  synchronized:
+    dependency: transitive
+    description:
+      name: synchronized
+      sha256: c254ade258ec8282947a0acbbc90b9575b4f19673533ee46f2f6e9b3aeefd7c0
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.4.0"
   term_glyph:
     dependency: transitive
     description:

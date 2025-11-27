@@ -1,0 +1,87 @@
+import 'dart:async';
+import 'package:drift/drift.dart';
+import 'package:sqlite_crdt/sqlite_crdt.dart';
+
+class CrdtQueryExecutor extends QueryExecutor {
+  final SqliteCrdt _crdt;
+
+  CrdtQueryExecutor(this._crdt);
+
+  @override
+  SqlDialect get dialect => SqlDialect.sqlite;
+
+  @override
+  Future<bool> ensureOpen(QueryExecutorUser user) async {
+    return true;
+  }
+
+  @override
+  Future<void> runBatched(BatchedStatements statements) async {
+    for (var i = 0; i < statements.statements.length; i++) {
+      final sql = statements.statements[i];
+      final args = statements.arguments[i];
+      // ArgumentsForBatchedStatement seems to be a wrapper.
+      // We assume it can be used as List<Object?> or converted.
+      // If not, we might need to inspect it.
+      // For now, let's try to cast it to dynamic and then to List.
+      await _crdt.execute(sql, (args as dynamic) as List<Object?>);
+    }
+  }
+
+  @override
+  Future<void> runCustom(String statement, [List<Object?>? args]) {
+    return _crdt.execute(statement, args ?? const []);
+  }
+
+  @override
+  Future<int> runDelete(String statement, List<Object?> args) async {
+    await _crdt.execute(statement, args);
+    return 0;
+  }
+
+  @override
+  Future<int> runInsert(String statement, List<Object?> args) async {
+    await _crdt.execute(statement, args);
+    return 0;
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+      String statement, List<Object?> args) {
+    return _crdt.query(statement, args);
+  }
+
+  @override
+  Future<int> runUpdate(String statement, List<Object?> args) async {
+    await _crdt.execute(statement, args);
+    return 0;
+  }
+
+  @override
+  QueryExecutor beginExclusive() {
+    return this;
+  }
+
+  @override
+  TransactionExecutor beginTransaction() {
+    return _CrdtTransactionExecutor(_crdt);
+  }
+}
+
+class _CrdtTransactionExecutor extends CrdtQueryExecutor
+    implements TransactionExecutor {
+  _CrdtTransactionExecutor(super.crdt);
+
+  @override
+  bool get supportsNestedTransactions => false;
+
+  @override
+  Future<void> send() async {
+    // No-op
+  }
+
+  @override
+  Future<void> rollback() async {
+    // No-op or manual rollback if supported
+  }
+}

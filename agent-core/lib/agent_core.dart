@@ -33,19 +33,19 @@ export 'src/services/toml_settings_service.dart';
 
 // Database
 export 'src/database/database.dart';
-export 'src/database/project_database.dart';
-export 'src/database/database_facade.dart';
-export 'src/database/entities/snippet_entity.dart';
-export 'src/database/tables/messages_table.dart';
-export 'src/database/tables/projects_table.dart';
-export 'src/database/tables/sessions_table.dart';
-export 'src/database/tables/snippets_table.dart';
-export 'src/database/daos/message_dao.dart';
+export 'src/database/crdt_executor_factory.dart';
+export 'src/database/crdt_executor.dart';
 export 'src/database/daos/project_dao.dart';
-export 'src/database/daos/session_dao.dart';
 export 'src/database/daos/snippet_dao.dart';
+export 'src/database/daos/session_dao.dart';
+export 'src/database/daos/message_dao.dart';
 export 'src/database/daos/project_snippet_dao.dart';
-export 'src/database/converters/tool_call_converter.dart';
+export 'src/database/tables/projects_table.dart';
+export 'src/database/tables/snippets_table.dart';
+export 'src/database/tables/sessions_table.dart';
+export 'src/database/tables/messages_table.dart';
+export 'src/database/tables/project_snippets_table.dart';
+export 'src/database/entities/snippet_entity.dart';
 
 // Extensions
 export 'src/extensions/chat_message_extensions.dart';

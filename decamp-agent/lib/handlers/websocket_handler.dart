@@ -6,7 +6,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// WebSocket handler for real-time client-server communication
 final websocketHandler = webSocketHandler(_handleWebSocket);
 
-void _handleWebSocket(WebSocketChannel webSocket) {
+void _handleWebSocket(WebSocketChannel webSocket, String? protocol) {
   developer.log('🔌 New WebSocket connection established', name: 'WebSocket');
 
   // Send welcome message

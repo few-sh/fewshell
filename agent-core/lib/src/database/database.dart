@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:crdt/crdt.dart';
 import 'package:llm_dart/llm_dart.dart';
 
 import 'tables/projects_table.dart';
@@ -9,6 +10,7 @@ import 'converters/tool_call_converter.dart';
 import 'entities/snippet_entity.dart';
 
 export 'project_database.dart';
+export 'crdt_executor_factory.dart';
 
 part 'database.g.dart';
 
@@ -16,11 +18,23 @@ part 'database.g.dart';
 /// Stores Projects and Global Snippets.
 @DriftDatabase(tables: [Projects, Snippets])
 class GlobalDatabase extends _$GlobalDatabase {
-  GlobalDatabase(super.e);
+  final Crdt? _crdt;
+  final Crdt Function()? _crdtProvider;
+
+  GlobalDatabase(super.e, {Crdt? crdt, Crdt Function()? crdtProvider})
+      : _crdt = crdt,
+        _crdtProvider = crdtProvider;
 
   // DAOs - lazy initialized
   late final ProjectDao projectDao = ProjectDao(this);
   late final SnippetDao snippetDao = SnippetDao(this);
+
+  /// Exposes the underlying CRDT store for sync.
+  Crdt get crdt {
+    if (_crdt != null) return _crdt;
+    if (_crdtProvider != null) return _crdtProvider();
+    throw StateError('Database is not running with CrdtQueryExecutor');
+  }
 
   @override
   int get schemaVersion => 5;
