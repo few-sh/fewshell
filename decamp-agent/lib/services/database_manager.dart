@@ -20,6 +20,9 @@ class DatabaseManager {
     final result =
         await CrdtExecutorFactory.createExecutor(globalDbPath, 'server');
     globalDatabase = GlobalDatabase(result.executor, crdt: result.crdt);
+
+    // Force database initialization to ensure tables exist before sync starts
+    await globalDatabase.customStatement('SELECT 1');
   }
 
   Future<ProjectDatabase> getProjectDatabase(String projectId) async {
@@ -36,6 +39,10 @@ class DatabaseManager {
     final result =
         await CrdtExecutorFactory.createExecutor(projectDbPath, 'server');
     final db = ProjectDatabase(result.executor, crdt: result.crdt);
+
+    // Force database initialization to ensure tables exist before sync starts
+    await db.customStatement('SELECT 1');
+
     _projectDatabases[projectId] = db;
     return db;
   }
