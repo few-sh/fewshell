@@ -4,6 +4,7 @@ import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 class CrdtQueryExecutor extends QueryExecutor {
   final SqliteCrdt _crdt;
+  bool _isOpening = false;
 
   CrdtQueryExecutor(this._crdt);
 
@@ -12,7 +13,39 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<bool> ensureOpen(QueryExecutorUser user) async {
-    return true;
+    if (_isOpening) return true;
+    _isOpening = true;
+    try {
+      final versionResult = await _crdt.query('PRAGMA user_version');
+      final currentVersion = (versionResult.first.values.first as int?) ?? 0;
+      final db = user as GeneratedDatabase;
+
+      if (currentVersion == 0) {
+        await db.beforeOpen(
+            this, OpeningDetails(null, user.schemaVersion));
+
+        final migrator = Migrator(db);
+        await db.migration.onCreate(migrator);
+
+        await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+      } else if (currentVersion < user.schemaVersion) {
+        await db.beforeOpen(
+            this, OpeningDetails(currentVersion, user.schemaVersion));
+
+        final migrator = Migrator(db);
+        await db.migration
+            .onUpgrade(migrator, currentVersion, user.schemaVersion);
+
+        await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+      } else {
+        await db.beforeOpen(
+            this, OpeningDetails(currentVersion, user.schemaVersion));
+      }
+
+      return true;
+    } finally {
+      _isOpening = false;
+    }
   }
 
   @override

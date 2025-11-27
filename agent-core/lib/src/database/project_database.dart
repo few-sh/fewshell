@@ -46,86 +46,50 @@ class ProjectDatabase extends _$ProjectDatabase {
         await m.createAll();
 
         // Create indexes for better query performance
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id)',
         );
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_sessions_project_timestamp ON sessions(project_id, timestamp DESC)',
         );
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)',
         );
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC)',
         );
-        await customStatement(
-          'CREATE INDEX IF NOT EXISTS idx_snippets_project_id ON snippets(project_id)',
+        await executor.runCustom(
+          'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON project_snippets(project_id)',
         );
-        await customStatement(
-          'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE)',
+        await executor.runCustom(
+          'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON project_snippets(name COLLATE NOCASE)',
         );
       },
       beforeOpen: (details) async {
         // Enable foreign keys
-        await customStatement('PRAGMA foreign_keys = ON');
+        await executor.runCustom('PRAGMA foreign_keys = ON');
       },
       onUpgrade: (Migrator m, int from, int to) async {
-        // Migration from version 1 to 2: Add position column to snippets
+        // Migration from version 1 to 2: Add position column to project_snippets
         if (from < 2) {
           // Add position column with default value 0
           await m.addColumn(projectSnippets, projectSnippets.position);
 
           // Initialize positions based on current updatedAt order
-          // For each project's snippets
-          await customStatement('''
-            UPDATE snippets 
+          await executor.runCustom('''
+            UPDATE project_snippets 
             SET position = (
               SELECT COUNT(*) 
-              FROM snippets s2 
-              WHERE s2.project_id = snippets.project_id 
-              AND s2.updated_at > snippets.updated_at
+              FROM project_snippets s2 
+              WHERE s2.project_id = project_snippets.project_id 
+              AND s2.updated_at > project_snippets.updated_at
             )
-            WHERE project_id IS NOT NULL
           ''');
 
           // Create index for position ordering
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
+          await executor.runCustom(
+            'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON project_snippets(project_id, position ASC)',
           );
-        }
-
-        // Migration from version 2 to 3: Add isArchived column to sessions
-        if (from < 3) {
-          // Add isArchived column with default value false
-          await m.addColumn(sessions, sessions.isArchived);
-
-          // Create index for efficient filtering of archived sessions
-          await customStatement(
-            'CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(project_id, is_archived, timestamp DESC)',
-          );
-        }
-
-        if (from < 4) {
-          // Add discriminated union columns for tool calls and results
-          await customStatement('''
-        ALTER TABLE messages
-        ADD COLUMN message_kind INTEGER NOT NULL DEFAULT 0
-      ''');
-
-          await customStatement('''
-        ALTER TABLE messages
-        ADD COLUMN tool_calls_json TEXT
-      ''');
-
-          await customStatement('''
-        ALTER TABLE messages
-        ADD COLUMN tool_results_json TEXT
-      ''');
-        }
-
-        // Migration from version 4 to 5: Add editedAt column to messages
-        if (from < 5) {
-          await m.addColumn(messages, messages.editedAt);
         }
       },
     );

@@ -45,22 +45,22 @@ class GlobalDatabase extends _$GlobalDatabase {
         await m.createAll();
 
         // Create indexes for better query performance
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_projects_last_session ON projects(last_session_date DESC)',
         );
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name COLLATE NOCASE)',
         );
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_snippets_project_id ON snippets(project_id)',
         );
-        await customStatement(
+        await executor.runCustom(
           'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE)',
         );
       },
       beforeOpen: (details) async {
         // Enable foreign keys
-        await customStatement('PRAGMA foreign_keys = ON');
+        await executor.runCustom('PRAGMA foreign_keys = ON');
 
         if (details.wasCreated) {
           // Seed initial data for development/testing
@@ -75,7 +75,7 @@ class GlobalDatabase extends _$GlobalDatabase {
 
           // Initialize positions based on current updatedAt order
           // For global snippets
-          await customStatement('''
+          await executor.runCustom('''
             UPDATE snippets 
             SET position = (
               SELECT COUNT(*) 
@@ -87,7 +87,7 @@ class GlobalDatabase extends _$GlobalDatabase {
           ''');
 
           // Create index for position ordering
-          await customStatement(
+          await executor.runCustom(
             'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
           );
         }
