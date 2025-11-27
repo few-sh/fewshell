@@ -59,10 +59,10 @@ class ProjectDatabase extends _$ProjectDatabase {
           'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC)',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON project_snippets(project_id)',
+          'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON snippets(project_id)',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON project_snippets(name COLLATE NOCASE)',
+          'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON snippets(name COLLATE NOCASE)',
         );
       },
       beforeOpen: (details) async {
@@ -77,18 +77,18 @@ class ProjectDatabase extends _$ProjectDatabase {
 
           // Initialize positions based on current updatedAt order
           await executor.runCustom('''
-            UPDATE project_snippets 
+            UPDATE snippets 
             SET position = (
               SELECT COUNT(*) 
-              FROM project_snippets s2 
-              WHERE s2.project_id = project_snippets.project_id 
-              AND s2.updated_at > project_snippets.updated_at
+              FROM snippets s2 
+              WHERE s2.project_id = snippets.project_id 
+              AND s2.updated_at > snippets.updated_at
             )
           ''');
 
           // Create index for position ordering
           await executor.runCustom(
-            'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON project_snippets(project_id, position ASC)',
+            'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC)',
           );
         }
       },
