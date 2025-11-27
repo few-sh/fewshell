@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import '../services/llm_service.dart';
 import 'llm_settings_provider.dart';
 import 'project_provider.dart';
 import 'settings_provider.dart';

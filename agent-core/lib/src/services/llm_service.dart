@@ -100,8 +100,7 @@ class LlmService {
 
       if (projectInstruction != null) {
         // Check model override first, then default
-        instruction =
-            projectInstruction.modelOverrides[modelIdentifier] ??
+        instruction = projectInstruction.modelOverrides[modelIdentifier] ??
             (projectInstruction.defaultInstruction.isNotEmpty
                 ? projectInstruction.defaultInstruction
                 : null);

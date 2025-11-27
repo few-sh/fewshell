@@ -25,6 +25,7 @@ export 'src/secrets_storage/file_secure_storage_impl.dart';
 export 'src/services/keychain_service.dart';
 export 'src/services/shell_service.dart';
 export 'src/services/shell_tools_provider.dart';
+export 'src/services/llm_service.dart';
 
 // Database
 export 'src/database/database.dart';
