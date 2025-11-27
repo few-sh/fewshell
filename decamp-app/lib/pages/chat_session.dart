@@ -11,7 +11,7 @@ import 'package:decamp/components/project_title_bar.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
-import 'package:decamp/providers/chat_controller.dart';
+import 'package:decamp/providers/chat_controller_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';

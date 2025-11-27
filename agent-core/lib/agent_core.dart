@@ -2,6 +2,9 @@
 
 export 'src/agent_loop.dart';
 export 'src/types.dart';
+export 'src/controllers/chat_controller.dart';
+export 'src/models/tool_action.dart';
+export 'src/utils/secret_redactor.dart';
 
 // Models
 export 'src/models/agent_instruction.dart';
