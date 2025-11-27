@@ -21,8 +21,7 @@ class CrdtQueryExecutor extends QueryExecutor {
       final db = user as GeneratedDatabase;
 
       if (currentVersion == 0) {
-        await db.beforeOpen(
-            this, OpeningDetails(null, user.schemaVersion));
+        await db.beforeOpen(this, OpeningDetails(null, user.schemaVersion));
 
         final migrator = Migrator(db);
         await db.migration.onCreate(migrator);
