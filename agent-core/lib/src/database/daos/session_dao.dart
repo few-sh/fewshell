@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../database.dart';
+import '../project_database.dart';
 import '../tables/sessions_table.dart';
 import 'package:agent_core/agent_core.dart';
 
@@ -8,8 +8,9 @@ part 'session_dao.g.dart';
 /// Data Access Object for Sessions table.
 /// Provides CRUD operations and reactive queries.
 @DriftAccessor(tables: [Sessions])
-class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
-  SessionDao(AppDatabase db) : super(db);
+class SessionDao extends DatabaseAccessor<ProjectDatabase>
+    with _$SessionDaoMixin {
+  SessionDao(ProjectDatabase db) : super(db);
 
   /// Watch sessions for a specific project, ordered by timestamp desc
   Stream<List<SessionEntity>> watchSessionsByProject(String projectId) {
@@ -65,7 +66,8 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
   Future<int> updateSession(SessionEntityCompanion session) {
     return (update(
       sessions,
-    )..where((s) => s.id.equals(session.id.value))).write(session);
+    )..where((s) => s.id.equals(session.id.value)))
+        .write(session);
   }
 
   /// Delete a session by ID
@@ -114,9 +116,10 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
 
   /// Delete all archived sessions for a specific project
   Future<int> deleteArchivedSessionsByProject(String projectId) {
-    return (delete(sessions)..where(
-          (s) => s.projectId.equals(projectId) & s.isArchived.equals(true),
-        ))
+    return (delete(sessions)
+          ..where(
+            (s) => s.projectId.equals(projectId) & s.isArchived.equals(true),
+          ))
         .go();
   }
 

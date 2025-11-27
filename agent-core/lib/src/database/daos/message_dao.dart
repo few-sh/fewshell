@@ -1,5 +1,5 @@
 import 'package:drift/drift.dart';
-import '../database.dart';
+import '../project_database.dart';
 import '../tables/messages_table.dart';
 import 'package:agent_core/agent_core.dart';
 
@@ -8,8 +8,9 @@ part 'message_dao.g.dart';
 /// Data Access Object for Messages table.
 /// Provides CRUD operations and reactive queries.
 @DriftAccessor(tables: [Messages])
-class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
-  MessageDao(AppDatabase db) : super(db);
+class MessageDao extends DatabaseAccessor<ProjectDatabase>
+    with _$MessageDaoMixin {
+  MessageDao(ProjectDatabase db) : super(db);
 
   /// Watch messages for a specific session, ordered by creation time asc
   Stream<List<MessageEntity>> watchMessagesBySession(String sessionId) {
@@ -154,13 +155,13 @@ class MessageDao extends DatabaseAccessor<AppDatabase> with _$MessageDaoMixin {
     required String sessionId,
     required DateTime afterTimestamp,
   }) async {
-    final result =
-        await (delete(messages)..where(
-              (m) =>
-                  m.sessionId.equals(sessionId) &
-                  m.timestamp.isBiggerThanValue(afterTimestamp),
-            ))
-            .go();
+    final result = await (delete(messages)
+          ..where(
+            (m) =>
+                m.sessionId.equals(sessionId) &
+                m.timestamp.isBiggerThanValue(afterTimestamp),
+          ))
+        .go();
 
     // Touch the session to update its updatedAt timestamp
     await db.sessionDao.touchSession(sessionId);

@@ -7,11 +7,12 @@ part 'snippet_dao.g.dart';
 /// Data Access Object for Snippets table.
 /// Provides CRUD operations and reactive queries for snippets.
 @DriftAccessor(tables: [Snippets])
-class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
-  SnippetDao(AppDatabase db) : super(db);
+class SnippetDao extends DatabaseAccessor<GlobalDatabase>
+    with _$SnippetDaoMixin {
+  SnippetDao(GlobalDatabase db) : super(db);
 
   /// Watch all global snippets (projectId is null)
-  Stream<List<SnippetEntity>> watchGlobalSnippets() {
+  watchGlobalSnippets() {
     return (select(snippets)
           ..where((s) => s.projectId.isNull())
           ..orderBy([
@@ -21,7 +22,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
   }
 
   /// Watch snippets for a specific project
-  Stream<List<SnippetEntity>> watchProjectSnippets(String projectId) {
+  watchProjectSnippets(String projectId) {
     return (select(snippets)
           ..where((s) => s.projectId.equals(projectId))
           ..orderBy([
@@ -31,7 +32,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
   }
 
   /// Get all global snippets
-  Future<List<SnippetEntity>> getGlobalSnippets() {
+  getGlobalSnippets() {
     return (select(snippets)
           ..where((s) => s.projectId.isNull())
           ..orderBy([
@@ -41,7 +42,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
   }
 
   /// Get snippets for a specific project
-  Future<List<SnippetEntity>> getProjectSnippets(String projectId) {
+  getProjectSnippets(String projectId) {
     return (select(snippets)
           ..where((s) => s.projectId.equals(projectId))
           ..orderBy([
@@ -51,15 +52,16 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
   }
 
   /// Get a single snippet by ID
-  Future<SnippetEntity?> getSnippet(String id) {
+  getSnippet(String id) {
     return (select(snippets)..where((s) => s.id.equals(id))).getSingleOrNull();
   }
 
   /// Watch a single snippet by ID
-  Stream<SnippetEntity?> watchSnippet(String id) {
+  watchSnippet(String id) {
     return (select(
       snippets,
-    )..where((s) => s.id.equals(id))).watchSingleOrNull();
+    )..where((s) => s.id.equals(id)))
+        .watchSingleOrNull();
   }
 
   /// Insert a new snippet
@@ -71,7 +73,8 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
   Future<int> updateSnippet(SnippetEntityCompanion snippet) {
     return (update(
       snippets,
-    )..where((s) => s.id.equals(snippet.id.value))).write(snippet);
+    )..where((s) => s.id.equals(snippet.id.value)))
+        .write(snippet);
   }
 
   /// Delete a snippet by ID
@@ -80,7 +83,7 @@ class SnippetDao extends DatabaseAccessor<AppDatabase> with _$SnippetDaoMixin {
   }
 
   /// Search snippets by name or content
-  Future<List<SnippetEntity>> searchSnippets(
+  searchSnippets(
     String query, {
     String? projectId,
   }) {

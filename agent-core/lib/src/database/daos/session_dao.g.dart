@@ -3,6 +3,6 @@
 part of 'session_dao.dart';
 
 // ignore_for_file: type=lint
-mixin _$SessionDaoMixin on DatabaseAccessor<AppDatabase> {
+mixin _$SessionDaoMixin on DatabaseAccessor<ProjectDatabase> {
   $SessionsTable get sessions => attachedDatabase.sessions;
 }

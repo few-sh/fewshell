@@ -10,6 +10,7 @@ import 'package:decamp/utils/project_utils.dart';
 import 'package:decamp/pages/main_settings.dart';
 import 'package:decamp/pages/qr_scanner_page.dart';
 import 'package:decamp/services/project_importer.dart';
+import '../providers/project_selection_provider.dart';
 
 class ProjectSetupView extends ConsumerWidget {
   const ProjectSetupView({super.key});
@@ -145,11 +146,8 @@ class ProjectSetupView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
-                  onPressed: () => _handleScanQrCode(
-                    context,
-                    ref,
-                    existingNames,
-                  ),
+                  onPressed: () =>
+                      _handleScanQrCode(context, ref, existingNames),
                   icon: const Icon(Icons.qr_code_scanner),
                   label: const Text('Scan QR Code'),
                   style: OutlinedButton.styleFrom(
@@ -161,11 +159,8 @@ class ProjectSetupView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
-                  onPressed: () => _createProjectWithRandomName(
-                    context,
-                    ref,
-                    existingNames,
-                  ),
+                  onPressed: () =>
+                      _createProjectWithRandomName(context, ref, existingNames),
                   icon: const Icon(Icons.edit),
                   label: const Text('Enter Manually'),
                   style: OutlinedButton.styleFrom(

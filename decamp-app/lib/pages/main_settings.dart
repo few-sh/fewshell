@@ -9,6 +9,7 @@ import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/project_selection_provider.dart';
 import '../utils/project_utils.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';

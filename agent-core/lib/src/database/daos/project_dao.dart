@@ -8,17 +8,19 @@ part 'project_dao.g.dart';
 /// Data Access Object for Projects table.
 /// Provides CRUD operations and reactive queries.
 @DriftAccessor(tables: [Projects])
-class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
-  ProjectDao(AppDatabase db) : super(db);
+class ProjectDao extends DatabaseAccessor<GlobalDatabase>
+    with _$ProjectDaoMixin {
+  ProjectDao(GlobalDatabase db) : super(db);
 
   /// Watch all projects, ordered by last session date
   Stream<List<ProjectEntity>> watchAllProjects() {
-    return (select(projects)..orderBy([
-          (p) => OrderingTerm(
-            expression: p.lastSessionDate,
-            mode: OrderingMode.desc,
-          ),
-        ]))
+    return (select(projects)
+          ..orderBy([
+            (p) => OrderingTerm(
+                  expression: p.lastSessionDate,
+                  mode: OrderingMode.desc,
+                ),
+          ]))
         .watch();
   }
 
@@ -26,7 +28,8 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
   Stream<ProjectEntity?> watchProject(String id) {
     return (select(
       projects,
-    )..where((p) => p.id.equals(id))).watchSingleOrNull();
+    )..where((p) => p.id.equals(id)))
+        .watchSingleOrNull();
   }
 
   /// Get a single project by ID
@@ -36,12 +39,13 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
 
   /// Get all projects
   Future<List<ProjectEntity>> getAllProjects() {
-    return (select(projects)..orderBy([
-          (p) => OrderingTerm(
-            expression: p.lastSessionDate,
-            mode: OrderingMode.desc,
-          ),
-        ]))
+    return (select(projects)
+          ..orderBy([
+            (p) => OrderingTerm(
+                  expression: p.lastSessionDate,
+                  mode: OrderingMode.desc,
+                ),
+          ]))
         .get();
   }
 
@@ -54,7 +58,8 @@ class ProjectDao extends DatabaseAccessor<AppDatabase> with _$ProjectDaoMixin {
   Future<int> updateProject(ProjectEntityCompanion project) {
     return (update(
       projects,
-    )..where((p) => p.id.equals(project.id.value))).write(project);
+    )..where((p) => p.id.equals(project.id.value)))
+        .write(project);
   }
 
   /// Delete a project by ID
