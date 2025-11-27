@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:toml/toml.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:path/path.dart' as p;
 import 'dart:convert';
@@ -9,10 +8,6 @@ import 'dart:convert';
 class TomlSettingsService {
   static const String _globalSettingsFilename = 'settings.toml';
   static const String _projectSettingsFilename = 'settings.toml';
-
-  // Legacy keys for migration
-  static const String _legacyGlobalSettingsKey = 'app_settings';
-  static const String _legacyProjectSettingsPrefix = 'project_settings_';
 
   Future<Directory> get _documentsDir => getApplicationDocumentsDirectory();
 
@@ -38,9 +33,7 @@ class TomlSettingsService {
         return null;
       }
     }
-
-    // Check for migration
-    return _migrateGlobalSettings(file);
+    return null;
   }
 
   /// Save global settings to TOML
@@ -81,9 +74,7 @@ class TomlSettingsService {
         return null;
       }
     }
-
-    // Check for migration
-    return _migrateProjectSettings(projectId, file);
+    return null;
   }
 
   /// Save project settings to TOML
@@ -115,62 +106,6 @@ class TomlSettingsService {
     if (await file.exists()) {
       await file.delete();
     }
-  }
-
-  // --- Migration Logic ---
-
-  Future<AppSettings?> _migrateGlobalSettings(File targetFile) async {
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_legacyGlobalSettingsKey);
-
-    if (json != null) {
-      try {
-        print('Migrating global settings from SharedPreferences to TOML...');
-        final settings = AppSettings.fromJson(jsonDecode(json));
-
-        // Save to TOML
-        await saveGlobalSettings(settings);
-
-        // Clear legacy
-        await prefs.remove(_legacyGlobalSettingsKey);
-        print('Global settings migration complete.');
-
-        return settings;
-      } catch (e) {
-        print('Error migrating global settings: $e');
-      }
-    }
-    return null;
-  }
-
-  Future<ProjectSettings?> _migrateProjectSettings(
-    String projectId,
-    File targetFile,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = '$_legacyProjectSettingsPrefix$projectId';
-    final json = prefs.getString(key);
-
-    if (json != null) {
-      try {
-        print(
-          'Migrating project settings for $projectId from SharedPreferences to TOML...',
-        );
-        final settings = ProjectSettings.fromJson(jsonDecode(json));
-
-        // Save to TOML
-        await saveProjectSettings(settings);
-
-        // Clear legacy
-        await prefs.remove(key);
-        print('Project settings migration for $projectId complete.');
-
-        return settings;
-      } catch (e) {
-        print('Error migrating project settings for $projectId: $e');
-      }
-    }
-    return null;
   }
 
   /// Recursively remove null values from a map
