@@ -28,8 +28,8 @@ class CodeHighlight {
 
 /// Injects special highlight markers into text for custom markdown component
 class HighlightInjector {
-  /// Marker pattern: §M<matchIndex>:<active>§text§/M§
-  /// Using § as it's unlikely to appear in normal text or markdown
+  // Marker pattern: §M<matchIndex>:<active>§text§/M§
+  // Using § as it's unlikely to appear in normal text or markdown
   static String injectMarkers(String text, List<HighlightRange> highlights) {
     if (highlights.isEmpty) return text;
 
