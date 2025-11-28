@@ -289,7 +289,7 @@ packages:
     source: hosted
     version: "3.1.1"
   dartssh2:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       name: dartssh2
       sha256: bb242396c1d90f05c261b5eb8338cc67167e803c0948b0207029339cc568a66c

@@ -66,6 +66,8 @@ dependencies:
   # Secure Storage
   flutter_secure_storage: ^9.2.2
 
+  # SSH Client
+  dartssh2: ^2.9.2
 
 dependency_overrides:
   sqlite_crdt: 3.0.3
@@ -87,8 +89,6 @@ dependency_overrides:
   # HTTP Client
   dio: ^5.4.0
 
-  # SSH Client
-  dartssh2: ^2.9.2
   toml: ^0.17.0
   drift_crdt: ^1.0.11
   crdt_sync: ^1.0.10
