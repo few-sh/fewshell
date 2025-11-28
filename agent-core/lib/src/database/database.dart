@@ -36,7 +36,7 @@ class GlobalDatabase extends _$GlobalDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -90,6 +90,11 @@ class GlobalDatabase extends _$GlobalDatabase {
           await executor.runCustom(
             'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
           );
+        }
+
+        // Migration from version 5 to 6: Add serverUrl column to projects
+        if (from < 6) {
+          await m.addColumn(projects, projects.serverUrl);
         }
       },
     );

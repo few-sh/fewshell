@@ -5,6 +5,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_selection_provider.dart';
+import '../providers/project_provider.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   final service = SyncService(ref);
@@ -35,6 +36,18 @@ class SyncService {
         }
       } else {
         _disconnectProject();
+      }
+    });
+
+    // Watch for project settings changes (specifically serverUrl)
+    ref.listen<ProjectEntity?>(currentProjectProvider, (previous, next) {
+      if (next != null &&
+          previous?.id == next.id &&
+          previous?.serverUrl != next.serverUrl) {
+        final projectDb = ref.read(projectDatabaseProvider);
+        if (projectDb != null) {
+          _connectProject(projectDb, next.id);
+        }
       }
     });
 
@@ -78,8 +91,22 @@ class SyncService {
       // Ensure DB is open
       await db.customSelect('SELECT 1').get();
 
+      // Get project settings to check for server URL
+      final project = await ref
+          .read(databaseProvider)
+          .projectDao
+          .getProject(projectId);
+      final serverUrl = project?.serverUrl;
+
+      if (serverUrl == null) {
+        print(
+          'SyncService: No server URL configured for project $projectId. Skipping sync.',
+        );
+        return;
+      }
+
       final crdt = db.crdt;
-      final uri = Uri.parse('$_baseUrl/sync/project/$projectId');
+      final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
       print('SyncService: Connecting to project sync at $uri');
       _projectSync = CrdtSync.client(crdt, WebSocketChannel.connect(uri));

@@ -13,6 +13,10 @@ class Projects extends Table {
   /// Optional project description
   TextColumn get description => text().nullable()();
 
+  /// Optional server URL for CRDT sync
+  /// If null, the project is local-only
+  TextColumn get serverUrl => text().nullable()();
+
   /// Timestamp of the last session activity
   DateTimeColumn get lastSessionDate => dateTime()();
 
