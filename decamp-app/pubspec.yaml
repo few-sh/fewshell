@@ -63,13 +63,14 @@ dependencies:
   qr_code_scanner: ^1.0.1
   permission_handler: ^11.3.1
 
+  # Secure Storage
+  flutter_secure_storage: ^9.2.2
+
+
 dependency_overrides:
   sqlite_crdt: 3.0.3
   sql_crdt: 3.0.3
   postgres_crdt: 3.0.0
-
-  # Secure Storage
-  flutter_secure_storage: ^9.2.2
 
   # Utilities
   uuid: ^4.5.2
