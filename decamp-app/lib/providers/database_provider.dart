@@ -8,7 +8,6 @@ import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
 import 'project_selection_provider.dart';
 import 'theme_provider.dart';
-import 'package:agent_core/src/database/database_facade.dart';
 
 // Registry to hold Crdt instances
 final crdtRegistry = <String, Crdt>{};
