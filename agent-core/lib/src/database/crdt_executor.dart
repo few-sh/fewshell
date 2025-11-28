@@ -68,13 +68,15 @@ class CrdtQueryExecutor extends QueryExecutor {
   @override
   Future<int> runDelete(String statement, List<Object?> args) async {
     await _crdt.execute(statement, args);
-    return 0;
+    final result = await _crdt.query('SELECT changes()');
+    return (result.first.values.first as int?) ?? 0;
   }
 
   @override
   Future<int> runInsert(String statement, List<Object?> args) async {
     await _crdt.execute(statement, args);
-    return 0;
+    final result = await _crdt.query('SELECT last_insert_rowid()');
+    return (result.first.values.first as int?) ?? 0;
   }
 
   @override
@@ -86,7 +88,8 @@ class CrdtQueryExecutor extends QueryExecutor {
   @override
   Future<int> runUpdate(String statement, List<Object?> args) async {
     await _crdt.execute(statement, args);
-    return 0;
+    final result = await _crdt.query('SELECT changes()');
+    return (result.first.values.first as int?) ?? 0;
   }
 
   @override
