@@ -18,10 +18,11 @@ class _QrScannerPageState extends State<QrScannerPage> {
   @override
   void reassemble() {
     super.reassemble();
-    if (Platform.isAndroid)
+    if (Platform.isAndroid) {
       controller?.pauseCamera();
-    else if (Platform.isIOS)
+    } else if (Platform.isIOS) {
       controller?.resumeCamera();
+    }
   }
 
   @override
@@ -46,7 +47,9 @@ class _QrScannerPageState extends State<QrScannerPage> {
             ),
             onPressed: () async {
               await controller?.toggleFlash();
-              setState(() => _flashOn = !_flashOn);
+              if (mounted) {
+                setState(() => _flashOn = !_flashOn);
+              }
             },
           ),
           IconButton(
@@ -66,7 +69,9 @@ class _QrScannerPageState extends State<QrScannerPage> {
                     ctrl.scannedDataStream.listen((scanData) {
                       if (scanData.code == null) return;
                       ctrl.pauseCamera();
-                      Navigator.of(context).pop(scanData.code);
+                      if (mounted) {
+                        Navigator.of(context).pop(scanData.code);
+                      }
                     });
                   },
                   overlay: QrScannerOverlayShape(
@@ -77,7 +82,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                     cutOutSize: 250,
                   ),
                   onPermissionSet: (ctrl, p) {
-                    if (!p) {
+                    if (!p && mounted) {
                       setState(() => _permissionDenied = true);
                     }
                   },
@@ -85,7 +90,11 @@ class _QrScannerPageState extends State<QrScannerPage> {
                 Align(
                   alignment: Alignment.bottomCenter,
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 48.0, left: 24, right: 24),
+                    padding: const EdgeInsets.only(
+                      bottom: 48.0,
+                      left: 24,
+                      right: 24,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -132,14 +141,16 @@ class _QrScannerPageState extends State<QrScannerPage> {
             Icon(
               Icons.camera_alt_outlined,
               size: 80,
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 24),
             Text(
               'Camera Permission Required',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -167,13 +178,13 @@ class _QrScannerPageState extends State<QrScannerPage> {
               onPressed: () {
                 Navigator.pop(context, '');
               },
-              child: const Text('Enter Manually'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
                   vertical: 12,
                 ),
               ),
+              child: const Text('Enter Manually'),
             ),
           ],
         ),
