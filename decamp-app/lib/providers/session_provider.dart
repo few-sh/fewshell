@@ -44,7 +44,7 @@ final sessionAutoSelectorProvider = Provider<void>((ref) {
     final sessions = sessionsAsync.when(
       data: (sessions) => sessions,
       loading: () => null,
-      error: (_, __) => null,
+      error: (_, _) => null,
     );
 
     if (sessions == null) return;

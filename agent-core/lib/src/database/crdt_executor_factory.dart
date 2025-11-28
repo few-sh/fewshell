@@ -12,7 +12,9 @@ class CrdtExecutorResult {
 
 class CrdtExecutorFactory {
   static Future<CrdtExecutorResult> createExecutor(
-      String path, String nodeId) async {
+    String path,
+    String nodeId,
+  ) async {
     final crdt = await SqliteCrdt.open(path);
     // Note: SqliteCrdt manages nodeId internally or generates it.
     // If we need to set it explicitly, we might need to check SqliteCrdt API.

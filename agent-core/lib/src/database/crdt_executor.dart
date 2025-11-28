@@ -29,7 +29,9 @@ class CrdtQueryExecutor extends QueryExecutor {
         await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
       } else if (currentVersion < user.schemaVersion) {
         await db.beforeOpen(
-            this, OpeningDetails(currentVersion, user.schemaVersion));
+          this,
+          OpeningDetails(currentVersion, user.schemaVersion),
+        );
 
         final migrator = Migrator(db);
         await db.migration
@@ -38,7 +40,9 @@ class CrdtQueryExecutor extends QueryExecutor {
         await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
       } else {
         await db.beforeOpen(
-            this, OpeningDetails(currentVersion, user.schemaVersion));
+          this,
+          OpeningDetails(currentVersion, user.schemaVersion),
+        );
       }
 
       return true;
@@ -81,7 +85,9 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<List<Map<String, Object?>>> runSelect(
-      String statement, List<Object?> args) {
+    String statement,
+    List<Object?> args,
+  ) {
     return _crdt.query(statement, args);
   }
 

@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import '../project_database.dart';
 import '../database.dart'; // For SnippetEntityCompanion
 import '../tables/project_snippets_table.dart';
 import '../entities/snippet_entity.dart';

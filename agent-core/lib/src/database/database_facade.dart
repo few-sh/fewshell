@@ -19,14 +19,14 @@ class DatabaseFacade {
 
   SessionDao get sessionDao {
     if (projectDatabase == null) {
-      throw Exception("No project selected or project database not loaded");
+      throw Exception('No project selected or project database not loaded');
     }
     return projectDatabase!.sessionDao;
   }
 
   MessageDao get messageDao {
     if (projectDatabase == null) {
-      throw Exception("No project selected or project database not loaded");
+      throw Exception('No project selected or project database not loaded');
     }
     return projectDatabase!.messageDao;
   }
@@ -106,7 +106,7 @@ class SnippetDaoFacade {
 
   Future<int> insertSnippet(SnippetEntityCompanion snippet) {
     if (snippet.projectId.present && snippet.projectId.value != null) {
-      if (projectDao == null) throw Exception("No project selected");
+      if (projectDao == null) throw Exception('No project selected');
       return projectDao!.insertSnippet(snippet);
     } else {
       return globalDao.insertSnippet(snippet);
@@ -117,7 +117,7 @@ class SnippetDaoFacade {
     // If projectId is explicitly set
     if (snippet.projectId.present) {
       if (snippet.projectId.value != null) {
-        if (projectDao == null) throw Exception("No project selected");
+        if (projectDao == null) throw Exception('No project selected');
         return projectDao!.updateSnippet(snippet);
       } else {
         return (await globalDao.updateSnippet(snippet)) > 0;
