@@ -35,7 +35,7 @@ final sessionAutoSelectorProvider = Provider<void>((ref) {
   final sessionsAsync = ref.watch(currentProjectSessionsProvider);
 
   // Schedule session selection for after the current build
-  ref.listenSelf((_, __) {
+  ref.listenSelf((_, _) {
     if (projectId == null) {
       ref.read(currentSessionIdProvider.notifier).state = null;
       return;
