@@ -12,6 +12,7 @@ import 'package:decamp/providers/theme_provider.dart';
 import 'package:agent_core/src/services/keychain_service.dart';
 import 'package:decamp/services/storage/flutter_secure_storage_impl.dart';
 import 'package:decamp/providers/project_selection_provider.dart';
+import 'dart:developer' as developer;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -68,7 +69,7 @@ void main() {
         isEmpty,
         reason: 'Project should start with no LLM models',
       );
-      print('Initial models count: ${initialModels.length}');
+      developer.log('Initial models count: ${initialModels.length}');
 
       // 2. Create QR code data (matching the format from get.few.sh)
       final qrData = {
@@ -77,17 +78,17 @@ void main() {
       };
       final qrJson = jsonEncode(qrData);
 
-      print('QR JSON: $qrJson');
+      developer.log('QR JSON: $qrJson');
 
       // 3. Import the QR code
       final importer = container.read(projectImporterProvider);
 
       try {
         await importer.importFromQrCode(qrJson, targetProjectId: testProjectId);
-        print('Import completed without throwing');
+        developer.log('Import completed without throwing');
       } catch (e, stackTrace) {
-        print('Import threw error: $e');
-        print('Stack trace: $stackTrace');
+        developer.log('Import threw error: $e');
+        developer.log('Stack trace: $stackTrace');
         fail('Import should not throw: $e');
       }
 
@@ -95,7 +96,7 @@ void main() {
       final updatedModels = container.read(
         projectLlmSettingsProvider(testProjectId),
       );
-      print('Updated models count: ${updatedModels.length}');
+      developer.log('Updated models count: ${updatedModels.length}');
 
       if (updatedModels.isEmpty) {
         fail(
@@ -106,9 +107,9 @@ void main() {
       expect(updatedModels.length, 1, reason: 'Should have exactly 1 model');
 
       final model = updatedModels.first;
-      print('Model identifier: ${model.identifier}');
-      print('Model apiType: ${model.apiType}');
-      print('Model baseUrl: ${model.baseUrl}');
+      developer.log('Model identifier: ${model.identifier}');
+      developer.log('Model apiType: ${model.apiType}');
+      developer.log('Model baseUrl: ${model.baseUrl}');
 
       expect(model.apiType, LlmApiType.openai);
 
