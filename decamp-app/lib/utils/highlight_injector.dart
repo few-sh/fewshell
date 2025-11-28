@@ -46,11 +46,7 @@ class HighlightInjector {
 
       final marker = '§M${hl.matchIndex}:${hl.isActive ? '1' : '0'}§';
       result =
-          result.substring(0, start) +
-          marker +
-          result.substring(start, end) +
-          '§/M§' +
-          result.substring(end);
+          '${result.substring(0, start)}$marker${result.substring(start, end)}§/M§${result.substring(end)}';
     }
 
     return result;
