@@ -72,6 +72,9 @@ class SyncService {
   Future<void> _connectGlobal(GlobalDatabase db) async {
     _globalSync?.close();
 
+    return; // Temporarily disable global sync.
+
+    // ignore: dead_code
     try {
       // Ensure DB is open so that crdt instance is available
       await db.customSelect('SELECT 1').get();
