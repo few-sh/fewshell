@@ -10,7 +10,7 @@ part 'project_snippet_dao.g.dart';
 @DriftAccessor(tables: [ProjectSnippets])
 class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
     with _$ProjectSnippetDaoMixin {
-  ProjectSnippetDao(ProjectDatabase db) : super(db);
+  ProjectSnippetDao(super.db);
 
   SnippetEntity _toEntity(ProjectSnippet s) {
     return SnippetEntity(

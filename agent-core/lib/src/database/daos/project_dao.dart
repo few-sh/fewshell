@@ -8,7 +8,7 @@ part 'project_dao.g.dart';
 @DriftAccessor(tables: [Projects])
 class ProjectDao extends DatabaseAccessor<GlobalDatabase>
     with _$ProjectDaoMixin {
-  ProjectDao(GlobalDatabase db) : super(db);
+  ProjectDao(super.db);
 
   /// Watch all projects, ordered by last session date
   Stream<List<ProjectEntity>> watchAllProjects() {

@@ -8,7 +8,7 @@ part 'session_dao.g.dart';
 @DriftAccessor(tables: [Sessions])
 class SessionDao extends DatabaseAccessor<ProjectDatabase>
     with _$SessionDaoMixin {
-  SessionDao(ProjectDatabase db) : super(db);
+  SessionDao(super.db);
 
   /// Watch sessions for a specific project, ordered by timestamp desc
   Stream<List<SessionEntity>> watchSessionsByProject(String projectId) {

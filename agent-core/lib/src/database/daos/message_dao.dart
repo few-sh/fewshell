@@ -8,7 +8,7 @@ part 'message_dao.g.dart';
 @DriftAccessor(tables: [Messages])
 class MessageDao extends DatabaseAccessor<ProjectDatabase>
     with _$MessageDaoMixin {
-  MessageDao(ProjectDatabase db) : super(db);
+  MessageDao(super.db);
 
   /// Watch messages for a specific session, ordered by creation time asc
   Stream<List<MessageEntity>> watchMessagesBySession(String sessionId) {
