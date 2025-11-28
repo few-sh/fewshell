@@ -66,10 +66,10 @@ class _QrScannerPageState extends State<QrScannerPage> {
                   key: qrKey,
                   onQRViewCreated: (ctrl) {
                     controller = ctrl;
-                    ctrl.scannedDataStream.listen((scanData) {
+                    ctrl.scannedDataStream.listen((scanData) async {
                       if (scanData.code == null) return;
-                      ctrl.pauseCamera();
-                      if (mounted) {
+                      await ctrl.pauseCamera();
+                      if (context.mounted) {
                         Navigator.of(context).pop(scanData.code);
                       }
                     });

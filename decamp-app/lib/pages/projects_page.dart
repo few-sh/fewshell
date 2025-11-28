@@ -109,6 +109,7 @@ class ProjectsPage extends ConsumerWidget {
                   onTap: () async {
                     // Select this project and navigate back
                     await selectProject(ref, project.id);
+                    if (!context.mounted) return;
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
