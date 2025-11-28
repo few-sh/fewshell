@@ -186,7 +186,7 @@ packages:
     source: hosted
     version: "1.15.0"
   crdt:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: crdt
       sha256: "5709bbb4bb6f1b7e08fa1a3896070adec870ed4029c5b5da6fb30fa3c501cb65"
