@@ -1,14 +1,11 @@
 import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:agent_core/src/database/database.dart';
 import 'package:drift/drift.dart';
-import 'package:drift/native.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'project_selection_provider.dart';
 import 'theme_provider.dart';
 import 'package:agent_core/src/database/database_facade.dart';

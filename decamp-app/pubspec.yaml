@@ -31,6 +31,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Agent Core
+  agent_core:
+    path: ../agent-core
+
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -76,10 +80,6 @@ dependency_overrides:
   # LLM Integration
   llm_dart:
     path: ../llm_dart
-
-  # Agent Core
-  agent_core:
-    path: ../agent-core
 
   # HTTP Client
   dio: ^5.4.0

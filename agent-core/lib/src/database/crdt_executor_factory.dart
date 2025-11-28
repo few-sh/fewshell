@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
-import 'package:crdt/crdt.dart';
 import 'crdt_executor.dart';
 
 class CrdtExecutorResult {

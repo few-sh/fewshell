@@ -1,6 +1,4 @@
 import 'package:drift/drift.dart';
-import '../project_database.dart';
-import '../tables/messages_table.dart';
 import 'package:agent_core/agent_core.dart';
 
 part 'message_dao.g.dart';

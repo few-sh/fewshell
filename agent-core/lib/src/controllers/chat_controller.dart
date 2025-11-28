@@ -6,8 +6,6 @@ import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 
 import '../../agent_core.dart';
-import '../models/tool_action.dart';
-import '../utils/secret_redactor.dart';
 
 // Constants for message user IDs
 const String _kUserUserId = 'user';
