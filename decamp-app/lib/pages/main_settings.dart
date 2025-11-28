@@ -781,7 +781,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   void _showDeleteSshConfirmation({required String projectId}) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Remote Shell Configuration'),
         content: const Text(
           'Are you sure you want to delete the remote shell configuration? '
@@ -789,7 +789,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -799,21 +799,23 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                     .read(projectSshSettingsProvider(projectId).notifier)
                     .deleteSshSettings();
 
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(
                       content: Text('Remote shell configuration deleted'),
                     ),
                   );
                 }
               } catch (e) {
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Error deleting configuration: $e'),
-                      backgroundColor: Theme.of(context).colorScheme.error,
+                      backgroundColor: Theme.of(
+                        dialogContext,
+                      ).colorScheme.error,
                     ),
                   );
                 }
@@ -989,14 +991,14 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete AI Model'),
         content: Text(
           'Are you sure you want to delete "${settings.identifier}"?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -1015,21 +1017,23 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                   }
                 }
 
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Deleted model: ${settings.identifier}'),
                     ),
                   );
                 }
               } catch (e) {
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Error deleting model: $e'),
-                      backgroundColor: Theme.of(context).colorScheme.error,
+                      backgroundColor: Theme.of(
+                        dialogContext,
+                      ).colorScheme.error,
                     ),
                   );
                 }
