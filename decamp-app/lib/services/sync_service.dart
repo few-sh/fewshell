@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -78,10 +79,10 @@ class SyncService {
       final crdt = db.crdt;
       final uri = Uri.parse('$_baseUrl/sync/global');
 
-      print('SyncService: Connecting to global sync at $uri');
+      developer.log('SyncService: Connecting to global sync at $uri');
       _globalSync = CrdtSync.client(crdt, WebSocketChannel.connect(uri));
     } catch (e) {
-      print('SyncService: Global DB not ready or error: $e');
+      developer.log('SyncService: Global DB not ready or error: $e');
     }
   }
 
@@ -99,7 +100,7 @@ class SyncService {
       final serverUrl = project?.serverUrl;
 
       if (serverUrl == null) {
-        print(
+        developer.log(
           'SyncService: No server URL configured for project $projectId. Skipping sync.',
         );
         return;
@@ -108,10 +109,10 @@ class SyncService {
       final crdt = db.crdt;
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
-      print('SyncService: Connecting to project sync at $uri');
+      developer.log('SyncService: Connecting to project sync at $uri');
       _projectSync = CrdtSync.client(crdt, WebSocketChannel.connect(uri));
     } catch (e) {
-      print('SyncService: Project DB not ready or error: $e');
+      developer.log('SyncService: Project DB not ready or error: $e');
     }
   }
 

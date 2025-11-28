@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logging/logging.dart';
+import 'dart:developer' as developer;
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
 import 'providers/theme_provider.dart';
@@ -17,8 +18,11 @@ void main() async {
   // Configure logging for AnthropicClient
   // Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
-    print(
+    developer.log(
       '${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}',
+      name: record.loggerName,
+      level: record.level.value,
+      time: record.time,
     );
   });
 

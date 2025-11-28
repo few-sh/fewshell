@@ -1,4 +1,5 @@
 import 'dart:mirrors';
+import 'dart:developer' as developer;
 import 'package:sql_crdt/sql_crdt.dart'; // Try importing sql_crdt directly
 import 'package:test/test.dart';
 
@@ -6,12 +7,12 @@ void main() {
   test('Inspect SqlCrdt API', () {
     try {
       final mirror = reflectClass(SqlCrdt);
-      print('Methods of SqlCrdt:');
+      developer.log('Methods of SqlCrdt:');
       for (var key in mirror.instanceMembers.keys) {
-        print(MirrorSystem.getName(key));
+        developer.log(MirrorSystem.getName(key));
       }
     } catch (e) {
-      print('SqlCrdt not found: $e');
+      developer.log('SqlCrdt not found: $e');
     }
   });
 }
