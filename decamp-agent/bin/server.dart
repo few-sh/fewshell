@@ -12,7 +12,7 @@ void main(List<String> args) async {
   final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
 
   // Initialize DatabaseManager
-  final dbManager = DatabaseManager(Directory.current.path + '/data');
+  final dbManager = DatabaseManager('${Directory.current.path}/data');
   await dbManager.init();
 
   // Add middleware for logging and CORS
