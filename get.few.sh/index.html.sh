@@ -125,41 +125,87 @@ get_public_ip() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo -e "${BOLD}🌐 IP Address / Hostname${RESET}"
     echo -e ""
-    echo -e "  ${YELLOW}1.${RESET} Auto-detect public IP"
-    echo -e "  ${YELLOW}2.${RESET} Enter manually (IP or hostname)"
-    echo -e "  ${YELLOW}3.${RESET} Skip (no IP/hostname)"
+    echo -e "${BLUE}Detecting IP addresses...${RESET}"
+    
+    # Array to store detected IPs
+    local detected_ips=()
+    
+    # 1. Try to get public IP
+    local public_ip
+    public_ip=$(curl -s --max-time 3 https://ifconfig.me || curl -s --max-time 3 https://api.ipify.org || echo "")
+    if [ -n "$public_ip" ]; then
+        detected_ips+=("$public_ip (Public)")
+    fi
+    
+    # 2. Try to get local IPs
+    if command -v hostname >/dev/null 2>&1 && hostname -I >/dev/null 2>&1; then
+        # Linux standard
+        read -r -a local_ips <<< "$(hostname -I)"
+        for ip in "${local_ips[@]}"; do
+            detected_ips+=("$ip (Local)")
+        done
+    else
+        # Fallback for Mac/BSD or systems without hostname -I
+        if command -v ifconfig >/dev/null 2>&1; then
+             # Mac/BSD often output: inet 192.168.1.5 netmask ...
+             local ifconfig_ips
+             ifconfig_ips=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}')
+             for ip in $ifconfig_ips; do
+                 detected_ips+=("$ip (Local)")
+             done
+        elif command -v ip >/dev/null 2>&1; then
+             # Linux ip command
+             local ip_cmd_ips
+             ip_cmd_ips=$(ip -4 addr show | grep inet | grep -v 127.0.0.1 | awk '{print $2}' | cut -d/ -f1)
+             for ip in $ip_cmd_ips; do
+                 detected_ips+=("$ip (Local)")
+             done
+        fi
+    fi
+
+    # Display Menu
+    local i=1
+    for ip_entry in "${detected_ips[@]}"; do
+        echo -e "  ${YELLOW}${i}.${RESET} ${ip_entry}"
+        ((i++))
+    done
+    
+    local manual_opt=$i
+    echo -e "  ${YELLOW}${manual_opt}.${RESET} Enter manually (IP or hostname)"
+    ((i++))
+    local skip_opt=$i
+    echo -e "  ${YELLOW}${skip_opt}.${RESET} Skip (no IP/hostname)"
     echo -e ""
+    
     read -p "$(echo -e "${YELLOW}Select option${RESET} [${GREEN}1${RESET}]: ")" ip_choice < /dev/tty
     echo ""
-
-    case "${ip_choice:-1}" in
-        1)
-            echo -e "${BLUE}Detecting public IP address...${RESET}"
-            EXTERNAL_IP=$(curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://api.ipify.org || echo "")
-            if [ -n "$EXTERNAL_IP" ]; then
-                echo -e "${GREEN}✓${RESET} IP Address: ${BOLD}${EXTERNAL_IP}${RESET}"
-            else
-                echo -e "${YELLOW}⚠${RESET}  Could not detect IP address, skipping."
-            fi
-            ;;
-        2)
-            read -p "$(echo -e "${YELLOW}Enter IP address or hostname${RESET}: ")" manual_ip < /dev/tty
-            EXTERNAL_IP="$manual_ip"
-            if [ -n "$EXTERNAL_IP" ]; then
-                echo -e "${GREEN}✓${RESET} IP/Hostname: ${BOLD}${EXTERNAL_IP}${RESET}"
-            else
-                echo -e "${DIM}No IP/hostname entered, skipping.${RESET}"
-            fi
-            ;;
-        3)
-            EXTERNAL_IP=""
-            echo -e "${DIM}Skipping IP/hostname.${RESET}"
-            ;;
-        *)
-            echo -e "${DIM}Invalid option, skipping.${RESET}"
-            EXTERNAL_IP=""
-            ;;
-    esac
+    
+    # Default to 1 if empty
+    ip_choice="${ip_choice:-1}"
+    
+    local num_detected=${#detected_ips[@]}
+    
+    if [[ "$ip_choice" =~ ^[0-9]+$ ]] && [ "$ip_choice" -le "$num_detected" ] && [ "$ip_choice" -ge 1 ]; then
+        # Selected one of the detected IPs
+        local selected_entry="${detected_ips[$((ip_choice-1))]}"
+        EXTERNAL_IP="${selected_entry%% *}"
+        echo -e "${GREEN}✓${RESET} IP Address: ${BOLD}${EXTERNAL_IP}${RESET}"
+    elif [ "$ip_choice" -eq "$manual_opt" ]; then
+        # Manual entry
+        read -p "$(echo -e "${YELLOW}Enter IP address or hostname${RESET}: ")" manual_ip < /dev/tty
+        EXTERNAL_IP="$manual_ip"
+        if [ -n "$EXTERNAL_IP" ]; then
+            echo -e "${GREEN}✓${RESET} IP/Hostname: ${BOLD}${EXTERNAL_IP}${RESET}"
+        else
+            echo -e "${DIM}No IP/hostname entered, skipping.${RESET}"
+        fi
+    elif [ "$ip_choice" -eq "$skip_opt" ]; then
+        EXTERNAL_IP=""
+        echo -e "${DIM}Skipping IP/hostname.${RESET}"
+    else
+        echo -e "${DIM}Invalid option, skipping.${RESET}"
+        EXTERNAL_IP=""
+    fi
 
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo ""
