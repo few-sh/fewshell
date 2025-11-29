@@ -2,6 +2,7 @@ import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:crdt_sync/crdt_sync.dart';
+import 'package:agent_core/agent_core.dart';
 import '../services/database_manager.dart';
 
 class SyncController {
@@ -15,7 +16,15 @@ class SyncController {
 
       if (path == 'global') {
         return webSocketHandler((WebSocketChannel channel, String? protocol) {
-          CrdtSync.server(dbManager.globalDatabase.crdt, channel);
+          final multiplexed = MultiplexedWebSocketChannel(channel);
+          multiplexed.onCustomMessage.listen((msg) {
+            print('Server (Global): Received custom message: $msg');
+            if (msg.toString().startsWith('PING:')) {
+              multiplexed
+                  .sendCustomMessage('PONG:${msg.toString().substring(5)}');
+            }
+          });
+          CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
         })(request);
       } else if (path.startsWith('project/')) {
         final segments = path.split('/');
@@ -24,7 +33,15 @@ class SyncController {
           return webSocketHandler(
               (WebSocketChannel channel, String? protocol) async {
             final db = await dbManager.getProjectDatabase(projectId);
-            CrdtSync.server(db.crdt, channel);
+            final multiplexed = MultiplexedWebSocketChannel(channel);
+            multiplexed.onCustomMessage.listen((msg) {
+              print('Server (Project): Received custom message: $msg');
+              if (msg.toString().startsWith('PING:')) {
+                multiplexed
+                    .sendCustomMessage('PONG:${msg.toString().substring(5)}');
+              }
+            });
+            CrdtSync.server(db.crdt, multiplexed);
           })(request);
         }
       }
