@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -21,7 +22,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
               _customMessageController.add(message);
             } catch (e) {
               // Ignore malformed custom messages
-              print('Error parsing custom message: $e');
+              developer.log('Error parsing custom message: $e');
             }
           } else {
             _inboundController.add(data);

@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -18,7 +19,7 @@ class SyncController {
         return webSocketHandler((WebSocketChannel channel, String? protocol) {
           final multiplexed = MultiplexedWebSocketChannel(channel);
           multiplexed.onCustomMessage.listen((msg) {
-            print('Server (Global): Received custom message: $msg');
+            developer.log('Server (Global): Received custom message: $msg');
             if (msg['type'] == 'PING') {
               multiplexed.sendCustomMessage({
                 'type': 'PONG',
@@ -37,7 +38,7 @@ class SyncController {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
             multiplexed.onCustomMessage.listen((msg) {
-              print('Server (Project): Received custom message: $msg');
+              developer.log('Server (Project): Received custom message: $msg');
               if (msg['type'] == 'PING') {
                 multiplexed.sendCustomMessage({
                   'type': 'PONG',
