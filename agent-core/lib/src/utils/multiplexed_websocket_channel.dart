@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -6,7 +7,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
     implements WebSocketChannel {
   final WebSocketChannel _inner;
   final StreamController _inboundController = StreamController();
-  final StreamController _customMessageController =
+  final StreamController<Map<String, dynamic>> _customMessageController =
       StreamController.broadcast();
   static const String _customPrefix = '__CUSTOM__:';
 
@@ -14,7 +15,14 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
     _inner.stream.listen(
         (data) {
           if (data is String && data.startsWith(_customPrefix)) {
-            _customMessageController.add(data.substring(_customPrefix.length));
+            try {
+              final payload = data.substring(_customPrefix.length);
+              final message = jsonDecode(payload) as Map<String, dynamic>;
+              _customMessageController.add(message);
+            } catch (e) {
+              // Ignore malformed custom messages
+              print('Error parsing custom message: $e');
+            }
           } else {
             _inboundController.add(data);
           }
@@ -32,11 +40,12 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   @override
   WebSocketSink get sink => _MultiplexedSink(_inner.sink);
 
-  void sendCustomMessage(String message) {
-    _inner.sink.add('$_customPrefix$message');
+  void sendCustomMessage(Map<String, dynamic> message) {
+    _inner.sink.add('$_customPrefix${jsonEncode(message)}');
   }
 
-  Stream get onCustomMessage => _customMessageController.stream;
+  Stream<Map<String, dynamic>> get onCustomMessage =>
+      _customMessageController.stream;
 
   @override
   String? get protocol => _inner.protocol;

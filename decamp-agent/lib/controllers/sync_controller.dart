@@ -19,9 +19,11 @@ class SyncController {
           final multiplexed = MultiplexedWebSocketChannel(channel);
           multiplexed.onCustomMessage.listen((msg) {
             print('Server (Global): Received custom message: $msg');
-            if (msg.toString().startsWith('PING:')) {
-              multiplexed
-                  .sendCustomMessage('PONG:${msg.toString().substring(5)}');
+            if (msg['type'] == 'PING') {
+              multiplexed.sendCustomMessage({
+                'type': 'PONG',
+                'payload': msg['payload'],
+              });
             }
           });
           CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
@@ -36,9 +38,11 @@ class SyncController {
             final multiplexed = MultiplexedWebSocketChannel(channel);
             multiplexed.onCustomMessage.listen((msg) {
               print('Server (Project): Received custom message: $msg');
-              if (msg.toString().startsWith('PING:')) {
-                multiplexed
-                    .sendCustomMessage('PONG:${msg.toString().substring(5)}');
+              if (msg['type'] == 'PING') {
+                multiplexed.sendCustomMessage({
+                  'type': 'PONG',
+                  'payload': msg['payload'],
+                });
               }
             });
             CrdtSync.server(db.crdt, multiplexed);

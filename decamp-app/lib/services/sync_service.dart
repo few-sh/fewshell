@@ -127,6 +127,11 @@ class SyncService {
       );
       _projectChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Project): Received custom message: $msg');
+        if (msg['type'] == 'PONG') {
+          developer.log(
+            'SyncService (Project): PONG received: ${msg['payload']}',
+          );
+        }
       });
       _projectSync = CrdtSync.client(crdt, _projectChannel!);
     } catch (e) {
@@ -148,7 +153,7 @@ class SyncService {
   void sendPing(String message) {
     if (_projectChannel != null) {
       developer.log('SyncService: Sending ping: $message');
-      _projectChannel!.sendCustomMessage('PING:$message');
+      _projectChannel!.sendCustomMessage({'type': 'PING', 'payload': message});
     } else {
       developer.log('SyncService: Cannot send ping, no project connection');
     }
