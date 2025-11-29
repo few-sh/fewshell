@@ -1,6 +1,4 @@
 import 'package:drift/drift.dart';
-import '../project_database.dart';
-import '../tables/messages_table.dart';
 import 'package:agent_core/agent_core.dart';
 
 part 'message_dao.g.dart';
@@ -10,7 +8,7 @@ part 'message_dao.g.dart';
 @DriftAccessor(tables: [Messages])
 class MessageDao extends DatabaseAccessor<ProjectDatabase>
     with _$MessageDaoMixin {
-  MessageDao(ProjectDatabase db) : super(db);
+  MessageDao(super.db);
 
   /// Watch messages for a specific session, ordered by creation time asc
   Stream<List<MessageEntity>> watchMessagesBySession(String sessionId) {

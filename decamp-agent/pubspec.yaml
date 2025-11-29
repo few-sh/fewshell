@@ -9,10 +9,14 @@ environment:
 dependencies:
   shelf: ^1.4.2
   shelf_router: ^1.1.4
-  shelf_web_socket: ^2.0.0
+  shelf_web_socket: ^3.0.0
   web_socket_channel: ^3.0.0
   agent_core:
     path: ../agent-core
+  drift_crdt: ^1.0.11
+  crdt_sync: ^1.0.10
+  uuid: ^4.5.2
+  path: ^1.9.0
 
 dev_dependencies:
   lints: ^4.0.0

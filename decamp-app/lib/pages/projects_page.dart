@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/project_provider.dart';
-import 'package:decamp/themes/terminal_theme.dart';
 import 'package:agent_core/agent_core.dart';
 import '../utils/project_utils.dart';
 import 'project_setup_page.dart';
@@ -15,7 +14,6 @@ class ProjectsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch the projects stream
     final projectsAsync = ref.watch(projectsStreamProvider);
-    final terminalTheme = Theme.of(context).extension<TerminalTheme>()!;
 
     return Scaffold(
       appBar: AppBar(
@@ -111,6 +109,7 @@ class ProjectsPage extends ConsumerWidget {
                   onTap: () async {
                     // Select this project and navigate back
                     await selectProject(ref, project.id);
+                    if (!context.mounted) return;
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -169,7 +168,7 @@ class ProjectsPage extends ConsumerWidget {
                 label: const Text('New Project'),
               ),
         loading: () => null,
-        error: (_, __) => null,
+        error: (_, _) => null,
       ),
     );
   }

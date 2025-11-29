@@ -1,6 +1,4 @@
 import 'package:drift/drift.dart';
-import '../project_database.dart';
-import '../tables/sessions_table.dart';
 import 'package:agent_core/agent_core.dart';
 
 part 'session_dao.g.dart';
@@ -10,7 +8,7 @@ part 'session_dao.g.dart';
 @DriftAccessor(tables: [Sessions])
 class SessionDao extends DatabaseAccessor<ProjectDatabase>
     with _$SessionDaoMixin {
-  SessionDao(ProjectDatabase db) : super(db);
+  SessionDao(super.db);
 
   /// Watch sessions for a specific project, ordered by timestamp desc
   Stream<List<SessionEntity>> watchSessionsByProject(String projectId) {

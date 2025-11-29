@@ -9,7 +9,7 @@ part 'snippet_dao.g.dart';
 @DriftAccessor(tables: [Snippets])
 class SnippetDao extends DatabaseAccessor<GlobalDatabase>
     with _$SnippetDaoMixin {
-  SnippetDao(GlobalDatabase db) : super(db);
+  SnippetDao(super.db);
 
   /// Watch all global snippets (projectId is null)
   watchGlobalSnippets() {

@@ -241,7 +241,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
             await deleteSnippet(ref, snippet.id);
           },
         );
-      }).toList(),
+      }),
     ];
 
     return ReorderableListView(

@@ -4,7 +4,14 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
+        {
+            "name": "decamp-agent (server)",
+            "cwd": "decamp-agent",
+            "request": "launch",
+            "type": "dart",
+            "program": "bin/server.dart",
+            "args": ["--port", "3123"]
+        },
         {
             "name": "decamp-app",
             "cwd": "decamp-app",
@@ -24,6 +31,12 @@
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Stack (Server + App)",
+            "configurations": ["decamp-agent (server)", "decamp-app"]
         }
     ]
 }

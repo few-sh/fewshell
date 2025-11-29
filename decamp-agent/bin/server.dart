@@ -4,17 +4,22 @@ import 'dart:io';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:decamp_agent/router.dart';
+import 'package:decamp_agent/services/database_manager.dart';
 
 void main(List<String> args) async {
   // Get port from environment or use default
   final portEnv = Platform.environment['PORT'];
   final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
 
+  // Initialize DatabaseManager
+  final dbManager = DatabaseManager('${Directory.current.path}/data');
+  await dbManager.init();
+
   // Add middleware for logging and CORS
   final handler = const shelf.Pipeline()
       .addMiddleware(shelf.logRequests())
       .addMiddleware(_corsMiddleware())
-      .addHandler(createRouter().call);
+      .addHandler(createRouter(dbManager).call);
 
   // Start the server
   final server = await shelf_io.serve(

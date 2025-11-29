@@ -46,6 +46,7 @@ Future<void> updateProject(
   required String id,
   String? name,
   String? description,
+  Value<String?> serverUrl = const Value.absent(),
 }) async {
   final projectDao = ref.read(databaseProvider).projectDao;
 
@@ -55,6 +56,7 @@ Future<void> updateProject(
     description: description != null
         ? Value(description)
         : const Value.absent(),
+    serverUrl: serverUrl,
     updatedAt: Value(DateTime.now()),
   );
 

@@ -31,20 +31,21 @@ final currentSessionIdProvider = StateProvider<String?>((ref) => null);
 /// Session auto-selector that runs after build
 /// Watches project and sessions to ensure a valid session is always selected
 final sessionAutoSelectorProvider = Provider<void>((ref) {
-  final projectId = ref.watch(currentProjectIdProvider);
-  final sessionsAsync = ref.watch(currentProjectSessionsProvider);
+  void handleSelection() {
+    final projectId = ref.read(currentProjectIdProvider);
+    final sessionsAsync = ref.read(currentProjectSessionsProvider);
 
-  // Schedule session selection for after the current build
-  ref.listenSelf((_, __) {
     if (projectId == null) {
-      ref.read(currentSessionIdProvider.notifier).state = null;
+      if (ref.read(currentSessionIdProvider) != null) {
+        ref.read(currentSessionIdProvider.notifier).state = null;
+      }
       return;
     }
 
     final sessions = sessionsAsync.when(
       data: (sessions) => sessions,
       loading: () => null,
-      error: (_, __) => null,
+      error: (_, _) => null,
     );
 
     if (sessions == null) return;
@@ -71,7 +72,13 @@ final sessionAutoSelectorProvider = Provider<void>((ref) {
       // Select most recent session
       ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
     }
-  });
+  }
+
+  ref.listen(currentProjectIdProvider, (_, _) => handleSelection());
+  ref.listen(currentProjectSessionsProvider, (_, _) => handleSelection());
+
+  // Run initially
+  Future.microtask(handleSelection);
 });
 
 /// Provider for the currently selected session

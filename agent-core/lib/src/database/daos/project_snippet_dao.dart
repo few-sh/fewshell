@@ -1,5 +1,4 @@
 import 'package:drift/drift.dart';
-import '../project_database.dart';
 import '../database.dart'; // For SnippetEntityCompanion
 import '../tables/project_snippets_table.dart';
 import '../entities/snippet_entity.dart';
@@ -11,7 +10,7 @@ part 'project_snippet_dao.g.dart';
 @DriftAccessor(tables: [ProjectSnippets])
 class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
     with _$ProjectSnippetDaoMixin {
-  ProjectSnippetDao(ProjectDatabase db) : super(db);
+  ProjectSnippetDao(super.db);
 
   SnippetEntity _toEntity(ProjectSnippet s) {
     return SnippetEntity(

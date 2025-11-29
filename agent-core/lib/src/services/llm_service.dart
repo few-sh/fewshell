@@ -70,11 +70,9 @@ class LlmService {
         LlmApiKeychainKeys.buildProjectKey(projectId, config.identifier),
       );
       // Fall back to global key if project-specific key not found
-      if (apiKey == null) {
-        apiKey = await keychainService.getGlobalSecret(
-          LlmApiKeychainKeys.buildGlobalKey(config.identifier),
-        );
-      }
+      apiKey ??= await keychainService.getGlobalSecret(
+        LlmApiKeychainKeys.buildGlobalKey(config.identifier),
+      );
     } else {
       apiKey = await keychainService.getGlobalSecret(
         LlmApiKeychainKeys.buildGlobalKey(config.identifier),

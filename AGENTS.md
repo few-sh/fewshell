@@ -43,16 +43,23 @@ Themes:
 - Dark / Light
 
 ## Project structure
+decamp-app/ is the mobile/desktop frontend application:
 - The app uses Riverpod. Data integration and state managemene code is located in models/, providers/, and database/
 - Full-screen pages are located in pages/
 - Reusable widgets are in components/
+
+decamp-agent/ is the server-side backend application.
+
+agent-core/ is the package with the common code shared between the frontend and the backend
+
+
 
 ## Rules to follow for implementing features:
 - NEVER hard-code any colors. Use themes (see themes/ folder).
 - In general avoid hard-coding. When in doubt, ASK me.
 - Think long-term. Avoid temporary hacky solutions. Avoid technical debt.
 - Avoid duplicating state, it leads to additional complexity of having to sychronize the redundant state and may lead to bugs when things go out of sync. Always examine the code base to see if existing state can already be queried.
-
+- Fix linter warnings when writing new code. (Pre-existing TODO warnings are OK to ignore).
 
 When it comes to state management and data model, make your design decisions assuming that we will have the following future features:
 - Real-time collaboration support (eg CRDT).

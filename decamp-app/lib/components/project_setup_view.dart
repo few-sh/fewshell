@@ -36,6 +36,8 @@ class ProjectSetupView extends ConsumerWidget {
           final importer = ref.read(projectImporterProvider);
           final projectId = await importer.importFromQrCode(jsonString);
 
+          if (!context.mounted) return;
+
           // Capture navigator before selecting project
           final navigator = Navigator.of(context, rootNavigator: true);
 
@@ -70,6 +72,8 @@ class ProjectSetupView extends ConsumerWidget {
 
     try {
       final projectId = await projectDao.createProjectWithId(name: name);
+
+      if (!context.mounted) return;
 
       // Capture navigator before selecting project
       final navigator = Navigator.of(context, rootNavigator: true);

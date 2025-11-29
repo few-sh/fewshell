@@ -42,7 +42,7 @@ class _ChatListState extends State<ChatList> {
   final Map<String, GlobalKey> _messageKeys = {};
   bool _isScrollingToMatch = false; // Flag to prevent scroll conflicts
   final Map<String, int> _scrollRetryCount = {}; // Track retries per message
-  Map<String, List<HighlightRange>> _highlightsByMessage =
+  final Map<String, List<HighlightRange>> _highlightsByMessage =
       {}; // O(1) lookup cache
 
   @override

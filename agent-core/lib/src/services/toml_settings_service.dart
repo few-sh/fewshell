@@ -3,6 +3,7 @@ import 'package:toml/toml.dart';
 import '../models/settings.dart';
 import 'package:path/path.dart' as p;
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 class TomlSettingsService {
   static const String _globalSettingsFilename = 'settings.toml';
@@ -21,13 +22,13 @@ class TomlSettingsService {
 
     if (await file.exists()) {
       try {
-        print('Loading global settings from TOML: ${file.path}');
+        developer.log('Loading global settings from TOML: ${file.path}');
         final content = await file.readAsString();
         final document = TomlDocument.parse(content);
         final map = document.toMap();
         return AppSettings.fromJson(map);
       } catch (e) {
-        print('Error loading global settings from TOML: $e');
+        developer.log('Error loading global settings from TOML: $e');
         // Fallback to migration check if file is corrupted?
         // Or just return null to trigger default?
         // For now, let's try to migrate if we can't read the file,
@@ -65,7 +66,7 @@ class TomlSettingsService {
 
     if (await file.exists()) {
       try {
-        print(
+        developer.log(
           'Loading project settings for $projectId from TOML: ${file.path}',
         );
         final content = await file.readAsString();
@@ -73,7 +74,8 @@ class TomlSettingsService {
         final map = document.toMap();
         return ProjectSettings.fromJson(map);
       } catch (e) {
-        print('Error loading project settings for $projectId from TOML: $e');
+        developer
+            .log('Error loading project settings for $projectId from TOML: $e');
         return null;
       }
     }

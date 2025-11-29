@@ -36,11 +36,11 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
   final String _projectId;
 
   ProjectSshSettingsNotifier(
-    SshSettings? initialSettings,
+    super.initialSettings,
     this._settingsNotifier,
     this._keychain,
     this._projectId,
-  ) : super(initialSettings);
+  );
 
   /// Create new SSH settings for the project
   Future<void> createSshSettings({
@@ -161,9 +161,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         }
 
         // Create new password secret or update existing
-        if (passwordSecretId == null) {
-          passwordSecretId = _generateSecretId('ssh_password');
-        }
+        passwordSecretId ??= _generateSecretId('ssh_password');
         await _keychain.saveProjectSecret(
           _projectId,
           passwordSecretId,
@@ -203,9 +201,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
 
       // Update private key
       if (privateKey != null && privateKey.isNotEmpty) {
-        if (privateKeySecretId == null) {
-          privateKeySecretId = _generateSecretId('ssh_privatekey');
-        }
+        privateKeySecretId ??= _generateSecretId('ssh_privatekey');
         await _keychain.saveProjectSecret(
           _projectId,
           privateKeySecretId,
@@ -216,9 +212,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       // Update passphrase
       if (passphrase != null) {
         if (passphrase.isNotEmpty) {
-          if (passphraseSecretId == null) {
-            passphraseSecretId = _generateSecretId('ssh_passphrase');
-          }
+          passphraseSecretId ??= _generateSecretId('ssh_passphrase');
           await _keychain.saveProjectSecret(
             _projectId,
             passphraseSecretId,
@@ -235,9 +229,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
     // Handle sudo password updates (independent of auth method)
     if (sudoPassword != null) {
       if (sudoPassword.isNotEmpty) {
-        if (sudoPasswordSecretId == null) {
-          sudoPasswordSecretId = _generateSecretId('ssh_sudo_password');
-        }
+        sudoPasswordSecretId ??= _generateSecretId('ssh_sudo_password');
         await _keychain.saveProjectSecret(
           _projectId,
           sudoPasswordSecretId,

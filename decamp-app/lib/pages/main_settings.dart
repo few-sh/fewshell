@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:agent_core/agent_core.dart';
 import '../services/project_importer.dart';
 import 'chat_session.dart';
@@ -107,6 +108,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       children: [
         if (currentProject != null) ...[
           _buildProjectNameSection(currentProject),
+          const SizedBox(height: 24),
+          _buildServerUrlSection(currentProject),
           const SizedBox(height: 24),
         ],
         _buildAIModelsSection(isGlobal: false),
@@ -778,7 +781,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   void _showDeleteSshConfirmation({required String projectId}) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Remote Shell Configuration'),
         content: const Text(
           'Are you sure you want to delete the remote shell configuration? '
@@ -786,7 +789,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -796,21 +799,23 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                     .read(projectSshSettingsProvider(projectId).notifier)
                     .deleteSshSettings();
 
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     const SnackBar(
                       content: Text('Remote shell configuration deleted'),
                     ),
                   );
                 }
               } catch (e) {
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Error deleting configuration: $e'),
-                      backgroundColor: Theme.of(context).colorScheme.error,
+                      backgroundColor: Theme.of(
+                        dialogContext,
+                      ).colorScheme.error,
                     ),
                   );
                 }
@@ -986,14 +991,14 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete AI Model'),
         content: Text(
           'Are you sure you want to delete "${settings.identifier}"?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
@@ -1012,21 +1017,23 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                   }
                 }
 
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Deleted model: ${settings.identifier}'),
                     ),
                   );
                 }
               } catch (e) {
-                if (mounted) {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                if (dialogContext.mounted) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
                     SnackBar(
                       content: Text('Error deleting model: $e'),
-                      backgroundColor: Theme.of(context).colorScheme.error,
+                      backgroundColor: Theme.of(
+                        dialogContext,
+                      ).colorScheme.error,
                     ),
                   );
                 }
@@ -1039,6 +1046,64 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildServerUrlSection(ProjectEntity project) {
+    final theme = Theme.of(context);
+    final controller = TextEditingController(text: project.serverUrl);
+
+    Future<void> saveChanges(String value) async {
+      final trimmedValue = value.trim();
+      final newValue = trimmedValue.isEmpty ? null : trimmedValue;
+
+      // Check if unchanged
+      if (newValue == project.serverUrl) {
+        return;
+      }
+
+      // Save the change
+      await updateProject(ref, id: project.id, serverUrl: Value(newValue));
+      if (mounted) {
+        _showSnack('Server URL updated');
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sync Server URL',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    labelText: 'Server URL',
+                    hintText: 'ws://localhost:3123',
+                    helperText: 'Leave empty to disable sync',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: const Icon(Icons.cloud_sync),
+                  ),
+                  onSubmitted: saveChanges,
+                  onTapOutside: (_) => saveChanges(controller.text),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
