@@ -768,7 +768,7 @@ class _SshSettingsDialogFormState
       );
 
       if (!connected) {
-        throw Exception('Connection failed');
+        throw Exception('Connection failed. Please check your settings and credentials. More details may be available in the developer logs.');
       }
 
       // Disconnect immediately - authentication success is sufficient
