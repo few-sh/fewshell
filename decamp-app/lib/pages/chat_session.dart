@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:decamp/providers/shell_service_provider.dart';
+import 'package:decamp/components/ssh_prompt_dialog.dart';
 import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/execution_progress_overlay.dart';
@@ -254,6 +256,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
   }
 
+  /// Handle SSH interactive prompts (e.g. 2FA, password)
+  Future<String> _handleSshPrompt(String prompt, bool echo) async {
+    return showSshPrompt(context, prompt, echo);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Activate auto-session selection
@@ -262,6 +269,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
+
+    // Inject SSH prompt callback
+    if (currentProject != null) {
+      final shellServiceProv = shellServiceProvider(currentProject.id);
+      ref.listen(shellServiceProv, (_, shellService) {
+        shellService.onUserPrompt = _handleSshPrompt;
+      });
+      ref.read(shellServiceProv).onUserPrompt = _handleSshPrompt;
+    }
 
     // Unfocus when session or project changes
     ref.listen(currentSessionIdProvider, (previous, next) {

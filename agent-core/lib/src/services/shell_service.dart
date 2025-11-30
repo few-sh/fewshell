@@ -5,8 +5,13 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
+// ignore: implementation_imports
+import 'package:dartssh2/src/ssh_userauth.dart';
 import '../models/ssh_settings.dart';
 import 'keychain_service.dart';
+
+/// Callback for interactive user prompts (e.g. 2FA, password)
+typedef UserPromptCallback = Future<String> Function(String prompt, bool echo);
 
 /// Service for executing shell commands via SSH
 class ShellService {
@@ -15,42 +20,35 @@ class ShellService {
   final KeychainService? _keychain;
   final String? _projectId;
 
+  /// Callback for handling interactive prompts from the SSH server
+  UserPromptCallback? onUserPrompt;
+
   ShellService(this._sshSettings, this._keychain, this._projectId);
 
   /// Connect to SSH server using the provided settings
   /// Returns true if connection successful, false otherwise
-  Future<bool> connect(SshSettings sshSettings) async {
+  ///
+  /// Optional inline credentials can be provided for testing purposes.
+  /// If provided, they override credentials from the keychain.
+  Future<bool> connect(
+    SshSettings sshSettings, {
+    String? inlinePassword,
+    String? inlinePrivateKey,
+    String? inlinePassphrase,
+  }) async {
     try {
       developer.log(
         'Connecting to SSH: ${sshSettings.username}@${sshSettings.host}:${sshSettings.port}',
         name: 'ShellService',
       );
 
-      // Get credentials from secrets
-      String? password;
-      String? privateKey;
-      String? passphrase;
-
-      if (_keychain != null && _projectId != null) {
-        if (sshSettings.passwordSecretId != null) {
-          password = await _keychain.getProjectSecret(
-            _projectId,
-            sshSettings.passwordSecretId!,
-          );
-        }
-        if (sshSettings.privateKeySecretId != null) {
-          privateKey = await _keychain.getProjectSecret(
-            _projectId,
-            sshSettings.privateKeySecretId!,
-          );
-        }
-        if (sshSettings.passphraseSecretId != null) {
-          passphrase = await _keychain.getProjectSecret(
-            _projectId,
-            sshSettings.passphraseSecretId!,
-          );
-        }
-      }
+      // Get credentials from inline or keychain
+      final password =
+          await _getCredential(inlinePassword, sshSettings.passwordSecretId);
+      final privateKey = await _getCredential(
+          inlinePrivateKey, sshSettings.privateKeySecretId);
+      final passphrase = await _getCredential(
+          inlinePassphrase, sshSettings.passphraseSecretId);
 
       // Create SSH socket
       final socket = await SSHSocket.connect(
@@ -69,6 +67,8 @@ class ShellService {
           socket,
           username: sshSettings.username,
           onPasswordRequest: () => password,
+          onUserInfoRequest: (request) =>
+              _handleUserInfoRequest(request, passwordFallback: password),
         );
       } else {
         // Private key authentication
@@ -80,8 +80,12 @@ class ShellService {
           socket,
           username: sshSettings.username,
           identities: [...SSHKeyPair.fromPem(privateKey, passphrase)],
+          onUserInfoRequest: (request) => _handleUserInfoRequest(request),
         );
       }
+
+      // Wait for authentication to complete
+      await _client!.authenticated;
 
       developer.log('SSH connection established', name: 'ShellService');
       return true;
@@ -588,6 +592,33 @@ ${envExports}DECAMP_SECRETS
     return RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name);
   }
 
+  /// Handle SSH keyboard-interactive requests
+  Future<List<String>> _handleUserInfoRequest(
+    SSHUserInfoRequest request, {
+    String? passwordFallback,
+  }) async {
+    final prompts = request.prompts;
+    if (onUserPrompt == null) {
+      // If no callback provided, try to use the stored password for the first prompt
+      // This is a fallback for servers that use keyboard-interactive for simple password auth
+      if (passwordFallback != null && prompts.isNotEmpty) {
+        final promptText = prompts.first.promptText;
+        if (promptText.toLowerCase().contains('password') ||
+            promptText.trim().endsWith(':')) {
+          return [passwordFallback];
+        }
+      }
+      return [];
+    }
+
+    final answers = <String>[];
+    for (var prompt in prompts) {
+      final answer = await onUserPrompt!(prompt.promptText, prompt.echo);
+      answers.add(answer);
+    }
+    return answers;
+  }
+
   /// Redact secrets from output text
   String _redactSecrets(String text, List<String> secrets) {
     var redacted = text;
@@ -597,5 +628,14 @@ ${envExports}DECAMP_SECRETS
       }
     }
     return redacted;
+  }
+
+  /// Get credential from inline value or keychain
+  /// Returns inline value if provided, otherwise fetches from keychain
+  Future<String?> _getCredential(String? inlineValue, String? secretId) async {
+    if (inlineValue != null) return inlineValue;
+    if (_keychain == null || _projectId == null || secretId == null)
+      return null;
+    return await _keychain.getProjectSecret(_projectId, secretId);
   }
 }
