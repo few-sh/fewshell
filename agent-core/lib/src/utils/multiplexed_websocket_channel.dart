@@ -13,17 +13,26 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   // Use Unit Separator (ASCII 31) as a prefix to avoid collisions with JSON
   static const String _customPrefix = '\u001F';
 
+  late final WebSocketSink _sink = _MultiplexedSink(_inner.sink);
+
   MultiplexedWebSocketChannel(this._inner) {
     _inner.stream.listen(
         (data) {
           if (data is String && data.startsWith(_customPrefix)) {
             try {
               final payload = data.substring(_customPrefix.length);
-              final message = jsonDecode(payload) as Map<String, dynamic>;
-              _customMessageController.add(message);
-            } catch (e) {
+              final decoded = jsonDecode(payload);
+              if (decoded is Map<String, dynamic>) {
+                _customMessageController.add(decoded);
+              } else {
+                developer.log('Custom message payload is not a Map: $decoded');
+              }
+            } catch (e, stackTrace) {
               // Ignore malformed custom messages
-              developer.log('Error parsing custom message: $e');
+              developer.log(
+                'Error parsing custom message: $e',
+                stackTrace: stackTrace,
+              );
             }
           } else {
             _inboundController.add(data);
@@ -40,7 +49,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   Stream get stream => _inboundController.stream;
 
   @override
-  WebSocketSink get sink => _MultiplexedSink(_inner.sink);
+  WebSocketSink get sink => _sink;
 
   void sendCustomMessage(Map<String, dynamic> message) {
     _inner.sink.add('$_customPrefix${jsonEncode(message)}');
