@@ -18,15 +18,7 @@ class SyncController {
       if (path == 'global') {
         return webSocketHandler((WebSocketChannel channel, String? protocol) {
           final multiplexed = MultiplexedWebSocketChannel(channel);
-          multiplexed.onCustomMessage.listen((msg) {
-            developer.log('Server (Global): Received custom message: $msg');
-            if (msg['type'] == 'PING') {
-              multiplexed.sendCustomMessage({
-                'type': 'PONG',
-                'payload': msg['payload'],
-              });
-            }
-          });
+          _setupCustomMessageHandling(multiplexed, 'Global');
           CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
         })(request);
       } else if (path.startsWith('project/')) {
@@ -37,15 +29,7 @@ class SyncController {
               (WebSocketChannel channel, String? protocol) async {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
-            multiplexed.onCustomMessage.listen((msg) {
-              developer.log('Server (Project): Received custom message: $msg');
-              if (msg['type'] == 'PING') {
-                multiplexed.sendCustomMessage({
-                  'type': 'PONG',
-                  'payload': msg['payload'],
-                });
-              }
-            });
+            _setupCustomMessageHandling(multiplexed, 'Project');
             CrdtSync.server(db.crdt, multiplexed);
           })(request);
         }
@@ -53,5 +37,22 @@ class SyncController {
 
       return Response.notFound('Not found');
     };
+  }
+
+  void _setupCustomMessageHandling(
+    MultiplexedWebSocketChannel channel,
+    String context,
+  ) {
+    // The subscription will be automatically cancelled when the channel is closed
+    // (connection dropped) as the stream will send a done event.
+    channel.onCustomMessage.listen((msg) {
+      developer.log('Server ($context): Received custom message: $msg');
+      if (msg['type'] == 'PING') {
+        channel.sendCustomMessage({
+          'type': 'PONG',
+          'payload': msg['payload'],
+        });
+      }
+    });
   }
 }
