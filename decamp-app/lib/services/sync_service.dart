@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +18,12 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 class SyncService {
   final Ref ref;
   CrdtSync? _globalSync;
+  MultiplexedWebSocketChannel? _globalChannel;
+  StreamSubscription? _globalSubscription;
+
   CrdtSync? _projectSync;
+  MultiplexedWebSocketChannel? _projectChannel;
+  StreamSubscription? _projectSubscription;
 
   SyncService(this.ref) {
     _init();
@@ -70,7 +76,7 @@ class SyncService {
   }
 
   Future<void> _connectGlobal(GlobalDatabase db) async {
-    _globalSync?.close();
+    _disconnectGlobal();
 
     return; // Temporarily disable global sync.
 
@@ -83,14 +89,20 @@ class SyncService {
       final uri = Uri.parse('$_baseUrl/sync/global');
 
       developer.log('SyncService: Connecting to global sync at $uri');
-      _globalSync = CrdtSync.client(crdt, WebSocketChannel.connect(uri));
+      _globalChannel = MultiplexedWebSocketChannel(
+        WebSocketChannel.connect(uri),
+      );
+      _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
+        developer.log('SyncService (Global): Received custom message: $msg');
+      });
+      _globalSync = CrdtSync.client(crdt, _globalChannel!);
     } catch (e) {
       developer.log('SyncService: Global DB not ready or error: $e');
     }
   }
 
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
-    _projectSync?.close();
+    _disconnectProject();
     try {
       // Ensure DB is open
       await db.customSelect('SELECT 1').get();
@@ -113,19 +125,50 @@ class SyncService {
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
       developer.log('SyncService: Connecting to project sync at $uri');
-      _projectSync = CrdtSync.client(crdt, WebSocketChannel.connect(uri));
+      _projectChannel = MultiplexedWebSocketChannel(
+        WebSocketChannel.connect(uri),
+      );
+      _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
+        developer.log('SyncService (Project): Received custom message: $msg');
+        if (msg['type'] == 'PONG') {
+          developer.log(
+            'SyncService (Project): PONG received: ${msg['payload']}',
+          );
+        }
+      });
+      _projectSync = CrdtSync.client(crdt, _projectChannel!);
     } catch (e) {
       developer.log('SyncService: Project DB not ready or error: $e');
     }
   }
 
+  void _disconnectGlobal() {
+    _globalSync?.close();
+    _globalSync = null;
+    _globalChannel = null;
+    _globalSubscription?.cancel();
+    _globalSubscription = null;
+  }
+
   void _disconnectProject() {
     _projectSync?.close();
     _projectSync = null;
+    _projectChannel = null;
+    _projectSubscription?.cancel();
+    _projectSubscription = null;
   }
 
   void dispose() {
-    _globalSync?.close();
-    _projectSync?.close();
+    _disconnectGlobal();
+    _disconnectProject();
+  }
+
+  void sendPing(String message) {
+    if (_projectChannel != null) {
+      developer.log('SyncService: Sending ping: $message');
+      _projectChannel!.sendCustomMessage({'type': 'PING', 'payload': message});
+    } else {
+      developer.log('SyncService: Cannot send ping, no project connection');
+    }
   }
 }

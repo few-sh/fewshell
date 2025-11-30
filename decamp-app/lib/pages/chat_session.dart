@@ -16,6 +16,7 @@ import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/components/no_llm_configured_overlay.dart';
+import 'package:decamp/services/sync_service.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -152,6 +153,24 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     }
 
     developer.log('📤 Sending message', name: 'ChatSession');
+
+    // Handle /ping command
+    final pingRegex = RegExp(r'^/ping(\s+(.*))?$');
+    final match = pingRegex.firstMatch(content.trim());
+    if (match != null) {
+      final message = match.group(2) ?? 'ping';
+      ref.read(syncServiceProvider).sendPing(message);
+
+      // Add a system message to chat to indicate ping was sent
+      final messageDao = ref.read(databaseProvider).messageDao;
+      await messageDao.insertMessageWithId(
+        sessionId: currentSessionId,
+        userId: 'system',
+        userName: 'System',
+        content: 'Sent ping: $message',
+      );
+      return;
+    }
 
     // Get the controller
     final controller = ref.read(
