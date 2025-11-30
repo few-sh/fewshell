@@ -76,9 +76,7 @@ class SyncService {
   }
 
   Future<void> _connectGlobal(GlobalDatabase db) async {
-    _globalSync?.close();
-    await _globalSubscription?.cancel();
-    _globalSubscription = null;
+    _disconnectGlobal();
 
     return; // Temporarily disable global sync.
 
@@ -104,9 +102,7 @@ class SyncService {
   }
 
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
-    _projectSync?.close();
-    await _projectSubscription?.cancel();
-    _projectSubscription = null;
+    _disconnectProject();
     try {
       // Ensure DB is open
       await db.customSelect('SELECT 1').get();
@@ -146,6 +142,14 @@ class SyncService {
     }
   }
 
+  void _disconnectGlobal() {
+    _globalSync?.close();
+    _globalSync = null;
+    _globalChannel = null;
+    _globalSubscription?.cancel();
+    _globalSubscription = null;
+  }
+
   void _disconnectProject() {
     _projectSync?.close();
     _projectSync = null;
@@ -155,10 +159,8 @@ class SyncService {
   }
 
   void dispose() {
-    _globalSync?.close();
-    _projectSync?.close();
-    _globalSubscription?.cancel();
-    _projectSubscription?.cancel();
+    _disconnectGlobal();
+    _disconnectProject();
   }
 
   void sendPing(String message) {
