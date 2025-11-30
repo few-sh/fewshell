@@ -155,10 +155,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     developer.log('📤 Sending message', name: 'ChatSession');
 
     // Handle /ping command
-    if (content.trim().startsWith('/ping')) {
-      final message = content.trim().length > 5
-          ? content.trim().substring(6)
-          : 'ping';
+    final pingRegex = RegExp(r'^/ping(\s+(.*))?$');
+    final match = pingRegex.firstMatch(content.trim());
+    if (match != null) {
+      final message = match.group(2) ?? 'ping';
       ref.read(syncServiceProvider).sendPing(message);
 
       // Add a system message to chat to indicate ping was sent
