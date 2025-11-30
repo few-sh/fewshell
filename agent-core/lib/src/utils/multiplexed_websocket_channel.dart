@@ -16,33 +16,33 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   late final WebSocketSink _sink = _MultiplexedSink(_inner.sink);
 
   MultiplexedWebSocketChannel(this._inner) {
-    _inner.stream.listen(
-        (data) {
-          if (data is String && data.startsWith(_customPrefix)) {
-            try {
-              final payload = data.substring(_customPrefix.length);
-              final decoded = jsonDecode(payload);
-              if (decoded is Map<String, dynamic>) {
-                _customMessageController.add(decoded);
-              } else {
-                developer.log('Custom message payload is not a Map: $decoded');
-              }
-            } catch (e, stackTrace) {
-              // Ignore malformed custom messages
-              developer.log(
-                'Error parsing custom message: $e',
-                stackTrace: stackTrace,
-              );
-            }
+    _inner.stream.listen((data) {
+      if (data is String && data.startsWith(_customPrefix)) {
+        try {
+          final payload = data.substring(_customPrefix.length);
+          final decoded = jsonDecode(payload);
+          if (decoded is Map<String, dynamic>) {
+            _customMessageController.add(decoded);
           } else {
-            _inboundController.add(data);
+            developer.log('Custom message payload is not a Map: $decoded');
           }
-        },
-        onError: _inboundController.addError,
-        onDone: () {
-          _inboundController.close();
-          _customMessageController.close();
-        });
+        } catch (e, stackTrace) {
+          // Ignore malformed custom messages
+          developer.log(
+            'Error parsing custom message: $e',
+            stackTrace: stackTrace,
+          );
+        }
+      } else {
+        _inboundController.add(data);
+      }
+    }, onError: (error, stackTrace) {
+      _inboundController.addError(error, stackTrace);
+      _customMessageController.addError(error, stackTrace);
+    }, onDone: () {
+      _inboundController.close();
+      _customMessageController.close();
+    });
   }
 
   @override
