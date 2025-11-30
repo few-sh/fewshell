@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,9 +19,11 @@ class SyncService {
   final Ref ref;
   CrdtSync? _globalSync;
   MultiplexedWebSocketChannel? _globalChannel;
+  StreamSubscription? _globalSubscription;
 
   CrdtSync? _projectSync;
   MultiplexedWebSocketChannel? _projectChannel;
+  StreamSubscription? _projectSubscription;
 
   SyncService(this.ref) {
     _init();
@@ -74,6 +77,8 @@ class SyncService {
 
   Future<void> _connectGlobal(GlobalDatabase db) async {
     _globalSync?.close();
+    await _globalSubscription?.cancel();
+    _globalSubscription = null;
 
     return; // Temporarily disable global sync.
 
@@ -89,7 +94,7 @@ class SyncService {
       _globalChannel = MultiplexedWebSocketChannel(
         WebSocketChannel.connect(uri),
       );
-      _globalChannel!.onCustomMessage.listen((msg) {
+      _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Global): Received custom message: $msg');
       });
       _globalSync = CrdtSync.client(crdt, _globalChannel!);
@@ -100,6 +105,8 @@ class SyncService {
 
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
     _projectSync?.close();
+    await _projectSubscription?.cancel();
+    _projectSubscription = null;
     try {
       // Ensure DB is open
       await db.customSelect('SELECT 1').get();
@@ -125,7 +132,7 @@ class SyncService {
       _projectChannel = MultiplexedWebSocketChannel(
         WebSocketChannel.connect(uri),
       );
-      _projectChannel!.onCustomMessage.listen((msg) {
+      _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Project): Received custom message: $msg');
         if (msg['type'] == 'PONG') {
           developer.log(
@@ -143,11 +150,15 @@ class SyncService {
     _projectSync?.close();
     _projectSync = null;
     _projectChannel = null;
+    _projectSubscription?.cancel();
+    _projectSubscription = null;
   }
 
   void dispose() {
     _globalSync?.close();
     _projectSync?.close();
+    _globalSubscription?.cancel();
+    _projectSubscription?.cancel();
   }
 
   void sendPing(String message) {
