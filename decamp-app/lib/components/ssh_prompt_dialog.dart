@@ -9,45 +9,69 @@ Future<String> showSshPrompt(
 ) async {
   if (!context.mounted) return '';
 
-  final controller = TextEditingController();
   return await showDialog<String>(
         context: context,
         barrierDismissible: false,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('SSH Authentication Required'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(prompt),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  obscureText: !echo,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Enter response',
-                  ),
-                  onSubmitted: (value) {
-                    Navigator.of(context).pop(value);
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(''),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(controller.text),
-                child: const Text('Submit'),
-              ),
-            ],
-          );
-        },
+        builder: (context) => _SshPromptDialog(prompt: prompt, echo: echo),
       ) ??
       '';
+}
+
+class _SshPromptDialog extends StatefulWidget {
+  final String prompt;
+  final bool echo;
+
+  const _SshPromptDialog({required this.prompt, required this.echo});
+
+  @override
+  State<_SshPromptDialog> createState() => _SshPromptDialogState();
+}
+
+class _SshPromptDialogState extends State<_SshPromptDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit([String? value]) {
+    Navigator.of(context).pop(value ?? _controller.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('SSH Authentication Required'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.prompt),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            obscureText: !widget.echo,
+            autofocus: true,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Enter response',
+            ),
+            onSubmitted: _submit,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => _submit(''), child: const Text('Cancel')),
+        TextButton(onPressed: _submit, child: const Text('Submit')),
+      ],
+    );
+  }
 }

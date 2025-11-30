@@ -253,8 +253,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Inject SSH prompt callback
     if (currentProject != null) {
-      final shellService = ref.watch(shellServiceProvider(currentProject.id));
-      shellService.onUserPrompt = _handleSshPrompt;
+      final shellServiceProv = shellServiceProvider(currentProject.id);
+      ref.listen(shellServiceProv, (_, shellService) {
+        shellService.onUserPrompt = _handleSshPrompt;
+      });
+      ref.read(shellServiceProv).onUserPrompt = _handleSshPrompt;
     }
 
     // Unfocus when session or project changes

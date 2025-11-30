@@ -5,6 +5,8 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
+// ignore: implementation_imports
+import 'package:dartssh2/src/ssh_userauth.dart';
 import '../models/ssh_settings.dart';
 import 'keychain_service.dart';
 
@@ -41,9 +43,12 @@ class ShellService {
       );
 
       // Get credentials from inline or keychain
-      final password = await _getCredential(inlinePassword, sshSettings.passwordSecretId);
-      final privateKey = await _getCredential(inlinePrivateKey, sshSettings.privateKeySecretId);
-      final passphrase = await _getCredential(inlinePassphrase, sshSettings.passphraseSecretId);
+      final password =
+          await _getCredential(inlinePassword, sshSettings.passwordSecretId);
+      final privateKey = await _getCredential(
+          inlinePrivateKey, sshSettings.privateKeySecretId);
+      final passphrase = await _getCredential(
+          inlinePassphrase, sshSettings.passphraseSecretId);
 
       // Create SSH socket
       final socket = await SSHSocket.connect(
@@ -62,7 +67,8 @@ class ShellService {
           socket,
           username: sshSettings.username,
           onPasswordRequest: () => password,
-          onUserInfoRequest: (request) => _handleUserInfoRequest(request, passwordFallback: password),
+          onUserInfoRequest: (request) =>
+              _handleUserInfoRequest(request, passwordFallback: password),
         );
       } else {
         // Private key authentication
@@ -628,7 +634,8 @@ ${envExports}DECAMP_SECRETS
   /// Returns inline value if provided, otherwise fetches from keychain
   Future<String?> _getCredential(String? inlineValue, String? secretId) async {
     if (inlineValue != null) return inlineValue;
-    if (_keychain == null || _projectId == null || secretId == null) return null;
+    if (_keychain == null || _projectId == null || secretId == null)
+      return null;
     return await _keychain.getProjectSecret(_projectId, secretId);
   }
 }
