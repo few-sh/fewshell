@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dartssh2/dartssh2.dart';
 import 'package:agent_core/agent_core.dart';
+import 'ssh_prompt_dialog.dart';
 import '../providers/ssh_settings_provider.dart';
 
 /// Reusable dialog for configuring SSH/Remote Shell settings
@@ -747,31 +747,38 @@ class _SshSettingsDialogFormState
         enabled: true,
       );
 
-      // Attempt to connect with inline credentials
-      bool connected = false;
+      // Create ShellService instance with inline credentials
+      final shellService = ShellService(null, null, null);
+      shellService.onUserPrompt = (prompt, echo) => 
+          showSshPrompt(context, prompt, echo);
 
-      if (_authMethod == SshAuthMethod.password) {
-        connected = await _testConnectionWithPassword(
-          testSettings,
-          _passwordController.text,
-        );
-      } else {
-        connected = await _testConnectionWithPrivateKey(
-          testSettings,
-          _privateKeyController.text,
-          _passphraseController.text.isEmpty
-              ? null
-              : _passphraseController.text,
-        );
+      // Connect with inline credentials
+      final connected = await shellService.connect(
+        testSettings,
+        inlinePassword: _authMethod == SshAuthMethod.password
+            ? _passwordController.text
+            : null,
+        inlinePrivateKey: _authMethod == SshAuthMethod.privateKey
+            ? _privateKeyController.text
+            : null,
+        inlinePassphrase: _authMethod == SshAuthMethod.privateKey &&
+                _passphraseController.text.isNotEmpty
+            ? _passphraseController.text
+            : null,
+      );
+
+      if (!connected) {
+        throw Exception('Connection failed');
       }
+
+      // Disconnect immediately - authentication success is sufficient
+      shellService.disconnect();
 
       if (mounted) {
         setState(() {
           _isTestingConnection = false;
-          _testResultSuccess = connected;
-          _testResultMessage = connected
-              ? 'Connection successful!'
-              : 'Connection failed. Please check your settings.';
+          _testResultSuccess = true;
+          _testResultMessage = 'Connection successful!';
         });
         _scrollToBottom();
       }
@@ -798,61 +805,6 @@ class _SshSettingsDialogFormState
         );
       }
     });
-  }
-
-  Future<bool> _testConnectionWithPassword(
-    SshSettings settings,
-    String password,
-  ) async {
-    try {
-      final socket = await SSHSocket.connect(
-        settings.host,
-        settings.port,
-        timeout: const Duration(seconds: 30),
-      );
-
-      final client = SSHClient(
-        socket,
-        username: settings.username,
-        onPasswordRequest: () => password,
-      );
-
-      // Test with a simple command
-      await client.run('echo test');
-      client.close();
-
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  Future<bool> _testConnectionWithPrivateKey(
-    SshSettings settings,
-    String privateKey,
-    String? passphrase,
-  ) async {
-    try {
-      final socket = await SSHSocket.connect(
-        settings.host,
-        settings.port,
-        timeout: const Duration(seconds: 30),
-      );
-
-      final client = SSHClient(
-        socket,
-        username: settings.username,
-        identities: [...SSHKeyPair.fromPem(privateKey, passphrase)],
-      );
-
-      // Test with a simple command
-      await client.run('echo test');
-      client.close();
-
-      return true;
-    } catch (e) {
-      return false;
-    }
   }
 
   void _save() {
