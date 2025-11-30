@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:llm_dart/llm_dart.dart';
 
 import 'types.dart';
+import 'utils/bash_block_parser.dart';
+import 'dart:developer' as developer;
 
 /// Runs the agent loop: LLM → tool calls → approval → execution → repeat
 ///
@@ -20,6 +22,7 @@ import 'types.dart';
 /// - [onTextDelta]: Optional callback for streaming text deltas
 /// - [onAssistantMessage]: Optional callback when assistant message is complete
 /// - [onToolResultMessage]: Optional callback when tool results are ready
+/// - [onUserMessage]: Optional callback when a user message (e.g. error recovery) is generated
 ///
 /// Returns [AgentLoopResult] indicating how the loop terminated:
 /// - [AgentLoopCompleted]: No more tool calls, conversation complete
@@ -49,6 +52,7 @@ Future<AgentLoopResult> runAgentLoop({
   TextDeltaCallback? onTextDelta,
   MessageCallback? onAssistantMessage,
   MessageCallback? onToolResultMessage,
+  MessageCallback? onUserMessage,
 }) async {
   // Work with a mutable copy if using in-memory conversation
   var messages = conversation != null
@@ -75,13 +79,68 @@ Future<AgentLoopResult> runAgentLoop({
         return AgentLoopError(streamResult.error!);
       }
 
-      // If no tool calls, we're done
+      // If no tool calls, check for bash blocks in text (Bash-First Mode)
       if (streamResult.toolCalls.isEmpty) {
-        // Notify about final text message if there is one
-        if (streamResult.text.isNotEmpty && onAssistantMessage != null) {
-          await onAssistantMessage(ChatMessage.assistant(streamResult.text));
+        try {
+          final bashToolCalls = BashBlockParser.parse(streamResult.text);
+          if (bashToolCalls.isNotEmpty) {
+            developer.log(
+              'Found ${bashToolCalls.length} bash blocks in text, converting to tool calls',
+              name: 'AgentLoop',
+            );
+          }
+          
+            // If still no tool calls (neither explicit nor bash blocks), check for protocol signals
+          if (bashToolCalls.isEmpty) {
+            final text = streamResult.text;
+            
+            // Check for explicit completion or question signals
+            if (text.contains('COMPLETED_TASK') || text.contains('ASK_USER')) {
+              // Valid termination of the turn
+              if (text.isNotEmpty && onAssistantMessage != null) {
+                await onAssistantMessage(ChatMessage.assistant(text));
+              }
+              return const AgentLoopCompleted();
+            }
+            
+            // VIOLATION: No command, no completion, no question.
+            // This is the "stalling" behavior. We must reject it.
+            throw BashBlockFormatException(
+              'Error: You responded with text but NO command. '
+              'You must provide a bash block, COMPLETED_TASK, or ASK_USER. '
+              'Do not explain your plan, just execute it.',
+            );
+          }
+          
+          // We have bash tool calls, proceed to approval
+          // Add them to the list for processing
+          streamResult.toolCalls.addAll(bashToolCalls);
+        } on BashBlockFormatException catch (e) {
+          // IMPORTANT: We must add the assistant's invalid message to the history
+          // so the LLM sees what it did wrong.
+          if (streamResult.text.isNotEmpty) {
+             final invalidMessage = ChatMessage.assistant(streamResult.text);
+             messages.add(invalidMessage);
+             if (onAssistantMessage != null) {
+               await onAssistantMessage(invalidMessage);
+             }
+          }
+
+          // Handle format error by sending a user message (observation) back to the agent
+          // This allows the agent to self-correct
+          final errorMessage = ChatMessage.user(e.message);
+          
+          // Add to in-memory conversation
+          messages.add(errorMessage);
+          
+          // Persist if callback provided
+          if (onUserMessage != null) {
+            await onUserMessage(errorMessage);
+          }
+          
+          // Continue loop to let agent try again
+          continue;
         }
-        return const AgentLoopCompleted();
       }
 
       // Convert to pending tool calls for approval

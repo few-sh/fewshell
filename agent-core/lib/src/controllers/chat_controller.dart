@@ -254,6 +254,16 @@ class ChatController extends StateNotifier<ChatState> {
             message.toMessageCompanion(sessionId: sessionId),
           );
         },
+        onUserMessage: (message) async {
+          // Save system-generated user message (e.g. error recovery)
+          final redactedContent = await _secretRedactor.redact(message.content);
+          await _messageDao.insertMessageWithId(
+            sessionId: sessionId,
+            userId: _kUserUserId,
+            userName: _kUserUserName,
+            content: redactedContent,
+          );
+        },
       );
 
       // Handle result

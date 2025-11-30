@@ -139,7 +139,8 @@ class ToolResultFormatter {
       buffer.writeln();
     }
 
-    return buffer.toString().trim();
+    final formatted = buffer.toString().trim();
+    return 'Observation:\n$formatted';
   }
 
   /// Format a tool result based on the tool name
