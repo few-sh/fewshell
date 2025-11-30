@@ -588,7 +588,7 @@ ${envExports}DECAMP_SECRETS
 
   /// Handle SSH keyboard-interactive requests
   Future<List<String>> _handleUserInfoRequest(
-    dynamic request, {
+    SSHUserInfoRequest request, {
     String? passwordFallback,
   }) async {
     final prompts = request.prompts;
