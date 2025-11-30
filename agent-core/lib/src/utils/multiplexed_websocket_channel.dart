@@ -10,7 +10,8 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   final StreamController _inboundController = StreamController();
   final StreamController<Map<String, dynamic>> _customMessageController =
       StreamController.broadcast();
-  static const String _customPrefix = '__CUSTOM__:';
+  // Use Unit Separator (ASCII 31) as a prefix to avoid collisions with JSON
+  static const String _customPrefix = '\u001F';
 
   MultiplexedWebSocketChannel(this._inner) {
     _inner.stream.listen(
