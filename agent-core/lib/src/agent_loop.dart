@@ -89,11 +89,11 @@ Future<AgentLoopResult> runAgentLoop({
               name: 'AgentLoop',
             );
           }
-          
-            // If still no tool calls (neither explicit nor bash blocks), check for protocol signals
+
+          // If still no tool calls (neither explicit nor bash blocks), check for protocol signals
           if (bashToolCalls.isEmpty) {
             final text = streamResult.text;
-            
+
             // Check for explicit completion or question signals
             if (text.contains('COMPLETED_TASK') || text.contains('ASK_USER')) {
               // Valid termination of the turn
@@ -102,7 +102,7 @@ Future<AgentLoopResult> runAgentLoop({
               }
               return const AgentLoopCompleted();
             }
-            
+
             // VIOLATION: No command, no completion, no question.
             // This is the "stalling" behavior. We must reject it.
             throw BashBlockFormatException(
@@ -111,7 +111,7 @@ Future<AgentLoopResult> runAgentLoop({
               'Do not explain your plan, just execute it.',
             );
           }
-          
+
           // We have bash tool calls, proceed to approval
           // Add them to the list for processing
           streamResult.toolCalls.addAll(bashToolCalls);
@@ -119,25 +119,25 @@ Future<AgentLoopResult> runAgentLoop({
           // IMPORTANT: We must add the assistant's invalid message to the history
           // so the LLM sees what it did wrong.
           if (streamResult.text.isNotEmpty) {
-             final invalidMessage = ChatMessage.assistant(streamResult.text);
-             messages.add(invalidMessage);
-             if (onAssistantMessage != null) {
-               await onAssistantMessage(invalidMessage);
-             }
+            final invalidMessage = ChatMessage.assistant(streamResult.text);
+            messages.add(invalidMessage);
+            if (onAssistantMessage != null) {
+              await onAssistantMessage(invalidMessage);
+            }
           }
 
           // Handle format error by sending a user message (observation) back to the agent
           // This allows the agent to self-correct
           final errorMessage = ChatMessage.user(e.message);
-          
+
           // Add to in-memory conversation
           messages.add(errorMessage);
-          
+
           // Persist if callback provided
           if (onUserMessage != null) {
             await onUserMessage(errorMessage);
           }
-          
+
           // Continue loop to let agent try again
           continue;
         }
@@ -269,14 +269,16 @@ Future<_StreamResult> _streamFromLlm({
           if (toolCallMap.containsKey(id)) {
             // Aggregate arguments
             final existing = toolCallMap[id]!;
-            final newArgs = existing.function.arguments + delta.function.arguments;
-            
+            final newArgs =
+                existing.function.arguments + delta.function.arguments;
+
             // Create updated tool call
             toolCallMap[id] = ToolCall(
               id: id,
               callType: existing.callType,
               function: FunctionCall(
-                name: existing.function.name, // Name usually comes in first delta
+                name:
+                    existing.function.name, // Name usually comes in first delta
                 arguments: newArgs,
               ),
             );
