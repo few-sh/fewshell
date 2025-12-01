@@ -52,3 +52,4 @@ export 'src/database/database_facade.dart';
 
 // Extensions
 export 'src/extensions/chat_message_extensions.dart';
+export 'src/extensions/chat_message_serialization.dart';

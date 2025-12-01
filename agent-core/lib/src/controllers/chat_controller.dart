@@ -187,7 +187,7 @@ class ChatController extends StateNotifier<ChatState> {
 
       // Get conversation history
       final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-      final conversation = _buildConversationHistory(dbMessages);
+      // final conversation = _buildConversationHistory(dbMessages);
 
       final AgentLoopResult result;
 
@@ -195,7 +195,6 @@ class ChatController extends StateNotifier<ChatState> {
         // Run the agent loop remotely
         result = await runRemoteAgentLoop(
           channel: syncChannel,
-          conversation: conversation,
           config: config,
           sessionId: sessionId,
           requestApproval: (pendingCalls) async {
@@ -270,10 +269,12 @@ class ChatController extends StateNotifier<ChatState> {
         );
       } else {
         // Run the agent loop locally
+        final conversation = _buildConversationHistory(dbMessages);
         result = await runAgentLoop(
-          llmStream: (conversation, tools) =>
-              _llmService.streamChat(conversation, tools: tools),
+          llmStream: (conv, tools) =>
+              _llmService.streamChat(conv, tools: tools),
           tools: shellTools,
+          conversation: conversation,
           getConversation: () async {
             // Rebuild conversation from database each iteration (single source of truth)
             final dbMessages =

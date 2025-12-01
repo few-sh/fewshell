@@ -8,7 +8,7 @@ import 'package:llm_dart/llm_dart.dart';
 /// Runs the agent loop remotely on the server using the existing sync channel
 Future<AgentLoopResult> runRemoteAgentLoop({
   required MultiplexedWebSocketChannel channel,
-  required List<ChatMessage> conversation,
+  List<ChatMessage>? conversation,
   required Map<String, dynamic> config,
   required String sessionId,
   required ApprovalFunction requestApproval,
@@ -30,12 +30,12 @@ Future<AgentLoopResult> runRemoteAgentLoop({
           onTextDelta?.call(data['content']);
         } else if (type == 'assistant_message') {
           onAssistantMessage?.call(
-            ChatMessage.fromJson(data['message']),
+            (data['message'] as Map<String, dynamic>).toChatMessage(),
             messageId: data['id'],
           );
         } else if (type == 'tool_result_message') {
           onToolResultMessage?.call(
-            ChatMessage.fromJson(data['message']),
+            (data['message'] as Map<String, dynamic>).toChatMessage(),
             messageId: data['id'],
           );
         } else if (type == 'request_approval') {
@@ -87,7 +87,8 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   // Start chat
   channel.sendCustomMessage({
     'type': 'start_chat',
-    'conversation': conversation.map((m) => m.toJson()).toList(),
+    if (conversation != null)
+      'conversation': conversation.map((m) => m.toJson()).toList(),
     'config': config,
     'sessionId': sessionId,
   });

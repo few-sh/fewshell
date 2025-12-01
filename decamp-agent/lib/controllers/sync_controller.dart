@@ -101,12 +101,22 @@ class _AgentSession {
   Future<void> _startChat(Map<String, dynamic> data) async {
     developer.log('🚀 Starting agent loop', name: 'AgentSession');
     try {
-      final conversationJson =
-          (data['conversation'] as List).cast<Map<String, dynamic>>();
-      final conversation =
-          conversationJson.map((j) => ChatMessage.fromJson(j)).toList();
       final config = data['config'] as Map<String, dynamic>;
       final sessionId = data['sessionId'] as String?;
+
+      List<ChatMessage> conversation;
+      if (data.containsKey('conversation')) {
+        final conversationJson =
+            (data['conversation'] as List).cast<Map<String, dynamic>>();
+        conversation = conversationJson.map((j) => j.toChatMessage()).toList();
+      } else {
+        if (sessionId == null || db == null) {
+          throw Exception(
+              'Session ID and Database required when conversation is not provided');
+        }
+        final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
+        conversation = dbMessages.map((m) => m.toChatMessage()).toList();
+      }
 
       final apiKey = config['apiKey'] as String;
       final providerType = config['provider'] as String;
