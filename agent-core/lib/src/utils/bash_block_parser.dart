@@ -25,7 +25,7 @@ class BashBlockParser {
   /// Throws [BashBlockFormatException] if multiple blocks are found
   static List<ToolCall> parse(String text) {
     final matches = _bashBlockRegex.allMatches(text);
-    
+
     if (matches.length > 1) {
       throw BashBlockFormatException(
         'Error: You provided multiple code blocks. Please provide EXACTLY ONE bash block per turn.',
@@ -49,8 +49,8 @@ class BashBlockParser {
           ),
         );
       } else {
-         // Empty block found
-         throw BashBlockFormatException(
+        // Empty block found
+        throw BashBlockFormatException(
           'Error: You provided an empty bash block. Please provide a valid command.',
         );
       }
