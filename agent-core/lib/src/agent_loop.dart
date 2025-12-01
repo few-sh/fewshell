@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:llm_dart/llm_dart.dart';
 
+import 'agent_adapter/agent_adapter.dart';
 import 'types.dart';
-import 'utils/bash_block_parser.dart';
 import 'dart:developer' as developer;
 
 /// Runs the agent loop: LLM → tool calls → approval → execution → repeat
@@ -12,8 +12,8 @@ import 'dart:developer' as developer;
 /// All persistence, UI, and streaming state management is handled by callbacks.
 ///
 /// Parameters:
+/// - [adapter]: The AgentAdapter that defines the prompt strategy and parses results
 /// - [llmStream]: Function to stream chat completion from LLM
-/// - [tools]: List of tools available to the LLM
 /// - [conversation]: Initial conversation messages (used if getConversation is null)
 /// - [getConversation]: Optional callback to get fresh conversation each iteration
 ///   (useful when conversation is persisted to DB and needs to be reloaded)
@@ -28,23 +28,9 @@ import 'dart:developer' as developer;
 /// - [AgentLoopCompleted]: No more tool calls, conversation complete
 /// - [AgentLoopCancelled]: User cancelled tool approval
 /// - [AgentLoopError]: An error occurred
-///
-/// Example:
-/// ```dart
-/// final result = await runAgentLoop(
-///   llmStream: (conv, tools) => llmService.streamChat(conv, tools: tools),
-///   tools: shellTools,
-///   conversation: messages,
-///   requestApproval: (toolCalls) => showApprovalDialog(toolCalls),
-///   executeToolCall: (tc) => shellService.execute(tc),
-///   onTextDelta: (delta) => updateUI(delta),
-///   onAssistantMessage: (msg) => db.insert(msg),
-///   onToolResultMessage: (msg) => db.insert(msg),
-/// );
-/// ```
 Future<AgentLoopResult> runAgentLoop({
+  required AgentAdapter adapter,
   required LlmStreamFunction llmStream,
-  required List<Tool> tools,
   List<ChatMessage>? conversation,
   ConversationProvider? getConversation,
   required ApprovalFunction requestApproval,
@@ -69,7 +55,7 @@ Future<AgentLoopResult> runAgentLoop({
       // Stream from LLM
       final streamResult = await _streamFromLlm(
         llmStream: llmStream,
-        tools: tools,
+        tools: adapter.tools,
         conversation: messages,
         onTextDelta: onTextDelta,
       );
@@ -79,43 +65,30 @@ Future<AgentLoopResult> runAgentLoop({
         return AgentLoopError(streamResult.error!);
       }
 
-      // If no tool calls, check for bash blocks in text (Bash-First Mode)
-      if (streamResult.toolCalls.isEmpty) {
-        try {
-          final bashToolCalls = BashBlockParser.parse(streamResult.text);
-          if (bashToolCalls.isNotEmpty) {
-            developer.log(
-              'Found ${bashToolCalls.length} bash blocks in text, converting to tool calls',
-              name: 'AgentLoop',
-            );
+      // Validate and parse the result using the adapter
+      final validationResult = adapter.validate(
+        streamResult.text,
+        streamResult.toolCalls,
+      );
+
+      List<ToolCall> currentToolCalls;
+
+      switch (validationResult) {
+        case AdapterSuccess(toolCalls: final calls):
+          developer.log(
+            'Adapter validated ${calls.length} tool calls',
+            name: 'AgentLoop',
+          );
+          currentToolCalls = calls;
+
+        case AdapterTurnComplete(content: final content):
+          // Valid termination of the turn
+          if (content.isNotEmpty && onAssistantMessage != null) {
+            await onAssistantMessage(ChatMessage.assistant(content));
           }
+          return const AgentLoopCompleted();
 
-          // If still no tool calls (neither explicit nor bash blocks), check for protocol signals
-          if (bashToolCalls.isEmpty) {
-            final text = streamResult.text;
-
-            // Check for explicit completion or question signals
-            if (text.contains('COMPLETED_TASK') || text.contains('ASK_USER')) {
-              // Valid termination of the turn
-              if (text.isNotEmpty && onAssistantMessage != null) {
-                await onAssistantMessage(ChatMessage.assistant(text));
-              }
-              return const AgentLoopCompleted();
-            }
-
-            // VIOLATION: No command, no completion, no question.
-            // This is the "stalling" behavior. We must reject it.
-            throw BashBlockFormatException(
-              'Error: You responded with text but NO command. '
-              'You must provide a bash block, COMPLETED_TASK, or ASK_USER. '
-              'Do not explain your plan, just execute it.',
-            );
-          }
-
-          // We have bash tool calls, proceed to approval
-          // Add them to the list for processing
-          streamResult.toolCalls.addAll(bashToolCalls);
-        } on BashBlockFormatException catch (e) {
+        case AdapterFailure(userErrorMessage: final errorMessage):
           // IMPORTANT: We must add the assistant's invalid message to the history
           // so the LLM sees what it did wrong.
           if (streamResult.text.isNotEmpty) {
@@ -128,24 +101,23 @@ Future<AgentLoopResult> runAgentLoop({
 
           // Handle format error by sending a user message (observation) back to the agent
           // This allows the agent to self-correct
-          final errorMessage = ChatMessage.user(e.message);
+          final userMsg = ChatMessage.user(errorMessage);
 
           // Add to in-memory conversation
-          messages.add(errorMessage);
+          messages.add(userMsg);
 
           // Persist if callback provided
           if (onUserMessage != null) {
-            await onUserMessage(errorMessage);
+            await onUserMessage(userMsg);
           }
 
           // Continue loop to let agent try again
           continue;
-        }
       }
 
       // Convert to pending tool calls for approval
       final pendingCalls = <PendingToolCall>[];
-      for (final tc in streamResult.toolCalls) {
+      for (final tc in currentToolCalls) {
         Map<String, dynamic> args;
         try {
           args = tc.function.arguments.isNotEmpty
