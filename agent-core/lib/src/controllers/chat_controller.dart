@@ -5,7 +5,6 @@ import 'package:state_notifier/state_notifier.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 
-import '../agent_adapter/bash_agent_adapter.dart';
 import '../../agent_core.dart';
 
 // Constants for message user IDs
@@ -177,24 +176,21 @@ class ChatController extends StateNotifier<ChatState> {
       var hasStartedStreaming = false;
       final streamingBuffer = StringBuffer();
 
-      // Initialize the adapter (TODO: Get from settings)
-      final adapter = BashAgentAdapter();
+      // Initialize the agent (TODO: Get from settings)
+      final agent = MiniSweAgent();
 
       // Run the agent loop using agent_core
       final result = await runAgentLoop(
-        adapter: adapter,
-        llmStream: (conversation, tools) =>
-            _llmService.streamChat(conversation, tools: tools),
+        agent: agent,
+        llmStream: (conversation, tools) => _llmService.streamChat(
+          conversation,
+          tools: tools,
+          agent: agent,
+        ),
         getConversation: () async {
           // Rebuild conversation from database each iteration (single source of truth)
           final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-          final history = _buildConversationHistory(dbMessages);
-
-          // Prepend adapter's system instruction to ensure protocol compliance
-          return [
-            ChatMessage.system(adapter.systemInstruction),
-            ...history,
-          ];
+          return _buildConversationHistory(dbMessages);
         },
         requestApproval: (pendingCalls) async {
           // Convert to UI's ToolAction format

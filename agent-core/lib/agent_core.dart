@@ -6,6 +6,12 @@ export 'src/controllers/chat_controller.dart';
 export 'src/models/tool_action.dart';
 export 'src/utils/secret_redactor.dart';
 
+// Agents
+export 'src/agents/agent.dart';
+export 'src/agents/native/native_agent.dart';
+export 'src/agents/tools/system_tools.dart';
+export 'src/agents/installed/miniswe/miniswe_agent.dart';
+
 // Models
 export 'src/models/agent_instruction.dart';
 export 'src/models/chat_state.dart';
@@ -28,7 +34,6 @@ export 'src/secrets_storage/file_secure_storage_impl.dart';
 // Services
 export 'src/services/keychain_service.dart';
 export 'src/services/shell_service.dart';
-export 'src/services/shell_tools_provider.dart';
 export 'src/services/llm_service.dart';
 export 'src/services/toml_settings_service.dart';
 

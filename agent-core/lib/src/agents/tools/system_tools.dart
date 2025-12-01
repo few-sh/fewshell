@@ -1,7 +1,9 @@
 import 'package:llm_dart/llm_dart.dart';
 
-/// Tool name constants
+/// Tool name for executing shell commands
 const String kExecuteShellCommand = 'execute_shell_command';
+
+/// Tool name for fetching URLs
 const String kFetch = 'fetch';
 
 /// Shell execution tools for LLM

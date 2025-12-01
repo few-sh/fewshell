@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:llm_dart/llm_dart.dart';
-import '../utils/id_generator.dart';
+import '../../../utils/id_generator.dart';
+import '../../tools/system_tools.dart';
 
 /// Exception thrown when bash block parsing fails
 class BashBlockFormatException implements Exception {
@@ -43,7 +44,7 @@ class BashBlockParser {
             id: IdGenerator.toolCallId(),
             callType: 'function',
             function: FunctionCall(
-              name: 'execute_shell_command',
+              name: kExecuteShellCommand,
               arguments: jsonEncode({'command': command}),
             ),
           ),

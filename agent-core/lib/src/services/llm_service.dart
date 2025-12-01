@@ -1,5 +1,7 @@
+import 'dart:developer' as developer;
 import 'package:llm_dart/llm_dart.dart';
 import 'package:agent_core/agent_core.dart';
+import '../agents/agent.dart';
 
 /// Service for interacting with LLM APIs using llm_dart
 ///
@@ -264,6 +266,7 @@ class LlmService {
   /// The caller is responsible for building the conversation state.
   Stream<ChatStreamEvent> streamChat(
     List<ChatMessage> conversation, {
+    required Agent agent,
     List<Tool>? tools,
   }) async* {
     final activeConfig = await _getActiveConfig();
@@ -278,13 +281,40 @@ class LlmService {
     }
 
     try {
-      final agentInstruction = await getAgentInstruction(
+      // 1. Get User/Project Instructions (Personality)
+      final userInstruction = await getAgentInstruction(
         activeConfig.config.identifier,
       );
+
+      // 2. Get Agent Protocol (How to use tools)
+      final protocolInstruction = agent.systemInstruction;
+
+      // 3. Combine them
+      final combinedSystemPrompt = [
+        protocolInstruction,
+        if (userInstruction != null && userInstruction.isNotEmpty)
+          '\n\n---\n\n$userInstruction',
+      ].join('');
+
+      developer.log(
+        '====== 🤖 SENDING TO LLM 🤖 ======\n'
+        'System Prompt: ${combinedSystemPrompt.substring(0, combinedSystemPrompt.length > 200 ? 200 : combinedSystemPrompt.length)}...\n'
+        'Tools: ${tools?.length ?? 0}\n'
+        'History (${conversation.length} msgs):\n${conversation.map((m) {
+          final content = m.content;
+          final preview = content.length > 100
+              ? '${content.substring(0, 100)}...'
+              : content;
+          return '[${m.role.name}] $preview';
+        }).join('\n')}\n'
+        '==================================',
+        name: 'LlmService',
+      );
+
       final provider = await _createProvider(
         activeConfig.config,
         activeConfig.apiKey,
-        systemInstruction: agentInstruction,
+        systemInstruction: combinedSystemPrompt,
       );
 
       final stream = provider.chatStream(conversation, tools: tools);

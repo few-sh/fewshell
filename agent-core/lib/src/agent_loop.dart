@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:llm_dart/llm_dart.dart';
 
-import 'agent_adapter/agent_adapter.dart';
+import 'agents/agent.dart';
 import 'types.dart';
 import 'dart:developer' as developer;
 
@@ -12,7 +12,7 @@ import 'dart:developer' as developer;
 /// All persistence, UI, and streaming state management is handled by callbacks.
 ///
 /// Parameters:
-/// - [adapter]: The AgentAdapter that defines the prompt strategy and parses results
+/// - [agent]: The Agent that defines the prompt strategy and parses results
 /// - [llmStream]: Function to stream chat completion from LLM
 /// - [conversation]: Initial conversation messages (used if getConversation is null)
 /// - [getConversation]: Optional callback to get fresh conversation each iteration
@@ -29,7 +29,7 @@ import 'dart:developer' as developer;
 /// - [AgentLoopCancelled]: User cancelled tool approval
 /// - [AgentLoopError]: An error occurred
 Future<AgentLoopResult> runAgentLoop({
-  required AgentAdapter adapter,
+  required Agent agent,
   required LlmStreamFunction llmStream,
   List<ChatMessage>? conversation,
   ConversationProvider? getConversation,
@@ -55,7 +55,7 @@ Future<AgentLoopResult> runAgentLoop({
       // Stream from LLM
       final streamResult = await _streamFromLlm(
         llmStream: llmStream,
-        tools: adapter.tools,
+        tools: agent.tools,
         conversation: messages,
         onTextDelta: onTextDelta,
       );
@@ -65,8 +65,8 @@ Future<AgentLoopResult> runAgentLoop({
         return AgentLoopError(streamResult.error!);
       }
 
-      // Validate and parse the result using the adapter
-      final validationResult = adapter.validate(
+      // Validate and parse the result using the agent
+      final validationResult = agent.validate(
         streamResult.text,
         streamResult.toolCalls,
       );
@@ -74,21 +74,21 @@ Future<AgentLoopResult> runAgentLoop({
       List<ToolCall> currentToolCalls;
 
       switch (validationResult) {
-        case AdapterSuccess(toolCalls: final calls):
+        case AgentSuccess(toolCalls: final calls):
           developer.log(
-            'Adapter validated ${calls.length} tool calls',
+            'Agent validated ${calls.length} tool calls',
             name: 'AgentLoop',
           );
           currentToolCalls = calls;
 
-        case AdapterTurnComplete(content: final content):
+        case AgentTurnComplete(content: final content):
           // Valid termination of the turn
           if (content.isNotEmpty && onAssistantMessage != null) {
             await onAssistantMessage(ChatMessage.assistant(content));
           }
           return const AgentLoopCompleted();
 
-        case AdapterFailure(userErrorMessage: final errorMessage):
+        case AgentFailure(userErrorMessage: final errorMessage):
           // IMPORTANT: We must add the assistant's invalid message to the history
           // so the LLM sees what it did wrong.
           if (streamResult.text.isNotEmpty) {
