@@ -50,7 +50,8 @@ typedef ToolExecutionFunction = Future<String> Function(ToolCall toolCall);
 
 typedef TextDeltaCallback = void Function(String delta);
 
-typedef MessageCallback = Future<void> Function(ChatMessage message);
+typedef MessageCallback = Future<void> Function(ChatMessage message,
+    {String? messageId});
 
 /// Optional callback to get fresh conversation (e.g., from database)
 /// If provided, called at the start of each iteration instead of using in-memory list

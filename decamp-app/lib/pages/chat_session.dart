@@ -177,6 +177,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
+    // Get sync channel
+    final syncChannel = ref.read(syncServiceProvider).projectChannel;
+
     // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
       content: content,
@@ -184,6 +187,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
       onNoConfig: () => NoLlmConfiguredOverlay.show(context),
+      syncChannel: syncChannel,
     );
   }
 
@@ -198,12 +202,16 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
+    // Get sync channel
+    final syncChannel = ref.read(syncServiceProvider).projectChannel;
+
     await controller.editMessage(
       messageId: messageId,
       newContent: newContent,
       sessionId: currentSessionId,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
+      syncChannel: syncChannel,
     );
   }
 
@@ -218,11 +226,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       chatControllerProvider(currentSessionId).notifier,
     );
 
+    // Get sync channel
+    final syncChannel = ref.read(syncServiceProvider).projectChannel;
+
     await controller.resendMessage(
       messageId: messageId,
       sessionId: currentSessionId,
       requestApproval: (actions) =>
           MultiCommandApprovalOverlay.show(context, actions),
+      syncChannel: syncChannel,
     );
   }
 

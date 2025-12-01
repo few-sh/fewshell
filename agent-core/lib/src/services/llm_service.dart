@@ -314,6 +314,21 @@ class LlmService {
     return getAgentInstruction(identifier);
   }
 
+  /// Get a snapshot of the active configuration for remote execution
+  Future<Map<String, dynamic>?> getActiveConfigSnapshot() async {
+    final activeConfig = await _getActiveConfig();
+    if (activeConfig == null) return null;
+
+    return {
+      'apiKey': activeConfig.apiKey,
+      'provider': activeConfig.config.apiType.name,
+      'model': activeConfig.config.identifier,
+      'baseUrl': activeConfig.config.baseUrl,
+      'temperature': activeConfig.config.temperature,
+      'maxTokens': activeConfig.config.maxTokens,
+    };
+  }
+
   /// Test API connection with the provided settings
   /// Returns null if successful, or an error message if failed
   Future<String?> testConnection({
