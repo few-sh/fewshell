@@ -1,4 +1,6 @@
 .env
+.env.deploy_ios
+
 
 # Miscellaneous
 *.class
