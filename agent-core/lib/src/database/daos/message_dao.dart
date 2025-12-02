@@ -28,7 +28,8 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
 
   /// Insert a new message
   Future<int> insertMessage(MessageEntityCompanion message) async {
-    final result = await into(messages).insert(message);
+    final result =
+        await into(messages).insert(message, mode: InsertMode.insertOrIgnore);
     // Touch the session to update its updatedAt timestamp
     if (message.sessionId.present) {
       await db.sessionDao.touchSession(message.sessionId.value);

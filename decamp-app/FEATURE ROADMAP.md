@@ -17,9 +17,24 @@ Smoother onboarding:
 [ ] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
 [ ] When no model configuration exists, guide the user through setting up.*
 
+[ ] Support sudo for local command execution at the remote agent side
+
 General papercuts:
 [ ] Add a context menu button to re-run command
 [ ] Eliminate all non-expandable ellipsis in any of the text controls
+[ ] Show currently active project on the projects page
+[ ] When selecting a peroject from projects list, close the projects page
+
+[ ] An indicator/icon when a project is remote
+
+[ ] A connection and activity indicator for remote project (eg when connected/disconnected, whebn sending data)
+
+[ ] Only sync the remote projects that belong to the agent
+
+
+[ ] Auto-detect when SUDO fails and prompt for password, allow a checkbox to save the sudo password to secrets
+
+
 
 
 * Display step-by-step instructions in the app: eg instruct the user that they need a server

@@ -155,6 +155,7 @@ class ChatController extends StateNotifier<ChatState> {
     required Future<List<ToolAction>?> Function(List<ToolAction>)
         requestApproval,
     void Function()? onNoConfig,
+    MultiplexedWebSocketChannel? syncChannel,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -176,85 +177,132 @@ class ChatController extends StateNotifier<ChatState> {
       var hasStartedStreaming = false;
       final streamingBuffer = StringBuffer();
 
-      // Run the agent loop using agent_core
-      final result = await runAgentLoop(
-        llmStream: (conversation, tools) =>
-            _llmService.streamChat(conversation, tools: tools),
-        tools: shellTools,
-        getConversation: () async {
-          // Rebuild conversation from database each iteration (single source of truth)
-          final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-          return _buildConversationHistory(dbMessages);
-        },
-        requestApproval: (pendingCalls) async {
-          // Convert to UI's ToolAction format
-          final actions = _pendingToolCallsToActions(pendingCalls);
-          final selectedActions = await requestApproval(actions);
+      // Get config for remote execution
+      final config = await _llmService.getActiveConfigSnapshot();
+      if (config == null) {
+        state = state.copyWith(isLoading: false);
+        onNoConfig?.call();
+        return;
+      }
 
-          if (selectedActions == null) {
-            return null; // User cancelled
-          }
+      // Define callbacks to be used by both local and remote loops
+      Future<List<PendingToolCall>?> handleRequestApproval(
+          List<PendingToolCall> pendingCalls) async {
+        // Convert to UI's ToolAction format
+        final actions = _pendingToolCallsToActions(pendingCalls);
+        final selectedActions = await requestApproval(actions);
 
-          developer.log(
-            '✅ User approved ${selectedActions.length} tool calls',
-            name: 'ChatController',
-          );
+        if (selectedActions == null) {
+          return null; // User cancelled
+        }
 
-          // Return the approved subset of PendingToolCalls
-          return pendingCalls
-              .where((pc) => selectedActions.any((a) => a.id == pc.id))
-              .toList();
-        },
-        executeToolCall: (toolCall) async {
-          // Execute and return result as JSON string
-          final result = await _executeToolCall(toolCall);
-          return jsonEncode(result);
-        },
-        onTextDelta: (delta) {
-          streamingBuffer.write(delta);
-          if (!hasStartedStreaming) {
-            startStreaming(aiMessageId);
-            hasStartedStreaming = true;
-          }
-          updateStreamingText(streamingBuffer.toString());
-        },
-        onAssistantMessage: (message) async {
-          if (hasStartedStreaming) {
-            stopStreaming();
-            hasStartedStreaming = false;
-            streamingBuffer.clear();
-          }
+        developer.log(
+          '✅ User approved ${selectedActions.length} tool calls',
+          name: 'ChatController',
+        );
 
-          // Determine if this is a tool use message or a text message
-          final messageType = message.messageType;
-          if (messageType is ToolUseMessage) {
-            // Save tool use message
-            await _messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId, id: aiMessageId),
-            );
-          } else {
-            // Save text message
-            final redactedContent = await _secretRedactor.redact(
-              message.content,
-            );
-            await _messageDao.insertMessageWithId(
-              id: aiMessageId,
-              sessionId: sessionId,
-              userId: _kAiUserId,
-              userName: _kAiUserName,
-              content: redactedContent,
-            );
-          }
+        // Return the approved subset of PendingToolCalls
+        return pendingCalls
+            .where((pc) => selectedActions.any((a) => a.id == pc.id))
+            .toList();
+      }
 
-          // Generate new ID for next message
-          aiMessageId = _messageDao.generateMessageId();
-        },
-        onToolResultMessage: (message) async {
+      void handleTextDelta(String delta) {
+        streamingBuffer.write(delta);
+        if (!hasStartedStreaming) {
+          startStreaming(aiMessageId);
+          hasStartedStreaming = true;
+        }
+        updateStreamingText(streamingBuffer.toString());
+      }
+
+      Future<void> handleAssistantMessage(ChatMessage message,
+          {String? messageId}) async {
+        if (hasStartedStreaming) {
+          stopStreaming();
+          hasStartedStreaming = false;
+          streamingBuffer.clear();
+        }
+
+        // Use the ID provided by server, or generate one if local
+        final idToUse = messageId ?? aiMessageId;
+
+        // Determine if this is a tool use message or a text message
+        final messageType = message.messageType;
+        if (messageType is ToolUseMessage) {
+          // Save tool use message
           await _messageDao.insertMessage(
-            message.toMessageCompanion(sessionId: sessionId),
+            message.toMessageCompanion(sessionId: sessionId, id: idToUse),
           );
-        },
-      );
+        } else {
+          // Save text message
+          final redactedContent = await _secretRedactor.redact(
+            message.content,
+          );
+          await _messageDao.insertMessageWithId(
+            id: idToUse,
+            sessionId: sessionId,
+            userId: _kAiUserId,
+            userName: _kAiUserName,
+            content: redactedContent,
+          );
+        }
+
+        // Generate new ID for next message (only used if local or if server didn't provide one)
+        aiMessageId = _messageDao.generateMessageId();
+      }
+
+      Future<void> handleToolResultMessage(ChatMessage message,
+          {String? messageId}) async {
+        // Use the ID provided by server, or generate one if local
+        final idToUse = messageId ?? _messageDao.generateMessageId();
+
+        await _messageDao.insertMessage(
+          message.toMessageCompanion(sessionId: sessionId, id: idToUse),
+        );
+      }
+
+      final AgentLoopResult result;
+
+      if (syncChannel != null) {
+        // Run the agent loop remotely
+        result = await runRemoteAgentLoop(
+          channel: syncChannel,
+          config: config,
+          sessionId: sessionId,
+          requestApproval: handleRequestApproval,
+          onTextDelta: handleTextDelta,
+          onAssistantMessage: handleAssistantMessage,
+          onToolResultMessage: handleToolResultMessage,
+        );
+      } else {
+        // Run the agent loop locally
+        // Get conversation history
+        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
+        final conversation = _buildConversationHistory(dbMessages);
+
+        result = await runAgentLoop(
+          llmStream: (conv, tools) =>
+              _llmService.streamChat(conv, tools: tools),
+          tools: shellTools,
+          conversation: conversation,
+          getConversation: () async {
+            // Rebuild conversation from database each iteration (single source of truth)
+            final dbMessages =
+                await _messageDao.getMessagesBySession(sessionId);
+            return _buildConversationHistory(dbMessages);
+          },
+          requestApproval: handleRequestApproval,
+          executeToolCall: (toolCall) async {
+            // Execute and return result as JSON string
+            final result = await _executeToolCall(toolCall);
+            return jsonEncode(result);
+          },
+          onTextDelta: handleTextDelta,
+          onAssistantMessage: handleAssistantMessage,
+          onToolResultMessage: handleToolResultMessage,
+        );
+      }
 
       // Handle result
       switch (result) {
@@ -394,6 +442,7 @@ class ChatController extends StateNotifier<ChatState> {
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
         requestApproval,
+    MultiplexedWebSocketChannel? syncChannel,
   }) async {
     developer.log('✏️ Editing message: $messageId', name: 'ChatController');
 
@@ -428,6 +477,7 @@ class ChatController extends StateNotifier<ChatState> {
       content: null, // Use existing conversation (now with edited message)
       sessionId: sessionId,
       requestApproval: requestApproval,
+      syncChannel: syncChannel,
     );
   }
 
@@ -437,6 +487,7 @@ class ChatController extends StateNotifier<ChatState> {
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
         requestApproval,
+    MultiplexedWebSocketChannel? syncChannel,
   }) async {
     developer.log(
       '🔄 Resending from message: $messageId',
@@ -466,6 +517,7 @@ class ChatController extends StateNotifier<ChatState> {
       content: null, // Use existing conversation
       sessionId: sessionId,
       requestApproval: requestApproval,
+      syncChannel: syncChannel,
     );
   }
 

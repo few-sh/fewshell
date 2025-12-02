@@ -13,6 +13,8 @@ dependencies:
   web_socket_channel: ^3.0.0
   agent_core:
     path: ../agent-core
+  llm_dart:
+    path: ../llm_dart
   drift_crdt: ^1.0.11
   crdt_sync: ^1.0.10
   uuid: ^4.5.2

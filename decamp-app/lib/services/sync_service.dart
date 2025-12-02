@@ -163,6 +163,8 @@ class SyncService {
     _disconnectProject();
   }
 
+  MultiplexedWebSocketChannel? get projectChannel => _projectChannel;
+
   void sendPing(String message) {
     if (_projectChannel != null) {
       developer.log('SyncService: Sending ping: $message');
