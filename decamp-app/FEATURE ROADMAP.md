@@ -17,6 +17,8 @@ Smoother onboarding:
 [ ] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
 [ ] When no model configuration exists, guide the user through setting up.*
 
+[ ] Support sudo for local command execution at the remote agent side
+
 General papercuts:
 [ ] Add a context menu button to re-run command
 [ ] Eliminate all non-expandable ellipsis in any of the text controls
