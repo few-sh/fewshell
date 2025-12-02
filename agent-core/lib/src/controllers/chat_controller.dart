@@ -185,9 +185,82 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
-      // Get conversation history
-      final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-      // final conversation = _buildConversationHistory(dbMessages);
+      // Define callbacks to be used by both local and remote loops
+      Future<List<PendingToolCall>?> handleRequestApproval(
+          List<PendingToolCall> pendingCalls) async {
+        // Convert to UI's ToolAction format
+        final actions = _pendingToolCallsToActions(pendingCalls);
+        final selectedActions = await requestApproval(actions);
+
+        if (selectedActions == null) {
+          return null; // User cancelled
+        }
+
+        developer.log(
+          '✅ User approved ${selectedActions.length} tool calls',
+          name: 'ChatController',
+        );
+
+        // Return the approved subset of PendingToolCalls
+        return pendingCalls
+            .where((pc) => selectedActions.any((a) => a.id == pc.id))
+            .toList();
+      }
+
+      void handleTextDelta(String delta) {
+        streamingBuffer.write(delta);
+        if (!hasStartedStreaming) {
+          startStreaming(aiMessageId);
+          hasStartedStreaming = true;
+        }
+        updateStreamingText(streamingBuffer.toString());
+      }
+
+      Future<void> handleAssistantMessage(ChatMessage message,
+          {String? messageId}) async {
+        if (hasStartedStreaming) {
+          stopStreaming();
+          hasStartedStreaming = false;
+          streamingBuffer.clear();
+        }
+
+        // Use the ID provided by server, or generate one if local
+        final idToUse = messageId ?? aiMessageId;
+
+        // Determine if this is a tool use message or a text message
+        final messageType = message.messageType;
+        if (messageType is ToolUseMessage) {
+          // Save tool use message
+          await _messageDao.insertMessage(
+            message.toMessageCompanion(sessionId: sessionId, id: idToUse),
+          );
+        } else {
+          // Save text message
+          final redactedContent = await _secretRedactor.redact(
+            message.content,
+          );
+          await _messageDao.insertMessageWithId(
+            id: idToUse,
+            sessionId: sessionId,
+            userId: _kAiUserId,
+            userName: _kAiUserName,
+            content: redactedContent,
+          );
+        }
+
+        // Generate new ID for next message (only used if local or if server didn't provide one)
+        aiMessageId = _messageDao.generateMessageId();
+      }
+
+      Future<void> handleToolResultMessage(ChatMessage message,
+          {String? messageId}) async {
+        // Use the ID provided by server, or generate one if local
+        final idToUse = messageId ?? _messageDao.generateMessageId();
+
+        await _messageDao.insertMessage(
+          message.toMessageCompanion(sessionId: sessionId, id: idToUse),
+        );
+      }
 
       final AgentLoopResult result;
 
@@ -197,79 +270,17 @@ class ChatController extends StateNotifier<ChatState> {
           channel: syncChannel,
           config: config,
           sessionId: sessionId,
-          requestApproval: (pendingCalls) async {
-            // Convert to UI's ToolAction format
-            final actions = _pendingToolCallsToActions(pendingCalls);
-            final selectedActions = await requestApproval(actions);
-
-            if (selectedActions == null) {
-              return null; // User cancelled
-            }
-
-            developer.log(
-              '✅ User approved ${selectedActions.length} tool calls',
-              name: 'ChatController',
-            );
-
-            // Return the approved subset of PendingToolCalls
-            return pendingCalls
-                .where((pc) => selectedActions.any((a) => a.id == pc.id))
-                .toList();
-          },
-          onTextDelta: (delta) {
-            streamingBuffer.write(delta);
-            if (!hasStartedStreaming) {
-              startStreaming(aiMessageId);
-              hasStartedStreaming = true;
-            }
-            updateStreamingText(streamingBuffer.toString());
-          },
-          onAssistantMessage: (message, {String? messageId}) async {
-            if (hasStartedStreaming) {
-              stopStreaming();
-              hasStartedStreaming = false;
-              streamingBuffer.clear();
-            }
-
-            // Use the ID provided by server, or generate one if local
-            final idToUse = messageId ?? aiMessageId;
-
-            // Determine if this is a tool use message or a text message
-            final messageType = message.messageType;
-            if (messageType is ToolUseMessage) {
-              // Save tool use message
-              await _messageDao.insertMessage(
-                message.toMessageCompanion(sessionId: sessionId, id: idToUse),
-              );
-            } else {
-              // Save text message
-              final redactedContent = await _secretRedactor.redact(
-                message.content,
-              );
-              await _messageDao.insertMessageWithId(
-                id: idToUse,
-                sessionId: sessionId,
-                userId: _kAiUserId,
-                userName: _kAiUserName,
-                content: redactedContent,
-              );
-            }
-
-            // Generate new ID for next message (only used if local or if server didn't provide one)
-            aiMessageId = _messageDao.generateMessageId();
-          },
-          onToolResultMessage: (message, {String? messageId}) async {
-            // Use the ID provided by server, or generate one if local
-            final idToUse = messageId ?? _messageDao.generateMessageId();
-
-            await _messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId, id: idToUse),
-            );
-          },
+          requestApproval: handleRequestApproval,
+          onTextDelta: handleTextDelta,
+          onAssistantMessage: handleAssistantMessage,
+          onToolResultMessage: handleToolResultMessage,
         );
       } else {
         // Run the agent loop locally
+        // Get conversation history
+        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
         final conversation = _buildConversationHistory(dbMessages);
+
         result = await runAgentLoop(
           llmStream: (conv, tools) =>
               _llmService.streamChat(conv, tools: tools),
@@ -281,75 +292,15 @@ class ChatController extends StateNotifier<ChatState> {
                 await _messageDao.getMessagesBySession(sessionId);
             return _buildConversationHistory(dbMessages);
           },
-          requestApproval: (pendingCalls) async {
-            // Convert to UI's ToolAction format
-            final actions = _pendingToolCallsToActions(pendingCalls);
-            final selectedActions = await requestApproval(actions);
-
-            if (selectedActions == null) {
-              return null; // User cancelled
-            }
-
-            developer.log(
-              '✅ User approved ${selectedActions.length} tool calls',
-              name: 'ChatController',
-            );
-
-            // Return the approved subset of PendingToolCalls
-            return pendingCalls
-                .where((pc) => selectedActions.any((a) => a.id == pc.id))
-                .toList();
-          },
+          requestApproval: handleRequestApproval,
           executeToolCall: (toolCall) async {
             // Execute and return result as JSON string
             final result = await _executeToolCall(toolCall);
             return jsonEncode(result);
           },
-          onTextDelta: (delta) {
-            streamingBuffer.write(delta);
-            if (!hasStartedStreaming) {
-              startStreaming(aiMessageId);
-              hasStartedStreaming = true;
-            }
-            updateStreamingText(streamingBuffer.toString());
-          },
-          onAssistantMessage: (message, {String? messageId}) async {
-            if (hasStartedStreaming) {
-              stopStreaming();
-              hasStartedStreaming = false;
-              streamingBuffer.clear();
-            }
-
-            // Determine if this is a tool use message or a text message
-            final messageType = message.messageType;
-            if (messageType is ToolUseMessage) {
-              // Save tool use message
-              await _messageDao.insertMessage(
-                message.toMessageCompanion(
-                    sessionId: sessionId, id: aiMessageId),
-              );
-            } else {
-              // Save text message
-              final redactedContent = await _secretRedactor.redact(
-                message.content,
-              );
-              await _messageDao.insertMessageWithId(
-                id: aiMessageId,
-                sessionId: sessionId,
-                userId: _kAiUserId,
-                userName: _kAiUserName,
-                content: redactedContent,
-              );
-            }
-
-            // Generate new ID for next message
-            aiMessageId = _messageDao.generateMessageId();
-          },
-          onToolResultMessage: (message, {String? messageId}) async {
-            await _messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId),
-            );
-          },
+          onTextDelta: handleTextDelta,
+          onAssistantMessage: handleAssistantMessage,
+          onToolResultMessage: handleToolResultMessage,
         );
       }
 
