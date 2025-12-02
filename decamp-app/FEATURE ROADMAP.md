@@ -27,6 +27,12 @@ General papercuts:
 
 [ ] A connection and activity indicator for remote project (eg when connected/disconnected, whebn sending data)
 
+[ ] Only sync the remote projects that belong to the agent
+
+
+[ ] Auto-detect when SUDO fails and prompt for password, allow a checkbox to save the sudo password to secrets
+
+
 
 
 * Display step-by-step instructions in the app: eg instruct the user that they need a server
