@@ -23,7 +23,15 @@ class SyncController {
         return webSocketHandler((WebSocketChannel channel, String? protocol) {
           final multiplexed = MultiplexedWebSocketChannel(channel);
           _setupCustomMessageHandling(multiplexed, 'Global');
-          CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
+
+          developer.log('Starting CrdtSync for global', name: 'SyncController');
+          final sync =
+              CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
+
+          unawaited(multiplexed.sink.done.then((_) {
+            developer.log('Channel closed for global', name: 'SyncController');
+            sync.close();
+          }));
         })(request);
       } else if (path.startsWith('project/')) {
         final segments = path.split('/');
@@ -34,7 +42,17 @@ class SyncController {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
-            CrdtSync.server(db.crdt, multiplexed);
+
+            developer.log('Starting CrdtSync for project $projectId',
+                name: 'SyncController');
+            final sync = CrdtSync.server(db.crdt, multiplexed);
+
+            // Ensure sync is closed when channel is closed
+            unawaited(multiplexed.sink.done.then((_) {
+              developer.log('Channel closed for project $projectId',
+                  name: 'SyncController');
+              sync.close();
+            }));
           })(request);
         }
       }
