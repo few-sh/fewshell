@@ -20,6 +20,13 @@ Smoother onboarding:
 General papercuts:
 [ ] Add a context menu button to re-run command
 [ ] Eliminate all non-expandable ellipsis in any of the text controls
+[ ] Show currently active project on the projects page
+[ ] When selecting a peroject from projects list, close the projects page
+
+[ ] An indicator/icon when a project is remote
+
+[ ] A connection and activity indicator for remote project (eg when connected/disconnected, whebn sending data)
+
 
 
 * Display step-by-step instructions in the app: eg instruct the user that they need a server
