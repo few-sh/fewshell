@@ -72,6 +72,8 @@ Feature brainstorm (random ideas in no particular order)
 [ ] A set of pre-made quick API references in a compressed, summarized format that the LLM can search/include
 [ ] Ability to set up multiple SSH configurations (just like we have for models)
 [ ] Abulity to add attach note to anything, eg a note for an SSH configuration that LLM would see
+[ ] A toggle switch to toggle a segret to be "Available to agent", with a help tooltip: available means the agent can use it to provide to commands. SSH keys should not be available to the agent by default, but
+is available for use by the underlying connection. All secrets are redacted from the LLM itself in the conversation.
 
 
 Background agent:
