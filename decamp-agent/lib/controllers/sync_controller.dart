@@ -28,10 +28,13 @@ class SyncController {
           final sync =
               CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
 
-          unawaited(multiplexed.sink.done.then((_) {
-            developer.log('Channel closed for global', name: 'SyncController');
-            sync.close();
-          }));
+          unawaited(
+            multiplexed.sink.done.then((_) {
+              developer.log('Channel closed for global',
+                  name: 'SyncController');
+              sync.close();
+            }),
+          );
         })(request);
       } else if (path.startsWith('project/')) {
         final segments = path.split('/');
@@ -43,16 +46,22 @@ class SyncController {
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
 
-            developer.log('Starting CrdtSync for project $projectId',
-                name: 'SyncController');
+            developer.log(
+              'Starting CrdtSync for project $projectId',
+              name: 'SyncController',
+            );
             final sync = CrdtSync.server(db.crdt, multiplexed);
 
             // Ensure sync is closed when channel is closed
-            unawaited(multiplexed.sink.done.then((_) {
-              developer.log('Channel closed for project $projectId',
-                  name: 'SyncController');
-              sync.close();
-            }));
+            unawaited(
+              multiplexed.sink.done.then((_) {
+                developer.log(
+                  'Channel closed for project $projectId',
+                  name: 'SyncController',
+                );
+                sync.close();
+              }),
+            );
           })(request);
         }
       }
@@ -62,8 +71,10 @@ class SyncController {
   }
 
   void _setupCustomMessageHandling(
-      MultiplexedWebSocketChannel channel, String context,
-      [ProjectDatabase? db]) {
+    MultiplexedWebSocketChannel channel,
+    String context, [
+    ProjectDatabase? db,
+  ]) {
     final agentSession = _AgentSession(channel, db);
 
     // The subscription will be automatically cancelled when the channel is closed
@@ -130,7 +141,8 @@ class _AgentSession {
       } else {
         if (sessionId == null || db == null) {
           throw Exception(
-              'Session ID and Database required when conversation is not provided');
+            'Session ID and Database required when conversation is not provided',
+          );
         }
         final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
         conversation = dbMessages.map((m) => m.toChatMessage()).toList();
@@ -156,9 +168,10 @@ class _AgentSession {
           channel.sendCustomMessage({
             'type': 'request_approval',
             'tools': pendingCalls
-                .map((c) =>
-                    {'id': c.id, 'name': c.name, 'arguments': c.arguments})
-                .toList()
+                .map(
+                  (c) => {'id': c.id, 'name': c.name, 'arguments': c.arguments},
+                )
+                .toList(),
           });
 
           final completer = Completer<List<PendingToolCall>?>();
@@ -236,7 +249,11 @@ class _AgentSession {
   }
 
   Future<ChatCapability> _createProvider(
-      String type, String apiKey, String model, String? baseUrl) async {
+    String type,
+    String apiKey,
+    String model,
+    String? baseUrl,
+  ) async {
     if (type == 'openai') {
       final builder = ai().openai().apiKey(apiKey).model(model);
       if (baseUrl != null) builder.baseUrl(baseUrl);
