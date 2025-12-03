@@ -39,6 +39,12 @@ class SyncService {
   SyncConnectionState get currentConnectionState => _currentConnectionState;
   Stream<bool> get isSyncing => _isSyncingController.stream;
 
+  Timer? _reconnectTimer;
+  String? _currentProjectId;
+  ProjectDatabase? _currentProjectDb;
+  _CancellationToken? _connectionToken;
+  int _reconnectAttempts = 0;
+
   SyncService(this.ref) {
     _init();
   }
@@ -61,7 +67,7 @@ class SyncService {
           _connectProject(next, projectId);
         }
       } else {
-        _disconnectProject();
+        _resetProjectSync();
       }
     });
 
@@ -121,16 +127,29 @@ class SyncService {
   }
 
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
-    _disconnectProject();
+    _reconnectTimer?.cancel();
+    _connectionToken?.cancel();
+    final token = _CancellationToken();
+    _connectionToken = token;
+
+    _currentProjectId = projectId;
+    _currentProjectDb = db;
+    _closeProjectConnection();
+
     try {
       // Ensure DB is open
       await db.customSelect('SELECT 1').get();
+
+      if (token.isCancelled) return;
 
       // Get project settings to check for server URL
       final project = await ref
           .read(databaseProvider)
           .projectDao
           .getProject(projectId);
+
+      if (token.isCancelled) return;
+
       final serverUrl = project?.serverUrl;
 
       if (serverUrl == null) {
@@ -151,16 +170,26 @@ class SyncService {
         wsChannel,
         onActivity: _handleSyncActivity,
         onDisconnect: () {
+          if (_currentProjectId != projectId) return;
           _updateConnectionState(SyncConnectionState.disconnected);
+          _scheduleReconnect();
         },
       );
 
       try {
         await monitoredChannel.ready;
+        if (token.isCancelled) {
+          monitoredChannel.sink.close();
+          return;
+        }
         _updateConnectionState(SyncConnectionState.connected);
+        _reconnectAttempts = 0;
       } catch (e) {
+        if (token.isCancelled) return;
         _updateConnectionState(SyncConnectionState.disconnected);
-        rethrow;
+        developer.log('SyncService: Connection failed: $e');
+        _scheduleReconnect();
+        return;
       }
 
       _projectChannel = MultiplexedWebSocketChannel(monitoredChannel);
@@ -174,7 +203,9 @@ class SyncService {
       });
       _projectSync = CrdtSync.client(crdt, _projectChannel!);
     } catch (e) {
+      if (token.isCancelled) return;
       developer.log('SyncService: Project DB not ready or error: $e');
+      _scheduleReconnect();
     }
   }
 
@@ -186,7 +217,46 @@ class SyncService {
     _globalSubscription = null;
   }
 
-  void _disconnectProject() {
+  void _scheduleReconnect() {
+    if (_reconnectTimer?.isActive ?? false) return;
+    if (_currentProjectId == null || _currentProjectDb == null) return;
+
+    final delaySeconds = _getFibonacciDelay(_reconnectAttempts);
+    developer.log(
+      'SyncService: Scheduling reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)...',
+    );
+
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      if (_currentProjectId != null && _currentProjectDb != null) {
+        _reconnectAttempts++;
+        _connectProject(_currentProjectDb!, _currentProjectId!);
+      }
+    });
+  }
+
+  int _getFibonacciDelay(int attempt) {
+    if (attempt <= 0) return 1;
+    if (attempt == 1) return 1;
+    int a = 1, b = 1;
+    for (int i = 2; i <= attempt; i++) {
+      int temp = a + b;
+      a = b;
+      b = temp;
+      if (b >= 5) return 5;
+    }
+    return b;
+  }
+
+  void _resetProjectSync() {
+    _reconnectTimer?.cancel();
+    _connectionToken?.cancel();
+    _currentProjectId = null;
+    _currentProjectDb = null;
+    _reconnectAttempts = 0;
+    _closeProjectConnection();
+  }
+
+  void _closeProjectConnection() {
     _projectSync?.close();
     _projectSync = null;
     _projectChannel = null;
@@ -197,7 +267,7 @@ class SyncService {
 
   void dispose() {
     _disconnectGlobal();
-    _disconnectProject();
+    _resetProjectSync();
     _connectionStateController.close();
     _isSyncingController.close();
     _syncDebounceTimer?.cancel();
@@ -304,4 +374,10 @@ class _ActivityMonitorSink implements WebSocketSink {
 
   @override
   Future get done => _inner.done;
+}
+
+class _CancellationToken {
+  bool _isCancelled = false;
+  bool get isCancelled => _isCancelled;
+  void cancel() => _isCancelled = true;
 }
