@@ -155,19 +155,6 @@ class MainDrawer extends ConsumerWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.monitor_heart),
-            title: const Text('Monitors (Premium)'),
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Monitoring page coming soon!'),
-                  duration: Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
-          ListTile(
             leading: const Icon(Icons.settings),
             title: const Text('Settings'),
             onTap: () {
