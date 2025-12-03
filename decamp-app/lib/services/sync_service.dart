@@ -43,6 +43,7 @@ class SyncService {
   String? _currentProjectId;
   ProjectDatabase? _currentProjectDb;
   _CancellationToken? _connectionToken;
+  int _reconnectAttempts = 0;
 
   SyncService(this.ref) {
     _init();
@@ -182,6 +183,7 @@ class SyncService {
           return;
         }
         _updateConnectionState(SyncConnectionState.connected);
+        _reconnectAttempts = 0;
       } catch (e) {
         if (token.isCancelled) return;
         _updateConnectionState(SyncConnectionState.disconnected);
@@ -219,12 +221,30 @@ class SyncService {
     if (_reconnectTimer?.isActive ?? false) return;
     if (_currentProjectId == null || _currentProjectDb == null) return;
 
-    developer.log('SyncService: Scheduling reconnect in 5 seconds...');
-    _reconnectTimer = Timer(const Duration(seconds: 5), () {
+    final delaySeconds = _getFibonacciDelay(_reconnectAttempts);
+    developer.log(
+      'SyncService: Scheduling reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)...',
+    );
+
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       if (_currentProjectId != null && _currentProjectDb != null) {
+        _reconnectAttempts++;
         _connectProject(_currentProjectDb!, _currentProjectId!);
       }
     });
+  }
+
+  int _getFibonacciDelay(int attempt) {
+    if (attempt <= 0) return 1;
+    if (attempt == 1) return 1;
+    int a = 1, b = 1;
+    for (int i = 2; i <= attempt; i++) {
+      int temp = a + b;
+      a = b;
+      b = temp;
+      if (b >= 5) return 5;
+    }
+    return b;
   }
 
   void _resetProjectSync() {
@@ -232,6 +252,7 @@ class SyncService {
     _connectionToken?.cancel();
     _currentProjectId = null;
     _currentProjectDb = null;
+    _reconnectAttempts = 0;
     _closeProjectConnection();
   }
 
