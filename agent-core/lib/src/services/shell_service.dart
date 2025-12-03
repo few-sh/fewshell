@@ -634,8 +634,9 @@ ${envExports}DECAMP_SECRETS
   /// Returns inline value if provided, otherwise fetches from keychain
   Future<String?> _getCredential(String? inlineValue, String? secretId) async {
     if (inlineValue != null) return inlineValue;
-    if (_keychain == null || _projectId == null || secretId == null)
+    if (_keychain == null || _projectId == null || secretId == null) {
       return null;
+    }
     return await _keychain.getProjectSecret(_projectId, secretId);
   }
 }
