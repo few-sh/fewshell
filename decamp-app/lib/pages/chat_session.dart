@@ -19,6 +19,7 @@ import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/components/no_llm_configured_overlay.dart';
 import 'package:decamp/services/sync_service.dart';
+import 'package:decamp/components/sync_indicator.dart';
 import 'dart:developer' as developer;
 
 class ChatSession extends ConsumerStatefulWidget {
@@ -347,7 +348,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
               curve: Curves.easeInOut,
               height: keyboardVisible ? 0 : kToolbarHeight,
               child: AppBar(
-                title: ProjectTitleBar(title: currentProjectName),
+                title: ProjectTitleBar(
+                  title: currentProjectName,
+                  leading: (currentProject?.serverUrl != null)
+                      ? const SyncIndicator()
+                      : null,
+                ),
                 centerTitle: false,
                 backgroundColor: Theme.of(context).colorScheme.inversePrimary,
                 actions: [

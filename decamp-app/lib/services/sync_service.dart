@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_selection_provider.dart';
@@ -25,8 +26,26 @@ class SyncService {
   MultiplexedWebSocketChannel? _projectChannel;
   StreamSubscription? _projectSubscription;
 
+  final StreamController<SyncConnectionState> _connectionStateController =
+      StreamController<SyncConnectionState>.broadcast();
+  final StreamController<bool> _isSyncingController =
+      StreamController<bool>.broadcast();
+  Timer? _syncDebounceTimer;
+  SyncConnectionState _currentConnectionState =
+      SyncConnectionState.disconnected;
+
+  Stream<SyncConnectionState> get connectionState =>
+      _connectionStateController.stream;
+  SyncConnectionState get currentConnectionState => _currentConnectionState;
+  Stream<bool> get isSyncing => _isSyncingController.stream;
+
   SyncService(this.ref) {
     _init();
+  }
+
+  void _updateConnectionState(SyncConnectionState state) {
+    _currentConnectionState = state;
+    _connectionStateController.add(state);
   }
 
   void _init() {
@@ -125,9 +144,26 @@ class SyncService {
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
       developer.log('SyncService: Connecting to project sync at $uri');
-      _projectChannel = MultiplexedWebSocketChannel(
-        WebSocketChannel.connect(uri),
+      _updateConnectionState(SyncConnectionState.connecting);
+
+      final wsChannel = WebSocketChannel.connect(uri);
+      final monitoredChannel = _ActivityMonitorWebSocketChannel(
+        wsChannel,
+        onActivity: _handleSyncActivity,
+        onDisconnect: () {
+          _updateConnectionState(SyncConnectionState.disconnected);
+        },
       );
+
+      try {
+        await monitoredChannel.ready;
+        _updateConnectionState(SyncConnectionState.connected);
+      } catch (e) {
+        _updateConnectionState(SyncConnectionState.disconnected);
+        rethrow;
+      }
+
+      _projectChannel = MultiplexedWebSocketChannel(monitoredChannel);
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Project): Received custom message: $msg');
         if (msg['type'] == 'PONG') {
@@ -156,11 +192,25 @@ class SyncService {
     _projectChannel = null;
     _projectSubscription?.cancel();
     _projectSubscription = null;
+    _updateConnectionState(SyncConnectionState.disconnected);
   }
 
   void dispose() {
     _disconnectGlobal();
     _disconnectProject();
+    _connectionStateController.close();
+    _isSyncingController.close();
+    _syncDebounceTimer?.cancel();
+  }
+
+  void _handleSyncActivity() {
+    if (!_isSyncingController.hasListener) return;
+
+    _isSyncingController.add(true);
+    _syncDebounceTimer?.cancel();
+    _syncDebounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _isSyncingController.add(false);
+    });
   }
 
   MultiplexedWebSocketChannel? get projectChannel => _projectChannel;
@@ -173,4 +223,85 @@ class SyncService {
       developer.log('SyncService: Cannot send ping, no project connection');
     }
   }
+}
+
+enum SyncConnectionState { disconnected, connecting, connected }
+
+class _ActivityMonitorWebSocketChannel
+    with StreamChannelMixin
+    implements WebSocketChannel {
+  final WebSocketChannel _inner;
+  final void Function() onActivity;
+  final void Function() onDisconnect;
+  late final WebSocketSink _sink;
+  late final Stream _stream;
+
+  _ActivityMonitorWebSocketChannel(
+    this._inner, {
+    required this.onActivity,
+    required this.onDisconnect,
+  }) {
+    _sink = _ActivityMonitorSink(_inner.sink, onActivity);
+    _stream = _inner.stream.transform(
+      StreamTransformer.fromHandlers(
+        handleData: (data, sink) {
+          onActivity();
+          sink.add(data);
+        },
+        handleError: (error, stackTrace, sink) {
+          onDisconnect();
+          sink.addError(error, stackTrace);
+        },
+        handleDone: (sink) {
+          onDisconnect();
+          sink.close();
+        },
+      ),
+    );
+  }
+
+  @override
+  Stream get stream => _stream;
+
+  @override
+  WebSocketSink get sink => _sink;
+
+  @override
+  String? get protocol => _inner.protocol;
+
+  @override
+  int? get closeCode => _inner.closeCode;
+
+  @override
+  String? get closeReason => _inner.closeReason;
+
+  @override
+  Future<void> get ready => _inner.ready;
+}
+
+class _ActivityMonitorSink implements WebSocketSink {
+  final WebSocketSink _inner;
+  final void Function() onActivity;
+
+  _ActivityMonitorSink(this._inner, this.onActivity);
+
+  @override
+  void add(event) {
+    onActivity();
+    _inner.add(event);
+  }
+
+  @override
+  void addError(Object error, [StackTrace? stackTrace]) =>
+      _inner.addError(error, stackTrace);
+
+  @override
+  Future addStream(Stream stream) => _inner.addStream(stream);
+
+  @override
+  Future close([int? closeCode, String? closeReason]) =>
+      _inner.close(closeCode, closeReason);
+
+  @override
+  Future get done => _inner.done;
 }

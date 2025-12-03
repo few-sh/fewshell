@@ -30,8 +30,10 @@ class SyncController {
 
           unawaited(
             multiplexed.sink.done.then((_) {
-              developer.log('Channel closed for global',
-                  name: 'SyncController');
+              developer.log(
+                'Channel closed for global',
+                name: 'SyncController',
+              );
               sync.close();
             }),
           );

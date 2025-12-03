@@ -5,11 +5,13 @@ import '../pages/projects_page.dart';
 class ProjectTitleBar extends StatelessWidget {
   final String title;
   final Color? iconColor;
+  final Widget? leading;
 
   const ProjectTitleBar({
     super.key,
     required this.title,
     this.iconColor,
+    this.leading,
   });
 
   @override
@@ -24,6 +26,7 @@ class ProjectTitleBar extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (leading != null) ...[leading!, const SizedBox(width: 8)],
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
