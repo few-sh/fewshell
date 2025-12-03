@@ -45,14 +45,18 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
         final connectionState = connectionSnapshot.data!;
 
         if (connectionState == SyncConnectionState.connecting) {
-          _spinController.repeat();
+          if (!_spinController.isAnimating) {
+            _spinController.repeat();
+          }
           return RotationTransition(
             turns: _spinController,
             child: const Icon(Icons.refresh, size: 16),
           );
         } else {
-          _spinController.stop();
-          _spinController.reset();
+          if (_spinController.isAnimating) {
+            _spinController.stop();
+            _spinController.reset();
+          }
         }
 
         if (connectionState == SyncConnectionState.disconnected) {
@@ -75,9 +79,11 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
                 _pulseController.repeat(reverse: true);
               }
             } else {
-              _pulseController.stop();
-              _pulseController.value =
-                  0.0; // Reset to fully visible (or dimmed)
+              if (_pulseController.isAnimating) {
+                _pulseController.stop();
+                _pulseController.value =
+                    0.0; // Reset to fully visible (or dimmed)
+              }
             }
 
             // When syncing, pulse between 1.0 and 0.5
