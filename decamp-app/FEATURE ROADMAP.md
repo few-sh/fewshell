@@ -55,6 +55,9 @@ Basic architecture:
 [Phone] -> SSH -> [Appliance(Docker or micro isntance*) + gcloud CLI]
 *NOTE: Micro instance preferred
 
+Error handling:
+[ ] When not connected to server  
+[X] When SSH throws an error
 
 Feature brainstorm (random ideas in no particular order)
 

@@ -26,11 +26,11 @@ class ShellService {
   ShellService(this._sshSettings, this._keychain, this._projectId);
 
   /// Connect to SSH server using the provided settings
-  /// Returns true if connection successful, false otherwise
+  /// Throws an exception if connection fails
   ///
   /// Optional inline credentials can be provided for testing purposes.
   /// If provided, they override credentials from the keychain.
-  Future<bool> connect(
+  Future<void> connect(
     SshSettings sshSettings, {
     String? inlinePassword,
     String? inlinePrivateKey,
@@ -88,12 +88,11 @@ class ShellService {
       await _client!.authenticated;
 
       developer.log('SSH connection established', name: 'ShellService');
-      return true;
     } catch (e) {
       developer.log('SSH connection failed: $e', name: 'ShellService');
       _client?.close();
       _client = null;
-      return false;
+      rethrow;
     }
   }
 
@@ -121,12 +120,7 @@ class ShellService {
           'No SSH settings configured for this project',
           name: 'ShellService',
         );
-        return {
-          'stdout': '',
-          'stderr': 'Error: SSH settings not configured for this project',
-          'exitCode': -1,
-          'executed': false,
-        };
+        throw Exception('SSH settings not configured for this project');
       }
 
       // Clean up stale client if it exists
@@ -136,15 +130,7 @@ class ShellService {
       }
 
       developer.log('Auto-connecting to SSH server...', name: 'ShellService');
-      final connected = await connect(_sshSettings);
-      if (!connected) {
-        return {
-          'stdout': '',
-          'stderr': 'Error: Failed to connect to SSH server',
-          'exitCode': -1,
-          'executed': false,
-        };
-      }
+      await connect(_sshSettings);
     }
 
     try {
@@ -239,30 +225,24 @@ ${envExports}DECAMP_SECRETS
 
         // Clean up and try to reconnect
         _client = null;
-        final reconnected = await connect(_sshSettings);
-        if (reconnected) {
-          developer.log(
-            'Reconnected, retrying command...',
-            name: 'ShellService',
-          );
-          // Retry the command once
-          return executeCommand(command, secrets: secrets, isRetry: true);
-        }
+        await connect(_sshSettings);
+
+        developer.log(
+          'Reconnected, retrying command...',
+          name: 'ShellService',
+        );
+        // Retry the command once
+        return executeCommand(command, secrets: secrets, isRetry: true);
       }
 
       developer.log('Command execution failed: $e', name: 'ShellService');
-      return {
-        'stdout': '',
-        'stderr': 'Error executing command: $e',
-        'exitCode': -1,
-        'executed': false,
-      };
+      rethrow;
     }
   }
 
   /// Execute a shell command with full control over stdin/stdout/stderr
   /// Returns a session that can be used for interactive commands
-  Future<SSHSession?> createSession() async {
+  Future<SSHSession> createSession() async {
     // Auto-connect if not connected or connection is stale
     if (!isConnected) {
       if (_sshSettings == null) {
@@ -270,7 +250,7 @@ ${envExports}DECAMP_SECRETS
           'No SSH settings configured for this project',
           name: 'ShellService',
         );
-        return null;
+        throw Exception('SSH settings not configured for this project');
       }
 
       // Clean up stale client if it exists
@@ -280,10 +260,7 @@ ${envExports}DECAMP_SECRETS
       }
 
       developer.log('Auto-connecting to SSH server...', name: 'ShellService');
-      final connected = await connect(_sshSettings);
-      if (!connected) {
-        return null;
-      }
+      await connect(_sshSettings);
     }
 
     try {
@@ -292,7 +269,7 @@ ${envExports}DECAMP_SECRETS
       return session;
     } catch (e) {
       developer.log('Failed to create session: $e', name: 'ShellService');
-      return null;
+      rethrow;
     }
   }
 
@@ -370,12 +347,7 @@ ${envExports}DECAMP_SECRETS
           'No SSH settings configured for this project',
           name: 'ShellService',
         );
-        return {
-          'stdout': '',
-          'stderr': 'Error: SSH settings not configured for this project',
-          'exitCode': -1,
-          'executed': false,
-        };
+        throw Exception('SSH settings not configured for this project');
       }
 
       // Clean up stale client if it exists
@@ -385,15 +357,7 @@ ${envExports}DECAMP_SECRETS
       }
 
       developer.log('Auto-connecting to SSH server...', name: 'ShellService');
-      final connected = await connect(_sshSettings);
-      if (!connected) {
-        return {
-          'stdout': '',
-          'stderr': 'Error: Failed to connect to SSH server',
-          'exitCode': -1,
-          'executed': false,
-        };
-      }
+      await connect(_sshSettings);
     }
 
     // Get sudo password from secrets if provided
@@ -410,12 +374,7 @@ ${envExports}DECAMP_SECRETS
           'Sudo password not found in secrets',
           name: 'ShellService',
         );
-        return {
-          'stdout': '',
-          'stderr': 'Error: Sudo password not found in secrets',
-          'exitCode': -1,
-          'executed': false,
-        };
+        throw Exception('Sudo password not found in secrets');
       }
     }
 
@@ -547,32 +506,23 @@ ${envExports}DECAMP_SECRETS
 
         // Clean up and try to reconnect
         _client = null;
-        final reconnected = await connect(_sshSettings);
-        if (reconnected) {
-          developer.log(
-            'Reconnected, retrying sudo command...',
-            name: 'ShellService',
-          );
-          // Retry the command once
-          return executeWithSudo(
-            command: command,
-            sudoPasswordSecretId: sudoPasswordSecretId,
-            secrets: secrets,
-            isRetry: true,
-          );
-        }
+        await connect(_sshSettings);
+
+        developer.log(
+          'Reconnected, retrying sudo command...',
+          name: 'ShellService',
+        );
+        // Retry the command once
+        return executeWithSudo(
+          command: command,
+          sudoPasswordSecretId: sudoPasswordSecretId,
+          secrets: secrets,
+          isRetry: true,
+        );
       }
 
       developer.log('Sudo command execution failed: $e', name: 'ShellService');
-      return {
-        'stdout': '',
-        'stderr': _redactSecrets(
-          'Error executing sudo command: $e',
-          secretsToRedact,
-        ),
-        'exitCode': -1,
-        'executed': false,
-      };
+      rethrow;
     }
   }
 

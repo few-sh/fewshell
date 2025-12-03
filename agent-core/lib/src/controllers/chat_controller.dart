@@ -360,16 +360,28 @@ class ChatController extends StateNotifier<ChatState> {
       final command = params['command'] as String;
       final sudoRequired = params['sudo_required'] as bool? ?? false;
 
-      final Map<String, dynamic> result;
+      Map<String, dynamic> result;
 
-      if (sudoRequired) {
-        result = await _shellService.executeWithSudo(
-          command: command,
-          sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
-              _sshSettings?.passwordSecretId,
-        );
-      } else {
-        result = await _shellService.executeCommand(command);
+      try {
+        if (sudoRequired) {
+          result = await _shellService.executeWithSudo(
+            command: command,
+            sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
+                _sshSettings?.passwordSecretId,
+          );
+        } else {
+          result = await _shellService.executeCommand(command);
+        }
+      } catch (e) {
+        // Handle exceptions by returning an error result that can be sent to the LLM
+        final errorMessage =
+            e.toString().replaceFirst(RegExp(r'^Exception: '), '');
+        result = {
+          'stdout': '',
+          'stderr': 'Error executing command: $errorMessage',
+          'exitCode': -1,
+          'executed': false,
+        };
       }
 
       return {
