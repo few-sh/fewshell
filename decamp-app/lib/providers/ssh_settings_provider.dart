@@ -312,18 +312,4 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
   Future<String?> getSecret(String secretId) async {
     return await _keychain.getProjectSecret(_projectId, secretId);
   }
-
-  /// Test SSH connection with current settings
-  Future<bool> testConnection() async {
-    final current = state;
-    if (current == null || !current.enabled) {
-      return false;
-    }
-
-    // TODO: Implement actual SSH connection test
-    // This would use the ssh_client package or similar
-    // For now, just return true as a placeholder
-    await Future.delayed(const Duration(seconds: 1));
-    return true;
-  }
 }

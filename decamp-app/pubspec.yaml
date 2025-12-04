@@ -70,6 +70,7 @@ dependencies:
 
   # SSH Client
   dartssh2: ^2.9.2
+  stream_channel: ^2.1.4
 
 dependency_overrides:
   sqlite_crdt: 3.0.3
