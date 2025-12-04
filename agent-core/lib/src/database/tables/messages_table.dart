@@ -33,6 +33,9 @@ class Messages extends Table {
   /// Timestamp when the message was last edited (null if never edited)
   DateTimeColumn get editedAt => dateTime().nullable()();
 
+  /// Whether the message is deleted (soft delete for CRDT)
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
+
   /// Discriminator: what kind of message is this?
   IntColumn get messageKind =>
       intEnum<MessageKind>().withDefault(const Constant(0))();
@@ -54,12 +57,12 @@ class Messages extends Table {
 
   @override
   List<String> get customConstraints => [
-    // Ensure only the appropriate column is populated for each message kind
-    'CHECK ('
-        '(message_kind = 0 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // text
-        '(message_kind = 1 AND image_url IS NOT NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // imageUrl
-        '(message_kind = 2 AND image_url IS NULL AND tool_calls_json IS NOT NULL AND tool_results_json IS NULL) OR ' // toolUse
-        '(message_kind = 3 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NOT NULL)' // toolResult
-        ')',
-  ];
+        // Ensure only the appropriate column is populated for each message kind
+        'CHECK ('
+            '(message_kind = 0 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // text
+            '(message_kind = 1 AND image_url IS NOT NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // imageUrl
+            '(message_kind = 2 AND image_url IS NULL AND tool_calls_json IS NOT NULL AND tool_results_json IS NULL) OR ' // toolUse
+            '(message_kind = 3 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NOT NULL)' // toolResult
+            ')',
+      ];
 }

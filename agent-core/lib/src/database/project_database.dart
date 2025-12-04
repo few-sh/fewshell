@@ -37,7 +37,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration {
@@ -90,6 +90,19 @@ class ProjectDatabase extends _$ProjectDatabase {
           await executor.runCustom(
             'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC)',
           );
+        }
+
+        // Migration from version 5 to 6: Add isDeleted column to messages
+        if (from < 6) {
+          // Check if column already exists to handle potential partial migrations
+          final columns =
+              await executor.runSelect('PRAGMA table_info(messages)', []);
+          final hasIsDeleted =
+              columns.any((row) => row['name'] == 'is_deleted');
+
+          if (!hasIsDeleted) {
+            await m.addColumn(messages, messages.isDeleted);
+          }
         }
       },
     );
