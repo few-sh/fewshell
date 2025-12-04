@@ -187,9 +187,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     await controller.sendMessage(
       content: content,
       sessionId: currentSessionId,
-      requestApproval: (actions) =>
-          MultiCommandApprovalOverlay.show(context, actions),
-      onNoConfig: () => NoLlmConfiguredOverlay.show(context),
+      requestApproval: (actions) {
+        if (!mounted) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(context, actions);
+      },
+      onNoConfig: () {
+        if (mounted) NoLlmConfiguredOverlay.show(context);
+      },
       syncChannel: syncChannel,
     );
   }
@@ -212,8 +216,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       messageId: messageId,
       newContent: newContent,
       sessionId: currentSessionId,
-      requestApproval: (actions) =>
-          MultiCommandApprovalOverlay.show(context, actions),
+      requestApproval: (actions) {
+        if (!mounted) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(context, actions);
+      },
       syncChannel: syncChannel,
     );
   }
@@ -235,8 +241,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     await controller.resendMessage(
       messageId: messageId,
       sessionId: currentSessionId,
-      requestApproval: (actions) =>
-          MultiCommandApprovalOverlay.show(context, actions),
+      requestApproval: (actions) {
+        if (!mounted) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(context, actions);
+      },
       syncChannel: syncChannel,
     );
   }
@@ -271,6 +279,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   /// Handle SSH interactive prompts (e.g. 2FA, password)
   Future<String> _handleSshPrompt(String prompt, bool echo) async {
+    if (!mounted) {
+      throw Exception('Chat session unmounted');
+    }
     return showSshPrompt(context, prompt, echo);
   }
 

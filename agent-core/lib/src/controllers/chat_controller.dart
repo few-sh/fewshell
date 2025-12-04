@@ -167,7 +167,7 @@ class ChatController extends StateNotifier<ChatState> {
           content: content,
         );
         if (!isValid) {
-          state = state.copyWith(isLoading: false);
+          if (mounted) state = state.copyWith(isLoading: false);
           onNoConfig?.call();
           return;
         }
@@ -180,7 +180,7 @@ class ChatController extends StateNotifier<ChatState> {
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
       if (config == null) {
-        state = state.copyWith(isLoading: false);
+        if (mounted) state = state.copyWith(isLoading: false);
         onNoConfig?.call();
         return;
       }
@@ -322,11 +322,12 @@ class ChatController extends StateNotifier<ChatState> {
             userName: _kAiUserName,
             content: redactedError,
           );
-          state = state.copyWith(isLoading: false, error: errorMsg);
+          if (mounted)
+            state = state.copyWith(isLoading: false, error: errorMsg);
           return;
       }
 
-      state = state.copyWith(isLoading: false);
+      if (mounted) state = state.copyWith(isLoading: false);
     } catch (e) {
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);
@@ -336,7 +337,8 @@ class ChatController extends StateNotifier<ChatState> {
         userName: _kAiUserName,
         content: redactedError,
       );
-      state = state.copyWith(isLoading: false, error: e.toString());
+      if (mounted)
+        state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -559,21 +561,23 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Start streaming for a message
   void startStreaming(String messageId) {
-    state = state.copyWith(streamingMessageId: messageId, streamingText: '');
+    if (mounted)
+      state = state.copyWith(streamingMessageId: messageId, streamingText: '');
   }
 
   /// Update streaming text for a message
   void updateStreamingText(String text) {
-    state = state.copyWith(streamingText: text);
+    if (mounted) state = state.copyWith(streamingText: text);
   }
 
   /// Stop streaming
   void stopStreaming() {
-    state = state.copyWith(streamingMessageId: null, streamingText: '');
+    if (mounted)
+      state = state.copyWith(streamingMessageId: null, streamingText: '');
   }
 
   /// Clear error state
   void clearError() {
-    state = state.copyWith(error: null);
+    if (mounted) state = state.copyWith(error: null);
   }
 }
