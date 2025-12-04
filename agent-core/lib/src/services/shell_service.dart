@@ -210,7 +210,7 @@ ${envExports}DECAMP_SECRETS
 
       final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
-      final exitCode = session.exitCode ?? -1;
+      final exitCode = session.exitCode ?? 0;
 
       developer.log(
         'Command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
