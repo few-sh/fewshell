@@ -94,6 +94,20 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     return query.map((row) => row.read(count)!).getSingle();
   }
 
+  /// Get the last message in a session
+  Future<MessageEntity?> getLastMessage(String sessionId) {
+    return (select(messages)
+          ..where(
+            (m) => m.sessionId.equals(sessionId) & m.isDeleted.equals(false),
+          )
+          ..orderBy([
+            (m) =>
+                OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// Generate a unique message ID
   String generateMessageId() => IdGenerator.messageId();
 

@@ -134,21 +134,32 @@ class _AgentSession {
     try {
       final config = data['config'] as Map<String, dynamic>;
       final sessionId = data['sessionId'] as String?;
+      final triggerMessageJson =
+          data['triggerMessage'] as Map<String, dynamic>?;
 
-      List<ChatMessage> conversation;
-      if (data.containsKey('conversation')) {
-        final conversationJson =
-            (data['conversation'] as List).cast<Map<String, dynamic>>();
-        conversation = conversationJson.map((j) => j.toChatMessage()).toList();
-      } else {
-        if (sessionId == null || db == null) {
-          throw Exception(
-            'Session ID and Database required when conversation is not provided',
-          );
-        }
-        final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
-        conversation = dbMessages.map((m) => m.toChatMessage()).toList();
+      if (sessionId == null || db == null) {
+        throw Exception(
+          'Session ID and Database required',
+        );
       }
+
+      // If we have a trigger message, upsert it immediately to ensure we have the latest context
+      if (triggerMessageJson != null) {
+        developer.log(
+          '📥 Received trigger message, upserting...',
+          name: 'AgentSession',
+        );
+        final triggerMessage = MessageEntity.fromJson(triggerMessageJson);
+        await db!.messageDao.insertMessage(triggerMessage.toCompanion(true));
+        developer.log(
+          '✅ Trigger message ${triggerMessage.id} upserted!',
+          name: 'AgentSession',
+        );
+      }
+
+      // Always load conversation from database (single source of truth)
+      final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
+      final conversation = dbMessages.map((m) => m.toChatMessage()).toList();
 
       final apiKey = config['apiKey'] as String;
       final providerType = config['provider'] as String;

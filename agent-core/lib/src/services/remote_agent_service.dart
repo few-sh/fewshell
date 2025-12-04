@@ -8,15 +8,17 @@ import 'package:llm_dart/llm_dart.dart';
 /// Runs the agent loop remotely on the server using the existing sync channel
 Future<AgentLoopResult> runRemoteAgentLoop({
   required MultiplexedWebSocketChannel channel,
-  List<ChatMessage>? conversation,
   required Map<String, dynamic> config,
   required String sessionId,
+  required MessageEntity triggerMessage,
   required ApprovalFunction requestApproval,
   TextDeltaCallback? onTextDelta,
   MessageCallback? onAssistantMessage,
   MessageCallback? onToolResultMessage,
 }) async {
-  developer.log('Starting remote agent loop', name: 'RemoteAgentService');
+  developer.log(
+      'Starting remote agent loop with sessionId: $sessionId triggerMessage: ${triggerMessage.toJsonString()}',
+      name: 'RemoteAgentService');
 
   final completer = Completer<AgentLoopResult>();
 
@@ -87,10 +89,9 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   // Start chat
   channel.sendCustomMessage({
     'type': 'start_chat',
-    if (conversation != null)
-      'conversation': conversation.map((m) => m.toJson()).toList(),
     'config': config,
     'sessionId': sessionId,
+    'triggerMessage': triggerMessage.toJson(),
   });
 
   try {
