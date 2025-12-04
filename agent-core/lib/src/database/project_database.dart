@@ -37,7 +37,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -102,6 +102,19 @@ class ProjectDatabase extends _$ProjectDatabase {
 
           if (!hasIsDeleted) {
             await m.addColumn(messages, messages.isDeleted);
+          }
+        }
+
+        // Migration from version 6 to 7: Add isStreaming column to messages
+        if (from < 7) {
+          // Check if column already exists to handle potential partial migrations
+          final columns =
+              await executor.runSelect('PRAGMA table_info(messages)', []);
+          final hasIsStreaming =
+              columns.any((row) => row['name'] == 'is_streaming');
+
+          if (!hasIsStreaming) {
+            await m.addColumn(messages, messages.isStreaming);
           }
         }
       },
