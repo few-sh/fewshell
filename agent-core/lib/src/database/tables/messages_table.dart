@@ -36,6 +36,9 @@ class Messages extends Table {
   /// Whether the message is deleted (soft delete for CRDT)
   BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
+  /// Whether the message is currently streaming
+  BoolColumn get isStreaming => boolean().withDefault(const Constant(false))();
+
   /// Discriminator: what kind of message is this?
   IntColumn get messageKind =>
       intEnum<MessageKind>().withDefault(const Constant(0))();

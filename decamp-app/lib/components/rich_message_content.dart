@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
@@ -16,6 +17,8 @@ import 'package:decamp/utils/highlight_injector.dart';
 class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
   final String? displayText; // Override for streaming
+  final Stream<String>? textStream;
+  final Stream<String>? toolStream;
   final bool isUser;
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
@@ -29,6 +32,8 @@ class RichMessageContent extends StatefulWidget {
     super.key,
     required this.message,
     this.displayText,
+    this.textStream,
+    this.toolStream,
     required this.isUser,
     this.onEdit,
     this.onResend,
@@ -43,6 +48,64 @@ class RichMessageContent extends StatefulWidget {
 
 class _RichMessageContentState extends State<RichMessageContent> {
   bool _isEditMode = false;
+  String _streamedText = '';
+  String _streamedToolOutput = '';
+  StreamSubscription? _textSub;
+  StreamSubscription? _toolSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupStreams();
+  }
+
+  @override
+  void didUpdateWidget(RichMessageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.textStream != oldWidget.textStream ||
+        widget.toolStream != oldWidget.toolStream) {
+      _disposeStreams();
+      _setupStreams();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeStreams();
+    super.dispose();
+  }
+
+  void _setupStreams() {
+    if (widget.textStream != null) {
+      _streamedText = widget.displayText ?? '';
+      _textSub = widget.textStream!.listen((delta) {
+        if (mounted) {
+          setState(() {
+            _streamedText += delta;
+          });
+        }
+      });
+    }
+    if (widget.toolStream != null) {
+      _streamedToolOutput = '';
+      _toolSub = widget.toolStream!.listen((output) {
+        if (mounted) {
+          setState(() {
+            _streamedToolOutput += output;
+          });
+        }
+      });
+    } else {
+      _streamedToolOutput = '';
+    }
+  }
+
+  void _disposeStreams() {
+    _textSub?.cancel();
+    _toolSub?.cancel();
+    _textSub = null;
+    _toolSub = null;
+  }
 
   void _enterEditMode() {
     setState(() {
@@ -86,9 +149,14 @@ class _RichMessageContentState extends State<RichMessageContent> {
     }
 
     // Use displayText override if provided (for streaming), otherwise format message content
-    final text =
-        widget.displayText ??
-        MessageFormatter.formatMessageContent(widget.message);
+    var text = widget.textStream != null
+        ? _streamedText
+        : (widget.displayText ??
+              MessageFormatter.formatMessageContent(widget.message));
+
+    if (_streamedToolOutput.isNotEmpty) {
+      text += '\n\n```\n$_streamedToolOutput\n```';
+    }
 
     // Build markdown content
     final content = _buildMarkdownContent(context, text);

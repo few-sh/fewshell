@@ -11,6 +11,8 @@ class ChatList extends StatefulWidget {
   final bool isLoading;
   final String? streamingMessageId;
   final String streamingText;
+  final Stream<String>? textDeltaStream;
+  final Stream<String>? toolOutputStream;
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
   final Function(String messageId)? onBranchSession;
@@ -25,6 +27,8 @@ class ChatList extends StatefulWidget {
     this.isLoading = false,
     this.streamingMessageId,
     this.streamingText = '',
+    this.textDeltaStream,
+    this.toolOutputStream,
     this.onEditMessage,
     this.onResendMessage,
     this.onBranchSession,
@@ -318,6 +322,8 @@ class _ChatListState extends State<ChatList> {
         final isStreaming = message.id == widget.streamingMessageId;
         // Only provide displayText when actually streaming
         final displayText = isStreaming ? widget.streamingText : null;
+        final textStream = isStreaming ? widget.textDeltaStream : null;
+        final toolStream = isStreaming ? widget.toolOutputStream : null;
         final isUser = message.userId == 'user';
 
         return Column(
@@ -342,6 +348,8 @@ class _ChatListState extends State<ChatList> {
                   child: RichMessageContent(
                     message: message,
                     displayText: displayText,
+                    textStream: textStream,
+                    toolStream: toolStream,
                     isUser: isUser,
                     onEdit: widget.onEditMessage,
                     onResend: widget.onResendMessage,

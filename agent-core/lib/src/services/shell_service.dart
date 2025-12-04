@@ -110,6 +110,8 @@ class ShellService {
     // ignore: avoid_private_typedef_parameters
     bool isRetry =
         false, // Internal: prevents infinite recursion on connection retry
+    void Function(String)? onStdout,
+    void Function(String)? onStderr,
   }) async {
     developer.log('Executing command: $command', name: 'ShellService');
 
@@ -182,13 +184,19 @@ ${envExports}DECAMP_SECRETS
       final stderrDone = Completer<void>();
 
       session.stdout.listen(
-        stdoutBuffer.add,
+        (data) {
+          stdoutBuffer.add(data);
+          onStdout?.call(String.fromCharCodes(data));
+        },
         onDone: stdoutDone.complete,
         onError: stdoutDone.completeError,
       );
 
       session.stderr.listen(
-        stderrBuffer.add,
+        (data) {
+          stderrBuffer.add(data);
+          onStderr?.call(String.fromCharCodes(data));
+        },
         onDone: stderrDone.complete,
         onError: stderrDone.completeError,
       );
@@ -232,7 +240,13 @@ ${envExports}DECAMP_SECRETS
           name: 'ShellService',
         );
         // Retry the command once
-        return executeCommand(command, secrets: secrets, isRetry: true);
+        return executeCommand(
+          command,
+          secrets: secrets,
+          isRetry: true,
+          onStdout: onStdout,
+          onStderr: onStderr,
+        );
       }
 
       developer.log('Command execution failed: $e', name: 'ShellService');
@@ -339,6 +353,8 @@ ${envExports}DECAMP_SECRETS
     // ignore: avoid_private_typedef_parameters
     bool isRetry =
         false, // Internal: prevents infinite recursion on connection retry
+    void Function(String)? onStdout,
+    void Function(String)? onStderr,
   }) async {
     // Auto-connect if not connected or connection is stale
     if (!isConnected) {
@@ -463,13 +479,19 @@ ${envExports}DECAMP_SECRETS
       final stderrDone = Completer<void>();
 
       session.stdout.listen(
-        stdoutBuffer.add,
+        (data) {
+          stdoutBuffer.add(data);
+          onStdout?.call(String.fromCharCodes(data));
+        },
         onDone: stdoutDone.complete,
         onError: stdoutDone.completeError,
       );
 
       session.stderr.listen(
-        stderrBuffer.add,
+        (data) {
+          stderrBuffer.add(data);
+          onStderr?.call(String.fromCharCodes(data));
+        },
         onDone: stderrDone.complete,
         onError: stderrDone.completeError,
       );
@@ -518,6 +540,8 @@ ${envExports}DECAMP_SECRETS
           sudoPasswordSecretId: sudoPasswordSecretId,
           secrets: secrets,
           isRetry: true,
+          onStdout: onStdout,
+          onStderr: onStderr,
         );
       }
 

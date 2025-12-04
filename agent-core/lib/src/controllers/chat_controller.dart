@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
@@ -25,6 +26,12 @@ class ChatController extends StateNotifier<ChatState> {
   final SshSettings? _sshSettings;
   final String? sessionId;
 
+  final _textDeltaController = StreamController<String>.broadcast();
+  final _toolOutputController = StreamController<String>.broadcast();
+
+  Stream<String> get textDeltaStream => _textDeltaController.stream;
+  Stream<String> get toolOutputStream => _toolOutputController.stream;
+
   ChatController({
     required MessageDao messageDao,
     required SessionDao sessionDao,
@@ -40,6 +47,13 @@ class ChatController extends StateNotifier<ChatState> {
         _secretRedactor = secretRedactor,
         _sshSettings = sshSettings,
         super(const ChatState());
+
+  @override
+  void dispose() {
+    _textDeltaController.close();
+    _toolOutputController.close();
+    super.dispose();
+  }
 
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
@@ -176,6 +190,17 @@ class ChatController extends StateNotifier<ChatState> {
       var aiMessageId = _messageDao.generateMessageId();
       var hasStartedStreaming = false;
       final streamingBuffer = StringBuffer();
+      String? currentToolMessageId;
+
+      // Insert placeholder message immediately
+      await _messageDao.insertMessageWithId(
+        id: aiMessageId,
+        sessionId: sessionId,
+        userId: _kAiUserId,
+        userName: _kAiUserName,
+        content: '',
+        isStreaming: true,
+      );
 
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
@@ -213,7 +238,7 @@ class ChatController extends StateNotifier<ChatState> {
           startStreaming(aiMessageId);
           hasStartedStreaming = true;
         }
-        updateStreamingText(streamingBuffer.toString());
+        _textDeltaController.add(delta);
       }
 
       Future<void> handleAssistantMessage(ChatMessage message,
@@ -234,6 +259,7 @@ class ChatController extends StateNotifier<ChatState> {
           await _messageDao.insertMessage(
             message.toMessageCompanion(sessionId: sessionId, id: idToUse),
           );
+          currentToolMessageId = idToUse;
         } else {
           // Save text message
           final redactedContent = await _secretRedactor.redact(
@@ -246,6 +272,7 @@ class ChatController extends StateNotifier<ChatState> {
             userName: _kAiUserName,
             content: redactedContent,
           );
+          currentToolMessageId = null;
         }
 
         // Generate new ID for next message (only used if local or if server didn't provide one)
@@ -294,8 +321,12 @@ class ChatController extends StateNotifier<ChatState> {
           },
           requestApproval: handleRequestApproval,
           executeToolCall: (toolCall) async {
+            if (currentToolMessageId != null) {
+              startStreaming(currentToolMessageId!);
+            }
             // Execute and return result as JSON string
             final result = await _executeToolCall(toolCall);
+            stopStreaming();
             return jsonEncode(result);
           },
           onTextDelta: handleTextDelta,
@@ -372,9 +403,15 @@ class ChatController extends StateNotifier<ChatState> {
             command: command,
             sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
                 _sshSettings?.passwordSecretId,
+            onStdout: (data) => _toolOutputController.add(data),
+            onStderr: (data) => _toolOutputController.add(data),
           );
         } else {
-          result = await _shellService.executeCommand(command);
+          result = await _shellService.executeCommand(
+            command,
+            onStdout: (data) => _toolOutputController.add(data),
+            onStderr: (data) => _toolOutputController.add(data),
+          );
         }
       } catch (e) {
         // Handle exceptions by returning an error result that can be sent to the LLM
