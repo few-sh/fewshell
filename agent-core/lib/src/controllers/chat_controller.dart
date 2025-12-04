@@ -322,8 +322,9 @@ class ChatController extends StateNotifier<ChatState> {
             userName: _kAiUserName,
             content: redactedError,
           );
-          if (mounted)
+          if (mounted) {
             state = state.copyWith(isLoading: false, error: errorMsg);
+          }
           return;
       }
 
@@ -337,8 +338,9 @@ class ChatController extends StateNotifier<ChatState> {
         userName: _kAiUserName,
         content: redactedError,
       );
-      if (mounted)
+      if (mounted) {
         state = state.copyWith(isLoading: false, error: e.toString());
+      }
     }
   }
 
@@ -561,8 +563,9 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Start streaming for a message
   void startStreaming(String messageId) {
-    if (mounted)
+    if (mounted) {
       state = state.copyWith(streamingMessageId: messageId, streamingText: '');
+    }
   }
 
   /// Update streaming text for a message
@@ -572,8 +575,9 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Stop streaming
   void stopStreaming() {
-    if (mounted)
+    if (mounted) {
       state = state.copyWith(streamingMessageId: null, streamingText: '');
+    }
   }
 
   /// Clear error state
