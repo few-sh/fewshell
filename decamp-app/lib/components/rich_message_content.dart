@@ -17,8 +17,7 @@ import 'package:decamp/utils/highlight_injector.dart';
 class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
   final String? displayText; // Override for streaming
-  final Stream<String>? textStream;
-  final Stream<String>? toolStream;
+  final Stream<MessageEntity>? messageStream;
   final bool isUser;
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
@@ -32,8 +31,7 @@ class RichMessageContent extends StatefulWidget {
     super.key,
     required this.message,
     this.displayText,
-    this.textStream,
-    this.toolStream,
+    this.messageStream,
     required this.isUser,
     this.onEdit,
     this.onResend,
@@ -48,10 +46,8 @@ class RichMessageContent extends StatefulWidget {
 
 class _RichMessageContentState extends State<RichMessageContent> {
   bool _isEditMode = false;
-  String _streamedText = '';
-  String _streamedToolOutput = '';
-  StreamSubscription? _textSub;
-  StreamSubscription? _toolSub;
+  String _streamedContent = '';
+  StreamSubscription? _messageSub;
 
   @override
   void initState() {
@@ -62,8 +58,7 @@ class _RichMessageContentState extends State<RichMessageContent> {
   @override
   void didUpdateWidget(RichMessageContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.textStream != oldWidget.textStream ||
-        widget.toolStream != oldWidget.toolStream) {
+    if (widget.messageStream != oldWidget.messageStream) {
       _disposeStreams();
       _setupStreams();
     }
@@ -76,35 +71,21 @@ class _RichMessageContentState extends State<RichMessageContent> {
   }
 
   void _setupStreams() {
-    if (widget.textStream != null) {
-      _streamedText = widget.displayText ?? '';
-      _textSub = widget.textStream!.listen((delta) {
-        if (mounted) {
+    if (widget.messageStream != null) {
+      _streamedContent = widget.displayText ?? '';
+      _messageSub = widget.messageStream!.listen((message) {
+        if (mounted && message.id == widget.message.id) {
           setState(() {
-            _streamedText += delta;
+            _streamedContent = message.content;
           });
         }
       });
-    }
-    if (widget.toolStream != null) {
-      _streamedToolOutput = '';
-      _toolSub = widget.toolStream!.listen((output) {
-        if (mounted) {
-          setState(() {
-            _streamedToolOutput += output;
-          });
-        }
-      });
-    } else {
-      _streamedToolOutput = '';
     }
   }
 
   void _disposeStreams() {
-    _textSub?.cancel();
-    _toolSub?.cancel();
-    _textSub = null;
-    _toolSub = null;
+    _messageSub?.cancel();
+    _messageSub = null;
   }
 
   void _enterEditMode() {
@@ -148,20 +129,17 @@ class _RichMessageContentState extends State<RichMessageContent> {
       );
     }
 
-    // Use displayText override if provided (for streaming), otherwise format message content
-    var text = widget.textStream != null
-        ? _streamedText
+    // Use streamed content if available, otherwise format message content
+    var text = widget.messageStream != null
+        ? _streamedContent
         : (widget.displayText ??
               MessageFormatter.formatMessageContent(widget.message));
 
-    if (_streamedToolOutput.isNotEmpty) {
-      text += '\n\n```\n$_streamedToolOutput\n```';
-    }
-
     // Build markdown content
-    final content = _buildMarkdownContent(context, text);
-
-    // Build timestamp with optional edit indicator
+    final content = _buildMarkdownContent(
+      context,
+      text,
+    ); // Build timestamp with optional edit indicator
     final timestamp = _buildTimestamp(context);
 
     // Build controls row (timestamp + menu)

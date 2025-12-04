@@ -406,8 +406,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             isLoading: chatState.isLoading,
                             streamingMessageId: chatState.streamingMessageId,
                             streamingText: chatState.streamingText,
-                            textDeltaStream: chatController.textDeltaStream,
-                            toolOutputStream: chatController.toolOutputStream,
+                            activeMessageStream:
+                                chatController.activeMessageStream,
                             onEditMessage: _handleEditMessage,
                             onResendMessage: _handleResendMessage,
                             onBranchSession: _handleBranchSession,

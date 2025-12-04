@@ -26,11 +26,10 @@ class ChatController extends StateNotifier<ChatState> {
   final SshSettings? _sshSettings;
   final String? sessionId;
 
-  final _textDeltaController = StreamController<String>.broadcast();
-  final _toolOutputController = StreamController<String>.broadcast();
+  final _activeMessageController = StreamController<MessageEntity>.broadcast();
 
-  Stream<String> get textDeltaStream => _textDeltaController.stream;
-  Stream<String> get toolOutputStream => _toolOutputController.stream;
+  Stream<MessageEntity> get activeMessageStream =>
+      _activeMessageController.stream;
 
   ChatController({
     required MessageDao messageDao,
@@ -50,8 +49,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   @override
   void dispose() {
-    _textDeltaController.close();
-    _toolOutputController.close();
+    _activeMessageController.close();
     super.dispose();
   }
 
@@ -191,6 +189,7 @@ class ChatController extends StateNotifier<ChatState> {
       var hasStartedStreaming = false;
       final streamingBuffer = StringBuffer();
       String? currentToolMessageId;
+      MessageEntity? currentEntity;
 
       // Insert placeholder message immediately
       await _messageDao.insertMessageWithId(
@@ -201,6 +200,9 @@ class ChatController extends StateNotifier<ChatState> {
         content: '',
         isStreaming: true,
       );
+
+      // Get initial entity
+      currentEntity = await _messageDao.getMessage(aiMessageId);
 
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
@@ -238,7 +240,14 @@ class ChatController extends StateNotifier<ChatState> {
           startStreaming(aiMessageId);
           hasStartedStreaming = true;
         }
-        _textDeltaController.add(delta);
+        if (currentEntity != null) {
+          // Update content for streaming
+          // Note: We don't update currentEntity here to avoid drift,
+          // but we emit a new entity with updated content
+          _activeMessageController.add(
+            currentEntity!.copyWith(content: streamingBuffer.toString()),
+          );
+        }
       }
 
       Future<void> handleAssistantMessage(ChatMessage message,
@@ -275,6 +284,9 @@ class ChatController extends StateNotifier<ChatState> {
           currentToolMessageId = null;
         }
 
+        // Update current entity for next steps
+        currentEntity = await _messageDao.getMessage(idToUse);
+
         // Generate new ID for next message (only used if local or if server didn't provide one)
         aiMessageId = _messageDao.generateMessageId();
       }
@@ -287,6 +299,9 @@ class ChatController extends StateNotifier<ChatState> {
         await _messageDao.insertMessage(
           message.toMessageCompanion(sessionId: sessionId, id: idToUse),
         );
+
+        // Update current entity
+        currentEntity = await _messageDao.getMessage(idToUse);
       }
 
       final AgentLoopResult result;
@@ -323,9 +338,26 @@ class ChatController extends StateNotifier<ChatState> {
           executeToolCall: (toolCall) async {
             if (currentToolMessageId != null) {
               startStreaming(currentToolMessageId!);
+              // Refresh current entity just in case
+              currentEntity =
+                  await _messageDao.getMessage(currentToolMessageId!);
             }
+
+            final toolOutputBuffer = StringBuffer();
+            void onOutput(String data) {
+              toolOutputBuffer.write(data);
+              if (currentEntity != null) {
+                // Construct display content: original content + code block with output
+                final displayContent =
+                    '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
+                _activeMessageController.add(
+                  currentEntity!.copyWith(content: displayContent),
+                );
+              }
+            }
+
             // Execute and return result as JSON string
-            final result = await _executeToolCall(toolCall);
+            final result = await _executeToolCall(toolCall, onOutput: onOutput);
             stopStreaming();
             return jsonEncode(result);
           },
@@ -376,21 +408,29 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Execute a single tool call and return result as Map
-  Future<Map<String, dynamic>> _executeToolCall(ToolCall toolCall) async {
+  Future<Map<String, dynamic>> _executeToolCall(
+    ToolCall toolCall, {
+    void Function(String)? onOutput,
+  }) async {
     final argumentsJson = toolCall.function.arguments;
     final params = argumentsJson.isNotEmpty
         ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
         : <String, dynamic>{};
 
-    final result = await _executeAction(toolCall.function.name, params);
+    final result = await _executeAction(
+      toolCall.function.name,
+      params,
+      onOutput: onOutput,
+    );
     return result['data'] as Map<String, dynamic>;
   }
 
   /// Execute a single action (shell command or fetch)
   Future<Map<String, dynamic>> _executeAction(
     String actionName,
-    Map<String, dynamic> params,
-  ) async {
+    Map<String, dynamic> params, {
+    void Function(String)? onOutput,
+  }) async {
     if (actionName == kExecuteShellCommand) {
       final command = params['command'] as String;
       final sudoRequired = params['sudo_required'] as bool? ?? false;
@@ -403,14 +443,14 @@ class ChatController extends StateNotifier<ChatState> {
             command: command,
             sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
                 _sshSettings?.passwordSecretId,
-            onStdout: (data) => _toolOutputController.add(data),
-            onStderr: (data) => _toolOutputController.add(data),
+            onStdout: (data) => onOutput?.call(data),
+            onStderr: (data) => onOutput?.call(data),
           );
         } else {
           result = await _shellService.executeCommand(
             command,
-            onStdout: (data) => _toolOutputController.add(data),
-            onStderr: (data) => _toolOutputController.add(data),
+            onStdout: (data) => onOutput?.call(data),
+            onStderr: (data) => onOutput?.call(data),
           );
         }
       } catch (e) {
