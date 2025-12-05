@@ -112,7 +112,7 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Validate and prepare for sending a message
-  Future<String?> _validateAndPrepare({
+  Future<MessageEntity?> _validateAndPrepare({
     required String sessionId,
     required String content,
   }) async {
@@ -146,7 +146,7 @@ class ChatController extends StateNotifier<ChatState> {
       return null;
     }
 
-    return messageId;
+    return _messageDao.getMessage(messageId);
   }
 
   /// Convert PendingToolCall to ToolAction for UI approval
@@ -180,16 +180,15 @@ class ChatController extends StateNotifier<ChatState> {
     try {
       // If content is provided, validate and save the new user message
       if (content != null) {
-        final messageId = await _validateAndPrepare(
+        triggerMessage = await _validateAndPrepare(
           sessionId: sessionId,
           content: content,
         );
-        if (messageId == null) {
+        if (triggerMessage == null) {
           if (mounted) state = state.copyWith(isLoading: false);
           onNoConfig?.call();
           return;
         }
-        triggerMessage = await _messageDao.getMessage(messageId);
       }
 
       var aiMessageId = _messageDao.generateMessageId();
