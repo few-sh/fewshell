@@ -93,6 +93,8 @@ class ProjectDatabase extends _$ProjectDatabase {
         }
 
         // Migration from version 5 to 6: Add isDeleted column to messages
+        // isDeleted is now managed by SqliteCrdt or implicitly handled
+        /*
         if (from < 6) {
           // Check if column already exists to handle potential partial migrations
           final columns =
@@ -101,9 +103,10 @@ class ProjectDatabase extends _$ProjectDatabase {
               columns.any((row) => row['name'] == 'is_deleted');
 
           if (!hasIsDeleted) {
-            await m.addColumn(messages, messages.isDeleted);
+            // await m.addColumn(messages, messages.isDeleted);
           }
         }
+        */
 
         // Migration from version 6 to 7: Add isStreaming column to messages
         if (from < 7) {

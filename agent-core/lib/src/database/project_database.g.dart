@@ -462,16 +462,6 @@ class $MessagesTable extends Messages
   late final GeneratedColumn<DateTime> editedAt = GeneratedColumn<DateTime>(
       'edited_at', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
-  static const VerificationMeta _isDeletedMeta =
-      const VerificationMeta('isDeleted');
-  @override
-  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
-      'is_deleted', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('CHECK ("is_deleted" IN (0, 1))'),
-      defaultValue: const Constant(false));
   static const VerificationMeta _isStreamingMeta =
       const VerificationMeta('isStreaming');
   @override
@@ -519,7 +509,6 @@ class $MessagesTable extends Messages
         timestamp,
         createdAt,
         editedAt,
-        isDeleted,
         isStreaming,
         messageKind,
         imageUrl,
@@ -581,10 +570,6 @@ class $MessagesTable extends Messages
       context.handle(_editedAtMeta,
           editedAt.isAcceptableOrUnknown(data['edited_at']!, _editedAtMeta));
     }
-    if (data.containsKey('is_deleted')) {
-      context.handle(_isDeletedMeta,
-          isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta));
-    }
     if (data.containsKey('is_streaming')) {
       context.handle(
           _isStreamingMeta,
@@ -620,8 +605,6 @@ class $MessagesTable extends Messages
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       editedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}edited_at']),
-      isDeleted: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}is_deleted'])!,
       isStreaming: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_streaming'])!,
       messageKind: $MessagesTable.$convertermessageKind.fromSql(attachedDatabase
@@ -676,9 +659,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
   /// Timestamp when the message was last edited (null if never edited)
   final DateTime? editedAt;
 
-  /// Whether the message is deleted (soft delete for CRDT)
-  final bool isDeleted;
-
   /// Whether the message is currently streaming
   final bool isStreaming;
 
@@ -698,7 +678,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       required this.timestamp,
       required this.createdAt,
       this.editedAt,
-      required this.isDeleted,
       required this.isStreaming,
       required this.messageKind,
       this.imageUrl,
@@ -717,7 +696,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
     if (!nullToAbsent || editedAt != null) {
       map['edited_at'] = Variable<DateTime>(editedAt);
     }
-    map['is_deleted'] = Variable<bool>(isDeleted);
     map['is_streaming'] = Variable<bool>(isStreaming);
     {
       map['message_kind'] = Variable<int>(
@@ -749,7 +727,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       editedAt: editedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(editedAt),
-      isDeleted: Value(isDeleted),
       isStreaming: Value(isStreaming),
       messageKind: Value(messageKind),
       imageUrl: imageUrl == null && nullToAbsent
@@ -776,7 +753,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       timestamp: serializer.fromJson<DateTime>(json['timestamp']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       editedAt: serializer.fromJson<DateTime?>(json['editedAt']),
-      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
       isStreaming: serializer.fromJson<bool>(json['isStreaming']),
       messageKind: $MessagesTable.$convertermessageKind
           .fromJson(serializer.fromJson<int>(json['messageKind'])),
@@ -799,7 +775,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       'timestamp': serializer.toJson<DateTime>(timestamp),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'editedAt': serializer.toJson<DateTime?>(editedAt),
-      'isDeleted': serializer.toJson<bool>(isDeleted),
       'isStreaming': serializer.toJson<bool>(isStreaming),
       'messageKind': serializer.toJson<int>(
           $MessagesTable.$convertermessageKind.toJson(messageKind)),
@@ -818,7 +793,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           DateTime? timestamp,
           DateTime? createdAt,
           Value<DateTime?> editedAt = const Value.absent(),
-          bool? isDeleted,
           bool? isStreaming,
           MessageKind? messageKind,
           Value<String?> imageUrl = const Value.absent(),
@@ -833,7 +807,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
         timestamp: timestamp ?? this.timestamp,
         createdAt: createdAt ?? this.createdAt,
         editedAt: editedAt.present ? editedAt.value : this.editedAt,
-        isDeleted: isDeleted ?? this.isDeleted,
         isStreaming: isStreaming ?? this.isStreaming,
         messageKind: messageKind ?? this.messageKind,
         imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
@@ -853,7 +826,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
-      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
       isStreaming:
           data.isStreaming.present ? data.isStreaming.value : this.isStreaming,
       messageKind:
@@ -879,7 +851,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ..write('timestamp: $timestamp, ')
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
-          ..write('isDeleted: $isDeleted, ')
           ..write('isStreaming: $isStreaming, ')
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
@@ -899,7 +870,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       timestamp,
       createdAt,
       editedAt,
-      isDeleted,
       isStreaming,
       messageKind,
       imageUrl,
@@ -917,7 +887,6 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           other.timestamp == this.timestamp &&
           other.createdAt == this.createdAt &&
           other.editedAt == this.editedAt &&
-          other.isDeleted == this.isDeleted &&
           other.isStreaming == this.isStreaming &&
           other.messageKind == this.messageKind &&
           other.imageUrl == this.imageUrl &&
@@ -934,7 +903,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
   final Value<DateTime> timestamp;
   final Value<DateTime> createdAt;
   final Value<DateTime?> editedAt;
-  final Value<bool> isDeleted;
   final Value<bool> isStreaming;
   final Value<MessageKind> messageKind;
   final Value<String?> imageUrl;
@@ -950,7 +918,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.timestamp = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.editedAt = const Value.absent(),
-    this.isDeleted = const Value.absent(),
     this.isStreaming = const Value.absent(),
     this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
@@ -967,7 +934,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     required DateTime timestamp,
     required DateTime createdAt,
     this.editedAt = const Value.absent(),
-    this.isDeleted = const Value.absent(),
     this.isStreaming = const Value.absent(),
     this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
@@ -990,7 +956,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     Expression<DateTime>? timestamp,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? editedAt,
-    Expression<bool>? isDeleted,
     Expression<bool>? isStreaming,
     Expression<int>? messageKind,
     Expression<String>? imageUrl,
@@ -1007,7 +972,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       if (timestamp != null) 'timestamp': timestamp,
       if (createdAt != null) 'created_at': createdAt,
       if (editedAt != null) 'edited_at': editedAt,
-      if (isDeleted != null) 'is_deleted': isDeleted,
       if (isStreaming != null) 'is_streaming': isStreaming,
       if (messageKind != null) 'message_kind': messageKind,
       if (imageUrl != null) 'image_url': imageUrl,
@@ -1026,7 +990,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       Value<DateTime>? timestamp,
       Value<DateTime>? createdAt,
       Value<DateTime?>? editedAt,
-      Value<bool>? isDeleted,
       Value<bool>? isStreaming,
       Value<MessageKind>? messageKind,
       Value<String?>? imageUrl,
@@ -1042,7 +1005,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       timestamp: timestamp ?? this.timestamp,
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
-      isDeleted: isDeleted ?? this.isDeleted,
       isStreaming: isStreaming ?? this.isStreaming,
       messageKind: messageKind ?? this.messageKind,
       imageUrl: imageUrl ?? this.imageUrl,
@@ -1078,9 +1040,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     }
     if (editedAt.present) {
       map['edited_at'] = Variable<DateTime>(editedAt.value);
-    }
-    if (isDeleted.present) {
-      map['is_deleted'] = Variable<bool>(isDeleted.value);
     }
     if (isStreaming.present) {
       map['is_streaming'] = Variable<bool>(isStreaming.value);
@@ -1118,7 +1077,6 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
           ..write('timestamp: $timestamp, ')
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
-          ..write('isDeleted: $isDeleted, ')
           ..write('isStreaming: $isStreaming, ')
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
@@ -1846,7 +1804,6 @@ typedef $$MessagesTableCreateCompanionBuilder = MessageEntityCompanion
   required DateTime timestamp,
   required DateTime createdAt,
   Value<DateTime?> editedAt,
-  Value<bool> isDeleted,
   Value<bool> isStreaming,
   Value<MessageKind> messageKind,
   Value<String?> imageUrl,
@@ -1864,7 +1821,6 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessageEntityCompanion
   Value<DateTime> timestamp,
   Value<DateTime> createdAt,
   Value<DateTime?> editedAt,
-  Value<bool> isDeleted,
   Value<bool> isStreaming,
   Value<MessageKind> messageKind,
   Value<String?> imageUrl,
@@ -1905,9 +1861,6 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<DateTime> get editedAt => $composableBuilder(
       column: $table.editedAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<bool> get isDeleted => $composableBuilder(
-      column: $table.isDeleted, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => ColumnFilters(column));
@@ -1964,9 +1917,6 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<DateTime> get editedAt => $composableBuilder(
       column: $table.editedAt, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<bool> get isDeleted => $composableBuilder(
-      column: $table.isDeleted, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => ColumnOrderings(column));
 
@@ -2017,9 +1967,6 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get editedAt =>
       $composableBuilder(column: $table.editedAt, builder: (column) => column);
-
-  GeneratedColumn<bool> get isDeleted =>
-      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
   GeneratedColumn<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => column);
@@ -2074,7 +2021,6 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<DateTime> timestamp = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime?> editedAt = const Value.absent(),
-            Value<bool> isDeleted = const Value.absent(),
             Value<bool> isStreaming = const Value.absent(),
             Value<MessageKind> messageKind = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
@@ -2091,7 +2037,6 @@ class $$MessagesTableTableManager extends RootTableManager<
             timestamp: timestamp,
             createdAt: createdAt,
             editedAt: editedAt,
-            isDeleted: isDeleted,
             isStreaming: isStreaming,
             messageKind: messageKind,
             imageUrl: imageUrl,
@@ -2108,7 +2053,6 @@ class $$MessagesTableTableManager extends RootTableManager<
             required DateTime timestamp,
             required DateTime createdAt,
             Value<DateTime?> editedAt = const Value.absent(),
-            Value<bool> isDeleted = const Value.absent(),
             Value<bool> isStreaming = const Value.absent(),
             Value<MessageKind> messageKind = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
@@ -2125,7 +2069,6 @@ class $$MessagesTableTableManager extends RootTableManager<
             timestamp: timestamp,
             createdAt: createdAt,
             editedAt: editedAt,
-            isDeleted: isDeleted,
             isStreaming: isStreaming,
             messageKind: messageKind,
             imageUrl: imageUrl,

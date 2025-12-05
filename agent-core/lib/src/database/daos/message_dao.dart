@@ -14,7 +14,9 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   Stream<List<MessageEntity>> watchMessagesBySession(String sessionId) {
     return (select(messages)
           ..where(
-            (m) => m.sessionId.equals(sessionId) & m.isDeleted.equals(false),
+            (m) =>
+                m.sessionId.equals(sessionId) &
+                const CustomExpression<bool>('is_deleted').equals(false),
           )
           ..orderBy([
             (m) =>
@@ -26,7 +28,11 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   /// Get a single message by ID
   Future<MessageEntity?> getMessage(String id) {
     return (select(messages)
-          ..where((m) => m.id.equals(id) & m.isDeleted.equals(false)))
+          ..where(
+            (m) =>
+                m.id.equals(id) &
+                const CustomExpression<bool>('is_deleted').equals(false),
+          ))
         .getSingleOrNull();
   }
 
@@ -55,8 +61,16 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   Future<int> deleteMessage(String id) async {
     // Get the message first to know which session to touch
     final message = await getMessage(id);
-    final result = await (update(messages)..where((m) => m.id.equals(id)))
-        .write(const MessageEntityCompanion(isDeleted: Value(true)));
+
+    // Explicitly perform soft delete by setting is_deleted = 1.
+    // We use customUpdate because the isDeleted column is managed by sqlite_crdt
+    // and not exposed in the Drift table definition.
+    final result = await customUpdate(
+      'UPDATE messages SET is_deleted = 1 WHERE id = ?',
+      variables: [Variable.withString(id)],
+      updates: {messages},
+    );
+
     // Touch the session to update its updatedAt timestamp
     if (message != null) {
       await db.sessionDao.touchSession(message.sessionId);
@@ -66,15 +80,21 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
 
   /// Delete all messages for a session
   Future<int> deleteMessagesBySession(String sessionId) {
-    return (update(messages)..where((m) => m.sessionId.equals(sessionId)))
-        .write(const MessageEntityCompanion(isDeleted: Value(true)));
+    // Explicitly perform soft delete by setting is_deleted = 1.
+    return customUpdate(
+      'UPDATE messages SET is_deleted = 1 WHERE session_id = ?',
+      variables: [Variable.withString(sessionId)],
+      updates: {messages},
+    );
   }
 
   /// Get messages for a session
   Future<List<MessageEntity>> getMessagesBySession(String sessionId) {
     return (select(messages)
           ..where(
-            (m) => m.sessionId.equals(sessionId) & m.isDeleted.equals(false),
+            (m) =>
+                m.sessionId.equals(sessionId) &
+                const CustomExpression<bool>('is_deleted').equals(false),
           )
           ..orderBy([
             (m) =>
@@ -89,7 +109,8 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     final query = selectOnly(messages)
       ..addColumns([count])
       ..where(
-        messages.sessionId.equals(sessionId) & messages.isDeleted.equals(false),
+        messages.sessionId.equals(sessionId) &
+            const CustomExpression<bool>('is_deleted').equals(false),
       );
     return query.map((row) => row.read(count)!).getSingle();
   }
@@ -98,7 +119,9 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   Future<MessageEntity?> getLastMessage(String sessionId) {
     return (select(messages)
           ..where(
-            (m) => m.sessionId.equals(sessionId) & m.isDeleted.equals(false),
+            (m) =>
+                m.sessionId.equals(sessionId) &
+                const CustomExpression<bool>('is_deleted').equals(false),
           )
           ..orderBy([
             (m) =>
@@ -180,13 +203,17 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     required String sessionId,
     required DateTime afterTimestamp,
   }) async {
-    final result = await (update(messages)
-          ..where(
-            (m) =>
-                m.sessionId.equals(sessionId) &
-                m.timestamp.isBiggerThanValue(afterTimestamp),
-          ))
-        .write(const MessageEntityCompanion(isDeleted: Value(true)));
+    // Explicitly perform soft delete by setting is_deleted = 1.
+    // We use customUpdate because the isDeleted column is managed by sqlite_crdt
+    // and not exposed in the Drift table definition.
+    final result = await customUpdate(
+      'UPDATE messages SET is_deleted = 1 WHERE session_id = ? AND timestamp > ?',
+      variables: [
+        Variable.withString(sessionId),
+        Variable.withDateTime(afterTimestamp),
+      ],
+      updates: {messages},
+    );
 
     // Touch the session to update its updatedAt timestamp
     await db.sessionDao.touchSession(sessionId);

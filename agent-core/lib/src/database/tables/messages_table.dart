@@ -33,9 +33,6 @@ class Messages extends Table {
   /// Timestamp when the message was last edited (null if never edited)
   DateTimeColumn get editedAt => dateTime().nullable()();
 
-  /// Whether the message is deleted (soft delete for CRDT)
-  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
-
   /// Whether the message is currently streaming
   BoolColumn get isStreaming => boolean().withDefault(const Constant(false))();
 
