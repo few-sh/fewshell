@@ -19,6 +19,13 @@
             "type": "dart"
         },
         {
+            "name": "decamp-app (macOS)",
+            "cwd": "decamp-app",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "macos"
+        },
+        {
             "name": "decamp-app (profile mode)",
             "cwd": "decamp-app",
             "request": "launch",
