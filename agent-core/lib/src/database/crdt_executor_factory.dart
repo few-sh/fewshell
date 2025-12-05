@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 import 'crdt_executor.dart';
+import 'dart:developer' as developer;
 
 class CrdtExecutorResult {
   final QueryExecutor executor;
@@ -16,6 +17,7 @@ class CrdtExecutorFactory {
     String nodeId,
   ) async {
     final crdt = await SqliteCrdt.open(path);
+    developer.log('Crdt DB opened at $path with nodeId: $nodeId');
     // Note: SqliteCrdt manages nodeId internally or generates it.
     // If we need to set it explicitly, we might need to check SqliteCrdt API.
 
