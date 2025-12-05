@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:drift/drift.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 
@@ -13,6 +14,7 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<bool> ensureOpen(QueryExecutorUser user) async {
+    developer.log('CrdtQueryExecutor: ensureOpen');
     if (_isOpening) return true;
     _isOpening = true;
     try {
@@ -53,6 +55,8 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<void> runBatched(BatchedStatements statements) async {
+    developer.log(
+        'CrdtQueryExecutor: runBatched ${statements.statements.length} statements');
     for (var i = 0; i < statements.statements.length; i++) {
       final sql = statements.statements[i];
       final args = statements.arguments[i];
@@ -66,11 +70,13 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<void> runCustom(String statement, [List<Object?>? args]) {
+    developer.log('CrdtQueryExecutor: runCustom $statement args: $args');
     return _crdt.execute(statement, args ?? const []);
   }
 
   @override
   Future<int> runDelete(String statement, List<Object?> args) async {
+    developer.log('CrdtQueryExecutor: runDelete $statement args: $args');
     await _crdt.execute(statement, args);
     final result = await _crdt.query('SELECT changes()');
     return (result.first.values.first as int?) ?? 0;
@@ -78,6 +84,7 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<int> runInsert(String statement, List<Object?> args) async {
+    developer.log('CrdtQueryExecutor: runInsert $statement args: $args');
     await _crdt.execute(statement, args);
     final result = await _crdt.query('SELECT last_insert_rowid()');
     return (result.first.values.first as int?) ?? 0;
@@ -88,11 +95,13 @@ class CrdtQueryExecutor extends QueryExecutor {
     String statement,
     List<Object?> args,
   ) {
+    developer.log('CrdtQueryExecutor: runSelect $statement args: $args');
     return _crdt.query(statement, args);
   }
 
   @override
   Future<int> runUpdate(String statement, List<Object?> args) async {
+    developer.log('CrdtQueryExecutor: runUpdate $statement args: $args');
     await _crdt.execute(statement, args);
     final result = await _crdt.query('SELECT changes()');
     return (result.first.values.first as int?) ?? 0;
@@ -105,6 +114,7 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   TransactionExecutor beginTransaction() {
+    developer.log('CrdtQueryExecutor: beginTransaction');
     return _CrdtTransactionExecutor(_crdt);
   }
 }
