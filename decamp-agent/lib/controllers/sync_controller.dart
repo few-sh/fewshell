@@ -134,21 +134,36 @@ class _AgentSession {
     try {
       final config = data['config'] as Map<String, dynamic>;
       final sessionId = data['sessionId'] as String?;
+      final triggerMessageJson =
+          data['triggerMessage'] as Map<String, dynamic>?;
 
-      List<ChatMessage> conversation;
-      if (data.containsKey('conversation')) {
-        final conversationJson =
-            (data['conversation'] as List).cast<Map<String, dynamic>>();
-        conversation = conversationJson.map((j) => j.toChatMessage()).toList();
-      } else {
-        if (sessionId == null || db == null) {
-          throw Exception(
-            'Session ID and Database required when conversation is not provided',
-          );
-        }
-        final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
-        conversation = dbMessages.map((m) => m.toChatMessage()).toList();
+      if (sessionId == null || db == null) {
+        throw Exception(
+          'Session ID and Database required',
+        );
       }
+
+      // If we have a trigger message, upsert it immediately to ensure we have the latest context
+      if (triggerMessageJson != null) {
+        developer.log(
+          '📥 Received trigger message, upserting...',
+          name: 'AgentSession',
+        );
+        final triggerMessage = MessageEntity.fromJson(triggerMessageJson);
+        await db!.messageDao.insertMessage(triggerMessage.toCompanion(true));
+        developer.log(
+          '✅ Trigger message ${triggerMessage.id} upserted!',
+          name: 'AgentSession',
+        );
+      }
+
+      // Always load conversation from database (single source of truth)
+      // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
+      final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
+      final conversation = dbMessages
+          .where((m) => !m.isStreaming)
+          .map((m) => m.toChatMessage())
+          .toList();
 
       final apiKey = config['apiKey'] as String;
       final providerType = config['provider'] as String;
@@ -201,44 +216,42 @@ class _AgentSession {
         },
         onAssistantMessage: (message, {String? messageId}) async {
           String? id;
-          if (db != null && sessionId != null) {
-            id = db!.messageDao.generateMessageId();
-            // Determine if this is a tool use message or a text message
-            final messageType = message.messageType;
-            if (messageType is ToolUseMessage) {
-              await db!.messageDao.insertMessage(
-                message.toMessageCompanion(sessionId: sessionId, id: id),
-              );
-            } else {
-              await db!.messageDao.insertMessageWithId(
-                id: id,
-                sessionId: sessionId,
-                userId: 'ai',
-                userName: 'Ops Agent',
-                content: message.content,
-              );
-            }
+          // db and sessionId are guaranteed to be non-null here due to checks at start of method
+          id = db!.messageDao.generateMessageId();
+          // Determine if this is a tool use message or a text message
+          final messageType = message.messageType;
+          if (messageType is ToolUseMessage) {
+            await db!.messageDao.insertMessage(
+              message.toMessageCompanion(sessionId: sessionId, id: id),
+            );
+          } else {
+            await db!.messageDao.insertMessageWithId(
+              id: id,
+              sessionId: sessionId,
+              userId: 'ai',
+              userName: 'Ops Agent',
+              content: message.content,
+            );
           }
 
           channel.sendCustomMessage({
             'type': 'assistant_message',
             'message': message.toJson(),
-            if (id != null) 'id': id,
+            'id': id,
           });
         },
         onToolResultMessage: (message, {String? messageId}) async {
           String? id;
-          if (db != null && sessionId != null) {
-            id = db!.messageDao.generateMessageId();
-            await db!.messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId, id: id),
-            );
-          }
+          // db and sessionId are guaranteed to be non-null here due to checks at start of method
+          id = db!.messageDao.generateMessageId();
+          await db!.messageDao.insertMessage(
+            message.toMessageCompanion(sessionId: sessionId, id: id),
+          );
 
           channel.sendCustomMessage({
             'type': 'tool_result_message',
             'message': message.toJson(),
-            if (id != null) 'id': id,
+            'id': id,
           });
         },
       );

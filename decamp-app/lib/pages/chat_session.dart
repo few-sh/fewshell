@@ -314,6 +314,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Watch chat state and messages
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
+    final chatController = ref.watch(
+      chatControllerProvider(currentSessionId).notifier,
+    );
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
 
     // Refresh search results when messages change
@@ -403,6 +406,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             isLoading: chatState.isLoading,
                             streamingMessageId: chatState.streamingMessageId,
                             streamingText: chatState.streamingText,
+                            activeMessageStream:
+                                chatController.activeMessageStream,
                             onEditMessage: _handleEditMessage,
                             onResendMessage: _handleResendMessage,
                             onBranchSession: _handleBranchSession,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
@@ -25,6 +26,11 @@ class ChatController extends StateNotifier<ChatState> {
   final SshSettings? _sshSettings;
   final String? sessionId;
 
+  final _activeMessageController = StreamController<MessageEntity>.broadcast();
+
+  Stream<MessageEntity> get activeMessageStream =>
+      _activeMessageController.stream;
+
   ChatController({
     required MessageDao messageDao,
     required SessionDao sessionDao,
@@ -40,6 +46,12 @@ class ChatController extends StateNotifier<ChatState> {
         _secretRedactor = secretRedactor,
         _sshSettings = sshSettings,
         super(const ChatState());
+
+  @override
+  void dispose() {
+    _activeMessageController.close();
+    super.dispose();
+  }
 
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
@@ -59,6 +71,11 @@ class ChatController extends StateNotifier<ChatState> {
     for (final msg in dbMessages) {
       // Cast to MessageEntity for type-safe access
       final messageEntity = msg as MessageEntity;
+
+      // Skip streaming messages (placeholders) to prevent sending empty/partial messages to LLM
+      if (messageEntity.isStreaming) {
+        continue;
+      }
 
       // Use the extension method to convert to ChatMessage
       final chatMessage = messageEntity.toChatMessage();
@@ -95,13 +112,13 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Validate and prepare for sending a message
-  Future<bool> _validateAndPrepare({
+  Future<MessageEntity?> _validateAndPrepare({
     required String sessionId,
     required String content,
   }) async {
     // Redact and save user's message
     final redactedContent = await _secretRedactor.redact(content);
-    await _messageDao.insertMessageWithId(
+    final messageId = await _messageDao.insertMessageWithId(
       sessionId: sessionId,
       userId: _kUserUserId,
       userName: _kUserUserName,
@@ -126,10 +143,10 @@ class ChatController extends StateNotifier<ChatState> {
     // Check if LLM is configured
     final isConfigured = await _llmService.isConfigured();
     if (!isConfigured) {
-      return false;
+      return null;
     }
 
-    return true;
+    return _messageDao.getMessage(messageId);
   }
 
   /// Convert PendingToolCall to ToolAction for UI approval
@@ -151,6 +168,7 @@ class ChatController extends StateNotifier<ChatState> {
   /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
     String? content,
+    MessageEntity? triggerMessage,
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
         requestApproval,
@@ -162,11 +180,11 @@ class ChatController extends StateNotifier<ChatState> {
     try {
       // If content is provided, validate and save the new user message
       if (content != null) {
-        final isValid = await _validateAndPrepare(
+        triggerMessage = await _validateAndPrepare(
           sessionId: sessionId,
           content: content,
         );
-        if (!isValid) {
+        if (triggerMessage == null) {
           if (mounted) state = state.copyWith(isLoading: false);
           onNoConfig?.call();
           return;
@@ -176,6 +194,21 @@ class ChatController extends StateNotifier<ChatState> {
       var aiMessageId = _messageDao.generateMessageId();
       var hasStartedStreaming = false;
       final streamingBuffer = StringBuffer();
+      String? currentToolMessageId;
+      MessageEntity? currentEntity;
+
+      // Insert placeholder message immediately
+      await _messageDao.insertMessageWithId(
+        id: aiMessageId,
+        sessionId: sessionId,
+        userId: _kAiUserId,
+        userName: _kAiUserName,
+        content: '',
+        isStreaming: true,
+      );
+
+      // Get initial entity
+      currentEntity = await _messageDao.getMessage(aiMessageId);
 
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
@@ -213,7 +246,14 @@ class ChatController extends StateNotifier<ChatState> {
           startStreaming(aiMessageId);
           hasStartedStreaming = true;
         }
-        updateStreamingText(streamingBuffer.toString());
+        if (currentEntity != null) {
+          // Update content for streaming
+          // Note: We don't update currentEntity here to avoid drift,
+          // but we emit a new entity with updated content
+          _activeMessageController.add(
+            currentEntity!.copyWith(content: streamingBuffer.toString()),
+          );
+        }
       }
 
       Future<void> handleAssistantMessage(ChatMessage message,
@@ -234,6 +274,7 @@ class ChatController extends StateNotifier<ChatState> {
           await _messageDao.insertMessage(
             message.toMessageCompanion(sessionId: sessionId, id: idToUse),
           );
+          currentToolMessageId = idToUse;
         } else {
           // Save text message
           final redactedContent = await _secretRedactor.redact(
@@ -246,7 +287,11 @@ class ChatController extends StateNotifier<ChatState> {
             userName: _kAiUserName,
             content: redactedContent,
           );
+          currentToolMessageId = null;
         }
+
+        // Update current entity for next steps
+        currentEntity = await _messageDao.getMessage(idToUse);
 
         // Generate new ID for next message (only used if local or if server didn't provide one)
         aiMessageId = _messageDao.generateMessageId();
@@ -260,16 +305,33 @@ class ChatController extends StateNotifier<ChatState> {
         await _messageDao.insertMessage(
           message.toMessageCompanion(sessionId: sessionId, id: idToUse),
         );
+
+        // Update current entity
+        currentEntity = await _messageDao.getMessage(idToUse);
       }
 
       final AgentLoopResult result;
 
       if (syncChannel != null) {
+        // Ensure we have a triggerMessage
+        triggerMessage ??= await _messageDao.getLastMessage(sessionId);
+
+        if (triggerMessage == null) {
+          if (mounted) {
+            state = state.copyWith(
+              isLoading: false,
+              error: 'Cannot start remote chat: no context',
+            );
+          }
+          return;
+        }
+
         // Run the agent loop remotely
         result = await runRemoteAgentLoop(
           channel: syncChannel,
           config: config,
           sessionId: sessionId,
+          triggerMessage: triggerMessage,
           requestApproval: handleRequestApproval,
           onTextDelta: handleTextDelta,
           onAssistantMessage: handleAssistantMessage,
@@ -294,8 +356,29 @@ class ChatController extends StateNotifier<ChatState> {
           },
           requestApproval: handleRequestApproval,
           executeToolCall: (toolCall) async {
+            if (currentToolMessageId != null) {
+              startStreaming(currentToolMessageId!);
+              // Refresh current entity just in case
+              currentEntity =
+                  await _messageDao.getMessage(currentToolMessageId!);
+            }
+
+            final toolOutputBuffer = StringBuffer();
+            void onOutput(String data) {
+              toolOutputBuffer.write(data);
+              if (currentEntity != null) {
+                // Construct display content: original content + code block with output
+                final displayContent =
+                    '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
+                _activeMessageController.add(
+                  currentEntity!.copyWith(content: displayContent),
+                );
+              }
+            }
+
             // Execute and return result as JSON string
-            final result = await _executeToolCall(toolCall);
+            final result = await _executeToolCall(toolCall, onOutput: onOutput);
+            stopStreaming();
             return jsonEncode(result);
           },
           onTextDelta: handleTextDelta,
@@ -345,21 +428,29 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Execute a single tool call and return result as Map
-  Future<Map<String, dynamic>> _executeToolCall(ToolCall toolCall) async {
+  Future<Map<String, dynamic>> _executeToolCall(
+    ToolCall toolCall, {
+    void Function(String)? onOutput,
+  }) async {
     final argumentsJson = toolCall.function.arguments;
     final params = argumentsJson.isNotEmpty
         ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
         : <String, dynamic>{};
 
-    final result = await _executeAction(toolCall.function.name, params);
+    final result = await _executeAction(
+      toolCall.function.name,
+      params,
+      onOutput: onOutput,
+    );
     return result['data'] as Map<String, dynamic>;
   }
 
   /// Execute a single action (shell command or fetch)
   Future<Map<String, dynamic>> _executeAction(
     String actionName,
-    Map<String, dynamic> params,
-  ) async {
+    Map<String, dynamic> params, {
+    void Function(String)? onOutput,
+  }) async {
     if (actionName == kExecuteShellCommand) {
       final command = params['command'] as String;
       final sudoRequired = params['sudo_required'] as bool? ?? false;
@@ -372,9 +463,15 @@ class ChatController extends StateNotifier<ChatState> {
             command: command,
             sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
                 _sshSettings?.passwordSecretId,
+            onStdout: (data) => onOutput?.call(data),
+            onStderr: (data) => onOutput?.call(data),
           );
         } else {
-          result = await _shellService.executeCommand(command);
+          result = await _shellService.executeCommand(
+            command,
+            onStdout: (data) => onOutput?.call(data),
+            onStderr: (data) => onOutput?.call(data),
+          );
         }
       } catch (e) {
         // Handle exceptions by returning an error result that can be sent to the LLM
@@ -491,6 +588,7 @@ class ChatController extends StateNotifier<ChatState> {
     // Resend from the edited message
     await sendMessage(
       content: null, // Use existing conversation (now with edited message)
+      triggerMessage: message,
       sessionId: sessionId,
       requestApproval: requestApproval,
       syncChannel: syncChannel,
@@ -531,6 +629,7 @@ class ChatController extends StateNotifier<ChatState> {
     // Resend - conversation will include the message we're resending from
     await sendMessage(
       content: null, // Use existing conversation
+      triggerMessage: message,
       sessionId: sessionId,
       requestApproval: requestApproval,
       syncChannel: syncChannel,

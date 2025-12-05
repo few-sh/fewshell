@@ -33,7 +33,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   /// Insert a new message
   Future<int> insertMessage(MessageEntityCompanion message) async {
     final result =
-        await into(messages).insert(message, mode: InsertMode.insertOrIgnore);
+        await into(messages).insert(message, mode: InsertMode.insertOrReplace);
     // Touch the session to update its updatedAt timestamp
     if (message.sessionId.present) {
       await db.sessionDao.touchSession(message.sessionId.value);
@@ -94,6 +94,20 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     return query.map((row) => row.read(count)!).getSingle();
   }
 
+  /// Get the last message in a session
+  Future<MessageEntity?> getLastMessage(String sessionId) {
+    return (select(messages)
+          ..where(
+            (m) => m.sessionId.equals(sessionId) & m.isDeleted.equals(false),
+          )
+          ..orderBy([
+            (m) =>
+                OrderingTerm(expression: m.createdAt, mode: OrderingMode.desc),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   /// Generate a unique message ID
   String generateMessageId() => IdGenerator.messageId();
 
@@ -106,6 +120,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     required String userName,
     required String content,
     String? imageUrl,
+    bool isStreaming = false,
   }) async {
     final now = DateTime.now();
     final messageId = id ?? generateMessageId();
@@ -124,6 +139,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       imageUrl: Value(imageUrl),
       toolCallsJson: const Value(null),
       toolResultsJson: const Value(null),
+      isStreaming: Value(isStreaming),
     );
 
     await insertMessage(companion);

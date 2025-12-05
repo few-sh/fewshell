@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
@@ -16,6 +17,7 @@ import 'package:decamp/utils/highlight_injector.dart';
 class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
   final String? displayText; // Override for streaming
+  final Stream<MessageEntity>? messageStream;
   final bool isUser;
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
@@ -29,6 +31,7 @@ class RichMessageContent extends StatefulWidget {
     super.key,
     required this.message,
     this.displayText,
+    this.messageStream,
     required this.isUser,
     this.onEdit,
     this.onResend,
@@ -43,6 +46,47 @@ class RichMessageContent extends StatefulWidget {
 
 class _RichMessageContentState extends State<RichMessageContent> {
   bool _isEditMode = false;
+  String _streamedContent = '';
+  StreamSubscription? _messageSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupStreams();
+  }
+
+  @override
+  void didUpdateWidget(RichMessageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.messageStream != oldWidget.messageStream) {
+      _disposeStreams();
+      _setupStreams();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposeStreams();
+    super.dispose();
+  }
+
+  void _setupStreams() {
+    if (widget.messageStream != null) {
+      _streamedContent = widget.displayText ?? '';
+      _messageSub = widget.messageStream!.listen((message) {
+        if (mounted && message.id == widget.message.id) {
+          setState(() {
+            _streamedContent = message.content;
+          });
+        }
+      });
+    }
+  }
+
+  void _disposeStreams() {
+    _messageSub?.cancel();
+    _messageSub = null;
+  }
 
   void _enterEditMode() {
     setState(() {
@@ -85,15 +129,17 @@ class _RichMessageContentState extends State<RichMessageContent> {
       );
     }
 
-    // Use displayText override if provided (for streaming), otherwise format message content
-    final text =
-        widget.displayText ??
-        MessageFormatter.formatMessageContent(widget.message);
+    // Use streamed content if available, otherwise format message content
+    var text = widget.messageStream != null
+        ? _streamedContent
+        : (widget.displayText ??
+              MessageFormatter.formatMessageContent(widget.message));
 
     // Build markdown content
-    final content = _buildMarkdownContent(context, text);
-
-    // Build timestamp with optional edit indicator
+    final content = _buildMarkdownContent(
+      context,
+      text,
+    ); // Build timestamp with optional edit indicator
     final timestamp = _buildTimestamp(context);
 
     // Build controls row (timestamp + menu)
