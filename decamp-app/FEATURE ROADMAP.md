@@ -13,8 +13,8 @@ MVP (Version 0 - private alpha) - Typical use-case
 TODOS:
 
 Smoother onboarding:
-[ ] When no project exists, automatically pop up the new project dialog
-[ ] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
+[X] When no project exists, automatically pop up the new project dialog
+[X] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
 [ ] When no model configuration exists, guide the user through setting up.*
 
 [ ] Support sudo for local command execution at the remote agent side
@@ -25,9 +25,8 @@ General papercuts:
 [ ] Show currently active project on the projects page
 [ ] When selecting a peroject from projects list, close the projects page
 
-[ ] An indicator/icon when a project is remote
-
-[ ] A connection and activity indicator for remote project (eg when connected/disconnected, whebn sending data)
+[X] An indicator/icon when a project is remote
+[X] A connection and activity indicator for remote project (eg when connected/disconnected, whebn sending data)
 
 [ ] Only sync the remote projects that belong to the agent
 
