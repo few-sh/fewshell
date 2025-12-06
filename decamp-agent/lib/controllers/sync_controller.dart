@@ -25,8 +25,11 @@ class SyncController {
           _setupCustomMessageHandling(multiplexed, 'Global');
 
           developer.log('Starting CrdtSync for global', name: 'SyncController');
-          final sync =
-              CrdtSync.server(dbManager.globalDatabase.crdt, multiplexed);
+          final sync = CrdtSync.server(
+            dbManager.globalDatabase.crdt,
+            multiplexed,
+            verbose: true,
+          );
 
           unawaited(
             multiplexed.sink.done.then((_) {
@@ -52,7 +55,11 @@ class SyncController {
               'Starting CrdtSync for project $projectId',
               name: 'SyncController',
             );
-            final sync = CrdtSync.server(db.crdt, multiplexed);
+            final sync = CrdtSync.server(
+              db.crdt,
+              multiplexed,
+              verbose: true,
+            );
 
             // Ensure sync is closed when channel is closed
             unawaited(
