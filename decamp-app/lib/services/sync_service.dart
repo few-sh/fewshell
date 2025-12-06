@@ -84,6 +84,9 @@ class SyncService {
     });
 
     // Initial connection
+    final nodeId = ref.read(nodeIdProvider);
+    developer.log('SyncService: Initializing with nodeId: $nodeId');
+
     _connectGlobal(ref.read(globalDatabaseProvider));
     final projectDb = ref.read(projectDatabaseProvider);
     final projectId = ref.read(currentProjectIdProvider);
@@ -103,8 +106,6 @@ class SyncService {
   Future<void> _connectGlobal(GlobalDatabase db) async {
     _disconnectGlobal();
 
-    return; // Temporarily disable global sync.
-
     // ignore: dead_code
     try {
       // Ensure DB is open so that crdt instance is available
@@ -120,7 +121,7 @@ class SyncService {
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Global): Received custom message: $msg');
       });
-      _globalSync = CrdtSync.client(crdt, _globalChannel!);
+      _globalSync = CrdtSync.client(crdt, _globalChannel!, verbose: true);
     } catch (e) {
       developer.log('SyncService: Global DB not ready or error: $e');
     }
@@ -201,7 +202,7 @@ class SyncService {
           );
         }
       });
-      _projectSync = CrdtSync.client(crdt, _projectChannel!);
+      _projectSync = CrdtSync.client(crdt, _projectChannel!, verbose: true);
     } catch (e) {
       if (token.isCancelled) return;
       developer.log('SyncService: Project DB not ready or error: $e');
