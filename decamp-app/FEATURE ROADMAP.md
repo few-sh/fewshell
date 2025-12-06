@@ -10,6 +10,8 @@ MVP (Version 0 - private alpha) - Typical use-case
 4. Decamp queries the logs via ssh + google cloud logs
 5. Decamp provides the log output and the summary.
 
+[ ] Feedback button
+
 TODOS:
 
 Smoother onboarding:
