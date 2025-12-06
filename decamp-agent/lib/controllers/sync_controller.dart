@@ -240,12 +240,6 @@ class _AgentSession {
               content: message.content,
             );
           }
-
-          channel.sendCustomMessage({
-            'type': 'assistant_message',
-            'message': message.toJson(),
-            'id': id,
-          });
         },
         onToolResultMessage: (message, {String? messageId}) async {
           String? id;
@@ -254,12 +248,6 @@ class _AgentSession {
           await db!.messageDao.insertMessage(
             message.toMessageCompanion(sessionId: sessionId, id: id),
           );
-
-          channel.sendCustomMessage({
-            'type': 'tool_result_message',
-            'message': message.toJson(),
-            'id': id,
-          });
         },
       );
 

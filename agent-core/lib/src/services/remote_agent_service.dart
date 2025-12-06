@@ -30,16 +30,6 @@ Future<AgentLoopResult> runRemoteAgentLoop({
 
         if (type == 'text_delta') {
           onTextDelta?.call(data['content']);
-        } else if (type == 'assistant_message') {
-          onAssistantMessage?.call(
-            (data['message'] as Map<String, dynamic>).toChatMessage(),
-            messageId: data['id'],
-          );
-        } else if (type == 'tool_result_message') {
-          onToolResultMessage?.call(
-            (data['message'] as Map<String, dynamic>).toChatMessage(),
-            messageId: data['id'],
-          );
         } else if (type == 'request_approval') {
           final toolsJson =
               (data['tools'] as List).cast<Map<String, dynamic>>();
