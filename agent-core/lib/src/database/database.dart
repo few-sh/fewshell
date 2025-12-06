@@ -22,7 +22,42 @@ class GlobalDatabase extends _$GlobalDatabase {
 
   GlobalDatabase(super.e, {Crdt? crdt, Crdt Function()? crdtProvider})
       : _crdt = crdt,
-        _crdtProvider = crdtProvider;
+        _crdtProvider = crdtProvider {
+    // Listen for external changes (e.g. from sync) and notify Drift
+    if (_crdt != null && _crdt is SqliteCrdt) {
+      _crdt.onTablesChanged.listen((event) {
+        _notifyDriftUpdates(event.tables);
+      });
+    } else if (_crdtProvider != null) {
+      // We can't easily listen here if it's a provider, but usually it's initialized
+      // immediately. We might need to handle this better if crdtProvider is used.
+      // For now, assume crdt is available if provider is used.
+      try {
+        final c = crdt;
+        if (c is SqliteCrdt) {
+          c.onTablesChanged.listen((event) {
+            _notifyDriftUpdates(event.tables);
+          });
+        }
+      } catch (_) {
+        // Ignore if not ready
+      }
+    }
+  }
+
+  void _notifyDriftUpdates(Iterable<String> changedTables) {
+    final updates = <TableUpdate>{};
+    for (final tableName in changedTables) {
+      for (final table in allTables) {
+        if (table.actualTableName == tableName) {
+          updates.add(TableUpdate.onTable(table));
+        }
+      }
+    }
+    if (updates.isNotEmpty) {
+      notifyUpdates(updates);
+    }
+  }
 
   // DAOs - lazy initialized
   late final ProjectDao projectDao = ProjectDao(this);
