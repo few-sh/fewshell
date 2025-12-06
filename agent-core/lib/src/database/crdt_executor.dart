@@ -5,7 +5,8 @@ import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 class CrdtQueryExecutor extends QueryExecutor {
   final SqliteCrdt _crdt;
-  bool _isOpening = false;
+  Completer<void>? _openingCompleter;
+  bool _isOpen = false;
 
   CrdtQueryExecutor(this._crdt);
 
@@ -14,9 +15,17 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<bool> ensureOpen(QueryExecutorUser user) async {
+    if (_isOpen) return true;
+
+    if (_openingCompleter != null) {
+      developer.log('CrdtQueryExecutor: waiting for existing open operation');
+      await _openingCompleter!.future;
+      return true;
+    }
+
     developer.log('CrdtQueryExecutor: ensureOpen');
-    if (_isOpening) return true;
-    _isOpening = true;
+    _openingCompleter = Completer<void>();
+
     try {
       final versionResult = await _crdt.query('PRAGMA user_version');
       final currentVersion = (versionResult.first.values.first as int?) ?? 0;
@@ -47,9 +56,13 @@ class CrdtQueryExecutor extends QueryExecutor {
         );
       }
 
+      _isOpen = true;
+      _openingCompleter!.complete();
       return true;
-    } finally {
-      _isOpening = false;
+    } catch (e, s) {
+      _openingCompleter!.completeError(e, s);
+      _openingCompleter = null;
+      rethrow;
     }
   }
 
