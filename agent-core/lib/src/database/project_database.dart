@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:crdt/crdt.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
@@ -19,27 +20,33 @@ part 'project_database.g.dart';
 class ProjectDatabase extends _$ProjectDatabase {
   final Crdt? _crdt;
   final Crdt Function()? _crdtProvider;
+  StreamSubscription? _crdtSubscription;
 
   ProjectDatabase(super.e, {Crdt? crdt, Crdt Function()? crdtProvider})
       : _crdt = crdt,
         _crdtProvider = crdtProvider {
-    // Listen for external changes (e.g. from sync) and notify Drift
-    if (_crdt != null && _crdt is SqliteCrdt) {
-      _crdt.onTablesChanged.listen((event) {
-        _notifyDriftUpdates(event.tables);
-      });
-    } else if (_crdtProvider != null) {
-      try {
-        final c = crdt;
-        if (c is SqliteCrdt) {
-          c.onTablesChanged.listen((event) {
-            _notifyDriftUpdates(event.tables);
-          });
-        }
-      } catch (_) {
-        // Ignore if not ready
+    _setupCrdtListener();
+  }
+
+  void _setupCrdtListener() {
+    if (_crdtSubscription != null) return;
+
+    try {
+      final c = crdt;
+      if (c is SqliteCrdt) {
+        _crdtSubscription = c.onTablesChanged.listen((event) {
+          _notifyDriftUpdates(event.tables);
+        });
       }
+    } catch (_) {
+      // Ignore if not ready
     }
+  }
+
+  @override
+  Future<void> close() {
+    _crdtSubscription?.cancel();
+    return super.close();
   }
 
   void _notifyDriftUpdates(Iterable<String> changedTables) {
@@ -100,6 +107,9 @@ class ProjectDatabase extends _$ProjectDatabase {
       beforeOpen: (details) async {
         // Enable foreign keys
         await executor.runCustom('PRAGMA foreign_keys = ON');
+
+        // Setup CRDT listener now that the DB is open and CRDT should be ready
+        _setupCrdtListener();
       },
       onUpgrade: (Migrator m, int from, int to) async {
         // Migration from version 1 to 2: Add position column to project_snippets
