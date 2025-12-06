@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:drift/drift.dart';
-import 'package:crdt/crdt.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 import 'tables/projects_table.dart';
