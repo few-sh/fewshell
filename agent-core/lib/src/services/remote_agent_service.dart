@@ -12,7 +12,6 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   required String sessionId,
   required MessageEntity triggerMessage,
   required ApprovalFunction requestApproval,
-  TextDeltaCallback? onTextDelta,
   MessageCallback? onAssistantMessage,
   MessageCallback? onToolResultMessage,
 }) async {
@@ -28,19 +27,7 @@ Future<AgentLoopResult> runRemoteAgentLoop({
       try {
         final type = data['type'] as String;
 
-        if (type == 'text_delta') {
-          onTextDelta?.call(data['content']);
-        } else if (type == 'assistant_message') {
-          onAssistantMessage?.call(
-            (data['message'] as Map<String, dynamic>).toChatMessage(),
-            messageId: data['id'],
-          );
-        } else if (type == 'tool_result_message') {
-          onToolResultMessage?.call(
-            (data['message'] as Map<String, dynamic>).toChatMessage(),
-            messageId: data['id'],
-          );
-        } else if (type == 'request_approval') {
+        if (type == 'request_approval') {
           final toolsJson =
               (data['tools'] as List).cast<Map<String, dynamic>>();
           final pendingCalls = toolsJson

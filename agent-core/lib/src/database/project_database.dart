@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:drift/drift.dart';
-import 'package:crdt/crdt.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 import 'package:llm_dart/llm_dart.dart';
 
