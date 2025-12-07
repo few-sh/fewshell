@@ -12,8 +12,6 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   required String sessionId,
   required MessageEntity triggerMessage,
   required ApprovalFunction requestApproval,
-  MessageCallback? onAssistantMessage,
-  MessageCallback? onToolResultMessage,
 }) async {
   developer.log(
       'Starting remote agent loop with sessionId: $sessionId triggerMessage: ${triggerMessage.toJsonString()}',

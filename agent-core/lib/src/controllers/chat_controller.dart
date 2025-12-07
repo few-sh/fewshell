@@ -323,8 +323,6 @@ class ChatController extends StateNotifier<ChatState> {
           sessionId: sessionId,
           triggerMessage: triggerMessage,
           requestApproval: handleRequestApproval,
-          onAssistantMessage: handleAssistantMessage,
-          onToolResultMessage: handleToolResultMessage,
         );
       } else {
         // Run the agent loop locally

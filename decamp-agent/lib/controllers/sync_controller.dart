@@ -239,8 +239,8 @@ class _AgentSession {
           final companion = MessageEntityCompanion(
             id: Value(id),
             sessionId: Value(sessionId),
-            userId: Value('ai'),
-            userName: Value('Ops Agent'),
+            userId: const Value('ai'),
+            userName: const Value('Ops Agent'),
             content: Value(content),
             timestamp: Value(createdAt),
             createdAt: Value(createdAt),
@@ -248,13 +248,14 @@ class _AgentSession {
             isStreaming: const Value(true),
           );
 
-          _lastDbWrite = _lastDbWrite.then((_) {
-            return db!.messageDao.insertMessage(companion);
+          _lastDbWrite = _lastDbWrite.then((_) async {
+            await db!.messageDao.insertMessage(companion);
           }).catchError((e) {
             developer.log(
               'Error writing streaming message: $e',
               name: 'AgentSession',
             );
+            // Return void to satisfy the Future<void> chain
           });
         },
         onAssistantMessage: (message, {String? messageId}) async {
