@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:developer' as developer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
@@ -25,6 +24,7 @@ class SyncService {
   CrdtSync? _projectSync;
   MultiplexedWebSocketChannel? _projectChannel;
   StreamSubscription? _projectSubscription;
+  String? _currentGlobalUrl;
 
   final StreamController<SyncConnectionState> _connectionStateController =
       StreamController<SyncConnectionState>.broadcast();
@@ -57,7 +57,8 @@ class SyncService {
   void _init() {
     // Watch for database changes
     ref.listen(globalDatabaseProvider, (previous, next) {
-      _connectGlobal(next);
+      final project = ref.read(currentProjectProvider);
+      _connectGlobal(next, project?.serverUrl);
     });
 
     ref.listen(projectDatabaseProvider, (previous, next) {
@@ -73,6 +74,7 @@ class SyncService {
 
     // Watch for project settings changes (specifically serverUrl)
     ref.listen<ProjectEntity?>(currentProjectProvider, (previous, next) {
+      // Handle Project Sync update
       if (next != null &&
           previous?.id == next.id &&
           previous?.serverUrl != next.serverUrl) {
@@ -81,13 +83,20 @@ class SyncService {
           _connectProject(projectDb, next.id);
         }
       }
+
+      // Handle Global Sync update
+      if (previous?.id != next?.id || previous?.serverUrl != next?.serverUrl) {
+        _connectGlobal(ref.read(globalDatabaseProvider), next?.serverUrl);
+      }
     });
 
     // Initial connection
     final nodeId = ref.read(nodeIdProvider);
     developer.log('SyncService: Initializing with nodeId: $nodeId');
 
-    _connectGlobal(ref.read(globalDatabaseProvider));
+    final project = ref.read(currentProjectProvider);
+    _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
+
     final projectDb = ref.read(projectDatabaseProvider);
     final projectId = ref.read(currentProjectIdProvider);
     if (projectDb != null && projectId != null) {
@@ -95,24 +104,27 @@ class SyncService {
     }
   }
 
-  String get _baseUrl {
-    // TODO: Make this configurable via settings
-    if (Platform.isAndroid) {
-      return 'ws://10.0.2.2:3123';
-    }
-    return 'ws://localhost:3123';
-  }
+  Future<void> _connectGlobal(GlobalDatabase db, String? serverUrl) async {
+    if (serverUrl == _currentGlobalUrl && _globalSync != null) return;
 
-  Future<void> _connectGlobal(GlobalDatabase db) async {
     _disconnectGlobal();
+    _currentGlobalUrl = serverUrl;
 
-    // ignore: dead_code
+    if (serverUrl == null || serverUrl.isEmpty) {
+      developer.log('SyncService: No server URL for global sync.');
+      return;
+    }
+
     try {
       // Ensure DB is open so that crdt instance is available
       await db.customSelect('SELECT 1').get();
 
       final crdt = db.crdt;
-      final uri = Uri.parse('$_baseUrl/sync/global');
+      // Remove trailing slash if present
+      final cleanUrl = serverUrl.endsWith('/')
+          ? serverUrl.substring(0, serverUrl.length - 1)
+          : serverUrl;
+      final uri = Uri.parse('$cleanUrl/sync/global');
 
       developer.log('SyncService: Connecting to global sync at $uri');
       _globalChannel = MultiplexedWebSocketChannel(
@@ -121,7 +133,49 @@ class SyncService {
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Global): Received custom message: $msg');
       });
-      _globalSync = CrdtSync.client(crdt, _globalChannel!, verbose: true);
+      _globalSync = CrdtSync.client(
+        crdt,
+        _globalChannel!,
+        verbose: true,
+        validateRecord: (table, record) {
+          if (table == 'projects') {
+            final remoteUrl = record['server_url'] as String?;
+            if (remoteUrl == null || remoteUrl.isEmpty) return false;
+          }
+          return true;
+        },
+        changesetBuilder:
+            ({
+              exceptNodeId,
+              modifiedAfter,
+              modifiedOn,
+              onlyNodeId,
+              onlyTables,
+            }) async {
+              final changeset = await crdt.getChangeset(
+                onlyTables: onlyTables,
+                onlyNodeId: onlyNodeId,
+                exceptNodeId: exceptNodeId,
+                modifiedOn: modifiedOn,
+                modifiedAfter: modifiedAfter,
+              );
+
+              if (changeset.containsKey('projects')) {
+                final records = changeset['projects']!;
+                final filteredRecords = records.where((record) {
+                  final recordUrl = record['server_url'] as String?;
+                  return recordUrl != null && recordUrl == serverUrl;
+                }).toList();
+
+                if (filteredRecords.isEmpty) {
+                  changeset.remove('projects');
+                } else {
+                  changeset['projects'] = filteredRecords;
+                }
+              }
+              return changeset;
+            },
+      );
     } catch (e) {
       developer.log('SyncService: Global DB not ready or error: $e');
     }

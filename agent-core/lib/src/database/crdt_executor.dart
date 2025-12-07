@@ -27,7 +27,9 @@ class CrdtQueryExecutor extends QueryExecutor {
     _openingCompleter = Completer<void>();
 
     try {
-      final versionResult = await _crdt.query('PRAGMA user_version');
+      // Use SELECT from pragma_user_version to avoid ParsingError from sqlparser
+      final versionResult =
+          await _crdt.query('SELECT * FROM pragma_user_version');
       final currentVersion = (versionResult.first.values.first as int?) ?? 0;
       final db = user as GeneratedDatabase;
 
@@ -37,6 +39,8 @@ class CrdtQueryExecutor extends QueryExecutor {
         final migrator = Migrator(db);
         await db.migration.onCreate(migrator);
 
+        // Use execute for PRAGMA updates as it bypasses sqlparser parsing in some cases
+        // or falls back to raw execution if parsing fails (as verified in tests)
         await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
       } else if (currentVersion < user.schemaVersion) {
         await db.beforeOpen(

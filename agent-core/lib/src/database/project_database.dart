@@ -136,8 +136,9 @@ class ProjectDatabase extends _$ProjectDatabase {
         // Migration from version 6 to 7: Add isStreaming column to messages
         if (from < 7) {
           // Check if column already exists to handle potential partial migrations
-          final columns =
-              await executor.runSelect('PRAGMA table_info(messages)', []);
+          // Use SELECT from pragma_table_info to avoid ParsingError from sqlparser
+          final columns = await executor
+              .runSelect("SELECT * FROM pragma_table_info('messages')", []);
           final hasIsStreaming =
               columns.any((row) => row['name'] == 'is_streaming');
 
