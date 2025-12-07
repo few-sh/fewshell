@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
@@ -273,11 +275,12 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 fontWeight: FontWeight.bold,
               ),
             ),
-            IconButton.filledTonal(
-              onPressed: () => _scanAndConfigureProject(project.id),
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: 'Scan Project Config',
-            ),
+            if (!kIsWeb && (Platform.isAndroid || Platform.isIOS))
+              IconButton.filledTonal(
+                onPressed: () => _scanAndConfigureProject(project.id),
+                icon: const Icon(Icons.qr_code_scanner),
+                tooltip: 'Scan Project Config',
+              ),
           ],
         ),
         const SizedBox(height: 16),
