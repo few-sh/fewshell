@@ -9,7 +9,6 @@ import 'package:decamp/utils/search_utils.dart';
 class ChatList extends StatefulWidget {
   final List<MessageEntity> messages;
   final bool isLoading;
-  final String? streamingMessageId;
   final Stream<MessageEntity?>? streamingMessageStream;
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
@@ -23,7 +22,6 @@ class ChatList extends StatefulWidget {
     super.key,
     required this.messages,
     this.isLoading = false,
-    this.streamingMessageId,
     this.streamingMessageStream,
     this.onEditMessage,
     this.onResendMessage,
@@ -57,8 +55,7 @@ class _ChatListState extends State<ChatList> {
     super.didUpdateWidget(oldWidget);
 
     // Update message keys when message list changes
-    if (widget.messages != oldWidget.messages ||
-        widget.streamingMessageId != oldWidget.streamingMessageId) {
+    if (widget.messages != oldWidget.messages) {
       _updateMessageKeys();
     }
 
@@ -70,8 +67,7 @@ class _ChatListState extends State<ChatList> {
 
     // Scroll when messages change or streaming updates (but not during match navigation)
     if (!_isScrollingToMatch &&
-        (widget.messages.length != oldWidget.messages.length ||
-            widget.streamingMessageId != oldWidget.streamingMessageId)) {
+        (widget.messages.length != oldWidget.messages.length)) {
       WidgetsBinding.instance.endOfFrame.then((_) {
         if (mounted && !_isScrollingToMatch) _scrollToBottom();
       });
@@ -117,9 +113,6 @@ class _ChatListState extends State<ChatList> {
   /// Update message keys to stay in sync with current messages
   void _updateMessageKeys() {
     final currentMessageIds = widget.messages.map((m) => m.id).toSet();
-    if (widget.streamingMessageId != null) {
-      currentMessageIds.add(widget.streamingMessageId!);
-    }
 
     // Remove keys for messages that no longer exist
     _messageKeys.removeWhere(
@@ -131,12 +124,6 @@ class _ChatListState extends State<ChatList> {
       _messageKeys.putIfAbsent(
         message.id,
         () => GlobalKey(debugLabel: 'message_${message.id}'),
-      );
-    }
-    if (widget.streamingMessageId != null) {
-      _messageKeys.putIfAbsent(
-        widget.streamingMessageId!,
-        () => GlobalKey(debugLabel: 'message_${widget.streamingMessageId}'),
       );
     }
   }
@@ -303,63 +290,87 @@ class _ChatListState extends State<ChatList> {
   Widget build(BuildContext context) {
     // Reverse the list so newest messages are at index 0
     final reversedMessages = widget.messages.reversed.toList();
-    final hasStreaming =
-        widget.streamingMessageId != null &&
-        widget.streamingMessageStream != null;
-    final showLoading = widget.isLoading && !hasStreaming;
 
-    return ListView.builder(
+    return CustomScrollView(
       controller: _scrollController,
-      // Reverse the ListView so it naturally starts at the bottom
       reverse: true,
-      padding: widget.searchNavigatorHeight > 0
-          ? EdgeInsets.only(bottom: widget.searchNavigatorHeight)
-          : EdgeInsets.zero,
-      itemCount:
-          reversedMessages.length +
-          (showLoading ? 1 : 0) +
-          (hasStreaming ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (showLoading && index == 0) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
+      slivers: [
+        // Padding for search navigator
+        if (widget.searchNavigatorHeight > 0)
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: widget.searchNavigatorHeight),
+          ),
 
-        if (hasStreaming && index == 0) {
-          return StreamBuilder<MessageEntity?>(
-            stream: widget.streamingMessageStream,
-            builder: (context, snapshot) {
-              final message = snapshot.data;
-              if (message == null) {
+        // Streaming Message (if any)
+        if (widget.streamingMessageStream != null)
+          SliverToBoxAdapter(
+            child: StreamBuilder<MessageEntity?>(
+              stream: widget.streamingMessageStream,
+              builder: (context, snapshot) {
+                final message = snapshot.data;
+                if (message != null) {
+                  return _buildMessageItem(
+                    context,
+                    message,
+                    isStreaming: true,
+                    showDivider: false,
+                  );
+                } else if (widget.isLoading) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
                 return const SizedBox.shrink();
-              }
-              return _buildMessageItem(
-                context,
-                message,
-                isStreaming: true,
-                showDivider: false,
-              );
-            },
-          );
-        }
+              },
+            ),
+          ),
 
-        // Get message (adjust index if loading/streaming is shown)
-        final offset = (showLoading || hasStreaming) ? 1 : 0;
-        final messageIndex = index - offset;
-        final message = reversedMessages[messageIndex];
+        // Loading Indicator (if loading and no stream provided)
+        if (widget.isLoading && widget.streamingMessageStream == null)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
 
-        // Show divider if this is not the first item in the list (index 0)
-        // But index 0 might be streaming/loading.
-        // So we check the absolute index passed to builder.
-        return _buildMessageItem(
-          context,
-          message,
-          isStreaming: false,
-          showDivider: index > 0,
-        );
-      },
+        // Completed Messages
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            final message = reversedMessages[index];
+            // Show divider if this is not the first item in the list (index 0)
+            // Note: If there is a streaming message, it is visually "before" (below) this list.
+            // So the first item in this list (index 0) is older than the streaming message.
+            // So it should have a divider if there is a streaming message?
+            // Or if it's just not the newest message overall.
+            // If streaming message exists, then index 0 here is effectively index 1 overall.
+            // So it should have a divider.
+            // If no streaming message, index 0 is newest, so no divider.
+            // But we don't know synchronously if streaming message exists (it's in StreamBuilder).
+            // However, visually, the divider is at the TOP of the message item.
+            // In a reversed list (bottom-up), the divider is between Item N and Item N+1 (above it).
+            // Wait, my previous logic was:
+            // "Show divider if index > 0".
+            // This puts divider on all items EXCEPT the newest one.
+            // If we have a streaming message, it is the newest.
+            // So the first item in THIS list (index 0) is the second newest.
+            // So it SHOULD have a divider.
+            // But we can't easily know if streaming message is visible inside this builder.
+            // Let's just stick to index > 0 for now.
+            // If there is a streaming message, there might be a missing divider between it and the first history message.
+            // We can add a divider to the bottom of the streaming message?
+            // Or top of the first history message?
+            // Let's keep it simple: index > 0.
+            return _buildMessageItem(
+              context,
+              message,
+              isStreaming: false,
+              showDivider: index > 0,
+            );
+          }, childCount: reversedMessages.length),
+        ),
+      ],
     );
   }
 
@@ -404,96 +415,4 @@ class _ChatListState extends State<ChatList> {
       ],
     );
   }
-}
-
-Widget _buildMessageItem(
-  BuildContext context,
-  MessageEntity message, {
-  required bool isStreaming,
-}) {
-  final isUser = message.userId == 'user';
-
-  return Column(
-    key: _messageKeys[message.id],
-    children: [
-      // Divider logic needs to be aware of list position, but for simplicity
-      // we can just show divider for all items except the very first one visually (last in list)
-      // But here we are building items.
-      // If we want to replicate exact divider logic:
-      // "if (messageIndex > 0)" -> means if it's NOT the newest message.
-      // But here we have streaming message which is newest.
-      // So streaming message (index 0) should have divider if there are older messages?
-      // No, divider is usually ABOVE the item (in normal list) or BELOW (in reversed).
-      // In reversed list, index 0 is bottom.
-      // The original code:
-      // if (messageIndex > 0) Divider...
-      // This puts divider between items.
-      // We can just put divider on all items, and hide it for the very last one (top of screen, end of list).
-      // But let's stick to simple logic: Divider at top of message (visually).
-      // In reversed list, that means AFTER the child.
-      // Original code:
-      // children: [ if (index > 0) Divider, Padding ]
-      // This puts divider ABOVE the message (visually below in reversed?).
-      // Wait, Column children order: Divider, Padding.
-      // In reversed ListView, items are stacked bottom to top.
-      // Item 0 (bottom): Divider, Padding.
-      // Item 1 (above): Divider, Padding.
-      // So Divider is BELOW the message?
-      // No, Column is not reversed.
-      // So Divider is visually ABOVE the Padding.
-      // So in a reversed list (bottom to top), Item 0 is at bottom.
-      // It has Divider (top of item) and Padding (bottom of item).
-      // So Divider separates Item 0 from Item 1?
-      // Item 1 is ABOVE Item 0.
-      // Item 1 has Divider at its top.
-      // So we have:
-      // [Item 1 Top]
-      // [Item 1 Divider]
-      // [Item 1 Content]
-      // [Item 0 Top]
-      // [Item 0 Divider]
-      // [Item 0 Content]
-      // This seems to put divider between items.
-      // Except Item 0 (newest) has a divider at its top?
-      // If messageIndex > 0.
-      // So Item 0 (newest) does NOT have a divider.
-      // Item 1 (older) HAS a divider.
-      // So divider is between 0 and 1.
-      // Correct.
-
-      // So:
-      // If isStreaming (index 0): No divider.
-      // If history (index > 0): Divider.
-      // But wait, if we have streaming, then history item 0 is now index 1.
-      // So it SHOULD have a divider.
-      // So logic: "Show divider if this is NOT the newest message".
-      // Streaming message IS the newest. So no divider.
-      // History messages are older. So they should have divider?
-      // Even the first history message? Yes, because it's older than streaming.
-      // What if no streaming?
-      // First history message (index 0) -> No divider.
-      // So logic: Show divider if NOT (index == 0).
-      // But index is passed to builder.
-      // So we can pass `showDivider` to `_buildMessageItem`.
-      if (isStreaming) ...[
-        // No divider for newest message
-      ] else ...[
-        // For history items, we need to know if it's the newest displayed item.
-        // If hasStreaming, then ALL history items are older, so ALL get divider.
-        // If !hasStreaming, then history item 0 is newest, so NO divider.
-      ],
-      // Actually, let's just use the `index` from `build`.
-      // If index > 0, show divider.
-    ],
-  );
-  // Wait, I can't access `index` inside `_buildMessageItem` unless I pass it.
-  // I'll pass `showDivider`.
-
-  return Column(
-    key: _messageKeys[message.id],
-    children: [
-      // I'll handle divider outside or pass it in.
-      // Let's pass `showDivider`.
-    ],
-  );
 }

@@ -24,9 +24,6 @@ class ChatState with _$ChatState {
     // Execution progress tracking
     ExecutionProgress? executionProgress,
 
-    // Streaming state
-    String? streamingMessageId,
-
     // Error state
     String? error,
   }) = _ChatState;

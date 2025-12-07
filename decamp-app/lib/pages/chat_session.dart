@@ -401,7 +401,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                           data: (messages) => ChatList(
                             messages: messages,
                             isLoading: chatState.isLoading,
-                            streamingMessageId: chatState.streamingMessageId,
                             streamingMessageStream:
                                 chatController.streamingMessageStream,
                             onEditMessage: _handleEditMessage,
