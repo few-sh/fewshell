@@ -323,7 +323,6 @@ class ChatController extends StateNotifier<ChatState> {
           sessionId: sessionId,
           triggerMessage: triggerMessage,
           requestApproval: handleRequestApproval,
-          onTextDelta: handleTextDelta,
           onAssistantMessage: handleAssistantMessage,
           onToolResultMessage: handleToolResultMessage,
         );

@@ -8,6 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
+import 'package:drift/drift.dart';
 import '../services/database_manager.dart';
 
 class SyncController {
@@ -108,6 +109,12 @@ class _AgentSession {
   final ProjectDatabase? db;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
+
+  // Streaming state
+  String? _streamingMessageId;
+  final StringBuffer _streamingContent = StringBuffer();
+  DateTime? _streamingCreatedAt;
+  Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(this.channel, this.db);
 
@@ -219,12 +226,51 @@ class _AgentSession {
           return jsonEncode({'error': 'Unknown tool'});
         },
         onTextDelta: (delta) {
-          channel.sendCustomMessage({'type': 'text_delta', 'content': delta});
+          if (_streamingMessageId == null) {
+            _streamingMessageId = db!.messageDao.generateMessageId();
+            _streamingCreatedAt = DateTime.now();
+          }
+          _streamingContent.write(delta);
+          final content = _streamingContent.toString();
+          final id = _streamingMessageId!;
+          final createdAt = _streamingCreatedAt!;
+
+          // Capture values for the closure
+          final companion = MessageEntityCompanion(
+            id: Value(id),
+            sessionId: Value(sessionId),
+            userId: Value('ai'),
+            userName: Value('Ops Agent'),
+            content: Value(content),
+            timestamp: Value(createdAt),
+            createdAt: Value(createdAt),
+            messageKind: const Value(MessageKind.text),
+            isStreaming: const Value(true),
+          );
+
+          _lastDbWrite = _lastDbWrite.then((_) {
+            return db!.messageDao.insertMessage(companion);
+          }).catchError((e) {
+            developer.log(
+              'Error writing streaming message: $e',
+              name: 'AgentSession',
+            );
+          });
         },
         onAssistantMessage: (message, {String? messageId}) async {
-          String? id;
+          // Wait for any pending streaming writes to finish
+          await _lastDbWrite;
+
+          String? id =
+              _streamingMessageId ?? db!.messageDao.generateMessageId();
+
+          // Reset streaming state
+          _streamingMessageId = null;
+          _streamingContent.clear();
+          _streamingCreatedAt = null;
+          _lastDbWrite = Future.value(); // Reset chain
+
           // db and sessionId are guaranteed to be non-null here due to checks at start of method
-          id = db!.messageDao.generateMessageId();
           // Determine if this is a tool use message or a text message
           final messageType = message.messageType;
           if (messageType is ToolUseMessage) {
@@ -238,6 +284,7 @@ class _AgentSession {
               userId: 'ai',
               userName: 'Ops Agent',
               content: message.content,
+              isStreaming: false,
             );
           }
         },
