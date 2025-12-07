@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/llm_settings_provider.dart';
-import '../providers/project_selection_provider.dart';
+import '../providers/project_provider.dart';
 import '../providers/llm_service_provider.dart';
 
 /// Reusable dialog for adding or editing AI model configurations

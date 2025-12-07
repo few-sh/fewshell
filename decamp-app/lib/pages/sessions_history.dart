@@ -5,7 +5,6 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:agent_core/agent_core.dart';
-import '../providers/project_selection_provider.dart';
 
 /// Enum for view mode in sessions history
 enum SessionsViewMode { active, archived }

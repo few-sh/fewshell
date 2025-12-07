@@ -85,7 +85,7 @@ Future<void> showDeleteProjectDialog({
 
   if (confirmed == true) {
     try {
-      await deleteProject(ref, projectId);
+      await ref.read(projectControllerProvider).deleteProject(projectId);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Project "$projectName" deleted')),

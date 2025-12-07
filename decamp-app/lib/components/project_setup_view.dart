@@ -10,7 +10,6 @@ import 'package:decamp/utils/project_utils.dart';
 import 'package:decamp/pages/main_settings.dart';
 import 'package:decamp/pages/qr_scanner_page.dart';
 import 'package:decamp/services/project_importer.dart';
-import '../providers/project_selection_provider.dart';
 
 class ProjectSetupView extends ConsumerWidget {
   const ProjectSetupView({super.key});
@@ -41,7 +40,7 @@ class ProjectSetupView extends ConsumerWidget {
           // Capture navigator before selecting project
           final navigator = Navigator.of(context, rootNavigator: true);
 
-          await selectProject(ref, projectId);
+          await ref.read(currentProjectIdProvider.notifier).select(projectId);
 
           await navigator.push(
             MaterialPageRoute(builder: (context) => const MainSettingsPage()),
@@ -78,7 +77,7 @@ class ProjectSetupView extends ConsumerWidget {
       // Capture navigator before selecting project
       final navigator = Navigator.of(context, rootNavigator: true);
 
-      await selectProject(ref, projectId);
+      await ref.read(currentProjectIdProvider.notifier).select(projectId);
 
       await navigator.push(
         MaterialPageRoute(builder: (context) => const MainSettingsPage()),

@@ -9,7 +9,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:decamp/providers/theme_provider.dart';
-import 'package:decamp/providers/project_selection_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -43,7 +42,13 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
 
           // Set the current project to our test project initially
-          currentProjectIdProvider.overrideWith((ref) => testProjectId),
+          currentProjectIdProvider.overrideWith((ref) {
+            final prefs = ref.watch(sharedPreferencesProvider);
+            final notifier = SelectedProjectNotifier(prefs);
+            // Set initial state directly without persisting to prefs (optional)
+            notifier.state = testProjectId;
+            return notifier;
+          }),
 
           // Mock current project entity to avoid DB access, respecting currentProjectId
           currentProjectProvider.overrideWith((ref) {
@@ -74,7 +79,7 @@ void main() {
 
       if (isGlobal) {
         // Clear current project so LlmService falls back to global
-        container.read(currentProjectIdProvider.notifier).state = null;
+        await container.read(currentProjectIdProvider.notifier).select(null);
 
         notifier = container.read(globalLlmSettingsProvider.notifier);
         getSettings = () => container.read(globalLlmSettingsProvider);
@@ -83,7 +88,9 @@ void main() {
         );
       } else {
         // Ensure project is set
-        container.read(currentProjectIdProvider.notifier).state = testProjectId;
+        await container
+            .read(currentProjectIdProvider.notifier)
+            .select(testProjectId);
 
         notifier = container.read(
           projectLlmSettingsProvider(testProjectId).notifier,

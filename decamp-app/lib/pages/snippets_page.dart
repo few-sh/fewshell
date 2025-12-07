@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/snippet_provider.dart';
-import '../providers/project_selection_provider.dart';
+import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
 import '../components/project_title_bar.dart';
 

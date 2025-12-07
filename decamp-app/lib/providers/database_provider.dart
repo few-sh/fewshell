@@ -6,7 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
-import 'project_selection_provider.dart';
+import 'project_provider.dart';
 import 'theme_provider.dart';
 
 final nodeIdProvider = Provider<String>((ref) {

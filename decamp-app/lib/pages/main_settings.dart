@@ -12,7 +12,6 @@ import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/settings_provider.dart';
-import '../providers/project_selection_provider.dart';
 import '../utils/project_utils.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
@@ -257,7 +256,9 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       }
 
       // Save the change
-      await updateProject(ref, id: project.id, name: trimmedValue);
+      await ref
+          .read(projectControllerProvider)
+          .updateProject(id: project.id, name: trimmedValue);
       if (mounted) {
         _showSnack('Project name updated');
       }
@@ -1066,7 +1067,9 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       }
 
       // Save the change
-      await updateProject(ref, id: project.id, serverUrl: Value(newValue));
+      await ref
+          .read(projectControllerProvider)
+          .updateProject(id: project.id, serverUrl: Value(newValue));
       if (mounted) {
         _showSnack('Server URL updated');
       }

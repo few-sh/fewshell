@@ -6,7 +6,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/database_provider.dart';
-import '../providers/project_selection_provider.dart';
 import '../providers/project_provider.dart';
 
 final syncServiceProvider = Provider<SyncService>((ref) {

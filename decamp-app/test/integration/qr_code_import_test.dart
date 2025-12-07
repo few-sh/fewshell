@@ -10,7 +10,6 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/providers/theme_provider.dart';
 import 'package:decamp/services/storage/flutter_secure_storage_impl.dart';
-import 'package:decamp/providers/project_selection_provider.dart';
 import 'dart:developer' as developer;
 
 void main() {
@@ -38,7 +37,12 @@ void main() {
         overrides: [
           keychainServiceProvider.overrideWithValue(keychainService),
           sharedPreferencesProvider.overrideWithValue(prefs),
-          currentProjectIdProvider.overrideWith((ref) => testProjectId),
+          currentProjectIdProvider.overrideWith((ref) {
+            final prefs = ref.watch(sharedPreferencesProvider);
+            final notifier = SelectedProjectNotifier(prefs);
+            notifier.state = testProjectId;
+            return notifier;
+          }),
           currentProjectProvider.overrideWith((ref) {
             final id = ref.watch(currentProjectIdProvider);
             if (id == null) return null;

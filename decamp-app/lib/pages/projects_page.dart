@@ -5,7 +5,6 @@ import 'package:agent_core/agent_core.dart';
 import '../utils/project_utils.dart';
 import 'project_setup_page.dart';
 import '../components/project_setup_view.dart';
-import '../providers/project_selection_provider.dart';
 
 class ProjectsPage extends ConsumerWidget {
   const ProjectsPage({super.key});
@@ -108,7 +107,9 @@ class ProjectsPage extends ConsumerWidget {
                   ),
                   onTap: () async {
                     // Select this project and navigate back
-                    await selectProject(ref, project.id);
+                    await ref
+                        .read(currentProjectIdProvider.notifier)
+                        .select(project.id);
                     if (!context.mounted) return;
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/secret_provider.dart';
-import '../providers/project_selection_provider.dart';
+import '../providers/project_provider.dart';
 import '../components/secret_dialog.dart';
 import '../components/project_title_bar.dart';
 
