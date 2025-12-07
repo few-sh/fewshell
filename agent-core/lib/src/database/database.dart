@@ -96,7 +96,8 @@ class GlobalDatabase extends _$GlobalDatabase {
       },
       beforeOpen: (details) async {
         // Enable foreign keys
-        await executor.runCustom('PRAGMA foreign_keys = ON');
+        // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
+        // await executor.runCustom('PRAGMA foreign_keys = ON');
 
         // Setup CRDT listener now that the DB is open and CRDT should be ready
         _setupCrdtListener();

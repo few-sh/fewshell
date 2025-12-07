@@ -39,9 +39,8 @@ class CrdtQueryExecutor extends QueryExecutor {
         final migrator = Migrator(db);
         await db.migration.onCreate(migrator);
 
-        // Use execute for PRAGMA updates as it bypasses sqlparser parsing in some cases
-        // or falls back to raw execution if parsing fails (as verified in tests)
-        await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+        // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
+        // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
       } else if (currentVersion < user.schemaVersion) {
         await db.beforeOpen(
           this,
@@ -52,7 +51,7 @@ class CrdtQueryExecutor extends QueryExecutor {
         await db.migration
             .onUpgrade(migrator, currentVersion, user.schemaVersion);
 
-        await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+        // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
       } else {
         await db.beforeOpen(
           this,
