@@ -28,58 +28,47 @@ final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
 /// StateProvider for the currently selected session ID
 final currentSessionIdProvider = StateProvider<String?>((ref) => null);
 
-/// Session auto-selector that runs after build
-/// Watches project and sessions to ensure a valid session is always selected
-final sessionAutoSelectorProvider = Provider<void>((ref) {
-  void handleSelection() {
-    final projectId = ref.read(currentProjectIdProvider);
-    final sessionsAsync = ref.read(currentProjectSessionsProvider);
+/// Controller for session logic
+class SessionController {
+  final Ref _ref;
 
-    if (projectId == null) {
-      if (ref.read(currentSessionIdProvider) != null) {
-        ref.read(currentSessionIdProvider.notifier).state = null;
-      }
-      return;
-    }
+  SessionController(this._ref);
 
-    final sessions = sessionsAsync.when(
-      data: (sessions) => sessions,
-      loading: () => null,
-      error: (_, _) => null,
-    );
-
-    if (sessions == null) return;
-
-    final currentSessionId = ref.read(currentSessionIdProvider);
-
-    // Check if we need to select a session
-    final needsSession =
-        currentSessionId == null ||
-        !sessions.any((s) => s.id == currentSessionId);
-
-    if (!needsSession) return;
+  /// Ensures a valid session is selected for the given project
+  Future<void> ensureSessionSelected(String projectId) async {
+    final sessionDao = _ref.read(databaseProvider).sessionDao;
+    final sessions = await sessionDao.getNonArchivedSessionsByProject(projectId);
 
     if (sessions.isEmpty) {
-      // Create new session
-      final sessionDao = ref.read(databaseProvider).sessionDao;
-      final projectDao = ref.read(databaseProvider).projectDao;
-
-      sessionDao.createSessionWithId(projectId: projectId).then((newSessionId) {
-        ref.read(currentSessionIdProvider.notifier).state = newSessionId;
-        projectDao.updateLastSessionDate(projectId, DateTime.now());
-      });
+      // Create new session if none exist
+      final projectDao = _ref.read(databaseProvider).projectDao;
+      final newSessionId = await sessionDao.createSessionWithId(projectId: projectId);
+      
+      _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+      await projectDao.updateLastSessionDate(projectId, DateTime.now());
     } else {
-      // Select most recent session
-      ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
+      // Select the most recent session
+      // Note: Assuming getNonArchivedSessionsByProject returns sorted by date desc
+      // If not, we might need to sort here or ensure DAO does it.
+      // Based on typical chat app behavior, most recent is usually first.
+      _ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
     }
   }
+  
+  Future<void> createNewSession() async {
+    final projectId = _ref.read(currentProjectIdProvider);
+    if (projectId == null) return;
 
-  ref.listen(currentProjectIdProvider, (_, _) => handleSelection());
-  ref.listen(currentProjectSessionsProvider, (_, _) => handleSelection());
+    final sessionDao = _ref.read(databaseProvider).sessionDao;
+    final projectDao = _ref.read(databaseProvider).projectDao;
 
-  // Run initially
-  Future.microtask(handleSelection);
-});
+    final newSessionId = await sessionDao.createSessionWithId(projectId: projectId);
+    _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+    await projectDao.updateLastSessionDate(projectId, DateTime.now());
+  }
+}
+
+final sessionControllerProvider = Provider((ref) => SessionController(ref));
 
 /// Provider for the currently selected session
 /// Returns null if no session is selected or session doesn't exist

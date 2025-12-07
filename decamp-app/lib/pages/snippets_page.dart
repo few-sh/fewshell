@@ -202,13 +202,14 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           isGlobal: isGlobal,
           onSave: (description, content) async {
             try {
-              await addSnippet(
-                ref,
-                name: description,
-                content: content,
-                description: description,
-                projectId: isGlobal ? null : currentProjectId,
-              );
+              await ref
+                  .read(snippetControllerProvider)
+                  .addSnippet(
+                    name: description,
+                    content: content,
+                    description: description,
+                    projectId: isGlobal ? null : currentProjectId,
+                  );
               setState(() {
                 _newSnippetId = null;
               });
@@ -238,7 +239,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           snippet: snippet,
           isGlobal: isGlobal,
           onDelete: () async {
-            await deleteSnippet(ref, snippet.id);
+            await ref.read(snippetControllerProvider).deleteSnippet(snippet.id);
           },
         );
       }),
@@ -261,12 +262,9 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
             : newIndex;
 
         // Update the order in the database
-        await reorderSnippets(
-          ref,
-          snippets,
-          adjustedOldIndex,
-          adjustedNewIndex,
-        );
+        await ref
+            .read(snippetControllerProvider)
+            .reorderSnippets(snippets, adjustedOldIndex, adjustedNewIndex);
       },
       children: listItems,
     );
@@ -551,13 +549,14 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
     setState(() => _isSaving = true);
 
     try {
-      await updateSnippet(
-        ref,
-        id: widget.snippet.id,
-        name: _descriptionController.text.trim(),
-        content: _contentController.text.trim(),
-        description: _descriptionController.text.trim(),
-      );
+      await ref
+          .read(snippetControllerProvider)
+          .updateSnippet(
+            id: widget.snippet.id,
+            name: _descriptionController.text.trim(),
+            content: _contentController.text.trim(),
+            description: _descriptionController.text.trim(),
+          );
 
       if (mounted) {
         setState(() {

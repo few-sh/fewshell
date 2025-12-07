@@ -287,9 +287,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
   @override
   Widget build(BuildContext context) {
-    // Activate auto-session selection
-    ref.watch(sessionAutoSelectorProvider);
-
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);

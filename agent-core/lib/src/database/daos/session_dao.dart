@@ -89,6 +89,21 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
         .get();
   }
 
+  /// Get non-archived sessions for a project
+  Future<List<SessionEntity>> getNonArchivedSessionsByProject(
+    String projectId,
+  ) {
+    return (select(sessions)
+          ..where(
+            (s) => s.projectId.equals(projectId) & s.isArchived.equals(false),
+          )
+          ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.updatedAt, mode: OrderingMode.desc),
+          ]))
+        .get();
+  }
+
   /// Get session count for a project
   Future<int> getSessionCountByProject(String projectId) {
     final count = countAll();

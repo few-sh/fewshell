@@ -39,7 +39,7 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           currentProjectIdProvider.overrideWith((ref) {
             final prefs = ref.watch(sharedPreferencesProvider);
-            final notifier = SelectedProjectNotifier(prefs);
+            final notifier = SelectedProjectNotifier(prefs, ref);
             notifier.state = testProjectId;
             return notifier;
           }),

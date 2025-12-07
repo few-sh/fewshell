@@ -44,7 +44,7 @@ void main() {
           // Set the current project to our test project initially
           currentProjectIdProvider.overrideWith((ref) {
             final prefs = ref.watch(sharedPreferencesProvider);
-            final notifier = SelectedProjectNotifier(prefs);
+            final notifier = SelectedProjectNotifier(prefs, ref);
             // Set initial state directly without persisting to prefs (optional)
             notifier.state = testProjectId;
             return notifier;
