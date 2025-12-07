@@ -26,7 +26,6 @@ class ChatController extends StateNotifier<ChatState> {
   final SecretRedactor _secretRedactor;
   final SshSettings? _sshSettings;
   final String? sessionId;
-  String? _streamingMessageId;
 
   final _activeMessageController = StreamController<MessageEntity>.broadcast();
 
@@ -661,14 +660,10 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Start streaming for a message
-  void startStreaming(String messageId) {
-    _streamingMessageId = messageId;
-  }
+  void startStreaming(String messageId) {}
 
   /// Stop streaming
-  void stopStreaming() {
-    _streamingMessageId = null;
-  }
+  void stopStreaming() {}
 
   /// Clear error state
   void clearError() {

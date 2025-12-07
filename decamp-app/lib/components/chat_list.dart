@@ -309,11 +309,16 @@ class _ChatListState extends State<ChatList> {
               builder: (context, snapshot) {
                 final message = snapshot.data;
                 if (message != null) {
-                  return _buildMessageItem(
-                    context,
-                    message,
+                  return _MessageItem(
+                    key: _messageKeys[message.id],
+                    message: message,
                     isStreaming: true,
                     showDivider: false,
+                    onEditMessage: widget.onEditMessage,
+                    onResendMessage: widget.onResendMessage,
+                    onBranchSession: widget.onBranchSession,
+                    highlights: _highlightsByMessage[message.id],
+                    currentMatchIndex: widget.currentMatchIndex,
                   );
                 } else if (widget.isLoading) {
                   return const Padding(
@@ -362,28 +367,51 @@ class _ChatListState extends State<ChatList> {
             // We can add a divider to the bottom of the streaming message?
             // Or top of the first history message?
             // Let's keep it simple: index > 0.
-            return _buildMessageItem(
-              context,
-              message,
+            return _MessageItem(
+              key: _messageKeys[message.id],
+              message: message,
               isStreaming: false,
               showDivider: index > 0,
+              onEditMessage: widget.onEditMessage,
+              onResendMessage: widget.onResendMessage,
+              onBranchSession: widget.onBranchSession,
+              highlights: _highlightsByMessage[message.id],
+              currentMatchIndex: widget.currentMatchIndex,
             );
           }, childCount: reversedMessages.length),
         ),
       ],
     );
   }
+}
 
-  Widget _buildMessageItem(
-    BuildContext context,
-    MessageEntity message, {
-    required bool isStreaming,
-    required bool showDivider,
-  }) {
+class _MessageItem extends StatelessWidget {
+  final MessageEntity message;
+  final bool isStreaming;
+  final bool showDivider;
+  final Function(String, String)? onEditMessage;
+  final Function(String)? onResendMessage;
+  final Function(String)? onBranchSession;
+  final List<HighlightRange>? highlights;
+  final int? currentMatchIndex;
+
+  const _MessageItem({
+    super.key,
+    required this.message,
+    required this.isStreaming,
+    required this.showDivider,
+    this.onEditMessage,
+    this.onResendMessage,
+    this.onBranchSession,
+    this.highlights,
+    this.currentMatchIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final isUser = message.userId == 'user';
 
     return Column(
-      key: _messageKeys[message.id],
       children: [
         if (showDivider)
           Divider(
@@ -403,11 +431,11 @@ class _ChatListState extends State<ChatList> {
                 message: message,
                 messageStream: null, // Handled by StreamBuilder
                 isUser: isUser,
-                onEdit: widget.onEditMessage,
-                onResend: widget.onResendMessage,
-                onBranch: widget.onBranchSession,
-                highlights: _highlightsByMessage[message.id],
-                currentMatchIndex: widget.currentMatchIndex,
+                onEdit: onEditMessage,
+                onResend: onResendMessage,
+                onBranch: onBranchSession,
+                highlights: highlights,
+                currentMatchIndex: currentMatchIndex,
               ),
             ),
           ),
