@@ -164,7 +164,6 @@ class ChatController extends StateNotifier<ChatState> {
   ///
   /// Streaming is managed internally through ChatState:
   /// - startStreaming: Sets streamingMessageId in state
-  /// - updateStreamingText: Updates streamingText in state
   /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
     String? content,
@@ -650,19 +649,14 @@ class ChatController extends StateNotifier<ChatState> {
   /// Start streaming for a message
   void startStreaming(String messageId) {
     if (mounted) {
-      state = state.copyWith(streamingMessageId: messageId, streamingText: '');
+      state = state.copyWith(streamingMessageId: messageId);
     }
-  }
-
-  /// Update streaming text for a message
-  void updateStreamingText(String text) {
-    if (mounted) state = state.copyWith(streamingText: text);
   }
 
   /// Stop streaming
   void stopStreaming() {
     if (mounted) {
-      state = state.copyWith(streamingMessageId: null, streamingText: '');
+      state = state.copyWith(streamingMessageId: null);
     }
   }
 

@@ -192,8 +192,8 @@ mixin _$ChatState {
       throw _privateConstructorUsedError; // Execution progress tracking
   ExecutionProgress? get executionProgress =>
       throw _privateConstructorUsedError; // Streaming state
-  String? get streamingMessageId => throw _privateConstructorUsedError;
-  String get streamingText => throw _privateConstructorUsedError; // Error state
+  String? get streamingMessageId =>
+      throw _privateConstructorUsedError; // Error state
   String? get error => throw _privateConstructorUsedError;
 
   /// Create a copy of ChatState
@@ -212,7 +212,6 @@ abstract class $ChatStateCopyWith<$Res> {
       {bool isLoading,
       ExecutionProgress? executionProgress,
       String? streamingMessageId,
-      String streamingText,
       String? error});
 
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
@@ -236,7 +235,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
     Object? isLoading = null,
     Object? executionProgress = freezed,
     Object? streamingMessageId = freezed,
-    Object? streamingText = null,
     Object? error = freezed,
   }) {
     return _then(_value.copyWith(
@@ -252,10 +250,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
           ? _value.streamingMessageId
           : streamingMessageId // ignore: cast_nullable_to_non_nullable
               as String?,
-      streamingText: null == streamingText
-          ? _value.streamingText
-          : streamingText // ignore: cast_nullable_to_non_nullable
-              as String,
       error: freezed == error
           ? _value.error
           : error // ignore: cast_nullable_to_non_nullable
@@ -290,7 +284,6 @@ abstract class _$$ChatStateImplCopyWith<$Res>
       {bool isLoading,
       ExecutionProgress? executionProgress,
       String? streamingMessageId,
-      String streamingText,
       String? error});
 
   @override
@@ -313,7 +306,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
     Object? isLoading = null,
     Object? executionProgress = freezed,
     Object? streamingMessageId = freezed,
-    Object? streamingText = null,
     Object? error = freezed,
   }) {
     return _then(_$ChatStateImpl(
@@ -329,10 +321,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
           ? _value.streamingMessageId
           : streamingMessageId // ignore: cast_nullable_to_non_nullable
               as String?,
-      streamingText: null == streamingText
-          ? _value.streamingText
-          : streamingText // ignore: cast_nullable_to_non_nullable
-              as String,
       error: freezed == error
           ? _value.error
           : error // ignore: cast_nullable_to_non_nullable
@@ -348,7 +336,6 @@ class _$ChatStateImpl extends _ChatState {
       {this.isLoading = false,
       this.executionProgress,
       this.streamingMessageId,
-      this.streamingText = '',
       this.error})
       : super._();
 
@@ -362,16 +349,13 @@ class _$ChatStateImpl extends _ChatState {
 // Streaming state
   @override
   final String? streamingMessageId;
-  @override
-  @JsonKey()
-  final String streamingText;
 // Error state
   @override
   final String? error;
 
   @override
   String toString() {
-    return 'ChatState(isLoading: $isLoading, executionProgress: $executionProgress, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
+    return 'ChatState(isLoading: $isLoading, executionProgress: $executionProgress, streamingMessageId: $streamingMessageId, error: $error)';
   }
 
   @override
@@ -385,14 +369,12 @@ class _$ChatStateImpl extends _ChatState {
                 other.executionProgress == executionProgress) &&
             (identical(other.streamingMessageId, streamingMessageId) ||
                 other.streamingMessageId == streamingMessageId) &&
-            (identical(other.streamingText, streamingText) ||
-                other.streamingText == streamingText) &&
             (identical(other.error, error) || other.error == error));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, isLoading, executionProgress,
-      streamingMessageId, streamingText, error);
+  int get hashCode => Object.hash(
+      runtimeType, isLoading, executionProgress, streamingMessageId, error);
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -408,7 +390,6 @@ abstract class _ChatState extends ChatState {
       {final bool isLoading,
       final ExecutionProgress? executionProgress,
       final String? streamingMessageId,
-      final String streamingText,
       final String? error}) = _$ChatStateImpl;
   const _ChatState._() : super._();
 
@@ -418,9 +399,7 @@ abstract class _ChatState extends ChatState {
   @override
   ExecutionProgress? get executionProgress; // Streaming state
   @override
-  String? get streamingMessageId;
-  @override
-  String get streamingText; // Error state
+  String? get streamingMessageId; // Error state
   @override
   String? get error;
 

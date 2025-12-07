@@ -26,7 +26,6 @@ class ChatState with _$ChatState {
 
     // Streaming state
     String? streamingMessageId,
-    @Default('') String streamingText,
 
     // Error state
     String? error,

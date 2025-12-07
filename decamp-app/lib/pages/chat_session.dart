@@ -402,7 +402,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             messages: messages,
                             isLoading: chatState.isLoading,
                             streamingMessageId: chatState.streamingMessageId,
-                            streamingText: chatState.streamingText,
                             activeMessageStream:
                                 chatController.activeMessageStream,
                             onEditMessage: _handleEditMessage,

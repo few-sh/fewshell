@@ -10,7 +10,6 @@ class ChatList extends StatefulWidget {
   final List<MessageEntity> messages;
   final bool isLoading;
   final String? streamingMessageId;
-  final String streamingText;
   final Stream<MessageEntity>? activeMessageStream;
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
@@ -25,7 +24,6 @@ class ChatList extends StatefulWidget {
     required this.messages,
     this.isLoading = false,
     this.streamingMessageId,
-    this.streamingText = '',
     this.activeMessageStream,
     this.onEditMessage,
     this.onResendMessage,
@@ -71,8 +69,7 @@ class _ChatListState extends State<ChatList> {
 
     // Scroll when messages change or streaming updates (but not during match navigation)
     if (!_isScrollingToMatch &&
-        (widget.messages.length != oldWidget.messages.length ||
-            widget.streamingText != oldWidget.streamingText)) {
+        (widget.messages.length != oldWidget.messages.length)) {
       WidgetsBinding.instance.endOfFrame.then((_) {
         if (mounted && !_isScrollingToMatch) _scrollToBottom();
       });
@@ -318,8 +315,6 @@ class _ChatListState extends State<ChatList> {
 
         // Check if this message is currently streaming
         final isStreaming = message.id == widget.streamingMessageId;
-        // Only provide displayText when actually streaming
-        final displayText = isStreaming ? widget.streamingText : null;
         final messageStream = isStreaming ? widget.activeMessageStream : null;
         final isUser = message.userId == 'user';
 
@@ -344,7 +339,6 @@ class _ChatListState extends State<ChatList> {
                   constraints: const BoxConstraints(maxWidth: 800),
                   child: RichMessageContent(
                     message: message,
-                    displayText: displayText,
                     messageStream: messageStream,
                     isUser: isUser,
                     onEdit: widget.onEditMessage,
