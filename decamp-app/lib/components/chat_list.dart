@@ -288,12 +288,10 @@ class _ChatListState extends State<ChatList> {
 
   @override
   Widget build(BuildContext context) {
-    // Reverse the list so newest messages are at index 0
-    final reversedMessages = widget.messages.reversed.toList();
-
     return CustomScrollView(
       controller: _scrollController,
       reverse: true,
+      cacheExtent: 1000, // Pre-render area to smooth out scrolling
       slivers: [
         // Padding for search navigator
         if (widget.searchNavigatorHeight > 0)
@@ -343,30 +341,13 @@ class _ChatListState extends State<ChatList> {
         // Completed Messages
         SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
-            final message = reversedMessages[index];
+            // Calculate index for reversed list without creating a new list
+            // widget.messages is [oldest, ..., newest]
+            // We want index 0 to be newest (last element)
+            final messageIndex = widget.messages.length - 1 - index;
+            final message = widget.messages[messageIndex];
+
             // Show divider if this is not the first item in the list (index 0)
-            // Note: If there is a streaming message, it is visually "before" (below) this list.
-            // So the first item in this list (index 0) is older than the streaming message.
-            // So it should have a divider if there is a streaming message?
-            // Or if it's just not the newest message overall.
-            // If streaming message exists, then index 0 here is effectively index 1 overall.
-            // So it should have a divider.
-            // If no streaming message, index 0 is newest, so no divider.
-            // But we don't know synchronously if streaming message exists (it's in StreamBuilder).
-            // However, visually, the divider is at the TOP of the message item.
-            // In a reversed list (bottom-up), the divider is between Item N and Item N+1 (above it).
-            // Wait, my previous logic was:
-            // "Show divider if index > 0".
-            // This puts divider on all items EXCEPT the newest one.
-            // If we have a streaming message, it is the newest.
-            // So the first item in THIS list (index 0) is the second newest.
-            // So it SHOULD have a divider.
-            // But we can't easily know if streaming message is visible inside this builder.
-            // Let's just stick to index > 0 for now.
-            // If there is a streaming message, there might be a missing divider between it and the first history message.
-            // We can add a divider to the bottom of the streaming message?
-            // Or top of the first history message?
-            // Let's keep it simple: index > 0.
             return _MessageItem(
               key: _messageKeys[message.id],
               message: message,
@@ -378,7 +359,7 @@ class _ChatListState extends State<ChatList> {
               highlights: _highlightsByMessage[message.id],
               currentMatchIndex: widget.currentMatchIndex,
             );
-          }, childCount: reversedMessages.length),
+          }, childCount: widget.messages.length),
         ),
       ],
     );
