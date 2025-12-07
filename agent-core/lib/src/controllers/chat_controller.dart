@@ -197,16 +197,6 @@ class ChatController extends StateNotifier<ChatState> {
       String? currentToolMessageId;
       MessageEntity? currentEntity;
 
-      // Insert placeholder message immediately
-      await _messageDao.insertMessageWithId(
-        id: aiMessageId,
-        sessionId: sessionId,
-        userId: _kAiUserId,
-        userName: _kAiUserName,
-        content: '',
-        isStreaming: true,
-      );
-
       // Get initial entity
       currentEntity = await _messageDao.getMessage(aiMessageId);
 
