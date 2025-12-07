@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:state_notifier/state_notifier.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
+import 'package:async/async.dart';
 
 import '../../agent_core.dart';
 
@@ -30,6 +31,18 @@ class ChatController extends StateNotifier<ChatState> {
 
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
+
+  /// Stream of the currently streaming message (if any)
+  /// Merges local updates (activeMessageStream) and remote updates (from DB)
+  Stream<MessageEntity?> get streamingMessageStream {
+    if (sessionId == null) return const Stream.empty();
+
+    final dbStream = _messageDao
+        .watchStreamingMessagesBySession(sessionId!)
+        .map((list) => list.firstOrNull);
+
+    return StreamGroup.merge([activeMessageStream, dbStream]);
+  }
 
   ChatController({
     required MessageDao messageDao,

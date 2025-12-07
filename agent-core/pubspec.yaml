@@ -26,6 +26,7 @@ dependencies:
   sql_crdt: ^3.0.3
   stream_channel: ^2.1.4
   web_socket_channel: ^3.0.3
+  async: ^2.13.0
 
 dev_dependencies:
   lints: ^5.0.0
