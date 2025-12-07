@@ -23,9 +23,7 @@ class ProjectDatabase extends _$ProjectDatabase {
 
   ProjectDatabase(super.e, {Crdt? crdt, Crdt Function()? crdtProvider})
       : _crdt = crdt,
-        _crdtProvider = crdtProvider {
-    _setupCrdtListener();
-  }
+        _crdtProvider = crdtProvider;
 
   void _setupCrdtListener() {
     if (_crdtSubscription != null) return;

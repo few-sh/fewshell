@@ -9,9 +9,6 @@ import 'package:crdt/crdt.dart';
 import 'project_selection_provider.dart';
 import 'theme_provider.dart';
 
-// Registry to hold Crdt instances
-final crdtRegistry = <String, Crdt>{};
-
 final nodeIdProvider = Provider<String>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
   var nodeId = prefs.getString('node_id');
@@ -25,9 +22,10 @@ final nodeIdProvider = Provider<String>((ref) {
 /// Provider for the GlobalDatabase instance (decamp.db).
 final globalDatabaseProvider = Provider<GlobalDatabase>((ref) {
   final nodeId = ref.watch(nodeIdProvider);
+  Crdt? crdt;
   final database = GlobalDatabase(
-    _openGlobalConnection(nodeId),
-    crdtProvider: () => crdtRegistry['global']!,
+    _openGlobalConnection(nodeId, (c) => crdt = c),
+    crdtProvider: () => crdt!,
   );
 
   // Dispose database when provider is disposed
@@ -38,13 +36,16 @@ final globalDatabaseProvider = Provider<GlobalDatabase>((ref) {
   return database;
 });
 
-LazyDatabase _openGlobalConnection(String nodeId) {
+LazyDatabase _openGlobalConnection(
+  String nodeId,
+  void Function(Crdt) onCrdtCreated,
+) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final path = p.join(dbFolder.path, 'decamp.db');
 
     final result = await CrdtExecutorFactory.createExecutor(path, nodeId);
-    crdtRegistry['global'] = result.crdt;
+    onCrdtCreated(result.crdt);
     return result.executor;
   });
 }
@@ -56,22 +57,26 @@ final projectDatabaseProvider = Provider<ProjectDatabase?>((ref) {
   if (projectId == null) return null;
 
   final nodeId = ref.watch(nodeIdProvider);
+  Crdt? crdt;
 
   final database = ProjectDatabase(
-    _openProjectConnection(projectId, nodeId),
-    crdtProvider: () => crdtRegistry[projectId]!,
+    _openProjectConnection(projectId, nodeId, (c) => crdt = c),
+    crdtProvider: () => crdt!,
   );
 
   // Dispose database when provider is disposed (e.g. project changed)
   ref.onDispose(() {
     database.close();
-    crdtRegistry.remove(projectId);
   });
 
   return database;
 });
 
-LazyDatabase _openProjectConnection(String projectId, String nodeId) {
+LazyDatabase _openProjectConnection(
+  String projectId,
+  String nodeId,
+  void Function(Crdt) onCrdtCreated,
+) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
     final projectDir = Directory(p.join(dbFolder.path, 'projects', projectId));
@@ -81,7 +86,7 @@ LazyDatabase _openProjectConnection(String projectId, String nodeId) {
     final path = p.join(projectDir.path, 'project.db');
 
     final result = await CrdtExecutorFactory.createExecutor(path, nodeId);
-    crdtRegistry[projectId] = result.crdt;
+    onCrdtCreated(result.crdt);
     return result.executor;
   });
 }
