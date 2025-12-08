@@ -24,7 +24,7 @@ if ! command -v gh &> /dev/null; then
 fi
 
 if ! gh auth status &> /dev/null; then
-    echo "Error: gh is not authenticated. file run 'gh auth login'."
+    echo "Error: gh is not authenticated. Please run 'gh auth login'."
     exit 1
 fi
 
