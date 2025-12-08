@@ -277,14 +277,15 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
 
             if (otherSessions.isNotEmpty) {
               // Switch to the most recent other session
-              ref.read(currentSessionIdProvider.notifier).state =
-                  otherSessions.first.id;
+              ref
+                  .read(currentSessionIdProvider.notifier)
+                  .select(otherSessions.first.id);
             } else {
               // No other sessions - create a new one
               final newSessionId = await sessionDao.createSessionWithId(
                 projectId: session.projectId,
               );
-              ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+              ref.read(currentSessionIdProvider.notifier).select(newSessionId);
             }
           }
 
@@ -406,8 +407,9 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
                 }
               : () {
                   // Switch to the selected session
-                  ref.read(currentSessionIdProvider.notifier).state =
-                      session.id;
+                  ref
+                      .read(currentSessionIdProvider.notifier)
+                      .select(session.id);
 
                   // Navigate back to chat
                   Navigator.pop(context);
