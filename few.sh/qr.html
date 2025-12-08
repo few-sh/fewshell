@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Fewshell - Configuration Generator</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="style.css" />
+        <!-- QR Code Library -->
+        <script src="qrcodegen-v1.8.0-es6.js"></script>
+    </head>
+
+    <body>
+        <div class="grid-bg"></div>
+        <div class="spotlight"></div>
+
+        <div class="container">
+            <header>
+                <div class="logo">Fewshell</div>
+                <nav>
+                    <a href="index.html">Home</a> &nbsp;/&nbsp;
+                    <a href="mailto:support@few.sh">Contact</a>
+                </nav>
+            </header>
+
+            <main>
+                <section class="hero visible">
+                    <h1>Configuration Generator</h1>
+                    <p class="subtitle">
+                        Generate a QR code to quickly configure your Fewshell
+                        mobile app. All data is processed locally in your
+                        browser and is never sent to any server.
+                    </p>
+
+                    <div class="form-section">
+                        <div class="form-group">
+                            <label class="form-label"
+                                >Project Name (Optional)</label
+                            >
+                            <span class="form-hint"
+                                >A friendly name to identify this environment on
+                                your phone.</span
+                            >
+                            <input
+                                type="text"
+                                id="projectName"
+                                class="form-input"
+                                placeholder="e.g. Production AWS"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label"
+                                >Host Connection (Optional)</label
+                            >
+                            <span class="form-hint"
+                                >Format: user@ip-address or user@hostname</span
+                            >
+                            <input
+                                type="text"
+                                id="hostConnection"
+                                class="form-input"
+                                placeholder="e.g. ubuntu@192.168.1.50"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label"
+                                >LLM Provider (Optional)</label
+                            >
+                            <select id="llmProvider" class="form-select">
+                                <option value="">Select a provider...</option>
+                                <option value="anthropic">
+                                    Anthropic (Claude)
+                                </option>
+                                <option value="openai">OpenAI (GPT)</option>
+                                <option value="google">Google (Gemini)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">API Key (Optional)</label>
+                            <span class="form-hint"
+                                >Your API key for the selected provider. Stored
+                                securely in your phone's keychain.</span
+                            >
+                            <input
+                                type="password"
+                                id="apiKey"
+                                class="form-input"
+                                placeholder="sk-..."
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label"
+                                >SSH Private Key (Optional)</label
+                            >
+                            <span class="form-hint"
+                                >Paste your private key (PEM/OpenSSH format). It
+                                will be compacted for the QR code.</span
+                            >
+                            <textarea
+                                id="sshKey"
+                                class="form-textarea"
+                                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
+                            ></textarea>
+                        </div>
+
+                        <button id="generateBtn" class="btn-generate">
+                            Generate QR Code
+                        </button>
+                    </div>
+
+                    <div id="qr-result">
+                        <h2>Scan with Fewshell</h2>
+                        <div id="qr-canvas-container">
+                            <canvas id="qrCanvas"></canvas>
+                        </div>
+                        <p class="subtitle">
+                            Open the Fewshell app and scan this code to import
+                            settings.
+                        </p>
+                    </div>
+                    <div id="qr-error"></div>
+                </section>
+            </main>
+
+            <footer>
+                <p>&copy; 2025 Fewshot Corp. All rights reserved.</p>
+                <p>
+                    <a href="privacy.html">Privacy Policy</a> |
+                    <a href="terms.html">Terms of Service</a>
+                </p>
+            </footer>
+        </div>
+
+        <script>
+            // Mouse Spotlight Effect (copied from main script logic implied by CSS)
+            document.addEventListener("mousemove", (e) => {
+                const spotlight = document.querySelector(".spotlight");
+                if (spotlight) {
+                    spotlight.style.setProperty("--x", `${e.clientX}px`);
+                    spotlight.style.setProperty("--y", `${e.clientY}px`);
+                }
+            });
+
+            function drawCanvas(
+                qr,
+                scale,
+                border,
+                lightColor,
+                darkColor,
+                canvas,
+            ) {
+                if (scale <= 0 || border < 0)
+                    throw new RangeError("Value out of range");
+                const width = (qr.size + border * 2) * scale;
+                canvas.width = width;
+                canvas.height = width;
+                let ctx = canvas.getContext("2d");
+                for (let y = -border; y < qr.size + border; y++) {
+                    for (let x = -border; x < qr.size + border; x++) {
+                        ctx.fillStyle = qr.getModule(x, y)
+                            ? darkColor
+                            : lightColor;
+                        ctx.fillRect(
+                            (x + border) * scale,
+                            (y + border) * scale,
+                            scale,
+                            scale,
+                        );
+                    }
+                }
+            }
+
+            document
+                .getElementById("generateBtn")
+                .addEventListener("click", function () {
+                    const resultDiv = document.getElementById("qr-result");
+                    const errorDiv = document.getElementById("qr-error");
+                    const canvas = document.getElementById("qrCanvas");
+
+                    // Hide previous results
+                    resultDiv.style.display = "none";
+                    errorDiv.style.display = "none";
+
+                    // Gather data
+                    const projectName = document
+                        .getElementById("projectName")
+                        .value.trim();
+                    const hostConnection = document
+                        .getElementById("hostConnection")
+                        .value.trim();
+                    const llmProvider =
+                        document.getElementById("llmProvider").value;
+                    const apiKey = document
+                        .getElementById("apiKey")
+                        .value.trim();
+                    let sshKey = document.getElementById("sshKey").value.trim();
+
+                    // Process SSH Key: Remove headers/footers and newlines to save space
+                    // Bash logic: grep -v "^-----" | tr -d '\n'
+                    if (sshKey) {
+                        sshKey = sshKey
+                            .split("\n")
+                            .filter((line) => !line.startsWith("-----"))
+                            .map((line) => line.trim())
+                            .join("");
+                    }
+
+                    // Construct JSON object (short keys to minimize QR size)
+                    // n: name, i: ip/host, l: label/provider, k: key, s: ssh
+                    const data = {};
+
+                    if (projectName) data.n = projectName;
+                    if (hostConnection) data.i = hostConnection;
+                    if (llmProvider) data.l = llmProvider;
+                    if (apiKey) data.k = apiKey;
+                    if (sshKey) data.s = sshKey;
+
+                    if (Object.keys(data).length === 0) {
+                        errorDiv.innerText =
+                            "Please fill in at least one field to generate a QR code.";
+                        errorDiv.style.display = "block";
+                        return;
+                    }
+
+                    const jsonString = JSON.stringify(data);
+
+                    // Generate QR Code
+                    try {
+                        const QrCode = qrcodegen.QrCode;
+                        const qr = QrCode.encodeText(
+                            jsonString,
+                            QrCode.Ecc.MEDIUM,
+                        );
+                        drawCanvas(qr, 5, 2, "#ffffff", "#000000", canvas);
+
+                        resultDiv.style.display = "block";
+                        // Scroll to result
+                        resultDiv.scrollIntoView({
+                            behavior: "smooth",
+                        });
+                    } catch (error) {
+                        console.error(error);
+                        errorDiv.innerText =
+                            "Error generating QR code: " + error.message;
+                        errorDiv.style.display = "block";
+                    }
+                });
+        </script>
+    </body>
+</html>
