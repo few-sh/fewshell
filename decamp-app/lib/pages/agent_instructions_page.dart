@@ -666,10 +666,12 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
                       ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   )
-                : GptMarkdown(
-                    _renderJinja
-                        ? (_processedText ?? widget.controller.text)
-                        : widget.controller.text,
+                : SelectionArea(
+                    child: GptMarkdown(
+                      _renderJinja
+                          ? (_processedText ?? widget.controller.text)
+                          : widget.controller.text,
+                    ),
                   ),
           ),
         ] else
@@ -827,10 +829,12 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
                           ).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       )
-                    : GptMarkdown(
-                        _renderJinja
-                            ? (_processedText ?? widget.controller.text)
-                            : widget.controller.text,
+                    : SelectionArea(
+                        child: GptMarkdown(
+                          _renderJinja
+                              ? (_processedText ?? widget.controller.text)
+                              : widget.controller.text,
+                        ),
                       ),
               ),
             ] else
