@@ -4,6 +4,7 @@ import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/settings_provider.dart';
 import '../providers/llm_settings_provider.dart';
+import '../providers/llm_service_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
 
@@ -547,7 +548,7 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
 }
 
 /// Widget for displaying and editing an instruction section
-class _InstructionSection extends StatelessWidget {
+class _InstructionSection extends ConsumerStatefulWidget {
   final String title;
   final String subtitle;
   final TextEditingController controller;
@@ -563,19 +564,54 @@ class _InstructionSection extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_InstructionSection> createState() =>
+      _InstructionSectionState();
+}
+
+class _InstructionSectionState extends ConsumerState<_InstructionSection> {
+  bool _renderJinja = false;
+  String? _processedText;
+  bool _isLoading = false;
+
+  Future<void> _loadContext() async {
+    if (_processedText != null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final llmService = ref.read(llmServiceProvider);
+      final processed = await llmService.processTemplate(
+        widget.controller.text,
+      );
+
+      if (mounted) {
+        setState(() {
+          _processedText = processed;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading preview context: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          title,
+          widget.title,
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 4),
         Text(
-          subtitle,
+          widget.subtitle,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: Theme.of(
               context,
@@ -583,7 +619,35 @@ class _InstructionSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        if (showPreview)
+        if (widget.showPreview) ...[
+          Row(
+            children: [
+              Checkbox(
+                value: _renderJinja,
+                onChanged: (value) {
+                  setState(() {
+                    _renderJinja = value ?? false;
+                    if (!_renderJinja) {
+                      _processedText = null;
+                    }
+                  });
+                  if (_renderJinja) {
+                    _loadContext();
+                  }
+                },
+              ),
+              const Text('Render Jinja in preview'),
+              if (_isLoading) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -592,7 +656,7 @@ class _InstructionSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             constraints: const BoxConstraints(minHeight: 200),
-            child: controller.text.isEmpty
+            child: widget.controller.text.isEmpty
                 ? Text(
                     'No instruction provided',
                     style: TextStyle(
@@ -602,19 +666,31 @@ class _InstructionSection extends StatelessWidget {
                       ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   )
-                : GptMarkdown(controller.text),
-          )
-        else
+                : GptMarkdown(
+                    _renderJinja
+                        ? (_processedText ?? widget.controller.text)
+                        : widget.controller.text,
+                  ),
+          ),
+        ] else
           TextField(
-            controller: controller,
+            controller: widget.controller,
             maxLines: null,
             minLines: 8,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'Enter instruction in markdown format...',
-              border: const OutlineInputBorder(),
+              border: OutlineInputBorder(),
               helperText: 'Supports markdown formatting',
             ),
-            onChanged: (_) => onChanged(),
+            onChanged: (_) {
+              if (_processedText != null) {
+                setState(() => _processedText = null);
+                if (_renderJinja) {
+                  _loadContext();
+                }
+              }
+              widget.onChanged();
+            },
           ),
       ],
     );
@@ -622,7 +698,7 @@ class _InstructionSection extends StatelessWidget {
 }
 
 /// Widget for a model-specific override section
-class _ModelOverrideSection extends StatelessWidget {
+class _ModelOverrideSection extends ConsumerStatefulWidget {
   final String modelIdentifier;
   final TextEditingController controller;
   final bool showPreview;
@@ -638,6 +714,41 @@ class _ModelOverrideSection extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_ModelOverrideSection> createState() =>
+      _ModelOverrideSectionState();
+}
+
+class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
+  bool _renderJinja = false;
+  String? _processedText;
+  bool _isLoading = false;
+
+  Future<void> _loadContext() async {
+    if (_processedText != null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final llmService = ref.read(llmServiceProvider);
+      final processed = await llmService.processTemplate(
+        widget.controller.text,
+      );
+
+      if (mounted) {
+        setState(() {
+          _processedText = processed;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading preview context: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -650,7 +761,7 @@ class _ModelOverrideSection extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    modelIdentifier,
+                    widget.modelIdentifier,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -659,13 +770,43 @@ class _ModelOverrideSection extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.delete_outline),
                   tooltip: 'Remove override',
-                  onPressed: onRemove,
+                  onPressed: widget.onRemove,
                   color: Theme.of(context).colorScheme.error,
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            if (showPreview)
+            if (widget.showPreview) ...[
+              Row(
+                children: [
+                  Checkbox(
+                    value: _renderJinja,
+                    onChanged: (value) {
+                      setState(() {
+                        _renderJinja = value ?? false;
+                        // Reset processed text when toggling off so we re-fetch if toggled on again
+                        // or if text changed (though we don't track text changes here easily without listener)
+                        if (!_renderJinja) {
+                          _processedText = null;
+                        }
+                      });
+                      if (_renderJinja) {
+                        _loadContext();
+                      }
+                    },
+                  ),
+                  const Text('Render Jinja in preview'),
+                  if (_isLoading) ...[
+                    const SizedBox(width: 8),
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 8),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
@@ -676,7 +817,7 @@ class _ModelOverrideSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 constraints: const BoxConstraints(minHeight: 150),
-                child: controller.text.isEmpty
+                child: widget.controller.text.isEmpty
                     ? Text(
                         'No override instruction provided',
                         style: TextStyle(
@@ -686,11 +827,15 @@ class _ModelOverrideSection extends StatelessWidget {
                           ).colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       )
-                    : GptMarkdown(controller.text),
-              )
-            else
+                    : GptMarkdown(
+                        _renderJinja
+                            ? (_processedText ?? widget.controller.text)
+                            : widget.controller.text,
+                      ),
+              ),
+            ] else
               TextField(
-                controller: controller,
+                controller: widget.controller,
                 maxLines: null,
                 minLines: 6,
                 decoration: const InputDecoration(
@@ -698,7 +843,16 @@ class _ModelOverrideSection extends StatelessWidget {
                   border: OutlineInputBorder(),
                   helperText: 'Supports markdown formatting',
                 ),
-                onChanged: (_) => onChanged(),
+                onChanged: (_) {
+                  // Invalidate processed text when content changes
+                  if (_processedText != null) {
+                    setState(() => _processedText = null);
+                    if (_renderJinja) {
+                      _loadContext();
+                    }
+                  }
+                  widget.onChanged();
+                },
               ),
           ],
         ),

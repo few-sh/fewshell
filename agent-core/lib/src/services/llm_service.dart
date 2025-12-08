@@ -144,7 +144,7 @@ class LlmService {
   }
 
   /// Process template variables in the instruction text
-  Future<String> _processTemplateVariables(String instruction) async {
+  Future<String> processTemplate(String instruction) async {
     // Quick check if there are any template variables
     if (!TemplateProcessor.hasTemplateVariables(instruction)) {
       return instruction;
@@ -184,6 +184,10 @@ class LlmService {
       projectSnippets: projectSnippets,
     );
   }
+
+  /// Internal helper to process template variables
+  Future<String> _processTemplateVariables(String instruction) =>
+      processTemplate(instruction);
 
   /// Create an LLM provider based on the API type
   Future<ChatCapability> _createProvider(
