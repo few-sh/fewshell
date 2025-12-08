@@ -95,6 +95,29 @@ fi
 echo "✅ Done! Release v$VERSION is live."
 
 # -----------------------------------------------------------------------------
+# Upload to Cloudflare R2
+# -----------------------------------------------------------------------------
+echo "☁️  Uploading to Cloudflare R2 (Bucket: fewshell-releases)..."
+
+if ! command -v npx &> /dev/null; then
+    echo "⚠️  npx not found. Skipping R2 upload."
+else
+    # Upload binary files
+    for FILE in "$BUILD_DIR"/decamp-agent-linux-*; do
+        if [ -f "$FILE" ]; then
+            FILENAME=$(basename "$FILE")
+            OBJECT_KEY="releases/$VERSION/$FILENAME"
+            
+            echo "    ⬆️  Uploading $FILENAME to $OBJECT_KEY..."
+            
+            # Use npx wrangler for upload
+            npx wrangler r2 object put "fewshell-releases/$OBJECT_KEY" --file "$FILE"
+        fi
+    done
+    echo "✅ Uploaded to R2."
+fi
+
+# -----------------------------------------------------------------------------
 # Cleanup
 # -----------------------------------------------------------------------------
 echo "🧹 Restoring local environment..."
