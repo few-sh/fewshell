@@ -31,7 +31,7 @@ fi
 # -----------------------------------------------------------------------------
 # Get Version
 # -----------------------------------------------------------------------------
-VERSION=$(grep 'version:' "$PROJECT_ROOT/pubspec.yaml" | awk '{print $2}')
+VERSION=$(grep '^version:' "$PROJECT_ROOT/pubspec.yaml" | awk '{print $2}')
 if [ -z "$VERSION" ]; then
     echo "Error: Could not extract version from pubspec.yaml"
     exit 1
