@@ -82,7 +82,7 @@ echo "📤 Pushing release v$VERSION to GitHub..."
 # Check if release exists
 if gh release view "v$VERSION" &> /dev/null; then
     echo "⚠️ Release v$VERSION already exists. Uploading assets to existing release..."
-    gh release upload "v$VERSION" "$BUILD_DIR/"* --clobber
+    gh release upload "v$VERSION" "$BUILD_DIR/decamp-agent-linux-"* --clobber
 else
     echo "✨ Creating new release v$VERSION..."
     gh release create "v$VERSION" \
