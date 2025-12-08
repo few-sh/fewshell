@@ -27,6 +27,7 @@ dependencies:
   stream_channel: ^2.1.4
   web_socket_channel: ^3.0.3
   async: ^2.13.0
+  jinja: ^0.6.5
 
 dev_dependencies:
   lints: ^5.0.0
