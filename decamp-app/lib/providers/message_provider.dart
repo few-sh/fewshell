@@ -12,5 +12,5 @@ final currentSessionMessagesProvider = StreamProvider<List<MessageEntity>>((
     return Stream.value([]);
   }
   final messageDao = ref.watch(databaseProvider).messageDao;
-  return messageDao.watchMessagesBySession(sessionId);
+  return messageDao.watchCompletedMessagesBySession(sessionId);
 });

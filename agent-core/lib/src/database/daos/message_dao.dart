@@ -25,6 +25,39 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
         .watch();
   }
 
+  /// Watch completed messages (not streaming) for a specific session
+  Stream<List<MessageEntity>> watchCompletedMessagesBySession(
+    String sessionId,
+  ) {
+    return _watchMessagesBySession(sessionId, isStreaming: false);
+  }
+
+  /// Watch streaming messages for a specific session
+  Stream<List<MessageEntity>> watchStreamingMessagesBySession(
+    String sessionId,
+  ) {
+    return _watchMessagesBySession(sessionId, isStreaming: true);
+  }
+
+  /// Helper to watch messages with a filter on streaming status
+  Stream<List<MessageEntity>> _watchMessagesBySession(
+    String sessionId, {
+    required bool isStreaming,
+  }) {
+    return (select(messages)
+          ..where(
+            (m) =>
+                m.sessionId.equals(sessionId) &
+                m.isStreaming.equals(isStreaming) &
+                const CustomExpression<bool>('is_deleted').equals(false),
+          )
+          ..orderBy([
+            (m) =>
+                OrderingTerm(expression: m.createdAt, mode: OrderingMode.asc),
+          ]))
+        .watch();
+  }
+
   /// Get a single message by ID
   Future<MessageEntity?> getMessage(String id) {
     return (select(messages)

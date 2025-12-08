@@ -136,7 +136,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     await projectDao.updateLastSessionDate(currentProject.id, DateTime.now());
 
     // Switch to the new session
-    ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+    ref.read(currentSessionIdProvider.notifier).select(newSessionId);
   }
 
   /// Show session history page
@@ -269,7 +269,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
 
     // Switch to the new session
-    ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+    ref.read(currentSessionIdProvider.notifier).select(newSessionId);
 
     developer.log(
       '✅ Switched to new session: $newSessionId',
@@ -401,10 +401,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                           data: (messages) => ChatList(
                             messages: messages,
                             isLoading: chatState.isLoading,
-                            streamingMessageId: chatState.streamingMessageId,
-                            streamingText: chatState.streamingText,
-                            activeMessageStream:
-                                chatController.activeMessageStream,
+                            streamingMessageStream:
+                                chatController.streamingMessageStream,
                             onEditMessage: _handleEditMessage,
                             onResendMessage: _handleResendMessage,
                             onBranchSession: _handleBranchSession,

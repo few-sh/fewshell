@@ -20,7 +20,14 @@ class SelectedProjectNotifier extends StateNotifier<String?> {
   static const _key = 'current_project_id';
 
   SelectedProjectNotifier(this._prefs, this._ref)
-    : super(_prefs.getString(_key));
+    : super(_prefs.getString(_key)) {
+    final initialId = state;
+    if (initialId != null) {
+      Future.microtask(() {
+        _ref.read(sessionControllerProvider).ensureSessionSelected(initialId);
+      });
+    }
+  }
 
   Future<void> select(String? id) async {
     state = id;
@@ -30,7 +37,7 @@ class SelectedProjectNotifier extends StateNotifier<String?> {
       await _ref.read(sessionControllerProvider).ensureSessionSelected(id);
     } else {
       await _prefs.remove(_key);
-      _ref.read(currentSessionIdProvider.notifier).state = null;
+      await _ref.read(currentSessionIdProvider.notifier).select(null);
     }
   }
 }

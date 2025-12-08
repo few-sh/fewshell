@@ -9,9 +9,7 @@ import 'package:decamp/utils/search_utils.dart';
 class ChatList extends StatefulWidget {
   final List<MessageEntity> messages;
   final bool isLoading;
-  final String? streamingMessageId;
-  final String streamingText;
-  final Stream<MessageEntity>? activeMessageStream;
+  final Stream<MessageEntity?>? streamingMessageStream;
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
   final Function(String messageId)? onBranchSession;
@@ -24,9 +22,7 @@ class ChatList extends StatefulWidget {
     super.key,
     required this.messages,
     this.isLoading = false,
-    this.streamingMessageId,
-    this.streamingText = '',
-    this.activeMessageStream,
+    this.streamingMessageStream,
     this.onEditMessage,
     this.onResendMessage,
     this.onBranchSession,
@@ -58,21 +54,20 @@ class _ChatListState extends State<ChatList> {
   void didUpdateWidget(ChatList oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Update message keys when message list changes
-    if (widget.messages != oldWidget.messages) {
-      _updateMessageKeys();
-    }
-
     // Update highlights cache when search matches or current index changes
     if (widget.searchMatches != oldWidget.searchMatches ||
         widget.currentMatchIndex != oldWidget.currentMatchIndex) {
       _updateHighlightsCache();
+      // Also update keys since they depend on search matches now
+      _updateMessageKeys();
+    } else if (widget.messages != oldWidget.messages) {
+      // Update message keys when message list changes (to clean up old keys)
+      _updateMessageKeys();
     }
 
     // Scroll when messages change or streaming updates (but not during match navigation)
     if (!_isScrollingToMatch &&
-        (widget.messages.length != oldWidget.messages.length ||
-            widget.streamingText != oldWidget.streamingText)) {
+        (widget.messages.length != oldWidget.messages.length)) {
       WidgetsBinding.instance.endOfFrame.then((_) {
         if (mounted && !_isScrollingToMatch) _scrollToBottom();
       });
@@ -116,19 +111,29 @@ class _ChatListState extends State<ChatList> {
   }
 
   /// Update message keys to stay in sync with current messages
+  /// Optimization: Only maintain GlobalKeys for messages that are search matches
   void _updateMessageKeys() {
-    final currentMessageIds = widget.messages.map((m) => m.id).toSet();
+    // If no search matches, clear all keys to free memory
+    if (widget.searchMatches == null || widget.searchMatches!.isEmpty) {
+      _messageKeys.clear();
+      return;
+    }
 
-    // Remove keys for messages that no longer exist
+    // Identify which messages need GlobalKeys (only those with search matches)
+    final messagesWithMatches = widget.searchMatches!
+        .map((m) => m.messageId)
+        .toSet();
+
+    // Remove keys for messages that no longer need them
     _messageKeys.removeWhere(
-      (messageId, _) => !currentMessageIds.contains(messageId),
+      (messageId, _) => !messagesWithMatches.contains(messageId),
     );
 
-    // Add keys for new messages
-    for (final message in widget.messages) {
+    // Add keys for new matches
+    for (final messageId in messagesWithMatches) {
       _messageKeys.putIfAbsent(
-        message.id,
-        () => GlobalKey(debugLabel: 'message_${message.id}'),
+        messageId,
+        () => GlobalKey(debugLabel: 'message_$messageId'),
       );
     }
   }
@@ -293,72 +298,147 @@ class _ChatListState extends State<ChatList> {
 
   @override
   Widget build(BuildContext context) {
-    // Reverse the list so newest messages are at index 0
-    final reversedMessages = widget.messages.reversed.toList();
-
-    return ListView.builder(
+    return CustomScrollView(
       controller: _scrollController,
-      // Reverse the ListView so it naturally starts at the bottom
       reverse: true,
-      padding: widget.searchNavigatorHeight > 0
-          ? EdgeInsets.only(bottom: widget.searchNavigatorHeight)
-          : EdgeInsets.zero,
-      itemCount: reversedMessages.length + (widget.isLoading ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (widget.isLoading && index == 0) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
+      cacheExtent: 1000, // Pre-render area to smooth out scrolling
+      slivers: [
+        // Padding for search navigator
+        if (widget.searchNavigatorHeight > 0)
+          SliverPadding(
+            padding: EdgeInsets.only(bottom: widget.searchNavigatorHeight),
+          ),
 
-        // Get message (adjust index if loading indicator is shown)
-        final messageIndex = widget.isLoading ? index - 1 : index;
-        final message = reversedMessages[messageIndex];
-
-        // Check if this message is currently streaming
-        final isStreaming = message.id == widget.streamingMessageId;
-        // Only provide displayText when actually streaming
-        final displayText = isStreaming ? widget.streamingText : null;
-        final messageStream = isStreaming ? widget.activeMessageStream : null;
-        final isUser = message.userId == 'user';
-
-        return Column(
-          key: _messageKeys[message.id],
-          children: [
-            if (messageIndex > 0)
-              Divider(
-                height: 8,
-                thickness: 0.5,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
-              ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.0),
-              child: Align(
-                alignment: isUser
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: RichMessageContent(
+        // Streaming Message (if any)
+        if (widget.streamingMessageStream != null)
+          SliverToBoxAdapter(
+            child: StreamBuilder<MessageEntity?>(
+              stream: widget.streamingMessageStream,
+              builder: (context, snapshot) {
+                final message = snapshot.data;
+                if (message != null) {
+                  return _MessageItem(
+                    key: _messageKeys[message.id],
                     message: message,
-                    displayText: displayText,
-                    messageStream: messageStream,
-                    isUser: isUser,
-                    onEdit: widget.onEditMessage,
-                    onResend: widget.onResendMessage,
-                    onBranch: widget.onBranchSession,
+                    isStreaming: true,
+                    showDivider: false,
+                    onEditMessage: widget.onEditMessage,
+                    onResendMessage: widget.onResendMessage,
+                    onBranchSession: widget.onBranchSession,
                     highlights: _highlightsByMessage[message.id],
                     currentMatchIndex: widget.currentMatchIndex,
-                  ),
-                ),
+                  );
+                } else if (widget.isLoading) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+
+        // Loading Indicator (if loading and no stream provided)
+        if (widget.isLoading && widget.streamingMessageStream == null)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ),
+
+        // Completed Messages
+        SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            // Calculate index for reversed list without creating a new list
+            // widget.messages is [oldest, ..., newest]
+            // We want index 0 to be newest (last element)
+            final messageIndex = widget.messages.length - 1 - index;
+            final message = widget.messages[messageIndex];
+
+            // Show divider if this is not the first item in the list (index 0)
+            return _MessageItem(
+              // Use GlobalKey if available (for search scrolling), otherwise ValueKey (for diffing)
+              key: _messageKeys[message.id] ?? ValueKey(message.id),
+              message: message,
+              isStreaming: false,
+              showDivider: index > 0,
+              onEditMessage: widget.onEditMessage,
+              onResendMessage: widget.onResendMessage,
+              onBranchSession: widget.onBranchSession,
+              highlights: _highlightsByMessage[message.id],
+              currentMatchIndex: widget.currentMatchIndex,
+            );
+          }, childCount: widget.messages.length),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageItem extends StatelessWidget {
+  final MessageEntity message;
+  final bool isStreaming;
+  final bool showDivider;
+  final Function(String, String)? onEditMessage;
+  final Function(String)? onResendMessage;
+  final Function(String)? onBranchSession;
+  final List<HighlightRange>? highlights;
+  final int? currentMatchIndex;
+
+  const _MessageItem({
+    super.key,
+    required this.message,
+    required this.isStreaming,
+    required this.showDivider,
+    this.onEditMessage,
+    this.onResendMessage,
+    this.onBranchSession,
+    this.highlights,
+    this.currentMatchIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isUser = message.userId == 'user';
+
+    return Column(
+      children: [
+        if (showDivider)
+          Divider(
+            height: 8,
+            thickness: 0.5,
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.0),
+          child: Align(
+            alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: RichMessageContent(
+                // Force rebuild for streaming messages to ensure updates are shown
+                // This handles cases where the message object instance might be reused
+                // or when deep updates aren't detected automatically
+                key: isStreaming
+                    ? ValueKey('streaming_${message.content.length}')
+                    : null,
+                message: message,
+                messageStream: null, // Handled by StreamBuilder
+                isUser: isUser,
+                onEdit: onEditMessage,
+                onResend: onResendMessage,
+                onBranch: onBranchSession,
+                highlights: highlights,
+                currentMatchIndex: currentMatchIndex,
               ),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
 }

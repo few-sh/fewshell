@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'database_provider.dart';
 import 'project_provider.dart';
+import 'theme_provider.dart';
 
 /// Provider for sessions of the currently selected project
 final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>(((
@@ -25,8 +27,28 @@ final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
   return sessionDao.watchArchivedSessionsByProject(projectId);
 });
 
-/// StateProvider for the currently selected session ID
-final currentSessionIdProvider = StateProvider<String?>((ref) => null);
+/// StateNotifier for the currently selected session ID
+class SelectedSessionNotifier extends StateNotifier<String?> {
+  final SharedPreferences _prefs;
+  final Ref _ref;
+
+  SelectedSessionNotifier(this._prefs, this._ref) : super(null);
+
+  Future<void> select(String? sessionId) async {
+    state = sessionId;
+    final projectId = _ref.read(currentProjectIdProvider);
+    if (projectId != null && sessionId != null) {
+      await _prefs.setString('last_session_\$projectId', sessionId);
+    }
+  }
+}
+
+/// Provider for the currently selected session ID
+final currentSessionIdProvider =
+    StateNotifierProvider<SelectedSessionNotifier, String?>((ref) {
+      final prefs = ref.watch(sharedPreferencesProvider);
+      return SelectedSessionNotifier(prefs, ref);
+    });
 
 /// Controller for session logic
 class SessionController {
@@ -37,24 +59,38 @@ class SessionController {
   /// Ensures a valid session is selected for the given project
   Future<void> ensureSessionSelected(String projectId) async {
     final sessionDao = _ref.read(databaseProvider).sessionDao;
-    final sessions = await sessionDao.getNonArchivedSessionsByProject(projectId);
+    final sessions = await sessionDao.getNonArchivedSessionsByProject(
+      projectId,
+    );
 
     if (sessions.isEmpty) {
       // Create new session if none exist
       final projectDao = _ref.read(databaseProvider).projectDao;
-      final newSessionId = await sessionDao.createSessionWithId(projectId: projectId);
-      
-      _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+      final newSessionId = await sessionDao.createSessionWithId(
+        projectId: projectId,
+      );
+
+      await _ref.read(currentSessionIdProvider.notifier).select(newSessionId);
       await projectDao.updateLastSessionDate(projectId, DateTime.now());
     } else {
-      // Select the most recent session
-      // Note: Assuming getNonArchivedSessionsByProject returns sorted by date desc
-      // If not, we might need to sort here or ensure DAO does it.
-      // Based on typical chat app behavior, most recent is usually first.
-      _ref.read(currentSessionIdProvider.notifier).state = sessions.first.id;
+      // Try to restore last selected session
+      final prefs = _ref.read(sharedPreferencesProvider);
+      final lastSessionId = prefs.getString('last_session_\$projectId');
+
+      if (lastSessionId != null && sessions.any((s) => s.id == lastSessionId)) {
+        await _ref
+            .read(currentSessionIdProvider.notifier)
+            .select(lastSessionId);
+      } else {
+        // Select the most recent session
+        // Note: Assuming getNonArchivedSessionsByProject returns sorted by date desc
+        await _ref
+            .read(currentSessionIdProvider.notifier)
+            .select(sessions.first.id);
+      }
     }
   }
-  
+
   Future<void> createNewSession() async {
     final projectId = _ref.read(currentProjectIdProvider);
     if (projectId == null) return;
@@ -62,8 +98,10 @@ class SessionController {
     final sessionDao = _ref.read(databaseProvider).sessionDao;
     final projectDao = _ref.read(databaseProvider).projectDao;
 
-    final newSessionId = await sessionDao.createSessionWithId(projectId: projectId);
-    _ref.read(currentSessionIdProvider.notifier).state = newSessionId;
+    final newSessionId = await sessionDao.createSessionWithId(
+      projectId: projectId,
+    );
+    await _ref.read(currentSessionIdProvider.notifier).select(newSessionId);
     await projectDao.updateLastSessionDate(projectId, DateTime.now());
   }
 }

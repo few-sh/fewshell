@@ -16,7 +16,6 @@ import 'package:decamp/utils/highlight_injector.dart';
 /// Supports inline editing with context menu and search highlighting
 class RichMessageContent extends StatefulWidget {
   final MessageEntity message;
-  final String? displayText; // Override for streaming
   final Stream<MessageEntity>? messageStream;
   final bool isUser;
   final Function(String messageId, String newContent)? onEdit;
@@ -30,7 +29,6 @@ class RichMessageContent extends StatefulWidget {
   const RichMessageContent({
     super.key,
     required this.message,
-    this.displayText,
     this.messageStream,
     required this.isUser,
     this.onEdit,
@@ -72,7 +70,7 @@ class _RichMessageContentState extends State<RichMessageContent> {
 
   void _setupStreams() {
     if (widget.messageStream != null) {
-      _streamedContent = widget.displayText ?? '';
+      _streamedContent = '';
       _messageSub = widget.messageStream!.listen((message) {
         if (mounted && message.id == widget.message.id) {
           setState(() {
@@ -132,8 +130,7 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Use streamed content if available, otherwise format message content
     var text = widget.messageStream != null
         ? _streamedContent
-        : (widget.displayText ??
-              MessageFormatter.formatMessageContent(widget.message));
+        : MessageFormatter.formatMessageContent(widget.message);
 
     // Build markdown content
     final content = _buildMarkdownContent(

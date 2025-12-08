@@ -191,9 +191,7 @@ mixin _$ChatState {
   bool get isLoading =>
       throw _privateConstructorUsedError; // Execution progress tracking
   ExecutionProgress? get executionProgress =>
-      throw _privateConstructorUsedError; // Streaming state
-  String? get streamingMessageId => throw _privateConstructorUsedError;
-  String get streamingText => throw _privateConstructorUsedError; // Error state
+      throw _privateConstructorUsedError; // Error state
   String? get error => throw _privateConstructorUsedError;
 
   /// Create a copy of ChatState
@@ -209,11 +207,7 @@ abstract class $ChatStateCopyWith<$Res> {
       _$ChatStateCopyWithImpl<$Res, ChatState>;
   @useResult
   $Res call(
-      {bool isLoading,
-      ExecutionProgress? executionProgress,
-      String? streamingMessageId,
-      String streamingText,
-      String? error});
+      {bool isLoading, ExecutionProgress? executionProgress, String? error});
 
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
 }
@@ -235,8 +229,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   $Res call({
     Object? isLoading = null,
     Object? executionProgress = freezed,
-    Object? streamingMessageId = freezed,
-    Object? streamingText = null,
     Object? error = freezed,
   }) {
     return _then(_value.copyWith(
@@ -248,14 +240,6 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
           ? _value.executionProgress
           : executionProgress // ignore: cast_nullable_to_non_nullable
               as ExecutionProgress?,
-      streamingMessageId: freezed == streamingMessageId
-          ? _value.streamingMessageId
-          : streamingMessageId // ignore: cast_nullable_to_non_nullable
-              as String?,
-      streamingText: null == streamingText
-          ? _value.streamingText
-          : streamingText // ignore: cast_nullable_to_non_nullable
-              as String,
       error: freezed == error
           ? _value.error
           : error // ignore: cast_nullable_to_non_nullable
@@ -287,11 +271,7 @@ abstract class _$$ChatStateImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {bool isLoading,
-      ExecutionProgress? executionProgress,
-      String? streamingMessageId,
-      String streamingText,
-      String? error});
+      {bool isLoading, ExecutionProgress? executionProgress, String? error});
 
   @override
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
@@ -312,8 +292,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   $Res call({
     Object? isLoading = null,
     Object? executionProgress = freezed,
-    Object? streamingMessageId = freezed,
-    Object? streamingText = null,
     Object? error = freezed,
   }) {
     return _then(_$ChatStateImpl(
@@ -325,14 +303,6 @@ class __$$ChatStateImplCopyWithImpl<$Res>
           ? _value.executionProgress
           : executionProgress // ignore: cast_nullable_to_non_nullable
               as ExecutionProgress?,
-      streamingMessageId: freezed == streamingMessageId
-          ? _value.streamingMessageId
-          : streamingMessageId // ignore: cast_nullable_to_non_nullable
-              as String?,
-      streamingText: null == streamingText
-          ? _value.streamingText
-          : streamingText // ignore: cast_nullable_to_non_nullable
-              as String,
       error: freezed == error
           ? _value.error
           : error // ignore: cast_nullable_to_non_nullable
@@ -345,11 +315,7 @@ class __$$ChatStateImplCopyWithImpl<$Res>
 
 class _$ChatStateImpl extends _ChatState {
   const _$ChatStateImpl(
-      {this.isLoading = false,
-      this.executionProgress,
-      this.streamingMessageId,
-      this.streamingText = '',
-      this.error})
+      {this.isLoading = false, this.executionProgress, this.error})
       : super._();
 
 // Loading state
@@ -359,19 +325,13 @@ class _$ChatStateImpl extends _ChatState {
 // Execution progress tracking
   @override
   final ExecutionProgress? executionProgress;
-// Streaming state
-  @override
-  final String? streamingMessageId;
-  @override
-  @JsonKey()
-  final String streamingText;
 // Error state
   @override
   final String? error;
 
   @override
   String toString() {
-    return 'ChatState(isLoading: $isLoading, executionProgress: $executionProgress, streamingMessageId: $streamingMessageId, streamingText: $streamingText, error: $error)';
+    return 'ChatState(isLoading: $isLoading, executionProgress: $executionProgress, error: $error)';
   }
 
   @override
@@ -383,16 +343,12 @@ class _$ChatStateImpl extends _ChatState {
                 other.isLoading == isLoading) &&
             (identical(other.executionProgress, executionProgress) ||
                 other.executionProgress == executionProgress) &&
-            (identical(other.streamingMessageId, streamingMessageId) ||
-                other.streamingMessageId == streamingMessageId) &&
-            (identical(other.streamingText, streamingText) ||
-                other.streamingText == streamingText) &&
             (identical(other.error, error) || other.error == error));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, isLoading, executionProgress,
-      streamingMessageId, streamingText, error);
+  int get hashCode =>
+      Object.hash(runtimeType, isLoading, executionProgress, error);
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -407,8 +363,6 @@ abstract class _ChatState extends ChatState {
   const factory _ChatState(
       {final bool isLoading,
       final ExecutionProgress? executionProgress,
-      final String? streamingMessageId,
-      final String streamingText,
       final String? error}) = _$ChatStateImpl;
   const _ChatState._() : super._();
 
@@ -416,11 +370,7 @@ abstract class _ChatState extends ChatState {
   @override
   bool get isLoading; // Execution progress tracking
   @override
-  ExecutionProgress? get executionProgress; // Streaming state
-  @override
-  String? get streamingMessageId;
-  @override
-  String get streamingText; // Error state
+  ExecutionProgress? get executionProgress; // Error state
   @override
   String? get error;
 

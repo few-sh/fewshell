@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:state_notifier/state_notifier.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
+import 'package:async/async.dart';
 
 import '../../agent_core.dart';
 
@@ -30,6 +31,18 @@ class ChatController extends StateNotifier<ChatState> {
 
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
+
+  /// Stream of the currently streaming message (if any)
+  /// Merges local updates (activeMessageStream) and remote updates (from DB)
+  Stream<MessageEntity?> get streamingMessageStream {
+    if (sessionId == null) return const Stream.empty();
+
+    final dbStream = _messageDao
+        .watchStreamingMessagesBySession(sessionId!)
+        .map((list) => list.firstOrNull);
+
+    return StreamGroup.merge([activeMessageStream, dbStream]);
+  }
 
   ChatController({
     required MessageDao messageDao,
@@ -164,7 +177,6 @@ class ChatController extends StateNotifier<ChatState> {
   ///
   /// Streaming is managed internally through ChatState:
   /// - startStreaming: Sets streamingMessageId in state
-  /// - updateStreamingText: Updates streamingText in state
   /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
     String? content,
@@ -233,7 +245,6 @@ class ChatController extends StateNotifier<ChatState> {
       void handleTextDelta(String delta) {
         streamingBuffer.write(delta);
         if (!hasStartedStreaming) {
-          startStreaming(aiMessageId);
           hasStartedStreaming = true;
         }
         if (currentEntity != null) {
@@ -249,7 +260,6 @@ class ChatController extends StateNotifier<ChatState> {
       Future<void> handleAssistantMessage(ChatMessage message,
           {String? messageId}) async {
         if (hasStartedStreaming) {
-          stopStreaming();
           hasStartedStreaming = false;
           streamingBuffer.clear();
         }
@@ -344,7 +354,6 @@ class ChatController extends StateNotifier<ChatState> {
           requestApproval: handleRequestApproval,
           executeToolCall: (toolCall) async {
             if (currentToolMessageId != null) {
-              startStreaming(currentToolMessageId!);
               // Refresh current entity just in case
               currentEntity =
                   await _messageDao.getMessage(currentToolMessageId!);
@@ -365,7 +374,6 @@ class ChatController extends StateNotifier<ChatState> {
 
             // Execute and return result as JSON string
             final result = await _executeToolCall(toolCall, onOutput: onOutput);
-            stopStreaming();
             return jsonEncode(result);
           },
           onTextDelta: handleTextDelta,
@@ -645,25 +653,6 @@ class ChatController extends StateNotifier<ChatState> {
     );
 
     return newSessionId;
-  }
-
-  /// Start streaming for a message
-  void startStreaming(String messageId) {
-    if (mounted) {
-      state = state.copyWith(streamingMessageId: messageId, streamingText: '');
-    }
-  }
-
-  /// Update streaming text for a message
-  void updateStreamingText(String text) {
-    if (mounted) state = state.copyWith(streamingText: text);
-  }
-
-  /// Stop streaming
-  void stopStreaming() {
-    if (mounted) {
-      state = state.copyWith(streamingMessageId: null, streamingText: '');
-    }
   }
 
   /// Clear error state
