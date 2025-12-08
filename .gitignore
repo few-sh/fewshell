@@ -1,2 +1,4 @@
 .DS_Store
 .flutter-plugins-dependencies
+node_modules
+.wrangler
