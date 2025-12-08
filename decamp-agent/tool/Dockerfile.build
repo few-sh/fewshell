@@ -1,0 +1,32 @@
+FROM ubuntu:22.04
+
+# Install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    unzip \
+    xz-utils \
+    zip \
+    libglu1-mesa \
+    build-essential \
+    cmake \
+    ninja-build \
+    pkg-config \
+    clang \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up Flutter/Dart
+ENV FLUTTER_ROOT=/sdk/flutter
+ENV PATH="${FLUTTER_ROOT}/bin:${PATH}"
+
+# Download and install Flutter
+RUN git clone https://github.com/flutter/flutter.git -b stable $FLUTTER_ROOT
+
+# Configure git to be safe for the /app mount (fixes potential ownership issues in dev)
+RUN git config --global --add safe.directory '*'
+
+# Pre-download Dart SDK and artifacts
+RUN flutter precache
+
+# Set working directory to where we expect the project to be mounted
+WORKDIR /app/decamp-agent
