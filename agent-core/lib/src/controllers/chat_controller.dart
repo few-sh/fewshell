@@ -245,7 +245,6 @@ class ChatController extends StateNotifier<ChatState> {
       void handleTextDelta(String delta) {
         streamingBuffer.write(delta);
         if (!hasStartedStreaming) {
-          startStreaming(aiMessageId);
           hasStartedStreaming = true;
         }
         if (currentEntity != null) {
@@ -261,7 +260,6 @@ class ChatController extends StateNotifier<ChatState> {
       Future<void> handleAssistantMessage(ChatMessage message,
           {String? messageId}) async {
         if (hasStartedStreaming) {
-          stopStreaming();
           hasStartedStreaming = false;
           streamingBuffer.clear();
         }
@@ -356,7 +354,6 @@ class ChatController extends StateNotifier<ChatState> {
           requestApproval: handleRequestApproval,
           executeToolCall: (toolCall) async {
             if (currentToolMessageId != null) {
-              startStreaming(currentToolMessageId!);
               // Refresh current entity just in case
               currentEntity =
                   await _messageDao.getMessage(currentToolMessageId!);
@@ -377,7 +374,6 @@ class ChatController extends StateNotifier<ChatState> {
 
             // Execute and return result as JSON string
             final result = await _executeToolCall(toolCall, onOutput: onOutput);
-            stopStreaming();
             return jsonEncode(result);
           },
           onTextDelta: handleTextDelta,
@@ -658,12 +654,6 @@ class ChatController extends StateNotifier<ChatState> {
 
     return newSessionId;
   }
-
-  /// Start streaming for a message
-  void startStreaming(String messageId) {}
-
-  /// Stop streaming
-  void stopStreaming() {}
 
   /// Clear error state
   void clearError() {
