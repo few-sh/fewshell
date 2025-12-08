@@ -4,11 +4,13 @@ import 'llm_settings_provider.dart';
 import 'project_provider.dart';
 import 'settings_provider.dart';
 import 'secret_provider.dart';
+import 'database_provider.dart';
 
 /// Provider for the LLM service
 final llmServiceProvider = Provider<LlmService>((ref) {
   final keychainService = ref.watch(keychainServiceProvider);
   final currentProject = ref.watch(currentProjectProvider);
+  final database = ref.watch(databaseProvider);
 
   // Watch global settings
   final globalLlmSettings = ref.watch(globalLlmSettingsProvider);
@@ -27,6 +29,7 @@ final llmServiceProvider = Provider<LlmService>((ref) {
 
   return LlmService(
     keychainService: keychainService,
+    snippetDao: database.snippetDao,
     currentProjectId: currentProject?.id,
     projectLlmSettings: projectLlmSettings,
     projectSettings: projectSettings,

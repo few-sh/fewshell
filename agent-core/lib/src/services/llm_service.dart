@@ -1,5 +1,6 @@
 import 'package:llm_dart/llm_dart.dart';
 import 'package:agent_core/agent_core.dart';
+import '../database/database_facade.dart';
 
 /// Service for interacting with LLM APIs using llm_dart
 ///
@@ -8,6 +9,7 @@ import 'package:agent_core/agent_core.dart';
 /// Conversation state management is handled by the ChatController.
 class LlmService {
   final KeychainService keychainService;
+  final SnippetDaoFacade? snippetDao;
   final String? currentProjectId;
 
   final List<LlmApiSettings> projectLlmSettings;
@@ -17,6 +19,7 @@ class LlmService {
 
   LlmService({
     required this.keychainService,
+    this.snippetDao,
     this.currentProjectId,
     required this.projectLlmSettings,
     required this.projectSettings,
@@ -160,8 +163,26 @@ class LlmService {
 
     final secretNames = secretsMap.keys.toList()..sort();
 
+    // Fetch snippets
+    List<SnippetEntity> userSnippets = [];
+    List<SnippetEntity> projectSnippets = [];
+
+    if (snippetDao != null) {
+      userSnippets = await snippetDao!.getGlobalSnippets();
+      if (currentProjectId != null) {
+        projectSnippets = await snippetDao!.getProjectSnippets(
+          currentProjectId!,
+        );
+      }
+    }
+
     // Process the template
-    return TemplateProcessor.process(instruction, secretNames: secretNames);
+    return TemplateProcessor.process(
+      instruction,
+      secretNames: secretNames,
+      userSnippets: userSnippets,
+      projectSnippets: projectSnippets,
+    );
   }
 
   /// Create an LLM provider based on the API type
