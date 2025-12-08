@@ -54,15 +54,15 @@ class _ChatListState extends State<ChatList> {
   void didUpdateWidget(ChatList oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // Update message keys when message list changes
-    if (widget.messages != oldWidget.messages) {
-      _updateMessageKeys();
-    }
-
     // Update highlights cache when search matches or current index changes
     if (widget.searchMatches != oldWidget.searchMatches ||
         widget.currentMatchIndex != oldWidget.currentMatchIndex) {
       _updateHighlightsCache();
+      // Also update keys since they depend on search matches now
+      _updateMessageKeys();
+    } else if (widget.messages != oldWidget.messages) {
+      // Update message keys when message list changes (to clean up old keys)
+      _updateMessageKeys();
     }
 
     // Scroll when messages change or streaming updates (but not during match navigation)
@@ -111,19 +111,29 @@ class _ChatListState extends State<ChatList> {
   }
 
   /// Update message keys to stay in sync with current messages
+  /// Optimization: Only maintain GlobalKeys for messages that are search matches
   void _updateMessageKeys() {
-    final currentMessageIds = widget.messages.map((m) => m.id).toSet();
+    // If no search matches, clear all keys to free memory
+    if (widget.searchMatches == null || widget.searchMatches!.isEmpty) {
+      _messageKeys.clear();
+      return;
+    }
 
-    // Remove keys for messages that no longer exist
+    // Identify which messages need GlobalKeys (only those with search matches)
+    final messagesWithMatches = widget.searchMatches!
+        .map((m) => m.messageId)
+        .toSet();
+
+    // Remove keys for messages that no longer need them
     _messageKeys.removeWhere(
-      (messageId, _) => !currentMessageIds.contains(messageId),
+      (messageId, _) => !messagesWithMatches.contains(messageId),
     );
 
-    // Add keys for new messages
-    for (final message in widget.messages) {
+    // Add keys for new matches
+    for (final messageId in messagesWithMatches) {
       _messageKeys.putIfAbsent(
-        message.id,
-        () => GlobalKey(debugLabel: 'message_${message.id}'),
+        messageId,
+        () => GlobalKey(debugLabel: 'message_$messageId'),
       );
     }
   }
@@ -349,7 +359,8 @@ class _ChatListState extends State<ChatList> {
 
             // Show divider if this is not the first item in the list (index 0)
             return _MessageItem(
-              key: _messageKeys[message.id],
+              // Use GlobalKey if available (for search scrolling), otherwise ValueKey (for diffing)
+              key: _messageKeys[message.id] ?? ValueKey(message.id),
               message: message,
               isStreaming: false,
               showDivider: index > 0,
