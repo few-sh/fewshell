@@ -420,6 +420,12 @@ class _MessageItem extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: RichMessageContent(
+                // Force rebuild for streaming messages to ensure updates are shown
+                // This handles cases where the message object instance might be reused
+                // or when deep updates aren't detected automatically
+                key: isStreaming
+                    ? ValueKey('streaming_${message.content.length}')
+                    : null,
                 message: message,
                 messageStream: null, // Handled by StreamBuilder
                 isUser: isUser,
