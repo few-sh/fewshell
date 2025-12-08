@@ -88,7 +88,7 @@ class LlmService {
 
   /// Get the final agent instruction for a model
   /// Simplified hierarchy: project override > project default > global override > global default
-  /// Processes template variables like {{SECRETS_LIST}}
+  /// Processes template variables like {{ SECRETS }}
   Future<String?> getAgentInstruction(String modelIdentifier) async {
     String? instruction;
 

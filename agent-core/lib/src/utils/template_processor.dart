@@ -6,17 +6,17 @@ import 'package:jinja/jinja.dart';
 class TemplateProcessor {
   /// Available template variables that can be used in agent instructions
   static const Map<String, String> availableVariables = {
-    'SECRETS_LIST': 'Comma-separated list of all available secret names',
+    'SECRETS': 'List of all available secret names',
   };
 
   /// Process template variables in the given text.
   ///
-  /// Replaces {{SECRETS_LIST}} with the provided list of secret names.
+  /// Supports {{ SECRETS }} as a list variable.
   ///
   /// Example:
   /// ```dart
   /// final result = TemplateProcessor.process(
-  ///   'Available secrets: {{SECRETS_LIST}}',
+  ///   'Available secrets: {{ SECRETS|join(", ") }}',
   ///   secretNames: ['API_KEY', 'DB_PASSWORD'],
   /// );
   /// // Result: 'Available secrets: API_KEY, DB_PASSWORD'
@@ -28,7 +28,7 @@ class TemplateProcessor {
     final template = environment.fromString(text);
 
     return template.render({
-      'SECRETS_LIST': secretNames.join(', '),
+      'SECRETS': secretNames,
     });
   }
 

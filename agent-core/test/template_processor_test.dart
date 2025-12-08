@@ -3,12 +3,20 @@ import 'package:test/test.dart';
 
 void main() {
   group('TemplateProcessor', () {
-    test('processes simple variable substitution', () {
+    test('processes list variable with join filter', () {
       final result = TemplateProcessor.process(
-        'Secrets: {{ SECRETS_LIST }}',
+        "Secrets: {{ SECRETS|join(', ') }}",
         secretNames: ['A', 'B'],
       );
       expect(result, 'Secrets: A, B');
+    });
+
+    test('processes list variable iteration', () {
+      final result = TemplateProcessor.process(
+        "{% for secret in SECRETS %}- {{ secret }}\n{% endfor %}",
+        secretNames: ['A', 'B'],
+      );
+      expect(result, '- A\n- B\n');
     });
 
     test('handles empty text', () {
@@ -29,7 +37,7 @@ void main() {
 
     test('handles empty secret list', () {
       final result = TemplateProcessor.process(
-        'Secrets: {{ SECRETS_LIST }}',
+        "Secrets: {{ SECRETS|join(', ') }}",
         secretNames: [],
       );
       expect(result, 'Secrets: ');

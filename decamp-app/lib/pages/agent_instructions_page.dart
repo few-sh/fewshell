@@ -806,7 +806,7 @@ class _TemplateVariablesInfo extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Use {{SECRETS_LIST}} to automatically insert a comma-separated list of all secret names.',
+                  'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
                   ),
