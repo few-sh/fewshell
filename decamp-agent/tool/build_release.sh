@@ -111,7 +111,7 @@ else
             echo "    ⬆️  Uploading $FILENAME to $OBJECT_KEY..."
             
             # Use npx wrangler for upload
-            npx wrangler r2 object put "fewshell-releases/$OBJECT_KEY" --file "$FILE"
+            npx wrangler r2 object put "fewshell-releases/$OBJECT_KEY" --file "$FILE" --remote
         fi
     done
     echo "✅ Uploaded to R2."
@@ -121,5 +121,6 @@ fi
 # Cleanup
 # -----------------------------------------------------------------------------
 echo "🧹 Restoring local environment..."
+cd "$PROJECT_ROOT"
 flutter pub get
 
