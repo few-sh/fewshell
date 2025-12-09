@@ -14,7 +14,9 @@ class SnippetDao extends DatabaseAccessor<GlobalDatabase>
   /// Watch all global snippets (projectId is null)
   watchGlobalSnippets() {
     return (select(snippets)
-          ..where((s) => s.projectId.isNull())
+          ..where((s) =>
+              s.projectId.isNull() &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
@@ -24,7 +26,9 @@ class SnippetDao extends DatabaseAccessor<GlobalDatabase>
   /// Watch snippets for a specific project
   watchProjectSnippets(String projectId) {
     return (select(snippets)
-          ..where((s) => s.projectId.equals(projectId))
+          ..where((s) =>
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
@@ -34,7 +38,9 @@ class SnippetDao extends DatabaseAccessor<GlobalDatabase>
   /// Get all global snippets
   getGlobalSnippets() {
     return (select(snippets)
-          ..where((s) => s.projectId.isNull())
+          ..where((s) =>
+              s.projectId.isNull() &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
@@ -44,7 +50,9 @@ class SnippetDao extends DatabaseAccessor<GlobalDatabase>
   /// Get snippets for a specific project
   getProjectSnippets(String projectId) {
     return (select(snippets)
-          ..where((s) => s.projectId.equals(projectId))
+          ..where((s) =>
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
@@ -53,14 +61,20 @@ class SnippetDao extends DatabaseAccessor<GlobalDatabase>
 
   /// Get a single snippet by ID
   getSnippet(String id) {
-    return (select(snippets)..where((s) => s.id.equals(id))).getSingleOrNull();
+    return (select(snippets)
+          ..where((s) =>
+              s.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
+        .getSingleOrNull();
   }
 
   /// Watch a single snippet by ID
   watchSnippet(String id) {
     return (select(
       snippets,
-    )..where((s) => s.id.equals(id)))
+    )..where((s) =>
+            s.id.equals(id) &
+            const CustomExpression<bool>('is_deleted').equals(false)))
         .watchSingleOrNull();
   }
 
@@ -88,7 +102,9 @@ class SnippetDao extends DatabaseAccessor<GlobalDatabase>
     String? projectId,
   }) {
     final searchQuery = select(snippets)
-      ..where((s) => s.name.like('%$query%') | s.content.like('%$query%'));
+      ..where((s) =>
+          (s.name.like('%$query%') | s.content.like('%$query%')) &
+          const CustomExpression<bool>('is_deleted').equals(false));
 
     if (projectId != null) {
       searchQuery.where((s) => s.projectId.equals(projectId));

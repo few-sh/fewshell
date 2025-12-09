@@ -13,7 +13,9 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
   /// Watch sessions for a specific project, ordered by timestamp desc
   Stream<List<SessionEntity>> watchSessionsByProject(String projectId) {
     return (select(sessions)
-          ..where((s) => s.projectId.equals(projectId))
+          ..where((s) =>
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) =>
                 OrderingTerm(expression: s.timestamp, mode: OrderingMode.desc),
@@ -27,7 +29,10 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
   ) {
     return (select(sessions)
           ..where(
-            (s) => s.projectId.equals(projectId) & s.isArchived.equals(false),
+            (s) =>
+                s.projectId.equals(projectId) &
+                s.isArchived.equals(false) &
+                const CustomExpression<bool>('is_deleted').equals(false),
           )
           ..orderBy([
             (s) =>
@@ -40,7 +45,10 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
   Stream<List<SessionEntity>> watchArchivedSessionsByProject(String projectId) {
     return (select(sessions)
           ..where(
-            (s) => s.projectId.equals(projectId) & s.isArchived.equals(true),
+            (s) =>
+                s.projectId.equals(projectId) &
+                s.isArchived.equals(true) &
+                const CustomExpression<bool>('is_deleted').equals(false),
           )
           ..orderBy([
             (s) =>
@@ -51,7 +59,11 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
 
   /// Get a single session by ID
   Future<SessionEntity?> getSession(String id) {
-    return (select(sessions)..where((s) => s.id.equals(id))).getSingleOrNull();
+    return (select(sessions)
+          ..where((s) =>
+              s.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
+        .getSingleOrNull();
   }
 
   /// Insert a new session
@@ -81,7 +93,9 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
   /// Get sessions for a project
   Future<List<SessionEntity>> getSessionsByProject(String projectId) {
     return (select(sessions)
-          ..where((s) => s.projectId.equals(projectId))
+          ..where((s) =>
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) =>
                 OrderingTerm(expression: s.timestamp, mode: OrderingMode.desc),
@@ -95,7 +109,10 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
   ) {
     return (select(sessions)
           ..where(
-            (s) => s.projectId.equals(projectId) & s.isArchived.equals(false),
+            (s) =>
+                s.projectId.equals(projectId) &
+                s.isArchived.equals(false) &
+                const CustomExpression<bool>('is_deleted').equals(false),
           )
           ..orderBy([
             (s) =>

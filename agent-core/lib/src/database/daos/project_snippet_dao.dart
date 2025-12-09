@@ -43,7 +43,9 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
   /// Watch snippets for a specific project
   Stream<List<SnippetEntity>> watchProjectSnippets(String projectId) {
     return (select(projectSnippets)
-          ..where((s) => s.projectId.equals(projectId))
+          ..where((s) =>
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
@@ -54,7 +56,9 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
   /// Get snippets for a specific project
   Future<List<SnippetEntity>> getProjectSnippets(String projectId) {
     return (select(projectSnippets)
-          ..where((s) => s.projectId.equals(projectId))
+          ..where((s) =>
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) => OrderingTerm(expression: s.position, mode: OrderingMode.asc),
           ]))
@@ -64,14 +68,20 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
 
   /// Get a single snippet by ID
   Future<SnippetEntity?> getSnippet(String id) {
-    return (select(projectSnippets)..where((s) => s.id.equals(id)))
+    return (select(projectSnippets)
+          ..where((s) =>
+              s.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
         .getSingleOrNull()
         .then((row) => row != null ? _toEntity(row) : null);
   }
 
   /// Watch a single snippet by ID
   Stream<SnippetEntity?> watchSnippet(String id) {
-    return (select(projectSnippets)..where((s) => s.id.equals(id)))
+    return (select(projectSnippets)
+          ..where((s) =>
+              s.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
         .watchSingleOrNull()
         .map((row) => row != null ? _toEntity(row) : null);
   }
@@ -99,7 +109,8 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
     return (select(projectSnippets)
           ..where((s) =>
               (s.name.like('%$query%') | s.content.like('%$query%')) &
-              s.projectId.equals(projectId))
+              s.projectId.equals(projectId) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([(s) => OrderingTerm(expression: s.name)]))
         .get()
         .then((rows) => rows.map(_toEntity).toList());

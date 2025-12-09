@@ -33,7 +33,9 @@ class SnippetController {
     final now = DateTime.now();
 
     // Get the next position (max + 1)
-    final maxPosition = await db.snippetDao.getMaxPosition(projectId: projectId);
+    final maxPosition = await db.snippetDao.getMaxPosition(
+      projectId: projectId,
+    );
     final nextPosition = maxPosition + 1;
 
     final snippet = SnippetEntityCompanion(
