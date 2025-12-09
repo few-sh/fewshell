@@ -100,6 +100,38 @@ build_arch "amd64" "linux/amd64"
 build_arch "arm64" "linux/arm64"
 
 # -----------------------------------------------------------------------------
+# MacOS Build (if running on Mac)
+# -----------------------------------------------------------------------------
+if [[ "$(uname)" == "Darwin" ]]; then
+    echo "🍎 Detected macOS. Building native artifact..."
+    
+    # Assuming Apple Silicon (arm64) for M-class macs
+    MACOS_ARCH="arm64"
+    MACOS_OUTPUT_NAME="decamp-agent-macos-$MACOS_ARCH"
+    MACOS_OUTPUT_PATH="$BUILD_DIR/$MACOS_OUTPUT_NAME"
+    
+    echo "🔨 Building binary for macOS ($MACOS_ARCH)..."
+    
+    # Native compilation - must run inside decamp-agent dir
+    (
+        cd "$PROJECT_ROOT"
+        dart pub get
+        dart compile exe bin/server.dart -o "$MACOS_OUTPUT_PATH"
+    )
+    
+    # Zip it (no need to bundle sqlite on macOS, it uses system framework)
+    echo "🤐 Zipping macOS binary..."
+    ZIP_NAME="decamp-agent-macos-$MACOS_ARCH.zip"
+    ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
+    (cd "$BUILD_DIR" && zip -r "$ZIP_PATH" "$MACOS_OUTPUT_NAME")
+    
+    # Keep raw binary executable
+    chmod +x "$MACOS_OUTPUT_PATH"
+else
+    echo "🐧 Not running on macOS. Skipping native build."
+fi
+
+# -----------------------------------------------------------------------------
 # Create GitHub Release
 # -----------------------------------------------------------------------------
 echo "📤 Pushing release v$VERSION to GitHub..."
@@ -113,9 +145,9 @@ else
     gh release create "v$VERSION" \
     echo "✨ Creating new release v$VERSION..."
     gh release create "v$VERSION" \
-        "$BUILD_DIR/decamp-agent-linux-"* \
+        "$BUILD_DIR/decamp-agent-"* \
         --title "v$VERSION" \
-        --notes "Release v$VERSION of decamp-agent (includes self-contained ZIPs)"
+        --notes "Release v$VERSION of decamp-agent (Linux AMD64/ARM64 + macOS ARM64)"
 fi
 
 echo "✅ Done! Release v$VERSION is live."
@@ -129,7 +161,7 @@ if ! command -v npx &> /dev/null; then
     echo "⚠️  npx not found. Skipping R2 upload."
 else
     # Upload binary files
-    for FILE in "$BUILD_DIR"/decamp-agent-linux-*; do
+    for FILE in "$BUILD_DIR"/decamp-agent-*; do
         if [ -f "$FILE" ]; then
             FILENAME=$(basename "$FILE")
             OBJECT_KEY="releases/$VERSION/$FILENAME"
