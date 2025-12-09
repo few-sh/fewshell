@@ -13,13 +13,8 @@ import 'package:decamp_agent/services/database_manager.dart';
 
 void main(List<String> args) async {
   try {
-    print(
-        'DEBUG: Agent starting (PID: ${pid}, Patched: ${Platform.environment['DECAMP_SQLITE_PATCHED']})');
-
     // Ensure we can load libsqlite3.so even if only libsqlite3.so.0 exists
     await _ensureRuntimeEnvironment(args);
-
-    print('DEBUG: Continuing execution...');
 
     // Override sqlite3 open behavior to support libsqlite3.so.0
     open.overrideFor(OperatingSystem.linux, () {
@@ -50,11 +45,9 @@ void main(List<String> args) async {
     final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
 
     // Initialize DatabaseManager
-    print('DEBUG: Initializing DatabaseManager...');
     final dbManager = DatabaseManager('${Directory.current.path}/data');
     try {
       await dbManager.init();
-      print('DEBUG: DatabaseManager initialized.');
     } catch (e) {
       if (e.toString().contains('libsqlite3') ||
           e.toString().contains('cannot open shared object file')) {
@@ -86,7 +79,7 @@ void main(List<String> args) async {
     developer.log(
       '🚀 Decamp Agent server running on http://${server.address.host}:${server.port}',
     );
-    print('DEBUG: Server serving...');
+    print('Server serving...');
   } catch (e, st) {
     print('CRITICAL FAILURE: $e\n$st');
     exit(1);
@@ -97,18 +90,35 @@ void main(List<String> args) async {
 Future<void> _ensureRuntimeEnvironment(List<String> args) async {
   if (!Platform.isLinux) return;
 
-  // 1. Check if we can already load libsqlite3.so
+  // 1. Check if we have a bundled libsqlite3.so in the same directory
+  final bundledLib = File('${Directory.current.path}/libsqlite3.so');
+  if (bundledLib.existsSync()) {
+    final currentLdPath = Platform.environment['LD_LIBRARY_PATH'] ?? '';
+    final newLdPath = '${Directory.current.path}:$currentLdPath';
+    print('Using bundled libsqlite3.so (LD_LIBRARY_PATH: $newLdPath)');
+
+    // Check if we are already patched with this path
+    // We can just rely on the variable or check the path
+    if (Platform.environment['DECAMP_SQLITE_PATCHED'] == 'true') {
+      return;
+    }
+
+    await _reExec(args, newLdPath);
+    return;
+  }
+
+  // 2. Try loading standard library
   try {
     DynamicLibrary.open('libsqlite3.so');
-    return; // All good
+    return; // Success
   } catch (_) {}
 
-  // 2. Check if we've already patched the environment (avoid infinite loop)
+  // 3. Check if we've already patched the environment (avoid infinite loop)
   if (Platform.environment['DECAMP_SQLITE_PATCHED'] == 'true') {
     return;
   }
 
-  // 3. Look for libsqlite3.so.0
+  // 4. Look for libsqlite3.so.0
   final commonPaths = [
     '/usr/lib/aarch64-linux-gnu',
     '/usr/lib/x86_64-linux-gnu',
@@ -142,20 +152,24 @@ Future<void> _ensureRuntimeEnvironment(List<String> args) async {
     final currentLdPath = Platform.environment['LD_LIBRARY_PATH'] ?? '';
     final newLdPath = '$currentLdPath:${tempDir.path}';
 
-    final newEnv = Map<String, String>.from(Platform.environment);
-    newEnv['LD_LIBRARY_PATH'] = newLdPath;
-    newEnv['DECAMP_SQLITE_PATCHED'] = 'true';
-
-    // We use a detached process to replace ourselves (wrapper style)
-    // stdin/out/err inheritance is important
-    final process = await Process.start(
-      Platform.executable,
-      args,
-      environment: newEnv,
-      mode: ProcessStartMode.inheritStdio,
-    );
-    exit(await process.exitCode);
+    await _reExec(args, newLdPath);
   }
+}
+
+Future<void> _reExec(List<String> args, String newLdPath) async {
+  final newEnv = Map<String, String>.from(Platform.environment);
+  newEnv['LD_LIBRARY_PATH'] = newLdPath;
+  newEnv['DECAMP_SQLITE_PATCHED'] = 'true';
+
+  // We use a detached process to replace ourselves (wrapper style)
+  // stdin/out/err inheritance is important
+  final process = await Process.start(
+    Platform.executable,
+    args,
+    environment: newEnv,
+    mode: ProcessStartMode.inheritStdio,
+  );
+  exit(await process.exitCode);
 }
 
 /// CORS middleware for cross-origin requests
