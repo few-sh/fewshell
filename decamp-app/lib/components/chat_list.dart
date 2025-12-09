@@ -298,81 +298,87 @@ class _ChatListState extends State<ChatList> {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      controller: _scrollController,
-      reverse: true,
-      cacheExtent: 1000, // Pre-render area to smooth out scrolling
-      slivers: [
-        // Padding for search navigator
-        if (widget.searchNavigatorHeight > 0)
-          SliverPadding(
-            padding: EdgeInsets.only(bottom: widget.searchNavigatorHeight),
-          ),
-
-        // Streaming Message (if any)
-        if (widget.streamingMessageStream != null)
-          SliverToBoxAdapter(
-            child: StreamBuilder<MessageEntity?>(
-              stream: widget.streamingMessageStream,
-              builder: (context, snapshot) {
-                final message = snapshot.data;
-                if (message != null) {
-                  return _MessageItem(
-                    key: _messageKeys[message.id],
-                    message: message,
-                    isStreaming: true,
-                    showDivider: false,
-                    onEditMessage: widget.onEditMessage,
-                    onResendMessage: widget.onResendMessage,
-                    onBranchSession: widget.onBranchSession,
-                    highlights: _highlightsByMessage[message.id],
-                    currentMatchIndex: widget.currentMatchIndex,
-                  );
-                } else if (widget.isLoading) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+    // TODO: When we copy the content, it should be a nicely formatted Markdown (if possible)
+    // FIXME: Currently no new lines are inserted between content and userName.
+    return SelectionArea(
+      child: CustomScrollView(
+        controller: _scrollController,
+        reverse: true,
+        cacheExtent: 1000, // Pre-render area to smooth out scrolling
+        slivers: [
+          // Padding for search navigator
+          if (widget.searchNavigatorHeight > 0)
+            SliverPadding(
+              padding: EdgeInsets.only(bottom: widget.searchNavigatorHeight),
             ),
-          ),
 
-        // Loading Indicator (if loading and no stream provided)
-        if (widget.isLoading && widget.streamingMessageStream == null)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(child: CircularProgressIndicator()),
+          // Streaming Message (if any)
+          if (widget.streamingMessageStream != null)
+            SliverToBoxAdapter(
+              child: SelectionContainer.disabled(
+                child: StreamBuilder<MessageEntity?>(
+                  stream: widget.streamingMessageStream,
+                  builder: (context, snapshot) {
+                    final message = snapshot.data;
+                    if (message != null) {
+                      return _MessageItem(
+                        key: _messageKeys[message.id],
+                        message: message,
+                        isStreaming: true,
+                        showDivider: false,
+                        onEditMessage: widget.onEditMessage,
+                        onResendMessage: widget.onResendMessage,
+                        onBranchSession: widget.onBranchSession,
+                        highlights: _highlightsByMessage[message.id],
+                        currentMatchIndex: widget.currentMatchIndex,
+                      );
+                    } else if (widget.isLoading) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
             ),
+
+          // Loading Indicator (if loading and no stream provided)
+          if (widget.isLoading && widget.streamingMessageStream == null)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+
+          // Completed Messages
+          SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              // Calculate index for reversed list without creating a new list
+              // widget.messages is [oldest, ..., newest]
+              // We want index 0 to be newest (last element)
+              final messageIndex = widget.messages.length - 1 - index;
+              final message = widget.messages[messageIndex];
+
+              // Show divider if this is not the first item in the list (index 0)
+              return _MessageItem(
+                // Use GlobalKey if available (for search scrolling), otherwise ValueKey (for diffing)
+                key: _messageKeys[message.id] ?? ValueKey(message.id),
+                message: message,
+                isStreaming: false,
+                showDivider: index > 0,
+                onEditMessage: widget.onEditMessage,
+                onResendMessage: widget.onResendMessage,
+                onBranchSession: widget.onBranchSession,
+                highlights: _highlightsByMessage[message.id],
+                currentMatchIndex: widget.currentMatchIndex,
+              );
+            }, childCount: widget.messages.length),
           ),
-
-        // Completed Messages
-        SliverList(
-          delegate: SliverChildBuilderDelegate((context, index) {
-            // Calculate index for reversed list without creating a new list
-            // widget.messages is [oldest, ..., newest]
-            // We want index 0 to be newest (last element)
-            final messageIndex = widget.messages.length - 1 - index;
-            final message = widget.messages[messageIndex];
-
-            // Show divider if this is not the first item in the list (index 0)
-            return _MessageItem(
-              // Use GlobalKey if available (for search scrolling), otherwise ValueKey (for diffing)
-              key: _messageKeys[message.id] ?? ValueKey(message.id),
-              message: message,
-              isStreaming: false,
-              showDivider: index > 0,
-              onEditMessage: widget.onEditMessage,
-              onResendMessage: widget.onResendMessage,
-              onBranchSession: widget.onBranchSession,
-              highlights: _highlightsByMessage[message.id],
-              currentMatchIndex: widget.currentMatchIndex,
-            );
-          }, childCount: widget.messages.length),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

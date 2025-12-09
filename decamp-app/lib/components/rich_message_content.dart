@@ -303,6 +303,6 @@ class _RichMessageContentState extends State<RichMessageContent> {
       },
     );
 
-    return SelectionArea(child: markdown);
+    return markdown;
   }
 }
