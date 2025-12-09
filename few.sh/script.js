@@ -27,9 +27,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Typing Effect for Hero
-  const heroText = "Fewshot releases Fewshell";
   const heroElement = document.querySelector(".hero h1");
   if (heroElement) {
+    // Read the existing text content from the h1
+    const heroText = heroElement.textContent.trim();
+
+    // Clear the element and type it out
     heroElement.textContent = "";
     let i = 0;
     const typeWriter = () => {
