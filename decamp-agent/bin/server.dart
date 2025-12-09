@@ -1,39 +1,29 @@
 import 'dart:developer' as developer;
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqlite3/open.dart';
-import 'package:sqlite3/sqlite3.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:decamp_agent/router.dart';
 import 'package:decamp_agent/services/database_manager.dart';
 
 void main(List<String> args) async {
   try {
-    // Ensure we can load libsqlite3.so even if only libsqlite3.so.0 exists
+    // Ensure we can load libsqlite3.so via LD_LIBRARY_PATH (process-wide)
+    // This is required because drift/sqlite_crdt uses background isolates,
+    // and open.overrideFor is only effective in the current isolate.
     await _ensureRuntimeEnvironment(args);
 
-    // Override sqlite3 open behavior to support libsqlite3.so.0
+    // Override sqlite3 open behavior to support libsqlite3.so.0 as a backup
+    // for the main isolate (though the shim should have handled it).
     open.overrideFor(OperatingSystem.linux, () {
-      // List of common library names to try in order of likelihood
-      const candidates = [
-        'libsqlite3.so.0', // Standard runtime name on Debian/Ubuntu/Fedora
-        'libsqlite3.so', // Development name / Alpine Linux
-      ];
-
-      for (final candidate in candidates) {
-        try {
-          return DynamicLibrary.open(candidate);
-        } catch (_) {
-          // Continue to next candidate
-        }
+      try {
+        return DynamicLibrary.open('libsqlite3.so');
+      } catch (_) {
+        return DynamicLibrary.open('libsqlite3.so.0');
       }
-
-      // If all fail, throw to trigger the friendly error handling below
-      throw Exception('Could not find libsqlite3.so.0 or libsqlite3.so');
     });
 
     // Initialize FFI for sqflite explicitly
@@ -86,7 +76,7 @@ void main(List<String> args) async {
   }
 }
 
-/// Checks if we need to polyfill libsqlite3.so and re-exec
+/// Checks if we need to set LD_LIBRARY_PATH and re-exec
 Future<void> _ensureRuntimeEnvironment(List<String> args) async {
   if (!Platform.isLinux) return;
 
@@ -95,30 +85,35 @@ Future<void> _ensureRuntimeEnvironment(List<String> args) async {
   if (bundledLib.existsSync()) {
     final currentLdPath = Platform.environment['LD_LIBRARY_PATH'] ?? '';
     final newLdPath = '${Directory.current.path}:$currentLdPath';
-    print('Using bundled libsqlite3.so (LD_LIBRARY_PATH: $newLdPath)');
 
     // Check if we are already patched with this path
-    // We can just rely on the variable or check the path
     if (Platform.environment['DECAMP_SQLITE_PATCHED'] == 'true') {
       return;
     }
 
+    // print('Using local libsqlite3.so (LD_LIBRARY_PATH augmented)');
     await _reExec(args, newLdPath);
     return;
   }
 
-  // 2. Try loading standard library
+  // 2. Check if the system library is findable by standard loader
+  // If we can open it now, we don't need to shim.
+  // 2. Check if the library is findable by the DEFAULT name (libsqlite3.so)
+  // which is what background isolates will try to load.
+  // If we can open 'libsqlite3.so', we are good.
   try {
     DynamicLibrary.open('libsqlite3.so');
-    return; // Success
-  } catch (_) {}
+    return;
+  } catch (_) {
+    // If we can't open .so, we MUST shim, even if .so.0 exists.
+  }
 
-  // 3. Check if we've already patched the environment (avoid infinite loop)
+  // 3. Fallback: Check if we've already patched the environment (avoid infinite loop)
   if (Platform.environment['DECAMP_SQLITE_PATCHED'] == 'true') {
     return;
   }
 
-  // 4. Look for libsqlite3.so.0
+  // 4. Look for libsqlite3.so.0 in specific system paths (for systems where loader misses it)
   final commonPaths = [
     '/usr/lib/aarch64-linux-gnu',
     '/usr/lib/x86_64-linux-gnu',
@@ -137,9 +132,15 @@ Future<void> _ensureRuntimeEnvironment(List<String> args) async {
     }
   }
 
-  // If we found the runtime library but not the dev link...
+  // If we found the runtime library but the loader didn't pick it up...
+  // We need to point LD_LIBRARY_PATH to its directory.
+  // If we found the runtime library but the loader didn't pick it up...
+  // We need to create a shim:
+  // 1. Create a temp dir
+  // 2. Symlink libsqlite3.so -> foundPath
+  // 3. Add temp dir to LD_LIBRARY_PATH
   if (foundPath != null) {
-    print('Found $foundPath, creating symlink shim...');
+    // print('Found system library at $foundPath, creating shim...');
 
     // Create a temporary directory for our shim
     final tempDir = Directory.systemTemp.createTempSync('decamp_libs_');
@@ -150,7 +151,7 @@ Future<void> _ensureRuntimeEnvironment(List<String> args) async {
 
     // Re-execute with updated LD_LIBRARY_PATH
     final currentLdPath = Platform.environment['LD_LIBRARY_PATH'] ?? '';
-    final newLdPath = '$currentLdPath:${tempDir.path}';
+    final newLdPath = '${tempDir.path}:$currentLdPath'; // Prepend shim dir
 
     await _reExec(args, newLdPath);
   }
