@@ -88,6 +88,12 @@ class LlmService {
     return (config: config, apiKey: apiKey);
   }
 
+  /// Get the active model identifier
+  Future<String?> getActiveModelIdentifier() async {
+    final config = await _getActiveConfig();
+    return config?.config.identifier;
+  }
+
   /// Get the final agent instruction for a model
   /// Simplified hierarchy: project override > project default > global override > global default
   /// Processes template variables like {{ SECRETS }}

@@ -271,8 +271,13 @@ class ChatController extends StateNotifier<ChatState> {
         final messageType = message.messageType;
         if (messageType is ToolUseMessage) {
           // Save tool use message
+          final aiUserName = await _getAiUserName();
           await _messageDao.insertMessage(
-            message.toMessageCompanion(sessionId: sessionId, id: idToUse),
+            message.toMessageCompanion(
+              sessionId: sessionId,
+              id: idToUse,
+              userName: aiUserName,
+            ),
           );
           currentToolMessageId = idToUse;
         } else {
@@ -280,11 +285,12 @@ class ChatController extends StateNotifier<ChatState> {
           final redactedContent = await _secretRedactor.redact(
             message.content,
           );
+          final aiUserName = await _getAiUserName();
           await _messageDao.insertMessageWithId(
             id: idToUse,
             sessionId: sessionId,
             userId: _kAiUserId,
-            userName: _kAiUserName,
+            userName: aiUserName,
             content: redactedContent,
           );
           currentToolMessageId = null;
@@ -394,10 +400,11 @@ class ChatController extends StateNotifier<ChatState> {
         case AgentLoopError(message: final errorMsg):
           final errorMessage = 'Sorry, I encountered an error: $errorMsg';
           final redactedError = await _secretRedactor.redact(errorMessage);
+          final aiUserName = await _getAiUserName();
           await _messageDao.insertMessageWithId(
             sessionId: sessionId,
             userId: _kAiUserId,
-            userName: _kAiUserName,
+            userName: aiUserName,
             content: redactedError,
           );
           if (mounted) {
@@ -410,10 +417,11 @@ class ChatController extends StateNotifier<ChatState> {
     } catch (e) {
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);
+      final aiUserName = await _getAiUserName();
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
         userId: _kAiUserId,
-        userName: _kAiUserName,
+        userName: aiUserName,
         content: redactedError,
       );
       if (mounted) {
@@ -658,5 +666,11 @@ class ChatController extends StateNotifier<ChatState> {
   /// Clear error state
   void clearError() {
     if (mounted) state = state.copyWith(error: null);
+  }
+
+  /// Get the AI username based on the active model identifier
+  Future<String> _getAiUserName() async {
+    final modelId = await _llmService.getActiveModelIdentifier();
+    return modelId ?? _kAiUserName;
   }
 }

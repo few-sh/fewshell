@@ -240,7 +240,7 @@ class _AgentSession {
             id: Value(id),
             sessionId: Value(sessionId),
             userId: const Value('ai'),
-            userName: const Value('Ops Agent'),
+            userName: Value(model),
             content: Value(content),
             timestamp: Value(createdAt),
             createdAt: Value(createdAt),
@@ -276,14 +276,18 @@ class _AgentSession {
           final messageType = message.messageType;
           if (messageType is ToolUseMessage) {
             await db!.messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId, id: id),
+              message.toMessageCompanion(
+                sessionId: sessionId,
+                id: id,
+                userName: model,
+              ),
             );
           } else {
             await db!.messageDao.insertMessageWithId(
               id: id,
               sessionId: sessionId,
               userId: 'ai',
-              userName: 'Ops Agent',
+              userName: model,
               content: message.content,
               isStreaming: false,
             );

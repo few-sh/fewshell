@@ -11,6 +11,7 @@ extension ChatMessageToDB on ChatMessage {
   MessageEntityCompanion toMessageCompanion({
     required String sessionId,
     String? id,
+    String? userName,
   }) {
     final now = DateTime.now();
     final messageId = id ?? IdGenerator.messageId();
@@ -59,7 +60,7 @@ extension ChatMessageToDB on ChatMessage {
       id: Value(messageId),
       sessionId: Value(sessionId),
       userId: Value(_userIdFromRole(role)),
-      userName: Value(_userNameFromRole(role)),
+      userName: Value(userName ?? _userNameFromRole(role)),
       content: Value(content),
       timestamp: Value(now),
       createdAt: Value(now),
