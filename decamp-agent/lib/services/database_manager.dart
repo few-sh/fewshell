@@ -22,7 +22,7 @@ class DatabaseManager {
     globalDatabase = GlobalDatabase(result.executor, crdt: result.crdt);
 
     // Force database initialization to ensure tables exist before sync starts
-    // await globalDatabase.customStatement('SELECT 1');
+    await globalDatabase.customStatement('SELECT 1;');
   }
 
   Future<ProjectDatabase> getProjectDatabase(String projectId) async {
