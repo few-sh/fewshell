@@ -1,4 +1,3 @@
-import 'package:agent_core/src/utils/template_processor.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:test/test.dart';
 
@@ -24,7 +23,7 @@ void main() {
 
     test('processes list variable iteration', () {
       final result = TemplateProcessor.process(
-        "{% for secret in SECRETS %}- {{ secret }}\n{% endfor %}",
+        '{% for secret in SECRETS %}- {{ secret }}\n{% endfor %}',
         secretNames: ['A', 'B'],
       );
       expect(result, '- A\n- B\n');

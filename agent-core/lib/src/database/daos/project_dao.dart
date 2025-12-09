@@ -13,6 +13,8 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
   /// Watch all projects, ordered by last session date
   Stream<List<ProjectEntity>> watchAllProjects() {
     return (select(projects)
+          ..where(
+              (p) => const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (p) => OrderingTerm(
                   expression: p.lastSessionDate,
@@ -26,18 +28,26 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
   Stream<ProjectEntity?> watchProject(String id) {
     return (select(
       projects,
-    )..where((p) => p.id.equals(id)))
+    )..where((p) =>
+            p.id.equals(id) &
+            const CustomExpression<bool>('is_deleted').equals(false)))
         .watchSingleOrNull();
   }
 
   /// Get a single project by ID
   Future<ProjectEntity?> getProject(String id) {
-    return (select(projects)..where((p) => p.id.equals(id))).getSingleOrNull();
+    return (select(projects)
+          ..where((p) =>
+              p.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
+        .getSingleOrNull();
   }
 
   /// Get all projects
   Future<List<ProjectEntity>> getAllProjects() {
     return (select(projects)
+          ..where(
+              (p) => const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (p) => OrderingTerm(
                   expression: p.lastSessionDate,
@@ -78,7 +88,9 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
   /// Search projects by name
   Future<List<ProjectEntity>> searchProjectsByName(String query) {
     return (select(projects)
-          ..where((p) => p.name.like('%$query%'))
+          ..where((p) =>
+              p.name.like('%$query%') &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([(p) => OrderingTerm(expression: p.name)]))
         .get();
   }

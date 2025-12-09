@@ -1,6 +1,5 @@
 import 'package:llm_dart/llm_dart.dart';
 import 'package:agent_core/agent_core.dart';
-import '../database/database_facade.dart';
 
 /// Service for interacting with LLM APIs using llm_dart
 ///
