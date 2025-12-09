@@ -41,6 +41,7 @@ echo "🚀 Preparing release for version: $VERSION"
 # -----------------------------------------------------------------------------
 # Build & Compile
 # -----------------------------------------------------------------------------
+rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 build_arch() {
@@ -53,7 +54,6 @@ build_arch() {
 
     echo "🏗️  Preparing builder for $ARCH ($PLATFORM)..."
     docker build \
-        --no-cache \
         --platform "$PLATFORM" \
         -t "$IMAGE_TAG" \
         -f "$SCRIPT_DIR/Dockerfile.build" \
