@@ -116,7 +116,7 @@ class SyncService {
 
     try {
       // Ensure DB is open so that crdt instance is available
-      await db.customSelect('SELECT 1').get();
+      await db.customSelect('SELECT 1;').get();
 
       final crdt = db.crdt;
       // Remove trailing slash if present
@@ -192,7 +192,7 @@ class SyncService {
 
     try {
       // Ensure DB is open
-      await db.customSelect('SELECT 1').get();
+      await db.customSelect('SELECT 1;').get();
 
       if (token.isCancelled) return;
 

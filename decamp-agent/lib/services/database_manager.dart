@@ -41,7 +41,7 @@ class DatabaseManager {
     final db = ProjectDatabase(result.executor, crdt: result.crdt);
 
     // Force database initialization to ensure tables exist before sync starts
-    await db.customStatement('SELECT 1');
+    await db.customStatement('SELECT 1;');
 
     _projectDatabases[projectId] = db;
     return db;
