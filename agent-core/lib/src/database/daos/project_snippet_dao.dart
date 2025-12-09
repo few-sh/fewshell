@@ -82,8 +82,11 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
   }
 
   /// Update an existing snippet
-  Future<bool> updateSnippet(SnippetEntityCompanion snippet) {
-    return update(projectSnippets).replace(_toCompanion(snippet));
+  Future<bool> updateSnippet(SnippetEntityCompanion snippet) async {
+    final count = await (update(projectSnippets)
+          ..where((s) => s.id.equals(snippet.id.value)))
+        .write(_toCompanion(snippet));
+    return count > 0;
   }
 
   /// Delete a snippet by ID
