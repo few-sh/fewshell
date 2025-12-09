@@ -17,6 +17,13 @@ class CrdtQueryExecutor extends QueryExecutor {
   Future<bool> ensureOpen(QueryExecutorUser user) async {
     if (_isOpen) return true;
 
+    // Check if we are already inside the opening process (re-entrant call from migration)
+    final isOpening = Zone.current[#isOpening] as bool? ?? false;
+    if (isOpening) {
+      developer.log('CrdtQueryExecutor: re-entrant open detected, proceeding');
+      return true;
+    }
+
     if (_openingCompleter != null) {
       developer.log('CrdtQueryExecutor: waiting for existing open operation');
       await _openingCompleter!.future;
@@ -27,40 +34,43 @@ class CrdtQueryExecutor extends QueryExecutor {
     _openingCompleter = Completer<void>();
 
     try {
-      // Use SELECT from pragma_user_version to avoid ParsingError from sqlparser
-      final versionResult =
-          await _crdt.query('SELECT * FROM pragma_user_version');
-      final currentVersion = (versionResult.first.values.first as int?) ?? 0;
-      final db = user as GeneratedDatabase;
+      await runZoned(() async {
+        // Use SELECT from pragma_user_version to avoid ParsingError from sqlparser
+        final versionResult =
+            await _crdt.query('SELECT * FROM pragma_user_version');
+        final currentVersion = (versionResult.first.values.first as int?) ?? 0;
+        final db = user as GeneratedDatabase;
 
-      if (currentVersion == 0) {
-        await db.beforeOpen(this, OpeningDetails(null, user.schemaVersion));
+        if (currentVersion == 0) {
+          await db.beforeOpen(this, OpeningDetails(null, user.schemaVersion));
 
-        final migrator = Migrator(db);
-        await db.migration.onCreate(migrator);
+          final migrator = Migrator(db);
+          await db.migration.onCreate(migrator);
 
-        // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
-        // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
-      } else if (currentVersion < user.schemaVersion) {
-        await db.beforeOpen(
-          this,
-          OpeningDetails(currentVersion, user.schemaVersion),
-        );
+          // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
+          // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+        } else if (currentVersion < user.schemaVersion) {
+          await db.beforeOpen(
+            this,
+            OpeningDetails(currentVersion, user.schemaVersion),
+          );
 
-        final migrator = Migrator(db);
-        await db.migration
-            .onUpgrade(migrator, currentVersion, user.schemaVersion);
+          final migrator = Migrator(db);
+          await db.migration
+              .onUpgrade(migrator, currentVersion, user.schemaVersion);
 
-        // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
-      } else {
-        await db.beforeOpen(
-          this,
-          OpeningDetails(currentVersion, user.schemaVersion),
-        );
-      }
+          // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+        } else {
+          await db.beforeOpen(
+            this,
+            OpeningDetails(currentVersion, user.schemaVersion),
+          );
+        }
 
-      _isOpen = true;
-      _openingCompleter!.complete();
+        _isOpen = true;
+        _openingCompleter!.complete();
+      }, zoneValues: {#isOpening: true});
+
       return true;
     } catch (e, s) {
       _openingCompleter!.completeError(e, s);

@@ -33,14 +33,14 @@ class ProjectSetupView extends ConsumerWidget {
 
         try {
           final importer = ref.read(projectImporterProvider);
+          // Capture navigator and notifier before async operation
+          final navigator = Navigator.of(context, rootNavigator: true);
+          final projectNotifier = ref.read(currentProjectIdProvider.notifier);
+
           final projectId = await importer.importFromQrCode(jsonString);
 
-          if (!context.mounted) return;
-
-          // Capture navigator before selecting project
-          final navigator = Navigator.of(context, rootNavigator: true);
-
-          await ref.read(currentProjectIdProvider.notifier).select(projectId);
+          // Don't await select to avoid blocking UI if DB init takes time
+          projectNotifier.select(projectId);
 
           await navigator.push(
             MaterialPageRoute(builder: (context) => const MainSettingsPage()),
@@ -70,14 +70,14 @@ class ProjectSetupView extends ConsumerWidget {
     final projectDao = ref.read(databaseProvider).projectDao;
 
     try {
-      final projectId = await projectDao.createProjectWithId(name: name);
-
-      if (!context.mounted) return;
-
       // Capture navigator before selecting project
       final navigator = Navigator.of(context, rootNavigator: true);
+      final projectNotifier = ref.read(currentProjectIdProvider.notifier);
 
-      await ref.read(currentProjectIdProvider.notifier).select(projectId);
+      final projectId = await projectDao.createProjectWithId(name: name);
+
+      // Don't await select to avoid blocking UI if DB init takes time
+      projectNotifier.select(projectId);
 
       await navigator.push(
         MaterialPageRoute(builder: (context) => const MainSettingsPage()),
