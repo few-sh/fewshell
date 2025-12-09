@@ -299,7 +299,6 @@ class _ChatListState extends State<ChatList> {
   @override
   Widget build(BuildContext context) {
     // TODO: When we copy the content, it should be a nicely formatted Markdown (if possible)
-    // FIXME: Currently no new lines are inserted between content and userName.
     return SelectionArea(
       child: CustomScrollView(
         controller: _scrollController,

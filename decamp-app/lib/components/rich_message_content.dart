@@ -233,6 +233,14 @@ class _RichMessageContentState extends State<RichMessageContent> {
     return Text.rich(
       TextSpan(
         children: [
+          const TextSpan(
+            text: '\n',
+            style: TextStyle(
+              fontSize: 1,
+              color: Colors.transparent,
+              height: 0.1,
+            ),
+          ),
           TextSpan(
             text: userName,
             style: baseStyle.copyWith(fontWeight: FontWeight.w600),
