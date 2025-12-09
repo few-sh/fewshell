@@ -73,11 +73,22 @@ build_arch() {
             flutter pub get && \
             echo '🔌 Compiling server...' && \
             mkdir -p build/bin && \
-            dart compile exe bin/server.dart -o build/bin/server
+            dart compile exe bin/server.dart -o build/bin/server && \
+            echo '🔧 Patching binary...' && \
+            patchelf --set-rpath '\$ORIGIN' build/bin/server && \
+            echo '📦 Bundling system library...' && \
+            cp /usr/lib/*-linux-gnu/libsqlite3.so.0 build/bin/libsqlite3.so
         "
 
-
     # Copy binary to release artifact name (e.g. decamp-agent-linux-amd64)
+    local ZIP_NAME="decamp-agent-linux-$ARCH.zip"
+    local ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
+    
+    echo "🤐 Zipping binary and library..."
+    # CD into build/bin so the zip structure is flat
+    (cd "$PROJECT_ROOT/build/bin" && zip -r "$ZIP_PATH" server libsqlite3.so)
+    
+    # Also keep the raw binary for reference (or if user wants just that)
     cp "$PROJECT_ROOT/build/bin/server" "$OUTPUT_PATH"
     chmod +x "$OUTPUT_PATH"
 }
@@ -100,10 +111,11 @@ if gh release view "v$VERSION" &> /dev/null; then
 else
     echo "✨ Creating new release v$VERSION..."
     gh release create "v$VERSION" \
-        "$BUILD_DIR/decamp-agent-linux-amd64" \
-        "$BUILD_DIR/decamp-agent-linux-arm64" \
+    echo "✨ Creating new release v$VERSION..."
+    gh release create "v$VERSION" \
+        "$BUILD_DIR/decamp-agent-linux-"* \
         --title "v$VERSION" \
-        --notes "Release v$VERSION of decamp-agent"
+        --notes "Release v$VERSION of decamp-agent (includes self-contained ZIPs)"
 fi
 
 echo "✅ Done! Release v$VERSION is live."
