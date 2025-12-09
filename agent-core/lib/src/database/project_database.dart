@@ -83,22 +83,22 @@ class ProjectDatabase extends _$ProjectDatabase {
 
         // Create indexes for better query performance
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id)',
+          'CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_sessions_project_timestamp ON sessions(project_id, timestamp DESC)',
+          'CREATE INDEX IF NOT EXISTS idx_sessions_project_timestamp ON sessions(project_id, timestamp DESC);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)',
+          'CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC)',
+          'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON snippets(project_id)',
+          'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON snippets(project_id);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON snippets(name COLLATE NOCASE)',
+          'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON snippets(name COLLATE NOCASE);',
         );
       },
       beforeOpen: (details) async {
@@ -123,12 +123,12 @@ class ProjectDatabase extends _$ProjectDatabase {
               FROM snippets s2 
               WHERE s2.project_id = snippets.project_id 
               AND s2.updated_at > snippets.updated_at
-            )
+            );
           ''');
 
           // Create index for position ordering
           await executor.runCustom(
-            'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC)',
+            'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC);',
           );
         }
 
@@ -137,7 +137,7 @@ class ProjectDatabase extends _$ProjectDatabase {
           // Check if column already exists to handle potential partial migrations
           // Use SELECT from pragma_table_info to avoid ParsingError from sqlparser
           final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('messages')", []);
+              .runSelect("SELECT * FROM pragma_table_info('messages');", []);
           final hasIsStreaming =
               columns.any((row) => row['name'] == 'is_streaming');
 

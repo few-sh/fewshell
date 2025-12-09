@@ -82,16 +82,16 @@ class GlobalDatabase extends _$GlobalDatabase {
 
         // Create indexes for better query performance
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_projects_last_session ON projects(last_session_date DESC)',
+          'CREATE INDEX IF NOT EXISTS idx_projects_last_session ON projects(last_session_date DESC);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name COLLATE NOCASE)',
+          'CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name COLLATE NOCASE);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_snippets_project_id ON snippets(project_id)',
+          'CREATE INDEX IF NOT EXISTS idx_snippets_project_id ON snippets(project_id);',
         );
         await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE)',
+          'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE);',
         );
       },
       beforeOpen: (details) async {
@@ -123,12 +123,12 @@ class GlobalDatabase extends _$GlobalDatabase {
               WHERE s2.project_id IS NULL 
               AND s2.updated_at > snippets.updated_at
             )
-            WHERE project_id IS NULL
+            WHERE project_id IS NULL;
           ''');
 
           // Create index for position ordering
           await executor.runCustom(
-            'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC)',
+            'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC);',
           );
         }
 
