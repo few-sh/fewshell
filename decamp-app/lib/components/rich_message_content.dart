@@ -220,14 +220,25 @@ class _RichMessageContentState extends State<RichMessageContent> {
     // Add edit indicator if message was edited
     final editedIndicator = widget.message.editedAt != null ? ' (edited)' : '';
 
-    return Text(
-      formattedTime + editedIndicator,
-      style: TextStyle(
-        fontSize: 10,
-        color: Theme.of(
-          context,
-        ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-        fontWeight: FontWeight.w400,
+    final userName = widget.message.userName;
+
+    final baseStyle = TextStyle(
+      fontSize: 10,
+      color: Theme.of(
+        context,
+      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+      fontWeight: FontWeight.w400,
+    );
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: userName,
+            style: baseStyle.copyWith(fontWeight: FontWeight.w600),
+          ),
+          TextSpan(text: ' | $formattedTime$editedIndicator', style: baseStyle),
+        ],
       ),
     );
   }
