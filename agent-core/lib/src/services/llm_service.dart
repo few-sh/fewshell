@@ -195,7 +195,7 @@ class LlmService {
       processTemplate(instruction);
 
   /// Create an LLM provider based on the API type
-  Future<ChatCapability> _createProvider(
+  static Future<ChatCapability> createProvider(
     LlmApiSettings config,
     String apiKey, {
     String? systemInstruction,
@@ -311,7 +311,7 @@ class LlmService {
       final agentInstruction = await getAgentInstruction(
         activeConfig.config.identifier,
       );
-      final provider = await _createProvider(
+      final provider = await createProvider(
         activeConfig.config,
         activeConfig.apiKey,
         systemInstruction: agentInstruction,
@@ -366,7 +366,7 @@ class LlmService {
     required String apiKey,
   }) async {
     try {
-      final provider = await _createProvider(config, apiKey);
+      final provider = await createProvider(config, apiKey);
       final messages = [ChatMessage.user('Hi')];
       final stream = provider.chatStream(messages);
       bool receivedResponse = false;

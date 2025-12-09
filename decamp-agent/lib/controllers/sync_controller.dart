@@ -180,12 +180,27 @@ class _AgentSession {
           .toList();
 
       final apiKey = config['apiKey'] as String;
-      final providerType = config['provider'] as String;
+      final providerTypeStr = config['provider'] as String;
       final model = config['model'] as String;
       final baseUrl = config['baseUrl'] as String?;
+      final temperature = config['temperature'] as double?;
+      final maxTokens = config['maxTokens'] as int?;
 
-      final provider =
-          await _createProvider(providerType, apiKey, model, baseUrl);
+      final apiType = LlmApiType.values.firstWhere(
+        (e) => e.name == providerTypeStr,
+        orElse: () =>
+            throw Exception('Unknown provider type: $providerTypeStr'),
+      );
+
+      final settings = LlmApiSettings(
+        identifier: model,
+        apiType: apiType,
+        baseUrl: baseUrl ?? apiType.defaultBaseUrl,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+
+      final provider = await LlmService.createProvider(settings, apiKey);
 
       await runAgentLoop(
         llmStream: (conv, tools) {
@@ -308,25 +323,6 @@ class _AgentSession {
       developer.log('Error in agent loop: $e', name: 'AgentSession');
       channel.sendCustomMessage({'type': 'error', 'message': e.toString()});
     }
-  }
-
-  Future<ChatCapability> _createProvider(
-    String type,
-    String apiKey,
-    String model,
-    String? baseUrl,
-  ) async {
-    if (type == 'openai') {
-      final builder = ai().openai().apiKey(apiKey).model(model);
-      if (baseUrl != null) builder.baseUrl(baseUrl);
-      return await builder.build();
-    } else if (type == 'anthropic') {
-      final builder = ai().anthropic().apiKey(apiKey).model(model);
-      if (baseUrl != null) builder.baseUrl(baseUrl);
-      return await builder.build();
-    }
-    // Add other providers as needed
-    throw Exception('Unsupported provider: $type');
   }
 
   Future<Map<String, dynamic>> _executeLocalCommand(String command) async {
