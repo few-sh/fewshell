@@ -1,12 +1,18 @@
 import 'dart:async';
-import 'dart:developer' as developer;
+import 'dart:io';
+import 'dart:convert';
+import 'package:logging/logging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/certs.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
+
+final _log = Logger('SyncService');
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   final service = SyncService(ref);
@@ -91,7 +97,7 @@ class SyncService {
 
     // Initial connection
     final nodeId = ref.read(nodeIdProvider);
-    developer.log('SyncService: Initializing with nodeId: $nodeId');
+    _log.info('Initializing with nodeId: $nodeId');
 
     final project = ref.read(currentProjectProvider);
     _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
@@ -110,7 +116,7 @@ class SyncService {
     _currentGlobalUrl = serverUrl;
 
     if (serverUrl == null || serverUrl.isEmpty) {
-      developer.log('SyncService: No server URL for global sync.');
+      _log.info('No server URL for global sync.');
       return;
     }
 
@@ -125,12 +131,10 @@ class SyncService {
           : serverUrl;
       final uri = Uri.parse('$cleanUrl/sync/global');
 
-      developer.log('SyncService: Connecting to global sync at $uri');
-      _globalChannel = MultiplexedWebSocketChannel(
-        WebSocketChannel.connect(uri),
-      );
+      _log.info('Connecting to global sync at $uri');
+      _globalChannel = MultiplexedWebSocketChannel(_connectWebSocket(uri));
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
-        developer.log('SyncService (Global): Received custom message: $msg');
+        _log.fine('Global sync received custom message: $msg');
       });
       _globalSync = CrdtSync.client(
         crdt,
@@ -176,7 +180,7 @@ class SyncService {
             },
       );
     } catch (e) {
-      developer.log('SyncService: Global DB not ready or error: $e');
+      _log.warning('Global DB not ready or error: $e');
     }
   }
 
@@ -207,8 +211,8 @@ class SyncService {
       final serverUrl = project?.serverUrl;
 
       if (serverUrl == null) {
-        developer.log(
-          'SyncService: No server URL configured for project $projectId. Skipping sync.',
+        _log.info(
+          'No server URL configured for project $projectId. Skipping sync.',
         );
         return;
       }
@@ -216,10 +220,10 @@ class SyncService {
       final crdt = db.crdt;
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
-      developer.log('SyncService: Connecting to project sync at $uri');
+      _log.info('Connecting to project sync at $uri');
       _updateConnectionState(SyncConnectionState.connecting);
 
-      final wsChannel = WebSocketChannel.connect(uri);
+      final wsChannel = _connectWebSocket(uri);
       final monitoredChannel = _ActivityMonitorWebSocketChannel(
         wsChannel,
         onActivity: _handleSyncActivity,
@@ -241,24 +245,22 @@ class SyncService {
       } catch (e) {
         if (token.isCancelled) return;
         _updateConnectionState(SyncConnectionState.disconnected);
-        developer.log('SyncService: Connection failed: $e');
+        _log.warning('Connection failed: $e');
         _scheduleReconnect();
         return;
       }
 
       _projectChannel = MultiplexedWebSocketChannel(monitoredChannel);
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
-        developer.log('SyncService (Project): Received custom message: $msg');
+        _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
-          developer.log(
-            'SyncService (Project): PONG received: ${msg['payload']}',
-          );
+          _log.fine('PONG received: ${msg['payload']}');
         }
       });
       _projectSync = CrdtSync.client(crdt, _projectChannel!, verbose: true);
     } catch (e) {
       if (token.isCancelled) return;
-      developer.log('SyncService: Project DB not ready or error: $e');
+      _log.warning('Project DB not ready or error: $e');
       _scheduleReconnect();
     }
   }
@@ -276,8 +278,8 @@ class SyncService {
     if (_currentProjectId == null || _currentProjectDb == null) return;
 
     final delaySeconds = _getFibonacciDelay(_reconnectAttempts);
-    developer.log(
-      'SyncService: Scheduling reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)...',
+    _log.info(
+      'Scheduling reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)...',
     );
 
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
@@ -341,10 +343,43 @@ class SyncService {
 
   void sendPing(String message) {
     if (_projectChannel != null) {
-      developer.log('SyncService: Sending ping: $message');
+      _log.fine('Sending ping: $message');
       _projectChannel!.sendCustomMessage({'type': 'PING', 'payload': message});
     } else {
-      developer.log('SyncService: Cannot send ping, no project connection');
+      _log.warning('Cannot send ping, no project connection');
+    }
+  }
+
+  WebSocketChannel _connectWebSocket(Uri uri) {
+    _log.info('_connectWebSocket called for $uri');
+
+    try {
+      _log.info('Configuring mTLS with embedded certificates');
+
+      final context = SecurityContext(withTrustedRoots: false)
+        ..useCertificateChainBytes(utf8.encode(clientCert))
+        ..usePrivateKeyBytes(utf8.encode(clientKey))
+        ..setTrustedCertificatesBytes(utf8.encode(caCert));
+
+      _log.info('SecurityContext created successfully.');
+
+      final client = HttpClient(context: context);
+
+      // We rely on SecurityContext for validation, but use this callback
+      // to log detailed errors if validation fails.
+      client.badCertificateCallback = (cert, host, port) {
+        _log.severe('Certificate verification failed for $host:$port');
+        _log.severe('Subject: ${cert.subject}');
+        _log.severe('Issuer: ${cert.issuer}');
+        // TODO: Ideally we want to show a certificate error to the user.
+        return false; // Fail the connection
+      };
+
+      _log.info('Connecting with mTLS to $uri');
+      return IOWebSocketChannel.connect(uri, customClient: client);
+    } catch (e, st) {
+      _log.severe('Error configuring mTLS', e, st);
+      rethrow;
     }
   }
 }
