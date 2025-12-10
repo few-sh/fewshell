@@ -365,10 +365,15 @@ class SyncService {
 
       final client = HttpClient(context: context);
 
-      // We do not set badCertificateCallback because we want to rely on
-      // SecurityContext validation. We have set withTrustedRoots: false
-      // and provided our CA via setTrustedCertificatesBytes, so the
-      // HttpClient will verify the server certificate against our CA.
+      // We rely on SecurityContext for validation, but use this callback
+      // to log detailed errors if validation fails.
+      client.badCertificateCallback = (cert, host, port) {
+        _log.severe('Certificate verification failed for $host:$port');
+        _log.severe('Subject: ${cert.subject}');
+        _log.severe('Issuer: ${cert.issuer}');
+        // TODO: Ideally we want to show a certificate error to the user.
+        return false; // Fail the connection
+      };
 
       _log.info('Connecting with mTLS to $uri');
       return IOWebSocketChannel.connect(uri, customClient: client);
