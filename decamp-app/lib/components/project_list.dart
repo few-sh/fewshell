@@ -3,35 +3,24 @@ import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/confirmation_dialog.dart';
 import 'package:decamp/components/empty_placeholder.dart';
 
-class Project {
-  final String id;
-  final String name;
-  final String? description;
-  final DateTime lastSessionDate;
-
-  Project({
-    required this.id,
-    required this.name,
-    this.description,
-    required this.lastSessionDate,
-  });
-}
-
 class ProjectList extends StatelessWidget {
-  final List<Project> projects;
-  final Function(Project)? onProjectTap;
-  final Function(Project)? onProjectDelete;
-  final VoidCallback? onCreateProject;
+  final List<ProjectEntity> projects;
+  final String? currentProjectId;
+  final Function(ProjectEntity)? onProjectTap;
+  final Function(ProjectEntity)? onProjectDelete;
 
   const ProjectList({
     super.key,
     required this.projects,
+    this.currentProjectId,
     this.onProjectTap,
     this.onProjectDelete,
-    this.onCreateProject,
   });
 
-  void _showDeleteConfirmation(BuildContext context, Project project) async {
+  void _showDeleteConfirmation(
+    BuildContext context,
+    ProjectEntity project,
+  ) async {
     final confirmed = await showConfirmationDialog(
       context: context,
       title: 'Delete Project',
@@ -50,26 +39,6 @@ class ProjectList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Create new project button
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onCreateProject,
-              icon: const Icon(Icons.add),
-              label: const Text('Create New Project'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor: Theme.of(
-                  context,
-                ).colorScheme.onPrimaryContainer,
-              ),
-            ),
-          ),
-        ),
-
         // Projects list
         Expanded(
           child: projects.isEmpty
@@ -82,6 +51,9 @@ class ProjectList extends StatelessWidget {
                   itemCount: projects.length,
                   itemBuilder: (context, index) {
                     final project = projects[index];
+                    final isCurrentProject = project.id == currentProjectId;
+                    final theme = Theme.of(context);
+
                     final absoluteDateTime =
                         DateFormatter.formatAbsoluteDateTime(
                           project.lastSessionDate,
@@ -95,7 +67,10 @@ class ProjectList extends StatelessWidget {
                         horizontal: 16,
                         vertical: 8,
                       ),
-                      elevation: 2,
+                      elevation: isCurrentProject ? 4 : 2,
+                      color: isCurrentProject
+                          ? theme.colorScheme.primaryContainer
+                          : null,
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -103,9 +78,12 @@ class ProjectList extends StatelessWidget {
                         ),
                         title: Text(
                           project.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
+                            color: isCurrentProject
+                                ? theme.colorScheme.onPrimaryContainer
+                                : null,
                           ),
                         ),
                         subtitle: Padding(
@@ -119,10 +97,11 @@ class ProjectList extends StatelessWidget {
                                   project.description!,
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurface
-                                        .withValues(alpha: 0.7),
+                                    color: isCurrentProject
+                                        ? theme.colorScheme.onPrimaryContainer
+                                              .withValues(alpha: 0.7)
+                                        : theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.7),
                                   ),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
@@ -133,8 +112,12 @@ class ProjectList extends StatelessWidget {
                                 'Last session: $absoluteDateTime',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.6),
+                                  color: isCurrentProject
+                                      ? theme.colorScheme.onPrimaryContainer
+                                            .withValues(alpha: 0.6)
+                                      : theme.colorScheme.onSurface.withValues(
+                                          alpha: 0.6,
+                                        ),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -142,43 +125,54 @@ class ProjectList extends StatelessWidget {
                                 relativeTime,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Theme.of(context).colorScheme.onSurface
-                                      .withValues(alpha: 0.5),
+                                  color: isCurrentProject
+                                      ? theme.colorScheme.onPrimaryContainer
+                                            .withValues(alpha: 0.5)
+                                      : theme.colorScheme.onSurface.withValues(
+                                          alpha: 0.5,
+                                        ),
                                   fontStyle: FontStyle.italic,
                                 ),
                               ),
+                              if (isCurrentProject)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 14,
+                                        color: theme
+                                            .colorScheme
+                                            .onPrimaryContainer,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Active',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme
+                                              .colorScheme
+                                              .onPrimaryContainer,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                             ],
                           ),
                         ),
-                        trailing: PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert),
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              _showDeleteConfirmation(context, project);
-                            }
-                          },
-                          itemBuilder: (BuildContext context) => [
-                            PopupMenuItem<String>(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete,
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        trailing: IconButton(
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: isCurrentProject
+                                ? theme.colorScheme.onPrimaryContainer
+                                : null,
+                          ),
+                          onPressed: () =>
+                              _showDeleteConfirmation(context, project),
+                          tooltip: 'Delete project',
                         ),
                         onTap: () {
                           if (onProjectTap != null) {
