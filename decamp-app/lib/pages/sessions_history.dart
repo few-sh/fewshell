@@ -603,7 +603,7 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
     }
   }
 
-  Future<void> _toggleStar(dynamic session) async {
+  Future<void> _toggleStar(SessionEntity session) async {
     final sessionDao = ref.read(databaseProvider).sessionDao;
     await sessionDao.toggleSessionStar(session.id, !session.isStarred);
   }
