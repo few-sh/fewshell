@@ -365,36 +365,10 @@ class SyncService {
 
       final client = HttpClient(context: context);
 
-      // Enforce certificate verification.
-      // Since we use withTrustedRoots: false and setTrustedCertificatesBytes,
-      // this effectively pins the connection to our CA.
-      client.badCertificateCallback = (cert, host, port) {
-        _log.warning('Certificate verification failed for $host:$port');
-        _log.warning('Subject: ${cert.subject}');
-        _log.warning('Issuer: ${cert.issuer}');
-
-        // Implement strict pinning by comparing the received certificate with our embedded server certificate.
-        // This bypasses issues with CA verification on some platforms (like macOS/iOS with custom CAs)
-        // and provides the highest level of security.
-        final pinnedCertClean = serverCert
-            .replaceAll(RegExp(r'-----.*-----'), '')
-            .replaceAll(RegExp(r'\s+'), '');
-        final receivedCertClean = cert.pem
-            .replaceAll(RegExp(r'-----.*-----'), '')
-            .replaceAll(RegExp(r'\s+'), '');
-
-        if (pinnedCertClean == receivedCertClean) {
-          _log.info(
-            'Certificate pinning successful: Server certificate matches pinned certificate.',
-          );
-          return true;
-        } else {
-          _log.severe(
-            'Certificate pinning FAILED: Server certificate does NOT match pinned certificate.',
-          );
-          return false;
-        }
-      };
+      // We do not set badCertificateCallback because we want to rely on
+      // SecurityContext validation. We have set withTrustedRoots: false
+      // and provided our CA via setTrustedCertificatesBytes, so the
+      // HttpClient will verify the server certificate against our CA.
 
       _log.info('Connecting with mTLS to $uri');
       return IOWebSocketChannel.connect(uri, customClient: client);
