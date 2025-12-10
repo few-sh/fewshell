@@ -28,7 +28,8 @@ openssl req -new -key client.key -out client.csr -subj "/CN=Decamp Client"
 
 # 5. Sign the Client CSR with the CA
 echo "Signing Client Cert..."
-openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256 \
+  -extfile <(printf "extendedKeyUsage=clientAuth")
 
 # 6. Convert Client key and cert to PKCS#12 format (often easier for clients to consume)
 echo "Creating Client PKCS#12..."
@@ -65,6 +66,11 @@ cat > "$APP_CERTS_FILE" <<EOF
 /// Certificate Authority Certificate
 const String caCert = r'''
 $(cat ca.crt)
+''';
+
+/// Server Certificate
+const String serverCert = r'''
+$(cat server.crt)
 ''';
 
 /// Client Certificate

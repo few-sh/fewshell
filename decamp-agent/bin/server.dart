@@ -84,11 +84,15 @@ void main(List<String> args) async {
 
     // Start the server
     _log.info('Starting server on port $port...');
+
+    // Use anyIPv6 with v6Only=false to listen on both IPv4 and IPv6
+    // This ensures localhost works regardless of whether it resolves to 127.0.0.1 or ::1
     final server = await HttpServer.bindSecure(
-      InternetAddress.anyIPv4,
+      InternetAddress.anyIPv6,
       port,
       securityContext,
       requestClientCertificate: true,
+      v6Only: false,
     );
 
     server.listen(
