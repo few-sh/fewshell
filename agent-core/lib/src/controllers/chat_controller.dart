@@ -128,13 +128,14 @@ class ChatController extends StateNotifier<ChatState> {
   Future<MessageEntity?> _validateAndPrepare({
     required String sessionId,
     required String content,
+    String? userName,
   }) async {
     // Redact and save user's message
     final redactedContent = await _secretRedactor.redact(content);
     final messageId = await _messageDao.insertMessageWithId(
       sessionId: sessionId,
       userId: _kUserUserId,
-      userName: _kUserUserName,
+      userName: userName ?? _kUserUserName,
       content: redactedContent,
     );
 
@@ -180,6 +181,7 @@ class ChatController extends StateNotifier<ChatState> {
   /// - stopStreaming: Clears streaming state
   Future<void> sendMessage({
     String? content,
+    String? userName,
     MessageEntity? triggerMessage,
     required String sessionId,
     required Future<List<ToolAction>?> Function(List<ToolAction>)
@@ -195,6 +197,7 @@ class ChatController extends StateNotifier<ChatState> {
         triggerMessage = await _validateAndPrepare(
           sessionId: sessionId,
           content: content,
+          userName: userName,
         );
         if (triggerMessage == null) {
           if (mounted) state = state.copyWith(isLoading: false);

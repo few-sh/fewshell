@@ -15,6 +15,7 @@ import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/message_provider.dart';
 import 'package:decamp/providers/chat_controller_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/providers/user_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/components/no_llm_configured_overlay.dart';
@@ -183,9 +184,13 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Get sync channel
     final syncChannel = ref.read(syncServiceProvider).projectChannel;
 
+    // Get current username
+    final userName = ref.read(userProvider);
+
     // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
       content: content,
+      userName: userName,
       sessionId: currentSessionId,
       requestApproval: (actions) {
         if (!mounted) return Future.value(null);
