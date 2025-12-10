@@ -5,6 +5,7 @@ import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
 import '../components/project_title_bar.dart';
+import '../components/empty_placeholder.dart';
 
 /// Snippets page with User and Project snippets tabs
 class SnippetsPage extends ConsumerStatefulWidget {
@@ -109,35 +110,10 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 
     if (currentProjectId == null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 64,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No Project Selected',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Select a project to manage project-specific snippets.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+        child: EmptyPlaceholder(
+          icon: Icons.info_outline,
+          title: 'No Project Selected',
+          subtitle: 'Select a project to manage project-specific snippets.',
         ),
       );
     }
@@ -161,35 +137,10 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     // Show empty state only if no snippets AND not adding a new one
     if (snippets.isEmpty && _newSnippetId == null) {
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.code_off,
-                size: 64,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.4),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No Snippets Yet',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Add your first snippet using the + button below.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+        child: EmptyPlaceholder(
+          icon: Icons.code_off,
+          title: 'No Snippets Yet',
+          subtitle: 'Add your first snippet using the + button below.',
         ),
       );
     }

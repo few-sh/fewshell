@@ -73,7 +73,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -105,6 +105,16 @@ class ProjectDatabase extends _$ProjectDatabase {
         // Enable foreign keys
         // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
         // await executor.runCustom('PRAGMA foreign_keys = ON');
+
+        // Ensure is_starred column exists (for CRDT databases that may skip migrations)
+        final columns = await executor
+            .runSelect("SELECT * FROM pragma_table_info('sessions');", []);
+        final hasIsStarred = columns.any((row) => row['name'] == 'is_starred');
+        if (!hasIsStarred) {
+          await executor.runCustom(
+            'ALTER TABLE sessions ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0 CHECK (is_starred IN (0, 1));',
+          );
+        }
 
         // Setup CRDT listener now that the DB is open and CRDT should be ready
         _setupCrdtListener();
@@ -143,6 +153,18 @@ class ProjectDatabase extends _$ProjectDatabase {
 
           if (!hasIsStreaming) {
             await m.addColumn(messages, messages.isStreaming);
+          }
+        }
+
+        // Migration from version 7 to 8: Add isStarred column to sessions
+        if (from < 8) {
+          final columns = await executor
+              .runSelect("SELECT * FROM pragma_table_info('sessions');", []);
+          final hasIsStarred =
+              columns.any((row) => row['name'] == 'is_starred');
+
+          if (!hasIsStarred) {
+            await m.addColumn(sessions, sessions.isStarred);
           }
         }
       },

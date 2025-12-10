@@ -144,6 +144,20 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
     );
   }
 
+  /// Toggle session star status
+  Future<int> toggleSessionStar(String id, bool isStarred) {
+    return (update(sessions)..where((s) => s.id.equals(id))).write(
+      SessionEntityCompanion(isStarred: Value(isStarred)),
+    );
+  }
+
+  /// Rename a session
+  Future<int> renameSession(String id, String newName) {
+    return (update(sessions)..where((s) => s.id.equals(id))).write(
+      SessionEntityCompanion(description: Value(newName)),
+    );
+  }
+
   /// Delete all archived sessions for a specific project
   Future<int> deleteArchivedSessionsByProject(String projectId) {
     return (delete(sessions)

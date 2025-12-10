@@ -5,6 +5,9 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/components/confirmation_dialog.dart';
+import 'package:decamp/components/empty_placeholder.dart';
+import 'package:decamp/components/input_dialog.dart';
 
 /// Enum for view mode in sessions history
 enum SessionsViewMode { active, archived }
@@ -132,45 +135,16 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
     String? currentSessionId,
   ) {
     if (sessions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _viewMode == SessionsViewMode.active
-                  ? Icons.chat_bubble_outline
-                  : Icons.archive_outlined,
-              size: 64,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _viewMode == SessionsViewMode.active
-                  ? 'No chat sessions yet'
-                  : 'No archived sessions',
-              style: TextStyle(
-                fontSize: 18,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _viewMode == SessionsViewMode.active
-                  ? 'Start a new conversation to see it here'
-                  : 'Archived sessions will appear here',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          ],
-        ),
+      return EmptyPlaceholder(
+        icon: _viewMode == SessionsViewMode.active
+            ? Icons.chat_bubble_outline
+            : Icons.archive_outlined,
+        title: _viewMode == SessionsViewMode.active
+            ? 'No chat sessions yet'
+            : 'No archived sessions',
+        subtitle: _viewMode == SessionsViewMode.active
+            ? 'Start a new conversation to see it here'
+            : 'Archived sessions will appear here',
       );
     }
 
@@ -329,7 +303,7 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
         child: ListTile(
           contentPadding: const EdgeInsets.only(
             left: 16,
-            right: 16,
+            right: 8, // Reduced right padding for trailing icons
             top: 12,
             bottom: 12,
           ),
@@ -398,6 +372,95 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
               ],
             ),
           ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Star icon
+              if (_viewMode == SessionsViewMode.active)
+                IconButton(
+                  icon: Icon(
+                    session.isStarred ? Icons.star : Icons.star_border,
+                    color: session.isStarred
+                        ? Colors.amber
+                        : theme.colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.6,
+                          ),
+                  ),
+                  tooltip: session.isStarred ? 'Unstar' : 'Star',
+                  onPressed: () => _toggleStar(session),
+                ),
+              // Menu icon
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_horiz, // Ellipsis like chat
+                  color: theme.colorScheme.onSurfaceVariant.withValues(
+                    alpha: 0.6,
+                  ),
+                ),
+                tooltip: 'Session options',
+                onSelected: (value) {
+                  switch (value) {
+                    case 'rename':
+                      _showRenameSessionDialog(context, session);
+                      break;
+                    case 'archive':
+                      _archiveSession(session);
+                      break;
+                    case 'unarchive':
+                      _unarchiveSession(session);
+                      break;
+                    case 'delete':
+                      _deleteSession(context, session);
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'rename',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 12),
+                        Text('Rename'),
+                      ],
+                    ),
+                  ),
+                  if (_viewMode == SessionsViewMode.active)
+                    const PopupMenuItem(
+                      value: 'archive',
+                      child: Row(
+                        children: [
+                          Icon(Icons.archive, size: 18),
+                          SizedBox(width: 12),
+                          Text('Archive'),
+                        ],
+                      ),
+                    )
+                  else
+                    const PopupMenuItem(
+                      value: 'unarchive',
+                      child: Row(
+                        children: [
+                          Icon(Icons.unarchive, size: 18),
+                          SizedBox(width: 12),
+                          Text('Unarchive'),
+                        ],
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        SizedBox(width: 12),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           onTap: _viewMode == SessionsViewMode.archived
               ? null // Archived sessions can't be tapped to open
               : isCurrentSession
@@ -461,70 +524,173 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
     );
   }
 
-  void _showDeleteAllArchivedDialog(BuildContext context, int count) {
-    showDialog(
+  void _showDeleteAllArchivedDialog(BuildContext context, int count) async {
+    final confirmed = await showConfirmationDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Delete All Archived Sessions?'),
-          content: Text(
-            'This will permanently delete $count archived ${count == 1 ? 'session' : 'sessions'}. This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                Navigator.of(dialogContext).pop();
-
-                final projectId = ref.read(currentProjectIdProvider);
-                if (projectId != null) {
-                  final sessionDao = ref.read(databaseProvider).sessionDao;
-                  final messageDao = ref.read(databaseProvider).messageDao;
-
-                  // Get all archived sessions first
-                  final archivedSessions = await sessionDao
-                      .getSessionsByProject(projectId);
-                  final archivedSessionsFiltered = archivedSessions
-                      .where((s) => s.isArchived)
-                      .toList();
-
-                  // Delete messages for each archived session
-                  for (final session in archivedSessionsFiltered) {
-                    await messageDao.deleteMessagesBySession(session.id);
-                  }
-
-                  // Now delete the archived sessions themselves
-                  final deletedCount = await sessionDao
-                      .deleteArchivedSessionsByProject(projectId);
-
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Deleted $deletedCount archived ${deletedCount == 1 ? 'session' : 'sessions'}',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-
-                    // Switch back to active view
-                    setState(() {
-                      _viewMode = SessionsViewMode.active;
-                    });
-                  }
-                }
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.error,
-              ),
-              child: const Text('Delete All'),
-            ),
-          ],
-        );
-      },
+      title: 'Delete All Archived Sessions?',
+      content:
+          'This will permanently delete $count archived ${count == 1 ? 'session' : 'sessions'}. This action cannot be undone.',
+      confirmLabel: 'Delete All',
     );
+
+    if (confirmed == true && context.mounted) {
+      final projectId = ref.read(currentProjectIdProvider);
+      if (projectId != null) {
+        final sessionDao = ref.read(databaseProvider).sessionDao;
+        final messageDao = ref.read(databaseProvider).messageDao;
+
+        // Get all archived sessions first
+        final archivedSessions = await sessionDao.getSessionsByProject(
+          projectId,
+        );
+        final archivedSessionsFiltered = archivedSessions
+            .where((s) => s.isArchived)
+            .toList();
+
+        // Delete messages for each archived session
+        for (final session in archivedSessionsFiltered) {
+          await messageDao.deleteMessagesBySession(session.id);
+        }
+
+        // Now delete the archived sessions themselves
+        final deletedCount = await sessionDao.deleteArchivedSessionsByProject(
+          projectId,
+        );
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Deleted $deletedCount archived ${deletedCount == 1 ? 'session' : 'sessions'}',
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+
+          // Switch back to active view
+          setState(() {
+            _viewMode = SessionsViewMode.active;
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> _toggleStar(SessionEntity session) async {
+    final sessionDao = ref.read(databaseProvider).sessionDao;
+    await sessionDao.toggleSessionStar(session.id, !session.isStarred);
+  }
+
+  Future<void> _archiveSession(dynamic session) async {
+    // Check if this is the currently active session
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == session.id) {
+      await _switchFromArchivedSession(session);
+    }
+
+    final sessionDao = ref.read(databaseProvider).sessionDao;
+    await sessionDao.archiveSession(session.id);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Archived: ${session.description}'),
+          action: SnackBarAction(
+            label: 'Undo',
+            onPressed: () {
+              sessionDao.unarchiveSession(session.id);
+            },
+          ),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _unarchiveSession(dynamic session) async {
+    final sessionDao = ref.read(databaseProvider).sessionDao;
+    await sessionDao.unarchiveSession(session.id);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Restored: ${session.description}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _switchFromArchivedSession(dynamic session) async {
+    final sessionDao = ref.read(databaseProvider).sessionDao;
+    // Get all non-archived sessions for this project
+    final sessions = await sessionDao.getSessionsByProject(session.projectId);
+    final otherSessions = sessions
+        .where((s) => s.id != session.id && !s.isArchived)
+        .toList();
+
+    if (otherSessions.isNotEmpty) {
+      // Switch to the most recent other session
+      ref
+          .read(currentSessionIdProvider.notifier)
+          .select(otherSessions.first.id);
+    } else {
+      // No other sessions - create a new one
+      final newSessionId = await sessionDao.createSessionWithId(
+        projectId: session.projectId,
+      );
+      ref.read(currentSessionIdProvider.notifier).select(newSessionId);
+    }
+  }
+
+  Future<void> _deleteSession(BuildContext context, dynamic session) async {
+    final confirmed = await showConfirmationDialog(
+      context: context,
+      title: 'Delete Session?',
+      content:
+          'Are you sure you want to delete "${session.description}"? This action cannot be undone.',
+    );
+
+    if (confirmed == true) {
+      // If deleting current session, switch to another one
+      final currentSessionId = ref.read(currentSessionIdProvider);
+      if (currentSessionId == session.id) {
+        await _switchFromArchivedSession(session);
+      }
+
+      final sessionDao = ref.read(databaseProvider).sessionDao;
+      final messageDao = ref.read(databaseProvider).messageDao;
+
+      // Delete messages first
+      await messageDao.deleteMessagesBySession(session.id);
+      // Delete session
+      await sessionDao.deleteSession(session.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Deleted: ${session.description}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRenameSessionDialog(BuildContext context, dynamic session) async {
+    final newName = await showInputDialog(
+      context: context,
+      title: 'Rename Session',
+      label: 'Session Name',
+      initialValue: session.description,
+      confirmLabel: 'Rename',
+    );
+
+    if (newName != null &&
+        newName.isNotEmpty &&
+        newName != session.description) {
+      final sessionDao = ref.read(databaseProvider).sessionDao;
+      await sessionDao.renameSession(session.id, newName);
+    }
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/components/confirmation_dialog.dart';
+import 'package:decamp/components/empty_placeholder.dart';
 
 class Project {
   final String id;
@@ -29,34 +31,19 @@ class ProjectList extends StatelessWidget {
     this.onCreateProject,
   });
 
-  void _showDeleteConfirmation(BuildContext context, Project project) {
-    showDialog(
+  void _showDeleteConfirmation(BuildContext context, Project project) async {
+    final confirmed = await showConfirmationDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Project'),
-          content: Text(
-            'Are you sure you want to delete "${project.name}"? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (onProjectDelete != null) {
-                  onProjectDelete!(project);
-                }
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+      title: 'Delete Project',
+      content:
+          'Are you sure you want to delete "${project.name}"? This action cannot be undone.',
     );
+
+    if (confirmed == true && context.mounted) {
+      if (onProjectDelete != null) {
+        onProjectDelete!(project);
+      }
+    }
   }
 
   @override
@@ -86,39 +73,10 @@ class ProjectList extends StatelessWidget {
         // Projects list
         Expanded(
           child: projects.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.folder_open,
-                        size: 64,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.onSurface.withValues(alpha: 0.3),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No projects yet',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Create a new project to get started',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ],
-                  ),
+              ? const EmptyPlaceholder(
+                  icon: Icons.folder_open,
+                  title: 'No projects yet',
+                  subtitle: 'Create a new project to get started',
                 )
               : ListView.builder(
                   itemCount: projects.length,
