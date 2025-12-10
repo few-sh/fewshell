@@ -349,16 +349,63 @@ class SyncService {
   }
 
   WebSocketChannel _connectWebSocket(Uri uri) {
+    developer.log('SyncService: _connectWebSocket called for $uri');
     // Check for mTLS configuration
     // In a real app, these would be loaded from secure storage or assets
     // For development/testing, we can check for environment variables or specific paths
     try {
-      if (Platform.environment['ENABLE_MTLS'] == 'true') {
+      final enableMtls = Platform.environment['ENABLE_MTLS'] == 'true';
+      developer.log(
+        'SyncService: Checking mTLS configuration. ENABLE_MTLS=$enableMtls',
+      );
+
+      if (enableMtls) {
         final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
+        developer.log('SyncService: Using certs path: $certsPath');
+        developer.log(
+          'SyncService: Current directory: ${Directory.current.path}',
+        );
+
+        final clientCertFile = File('$certsPath/client.crt');
+        final clientKeyFile = File('$certsPath/client.key');
+        final caCertFile = File('$certsPath/ca.crt');
+
+        bool missingFiles = false;
+        if (!clientCertFile.existsSync()) {
+          developer.log(
+            'SyncService: ERROR: Client cert missing at ${clientCertFile.absolute.path}',
+          );
+          missingFiles = true;
+        }
+        if (!clientKeyFile.existsSync()) {
+          developer.log(
+            'SyncService: ERROR: Client key missing at ${clientKeyFile.absolute.path}',
+          );
+          missingFiles = true;
+        }
+        if (!caCertFile.existsSync()) {
+          developer.log(
+            'SyncService: ERROR: CA cert missing at ${caCertFile.absolute.path}',
+          );
+          missingFiles = true;
+        }
+
+        if (missingFiles) {
+          developer.log(
+            'SyncService: Aborting mTLS setup due to missing files.',
+          );
+          // Fallback to standard connection or throw?
+          // If mTLS is explicitly requested, we probably shouldn't fallback silently,
+          // but for now let's allow the catch block to handle it or proceed to fallback.
+          throw const FileSystemException('Missing mTLS certificate files');
+        }
+
         final context = SecurityContext(withTrustedRoots: true)
-          ..useCertificateChain('$certsPath/client.crt')
-          ..usePrivateKey('$certsPath/client.key')
-          ..setClientAuthorities('$certsPath/ca.crt');
+          ..useCertificateChain(clientCertFile.path)
+          ..usePrivateKey(clientKeyFile.path)
+          ..setClientAuthorities(caCertFile.path);
+
+        developer.log('SyncService: SecurityContext created successfully.');
 
         final client = HttpClient(context: context);
         // Allow self-signed certs for localhost/testing
@@ -367,10 +414,15 @@ class SyncService {
         developer.log('SyncService: Connecting with mTLS to $uri');
         return IOWebSocketChannel.connect(uri, customClient: client);
       }
-    } catch (e) {
-      developer.log('SyncService: Error configuring mTLS: $e');
+    } catch (e, st) {
+      developer.log(
+        'SyncService: Error configuring mTLS',
+        error: e,
+        stackTrace: st,
+      );
     }
 
+    developer.log('SyncService: Connecting with standard WebSocket to $uri');
     return WebSocketChannel.connect(uri);
   }
 }

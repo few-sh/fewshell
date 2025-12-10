@@ -12,8 +12,10 @@ import 'themes/neon_dark.dart';
 import 'themes/terminal_theme.dart';
 
 void main() async {
+  developer.log('App: main() started');
   // Ensure Flutter bindings are initialized before async operations
   WidgetsFlutterBinding.ensureInitialized();
+  developer.log('App: WidgetsFlutterBinding initialized');
 
   // Configure logging for AnthropicClient
   // Logger.root.level = Level.ALL;
@@ -28,6 +30,7 @@ void main() async {
 
   // Initialize SharedPreferences
   final sharedPreferences = await SharedPreferences.getInstance();
+  developer.log('App: SharedPreferences initialized');
 
   runApp(
     ProviderScope(
@@ -38,6 +41,7 @@ void main() async {
       child: const DecampApp(),
     ),
   );
+  developer.log('App: runApp called');
 }
 
 class DecampApp extends ConsumerWidget {
@@ -45,8 +49,18 @@ class DecampApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Initialize SyncService
-    ref.watch(syncServiceProvider);
+    developer.log('DecampApp: build called');
+    try {
+      // Initialize SyncService
+      ref.watch(syncServiceProvider);
+      developer.log('DecampApp: SyncService initialized');
+    } catch (e, st) {
+      developer.log(
+        'DecampApp: Error initializing SyncService',
+        error: e,
+        stackTrace: st,
+      );
+    }
 
     final themeMode = ref.watch(themeProvider);
 
