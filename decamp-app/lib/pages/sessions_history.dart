@@ -6,6 +6,8 @@ import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/confirmation_dialog.dart';
+import 'package:decamp/components/empty_placeholder.dart';
+import 'package:decamp/components/input_dialog.dart';
 
 /// Enum for view mode in sessions history
 enum SessionsViewMode { active, archived }
@@ -133,45 +135,16 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
     String? currentSessionId,
   ) {
     if (sessions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _viewMode == SessionsViewMode.active
-                  ? Icons.chat_bubble_outline
-                  : Icons.archive_outlined,
-              size: 64,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _viewMode == SessionsViewMode.active
-                  ? 'No chat sessions yet'
-                  : 'No archived sessions',
-              style: TextStyle(
-                fontSize: 18,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _viewMode == SessionsViewMode.active
-                  ? 'Start a new conversation to see it here'
-                  : 'Archived sessions will appear here',
-              style: TextStyle(
-                fontSize: 14,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.5),
-              ),
-            ),
-          ],
-        ),
+      return EmptyPlaceholder(
+        icon: _viewMode == SessionsViewMode.active
+            ? Icons.chat_bubble_outline
+            : Icons.archive_outlined,
+        title: _viewMode == SessionsViewMode.active
+            ? 'No chat sessions yet'
+            : 'No archived sessions',
+        subtitle: _viewMode == SessionsViewMode.active
+            ? 'Start a new conversation to see it here'
+            : 'Archived sessions will appear here',
       );
     }
 
@@ -704,39 +677,20 @@ class _SessionsHistoryPageState extends ConsumerState<SessionsHistoryPage> {
     }
   }
 
-  void _showRenameSessionDialog(BuildContext context, dynamic session) {
-    final controller = TextEditingController(text: session.description);
-    showDialog(
+  void _showRenameSessionDialog(BuildContext context, dynamic session) async {
+    final newName = await showInputDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rename Session'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Session Name',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty && newName != session.description) {
-                final sessionDao = ref.read(databaseProvider).sessionDao;
-                await sessionDao.renameSession(session.id, newName);
-              }
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('Rename'),
-          ),
-        ],
-      ),
+      title: 'Rename Session',
+      label: 'Session Name',
+      initialValue: session.description,
+      confirmLabel: 'Rename',
     );
+
+    if (newName != null &&
+        newName.isNotEmpty &&
+        newName != session.description) {
+      final sessionDao = ref.read(databaseProvider).sessionDao;
+      await sessionDao.renameSession(session.id, newName);
+    }
   }
 }
