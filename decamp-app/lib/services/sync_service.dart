@@ -392,7 +392,7 @@ class SyncService {
           throw const FileSystemException('Missing mTLS certificate files');
         }
 
-        final context = SecurityContext(withTrustedRoots: true)
+        final context = SecurityContext(withTrustedRoots: false)
           ..useCertificateChain(clientCertFile.path)
           ..usePrivateKey(clientKeyFile.path)
           ..setTrustedCertificates(caCertFile.path);
@@ -400,14 +400,13 @@ class SyncService {
         _log.info('SecurityContext created successfully.');
 
         final client = HttpClient(context: context);
-        // Allow self-signed certs for localhost/testing
-        client.badCertificateCallback = (cert, host, port) => true;
 
         _log.info('Connecting with mTLS to $uri');
         return IOWebSocketChannel.connect(uri, customClient: client);
       }
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
+      rethrow;
     }
 
     _log.info('Connecting with standard WebSocket to $uri');

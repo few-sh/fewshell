@@ -50,6 +50,12 @@ void main(List<String> args) async {
           ..usePrivateKey('$certsPath/server.key')
           ..setClientAuthorities('$certsPath/ca.crt');
         _log.info('SecurityContext initialized successfully');
+      } on FileSystemException catch (e) {
+        _log.severe(
+          'Failed to load mTLS certificates from "$certsPath". Please check if the files exist and are readable.',
+          e,
+        );
+        rethrow;
       } catch (e, st) {
         _log.severe('Failed to initialize SecurityContext', e, st);
         rethrow;

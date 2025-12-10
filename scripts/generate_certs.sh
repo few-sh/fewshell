@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # Create a directory for certificates
 mkdir -p certs
@@ -32,5 +33,8 @@ openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out c
 # 6. Convert Client key and cert to PKCS#12 format (often easier for clients to consume)
 echo "Creating Client PKCS#12..."
 openssl pkcs12 -export -out client.p12 -inkey client.key -in client.crt -certfile ca.crt -passout pass:decamp
+
+# Clean up intermediate files
+rm server.csr client.csr ca.srl
 
 echo "Done! Certificates are in the 'certs' directory."
