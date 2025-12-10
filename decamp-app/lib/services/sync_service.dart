@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/database_provider.dart';
@@ -126,9 +128,7 @@ class SyncService {
       final uri = Uri.parse('$cleanUrl/sync/global');
 
       developer.log('SyncService: Connecting to global sync at $uri');
-      _globalChannel = MultiplexedWebSocketChannel(
-        WebSocketChannel.connect(uri),
-      );
+      _globalChannel = MultiplexedWebSocketChannel(_connectWebSocket(uri));
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         developer.log('SyncService (Global): Received custom message: $msg');
       });
@@ -219,7 +219,7 @@ class SyncService {
       developer.log('SyncService: Connecting to project sync at $uri');
       _updateConnectionState(SyncConnectionState.connecting);
 
-      final wsChannel = WebSocketChannel.connect(uri);
+      final wsChannel = _connectWebSocket(uri);
       final monitoredChannel = _ActivityMonitorWebSocketChannel(
         wsChannel,
         onActivity: _handleSyncActivity,
@@ -346,6 +346,32 @@ class SyncService {
     } else {
       developer.log('SyncService: Cannot send ping, no project connection');
     }
+  }
+
+  WebSocketChannel _connectWebSocket(Uri uri) {
+    // Check for mTLS configuration
+    // In a real app, these would be loaded from secure storage or assets
+    // For development/testing, we can check for environment variables or specific paths
+    try {
+      if (Platform.environment['ENABLE_MTLS'] == 'true') {
+        final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
+        final context = SecurityContext(withTrustedRoots: true)
+          ..useCertificateChain('$certsPath/client.crt')
+          ..usePrivateKey('$certsPath/client.key')
+          ..setClientAuthorities('$certsPath/ca.crt');
+
+        final client = HttpClient(context: context);
+        // Allow self-signed certs for localhost/testing
+        client.badCertificateCallback = (cert, host, port) => true;
+
+        developer.log('SyncService: Connecting with mTLS to $uri');
+        return IOWebSocketChannel.connect(uri, customClient: client);
+      }
+    } catch (e) {
+      developer.log('SyncService: Error configuring mTLS: $e');
+    }
+
+    return WebSocketChannel.connect(uri);
   }
 }
 

@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Create a directory for certificates
+mkdir -p certs
+cd certs
+
+# 1. Generate CA private key and self-signed certificate
+echo "Generating CA..."
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -sha256 -days 3650 -out ca.crt -subj "/CN=Decamp CA"
+
+# 2. Generate Server private key and certificate signing request (CSR)
+echo "Generating Server Certs..."
+openssl genrsa -out server.key 2048
+openssl req -new -key server.key -out server.csr -subj "/CN=localhost"
+
+# 3. Sign the Server CSR with the CA
+echo "Signing Server Cert..."
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -sha256
+
+# 4. Generate Client private key and CSR
+echo "Generating Client Certs..."
+openssl genrsa -out client.key 2048
+openssl req -new -key client.key -out client.csr -subj "/CN=Decamp Client"
+
+# 5. Sign the Client CSR with the CA
+echo "Signing Client Cert..."
+openssl x509 -req -in client.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out client.crt -days 365 -sha256
+
+# 6. Convert Client key and cert to PKCS#12 format (often easier for clients to consume)
+echo "Creating Client PKCS#12..."
+openssl pkcs12 -export -out client.p12 -inkey client.key -in client.crt -certfile ca.crt -passout pass:decamp
+
+echo "Done! Certificates are in the 'certs' directory."

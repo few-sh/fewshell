@@ -21,6 +21,17 @@ void main(List<String> args) async {
     final dbManager = DatabaseManager('${Directory.current.path}/data');
     await dbManager.init();
 
+    // Configure SecurityContext for mTLS if enabled
+    SecurityContext? securityContext;
+    if (Platform.environment['ENABLE_MTLS'] == 'true') {
+      final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
+      securityContext = SecurityContext(withTrustedRoots: true)
+        ..useCertificateChain('$certsPath/server.crt')
+        ..usePrivateKey('$certsPath/server.key')
+        ..setClientAuthorities('$certsPath/ca.crt');
+      developer.log('mTLS enabled. Using certs from $certsPath');
+    }
+
     // Add middleware for logging and CORS
     final handler = const shelf.Pipeline()
         .addMiddleware(shelf.logRequests())
@@ -32,14 +43,16 @@ void main(List<String> args) async {
       handler,
       InternetAddress.anyIPv4,
       port,
+      securityContext: securityContext,
     );
 
+    final scheme = securityContext != null ? 'https' : 'http';
     developer.log(
-      '🚀 Decamp Agent server running on http://${server.address.host}:${server.port}',
+      '🚀 Decamp Agent server running on $scheme://${server.address.host}:${server.port}',
     );
-    print('Server serving...');
+    developer.log('Server serving...');
   } catch (e, st) {
-    print('CRITICAL FAILURE: $e\n$st');
+    developer.log('CRITICAL FAILURE', error: e, stackTrace: st);
     exit(1);
   }
 }
