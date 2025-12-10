@@ -1,85 +1,51 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Spotlight Effect
-  const spotlight = document.querySelector(".spotlight");
-  document.addEventListener("mousemove", (e) => {
-    spotlight.style.setProperty("--x", `${e.clientX}px`);
-    spotlight.style.setProperty("--y", `${e.clientY}px`);
+  // Keyboard Navigation
+  const focusableElements = 'a, button, input, textarea, [tabindex]:not([tabindex="-1"])';
+  const focusableEvents = document.querySelectorAll(focusableElements);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      focusNextElement();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      focusPreviousElement();
+    }
   });
 
-  // Scroll Observer for Fade-in
-  const observerOptions = {
-    root: null,
-    rootMargin: "0px",
-    threshold: 0.1,
-  };
-
-  const observer = new IntersectionObserver((entries, observer) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add("visible");
-        observer.unobserve(entry.target);
-      }
-    });
-  }, observerOptions);
-
-  document.querySelectorAll("section").forEach((section) => {
-    observer.observe(section);
-  });
-
-  // Typing Effect for Hero
-  const heroElement = document.querySelector(".hero h1");
-  if (heroElement) {
-    // Read the existing text content from the h1
-    const heroText = heroElement.textContent.trim();
-
-    // Clear the element and type it out
-    heroElement.textContent = "";
-    let i = 0;
-    const typeWriter = () => {
-      if (i < heroText.length) {
-        heroElement.textContent += heroText.charAt(i);
-        i++;
-        setTimeout(typeWriter, 50 + Math.random() * 50);
-      } else {
-        heroElement.innerHTML += '<span class="cursor">_</span>';
-      }
-    };
-    // Start typing after a short delay
-    setTimeout(typeWriter, 500);
+  function focusNextElement() {
+    const focusable = Array.from(document.querySelectorAll(focusableElements));
+    const index = focusable.indexOf(document.activeElement);
+    const nextIndex = (index + 1) % focusable.length;
+    focusable[nextIndex].focus();
   }
 
-  // Handle Signup Form
-  const form = document.querySelector(".signup-form");
-  if (form) {
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const button = form.querySelector("button");
-      const originalText = button.textContent;
+  function focusPreviousElement() {
+    const focusable = Array.from(document.querySelectorAll(focusableElements));
+    const index = focusable.indexOf(document.activeElement);
+    const prevIndex = (index - 1 + focusable.length) % focusable.length;
+    focusable[prevIndex].focus();
+  }
 
-      button.disabled = true;
-      button.textContent = "Sending...";
+  // Typing Effect for specific terminal lines
+  const typeWriterElements = document.querySelectorAll('.type-writer');
+  typeWriterElements.forEach((el, index) => {
+    const text = el.getAttribute('data-text') || el.textContent;
+    el.textContent = '';
+    setTimeout(() => {
+      typeText(el, text);
+    }, index * 1000 + 500); // Stagger text
+  });
 
-      try {
-        const response = await fetch(form.action, {
-          method: form.method,
-          headers: { Accept: "application/json" },
-          body: new FormData(form),
-        });
-
-        if (response.ok) {
-          form.innerHTML =
-            '<div style="color: var(--accent-green); font-weight: bold;">Thanks for your interest!</div>';
-        } else {
-          throw new Error("Network response was not ok");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        button.textContent = "Error";
-        setTimeout(() => {
-          button.disabled = false;
-          button.textContent = originalText;
-        }, 2000);
+  function typeText(element, text) {
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < text.length) {
+        element.textContent += text.charAt(i);
+        i++;
+      } else {
+        clearInterval(interval);
       }
-    });
+    }, 30); // Speed
   }
 });

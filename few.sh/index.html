@@ -1,59 +1,63 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fewshot Corp</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&display=swap"
-        rel="stylesheet" />
-    <link rel="stylesheet" href="style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Fira+Code:wght@300;400;600&family=Roboto+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
 </head>
 
 <body>
-    <div class="grid-bg"></div>
-    <div class="spotlight"></div>
-
     <div class="container">
         <header>
             <div class="logo">Fewshot Corp</div>
             <nav>
-                <a href="fewshell.html">Fewshell</a> &nbsp;/&nbsp;
-                <a href="mailto:support@few.sh">Contact</a>
+                <a href="fewshell.html">[ Fewshell ]</a>
+                <a href="mailto:support@few.sh">[ Contact ]</a>
             </nav>
         </header>
 
         <main>
-            <section class="hero visible">
+            <section class="hero">
+                <p class="type-writer" style="color: var(--primary); margin-bottom: 0;">$ whoami</p>
                 <h1>Fewshot Corp.</h1>
-                <p class="subtitle">
+                <p>
+
                 </p>
             </section>
 
             <section id="projects">
-                <h2>Our Work</h2>
+                <h2># Our Work</h2>
+
                 <div class="faq-item">
                     <div class="faq-question">
-                        <a href="fewshell.html" style="color: var(--accent-green); text-decoration: none;">Fewshell</a>
+                        <a href="fewshell.html" style="border-bottom: none;">./fewshell</a>
                     </div>
-                    <div class="faq-answer">
+                    <div style="padding-left: 2rem; color: var(--text-dim);">
                         A mobile AI-assistant for DevOps practitioners and on-calls.
                         Manage your infrastructure from anywhere, without sacrificing
                         effectiveness, speed, or security.
+                        <br><br>
+                        <a href="fewshell.html" class="btn">EXECUTE</a>
                     </div>
                 </div>
             </section>
         </main>
 
         <footer>
-            <p>&copy; 2025 Fewshot Corp. All rights reserved.</p>
-            <p>
-                <a href="privacy.html">Privacy Policy</a> |
-                <a href="terms.html">Terms of Service</a>
-            </p>
+            <div>&copy; 2025 Fewshot Corp.</div>
+            <div>
+                <a href="privacy.html">Privacy</a>
+                <span style="color: var(--border-color)">|</span>
+                <a href="terms.html">Terms</a>
+            </div>
         </footer>
     </div>
 </body>
