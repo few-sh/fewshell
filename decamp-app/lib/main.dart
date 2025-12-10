@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logging/logging.dart';
-import 'dart:developer' as developer;
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
 import 'providers/theme_provider.dart';
@@ -11,26 +10,31 @@ import 'services/sync_service.dart';
 import 'themes/neon_dark.dart';
 import 'themes/terminal_theme.dart';
 
+final _log = Logger('DecampApp');
+
 void main() async {
-  developer.log('App: main() started');
+  // Configure logging
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    debugPrint(
+      '${record.time.toIso8601String()} [${record.loggerName}] ${record.level.name}: ${record.message}',
+    );
+    if (record.error != null) {
+      debugPrint('Error: ${record.error}');
+      if (record.stackTrace != null) {
+        debugPrint('Stack trace:\n${record.stackTrace}');
+      }
+    }
+  });
+
+  _log.info('main() started');
   // Ensure Flutter bindings are initialized before async operations
   WidgetsFlutterBinding.ensureInitialized();
-  developer.log('App: WidgetsFlutterBinding initialized');
-
-  // Configure logging for AnthropicClient
-  // Logger.root.level = Level.ALL;
-  Logger.root.onRecord.listen((record) {
-    developer.log(
-      '${record.level.name}: ${record.time}: ${record.loggerName}: ${record.message}',
-      name: record.loggerName,
-      level: record.level.value,
-      time: record.time,
-    );
-  });
+  _log.info('WidgetsFlutterBinding initialized');
 
   // Initialize SharedPreferences
   final sharedPreferences = await SharedPreferences.getInstance();
-  developer.log('App: SharedPreferences initialized');
+  _log.info('SharedPreferences initialized');
 
   runApp(
     ProviderScope(
@@ -41,7 +45,7 @@ void main() async {
       child: const DecampApp(),
     ),
   );
-  developer.log('App: runApp called');
+  _log.info('runApp called');
 }
 
 class DecampApp extends ConsumerWidget {
@@ -49,17 +53,13 @@ class DecampApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    developer.log('DecampApp: build called');
+    _log.info('build called');
     try {
       // Initialize SyncService
       ref.watch(syncServiceProvider);
-      developer.log('DecampApp: SyncService initialized');
+      _log.info('SyncService initialized');
     } catch (e, st) {
-      developer.log(
-        'DecampApp: Error initializing SyncService',
-        error: e,
-        stackTrace: st,
-      );
+      _log.severe('Error initializing SyncService', e, st);
     }
 
     final themeMode = ref.watch(themeProvider);

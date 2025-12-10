@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 import 'dart:io';
+import 'package:logging/logging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -9,6 +9,8 @@ import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
+
+final _log = Logger('SyncService');
 
 final syncServiceProvider = Provider<SyncService>((ref) {
   final service = SyncService(ref);
@@ -93,7 +95,7 @@ class SyncService {
 
     // Initial connection
     final nodeId = ref.read(nodeIdProvider);
-    developer.log('SyncService: Initializing with nodeId: $nodeId');
+    _log.info('Initializing with nodeId: $nodeId');
 
     final project = ref.read(currentProjectProvider);
     _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
@@ -112,7 +114,7 @@ class SyncService {
     _currentGlobalUrl = serverUrl;
 
     if (serverUrl == null || serverUrl.isEmpty) {
-      developer.log('SyncService: No server URL for global sync.');
+      _log.info('No server URL for global sync.');
       return;
     }
 
@@ -127,10 +129,10 @@ class SyncService {
           : serverUrl;
       final uri = Uri.parse('$cleanUrl/sync/global');
 
-      developer.log('SyncService: Connecting to global sync at $uri');
+      _log.info('Connecting to global sync at $uri');
       _globalChannel = MultiplexedWebSocketChannel(_connectWebSocket(uri));
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
-        developer.log('SyncService (Global): Received custom message: $msg');
+        _log.fine('Global sync received custom message: $msg');
       });
       _globalSync = CrdtSync.client(
         crdt,
@@ -176,7 +178,7 @@ class SyncService {
             },
       );
     } catch (e) {
-      developer.log('SyncService: Global DB not ready or error: $e');
+      _log.warning('Global DB not ready or error: $e');
     }
   }
 
@@ -207,8 +209,8 @@ class SyncService {
       final serverUrl = project?.serverUrl;
 
       if (serverUrl == null) {
-        developer.log(
-          'SyncService: No server URL configured for project $projectId. Skipping sync.',
+        _log.info(
+          'No server URL configured for project $projectId. Skipping sync.',
         );
         return;
       }
@@ -216,7 +218,7 @@ class SyncService {
       final crdt = db.crdt;
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
-      developer.log('SyncService: Connecting to project sync at $uri');
+      _log.info('Connecting to project sync at $uri');
       _updateConnectionState(SyncConnectionState.connecting);
 
       final wsChannel = _connectWebSocket(uri);
@@ -241,24 +243,22 @@ class SyncService {
       } catch (e) {
         if (token.isCancelled) return;
         _updateConnectionState(SyncConnectionState.disconnected);
-        developer.log('SyncService: Connection failed: $e');
+        _log.warning('Connection failed: $e');
         _scheduleReconnect();
         return;
       }
 
       _projectChannel = MultiplexedWebSocketChannel(monitoredChannel);
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
-        developer.log('SyncService (Project): Received custom message: $msg');
+        _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
-          developer.log(
-            'SyncService (Project): PONG received: ${msg['payload']}',
-          );
+          _log.fine('PONG received: ${msg['payload']}');
         }
       });
       _projectSync = CrdtSync.client(crdt, _projectChannel!, verbose: true);
     } catch (e) {
       if (token.isCancelled) return;
-      developer.log('SyncService: Project DB not ready or error: $e');
+      _log.warning('Project DB not ready or error: $e');
       _scheduleReconnect();
     }
   }
@@ -276,8 +276,8 @@ class SyncService {
     if (_currentProjectId == null || _currentProjectDb == null) return;
 
     final delaySeconds = _getFibonacciDelay(_reconnectAttempts);
-    developer.log(
-      'SyncService: Scheduling reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)...',
+    _log.info(
+      'Scheduling reconnect in $delaySeconds seconds (attempt $_reconnectAttempts)...',
     );
 
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
@@ -341,30 +341,26 @@ class SyncService {
 
   void sendPing(String message) {
     if (_projectChannel != null) {
-      developer.log('SyncService: Sending ping: $message');
+      _log.fine('Sending ping: $message');
       _projectChannel!.sendCustomMessage({'type': 'PING', 'payload': message});
     } else {
-      developer.log('SyncService: Cannot send ping, no project connection');
+      _log.warning('Cannot send ping, no project connection');
     }
   }
 
   WebSocketChannel _connectWebSocket(Uri uri) {
-    developer.log('SyncService: _connectWebSocket called for $uri');
+    _log.info('_connectWebSocket called for $uri');
     // Check for mTLS configuration
     // In a real app, these would be loaded from secure storage or assets
     // For development/testing, we can check for environment variables or specific paths
     try {
       final enableMtls = Platform.environment['ENABLE_MTLS'] == 'true';
-      developer.log(
-        'SyncService: Checking mTLS configuration. ENABLE_MTLS=$enableMtls',
-      );
+      _log.info('Checking mTLS configuration. ENABLE_MTLS=$enableMtls');
 
       if (enableMtls) {
         final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
-        developer.log('SyncService: Using certs path: $certsPath');
-        developer.log(
-          'SyncService: Current directory: ${Directory.current.path}',
-        );
+        _log.info('Using certs path: $certsPath');
+        _log.info('Current directory: ${Directory.current.path}');
 
         final clientCertFile = File('$certsPath/client.crt');
         final clientKeyFile = File('$certsPath/client.key');
@@ -372,28 +368,24 @@ class SyncService {
 
         bool missingFiles = false;
         if (!clientCertFile.existsSync()) {
-          developer.log(
-            'SyncService: ERROR: Client cert missing at ${clientCertFile.absolute.path}',
+          _log.severe(
+            'ERROR: Client cert missing at ${clientCertFile.absolute.path}',
           );
           missingFiles = true;
         }
         if (!clientKeyFile.existsSync()) {
-          developer.log(
-            'SyncService: ERROR: Client key missing at ${clientKeyFile.absolute.path}',
+          _log.severe(
+            'ERROR: Client key missing at ${clientKeyFile.absolute.path}',
           );
           missingFiles = true;
         }
         if (!caCertFile.existsSync()) {
-          developer.log(
-            'SyncService: ERROR: CA cert missing at ${caCertFile.absolute.path}',
-          );
+          _log.severe('ERROR: CA cert missing at ${caCertFile.absolute.path}');
           missingFiles = true;
         }
 
         if (missingFiles) {
-          developer.log(
-            'SyncService: Aborting mTLS setup due to missing files.',
-          );
+          _log.severe('Aborting mTLS setup due to missing files.');
           // Fallback to standard connection or throw?
           // If mTLS is explicitly requested, we probably shouldn't fallback silently,
           // but for now let's allow the catch block to handle it or proceed to fallback.
@@ -403,26 +395,22 @@ class SyncService {
         final context = SecurityContext(withTrustedRoots: true)
           ..useCertificateChain(clientCertFile.path)
           ..usePrivateKey(clientKeyFile.path)
-          ..setClientAuthorities(caCertFile.path);
+          ..setTrustedCertificates(caCertFile.path);
 
-        developer.log('SyncService: SecurityContext created successfully.');
+        _log.info('SecurityContext created successfully.');
 
         final client = HttpClient(context: context);
         // Allow self-signed certs for localhost/testing
         client.badCertificateCallback = (cert, host, port) => true;
 
-        developer.log('SyncService: Connecting with mTLS to $uri');
+        _log.info('Connecting with mTLS to $uri');
         return IOWebSocketChannel.connect(uri, customClient: client);
       }
     } catch (e, st) {
-      developer.log(
-        'SyncService: Error configuring mTLS',
-        error: e,
-        stackTrace: st,
-      );
+      _log.severe('Error configuring mTLS', e, st);
     }
 
-    developer.log('SyncService: Connecting with standard WebSocket to $uri');
+    _log.info('Connecting with standard WebSocket to $uri');
     return WebSocketChannel.connect(uri);
   }
 }
