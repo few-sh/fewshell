@@ -112,7 +112,7 @@ class ProjectDatabase extends _$ProjectDatabase {
         final hasIsStarred = columns.any((row) => row['name'] == 'is_starred');
         if (!hasIsStarred) {
           await executor.runCustom(
-            'ALTER TABLE sessions ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0;',
+            'ALTER TABLE sessions ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0 CHECK (is_starred IN (0, 1));',
           );
         }
 
