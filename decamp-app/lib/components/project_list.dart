@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/components/confirmation_dialog.dart';
 
 class Project {
   final String id;
@@ -29,34 +30,19 @@ class ProjectList extends StatelessWidget {
     this.onCreateProject,
   });
 
-  void _showDeleteConfirmation(BuildContext context, Project project) {
-    showDialog(
+  void _showDeleteConfirmation(BuildContext context, Project project) async {
+    final confirmed = await showConfirmationDialog(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Project'),
-          content: Text(
-            'Are you sure you want to delete "${project.name}"? This action cannot be undone.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (onProjectDelete != null) {
-                  onProjectDelete!(project);
-                }
-              },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
+      title: 'Delete Project',
+      content:
+          'Are you sure you want to delete "${project.name}"? This action cannot be undone.',
     );
+
+    if (confirmed == true && context.mounted) {
+      if (onProjectDelete != null) {
+        onProjectDelete!(project);
+      }
+    }
   }
 
   @override
