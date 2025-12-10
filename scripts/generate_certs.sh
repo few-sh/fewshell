@@ -19,7 +19,7 @@ openssl req -new -key server.key -out server.csr -subj "/CN=localhost" \
 # 3. Sign the Server CSR with the CA
 echo "Signing Server Cert..."
 openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out server.crt -days 365 -sha256 \
-  -extfile <(printf "subjectAltName=DNS:localhost,IP:127.0.0.1")
+  -extfile <(printf "subjectAltName=DNS:localhost,IP:127.0.0.1\nextendedKeyUsage=serverAuth")
 
 # 4. Generate Client private key and CSR
 echo "Generating Client Certs..."
@@ -46,17 +46,18 @@ APP_CERTS_FILE="../../decamp-app/lib/certs.dart"
 echo "Updating $AGENT_CERTS_FILE..."
 cat > "$AGENT_CERTS_FILE" <<EOF
 /// Certificate Authority Certificate
-const String caCert = r'''
+const String caCert = r'''\
 $(cat ca.crt)
 ''';
 
 /// Server Certificate
-const String serverCert = r'''
+const String serverCert = r'''\
 $(cat server.crt)
+$(cat ca.crt)
 ''';
 
 /// Server Private Key
-const String serverKey = r'''
+const String serverKey = r'''\
 $(cat server.key)
 ''';
 EOF
@@ -64,22 +65,23 @@ EOF
 echo "Updating $APP_CERTS_FILE..."
 cat > "$APP_CERTS_FILE" <<EOF
 /// Certificate Authority Certificate
-const String caCert = r'''
+const String caCert = r'''\
 $(cat ca.crt)
 ''';
 
 /// Server Certificate
-const String serverCert = r'''
+const String serverCert = r'''\
 $(cat server.crt)
 ''';
 
 /// Client Certificate
-const String clientCert = r'''
+const String clientCert = r'''\
 $(cat client.crt)
+$(cat ca.crt)
 ''';
 
 /// Client Private Key
-const String clientKey = r'''
+const String clientKey = r'''\
 $(cat client.key)
 ''';
 EOF

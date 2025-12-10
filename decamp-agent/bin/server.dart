@@ -58,10 +58,11 @@ void main(List<String> args) async {
       _log.info('Server Certificate PEM:\n$serverCert');
     }
 
-    final securityContext = SecurityContext(withTrustedRoots: true)
+    final securityContext = SecurityContext(withTrustedRoots: false)
       ..useCertificateChainBytes(utf8.encode(serverCert))
       ..usePrivateKeyBytes(utf8.encode(serverKey))
-      ..setClientAuthoritiesBytes(utf8.encode(caCert));
+      ..setClientAuthoritiesBytes(utf8.encode(caCert))
+      ..setTrustedCertificatesBytes(utf8.encode(caCert));
     _log.info(
       'SecurityContext initialized successfully ${securityContext.toString()}',
     );
