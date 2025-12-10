@@ -33,7 +33,7 @@ packages:
     source: hosted
     version: "2.7.0"
   asn1lib:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: asn1lib
       sha256: "9a8f69025044eb466b9b60ef3bc3ac99b4dc6c158ae9c56d25eeccf5bc56d024"
