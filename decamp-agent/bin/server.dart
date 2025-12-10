@@ -63,7 +63,8 @@ void main(List<String> args) async {
       ..usePrivateKeyBytes(utf8.encode(serverKey))
       ..setClientAuthoritiesBytes(utf8.encode(caCert));
     _log.info(
-        'SecurityContext initialized successfully ${securityContext.toString()}');
+      'SecurityContext initialized successfully ${securityContext.toString()}',
+    );
 
     // Add middleware for logging and CORS
     final handler = const shelf.Pipeline()
@@ -83,11 +84,37 @@ void main(List<String> args) async {
 
     // Start the server
     _log.info('Starting server on port $port...');
-    final server = await shelf_io.serve(
-      handler,
+    final server = await HttpServer.bindSecure(
       InternetAddress.anyIPv4,
       port,
-      securityContext: securityContext,
+      securityContext,
+      requestClientCertificate: true,
+    );
+
+    server.listen(
+      (HttpRequest request) {
+        try {
+          final clientIp = request.connectionInfo?.remoteAddress.address;
+          final cert = request.certificate;
+
+          if (cert != null) {
+            _log.info('Client connection from $clientIp');
+            _log.info('  Client Cert Subject: ${cert.subject}');
+            _log.info('  Client Cert Issuer:  ${cert.issuer}');
+          } else {
+            _log.warning(
+              'Client connection from $clientIp - NO CERTIFICATE PRESENTED',
+            );
+          }
+        } catch (e) {
+          _log.warning('Error logging client info: $e');
+        }
+
+        shelf_io.handleRequest(request, handler);
+      },
+      onError: (e) {
+        _log.severe('HttpServer stream error', e);
+      },
     );
 
     final scheme = 'https';
