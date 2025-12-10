@@ -89,3 +89,7 @@ Onboarding:
     1. Spin up a docker instance
     2. Open a communication channel to it
 
+
+## Website Desing
+
+[ ] some inspiration to conside https://archerhume.com/, https://www.abundant.ai/
