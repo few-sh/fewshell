@@ -6,6 +6,7 @@ import 'package:decamp/pages/main_settings.dart';
 import 'package:decamp/pages/agent_instructions_page.dart';
 import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/snippets_page.dart';
+import 'package:decamp/components/user_badge.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key});
@@ -28,17 +29,7 @@ class MainDrawer extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'PROJECT',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.7),
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                const UserBadge(),
                 const SizedBox(height: 8),
                 Row(
                   children: [
