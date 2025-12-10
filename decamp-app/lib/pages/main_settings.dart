@@ -374,7 +374,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             title: 'No AI Models',
             subtitle:
                 'No AI models configured yet. Click "Add Model" to get started.',
-          ),
+          )
         else
           ...llmSettings.map(
             (settings) => Padding(
