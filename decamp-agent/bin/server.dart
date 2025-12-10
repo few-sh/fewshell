@@ -1,13 +1,30 @@
-import 'dart:developer' as developer;
 import 'dart:io';
 
+import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:decamp_agent/router.dart';
 import 'package:decamp_agent/services/database_manager.dart';
 
+final _log = Logger('DecampAgent');
+
 void main(List<String> args) async {
+  // Configure logging
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    final timestamp = record.time.toIso8601String();
+    final level = record.level.name;
+    final message = '$timestamp [$level] ${record.message}';
+    if (record.level >= Level.SEVERE) {
+      stderr.writeln(message);
+      if (record.error != null) stderr.writeln(record.error);
+      if (record.stackTrace != null) stderr.writeln(record.stackTrace);
+    } else {
+      stdout.writeln(message);
+    }
+  });
+
   try {
     // Initialize FFI for sqflite explicitly
     sqfliteFfiInit();
@@ -25,20 +42,38 @@ void main(List<String> args) async {
     SecurityContext? securityContext;
     if (Platform.environment['ENABLE_MTLS'] == 'true') {
       final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
-      securityContext = SecurityContext(withTrustedRoots: true)
-        ..useCertificateChain('$certsPath/server.crt')
-        ..usePrivateKey('$certsPath/server.key')
-        ..setClientAuthorities('$certsPath/ca.crt');
-      developer.log('mTLS enabled. Using certs from $certsPath');
+      _log.info('mTLS enabled. Loading certs from $certsPath');
+
+      try {
+        securityContext = SecurityContext(withTrustedRoots: true)
+          ..useCertificateChain('$certsPath/server.crt')
+          ..usePrivateKey('$certsPath/server.key')
+          ..setClientAuthorities('$certsPath/ca.crt');
+        _log.info('SecurityContext initialized successfully');
+      } catch (e, st) {
+        _log.severe('Failed to initialize SecurityContext', e, st);
+        rethrow;
+      }
     }
 
     // Add middleware for logging and CORS
     final handler = const shelf.Pipeline()
-        .addMiddleware(shelf.logRequests())
+        .addMiddleware(
+          shelf.logRequests(
+            logger: (msg, isError) {
+              if (isError) {
+                _log.severe(msg);
+              } else {
+                _log.info(msg);
+              }
+            },
+          ),
+        )
         .addMiddleware(_corsMiddleware())
         .addHandler(createRouter(dbManager).call);
 
     // Start the server
+    _log.info('Starting server on port $port...');
     final server = await shelf_io.serve(
       handler,
       InternetAddress.anyIPv4,
@@ -47,12 +82,12 @@ void main(List<String> args) async {
     );
 
     final scheme = securityContext != null ? 'https' : 'http';
-    developer.log(
+    _log.info(
       '🚀 Decamp Agent server running on $scheme://${server.address.host}:${server.port}',
     );
-    developer.log('Server serving...');
+    _log.info('Server serving...');
   } catch (e, st) {
-    developer.log('CRITICAL FAILURE', error: e, stackTrace: st);
+    _log.severe('CRITICAL FAILURE', e, st);
     exit(1);
   }
 }
