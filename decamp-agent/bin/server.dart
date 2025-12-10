@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
@@ -6,6 +7,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:decamp_agent/router.dart';
 import 'package:decamp_agent/services/database_manager.dart';
+import 'package:decamp_agent/certs.dart';
 
 final _log = Logger('DecampAgent');
 
@@ -38,29 +40,13 @@ void main(List<String> args) async {
     final dbManager = DatabaseManager('${Directory.current.path}/data');
     await dbManager.init();
 
-    // Configure SecurityContext for mTLS if enabled
-    SecurityContext? securityContext;
-    if (Platform.environment['ENABLE_MTLS'] == 'true') {
-      final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
-      _log.info('mTLS enabled. Loading certs from $certsPath');
-
-      try {
-        securityContext = SecurityContext(withTrustedRoots: true)
-          ..useCertificateChain('$certsPath/server.crt')
-          ..usePrivateKey('$certsPath/server.key')
-          ..setClientAuthorities('$certsPath/ca.crt');
-        _log.info('SecurityContext initialized successfully');
-      } on FileSystemException catch (e) {
-        _log.severe(
-          'Failed to load mTLS certificates from "$certsPath". Please check if the files exist and are readable.',
-          e,
-        );
-        rethrow;
-      } catch (e, st) {
-        _log.severe('Failed to initialize SecurityContext', e, st);
-        rethrow;
-      }
-    }
+    // Configure SecurityContext for mTLS
+    _log.info('Initializing mTLS with embedded certificates');
+    final securityContext = SecurityContext(withTrustedRoots: true)
+      ..useCertificateChainBytes(utf8.encode(serverCert))
+      ..usePrivateKeyBytes(utf8.encode(serverKey))
+      ..setClientAuthoritiesBytes(utf8.encode(caCert));
+    _log.info('SecurityContext initialized successfully');
 
     // Add middleware for logging and CORS
     final handler = const shelf.Pipeline()
@@ -87,7 +73,7 @@ void main(List<String> args) async {
       securityContext: securityContext,
     );
 
-    final scheme = securityContext != null ? 'https' : 'http';
+    final scheme = 'https';
     _log.info(
       '🚀 Decamp Agent server running on $scheme://${server.address.host}:${server.port}',
     );

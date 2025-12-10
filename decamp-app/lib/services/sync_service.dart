@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:logging/logging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
@@ -7,6 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/certs.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 
@@ -350,67 +352,35 @@ class SyncService {
 
   WebSocketChannel _connectWebSocket(Uri uri) {
     _log.info('_connectWebSocket called for $uri');
-    // Check for mTLS configuration
-    // In a real app, these would be loaded from secure storage or assets
-    // For development/testing, we can check for environment variables or specific paths
+
     try {
-      final enableMtls = Platform.environment['ENABLE_MTLS'] == 'true';
-      _log.info('Checking mTLS configuration. ENABLE_MTLS=$enableMtls');
+      _log.info('Configuring mTLS with embedded certificates');
 
-      if (enableMtls) {
-        final certsPath = Platform.environment['CERTS_PATH'] ?? 'certs';
-        _log.info('Using certs path: $certsPath');
-        _log.info('Current directory: ${Directory.current.path}');
+      final context = SecurityContext(withTrustedRoots: false)
+        ..useCertificateChainBytes(utf8.encode(clientCert))
+        ..usePrivateKeyBytes(utf8.encode(clientKey))
+        ..setTrustedCertificatesBytes(utf8.encode(caCert));
 
-        final clientCertFile = File('$certsPath/client.crt');
-        final clientKeyFile = File('$certsPath/client.key');
-        final caCertFile = File('$certsPath/ca.crt');
+      _log.info('SecurityContext created successfully.');
 
-        bool missingFiles = false;
-        if (!clientCertFile.existsSync()) {
-          _log.severe(
-            'ERROR: Client cert missing at ${clientCertFile.absolute.path}',
-          );
-          missingFiles = true;
-        }
-        if (!clientKeyFile.existsSync()) {
-          _log.severe(
-            'ERROR: Client key missing at ${clientKeyFile.absolute.path}',
-          );
-          missingFiles = true;
-        }
-        if (!caCertFile.existsSync()) {
-          _log.severe('ERROR: CA cert missing at ${caCertFile.absolute.path}');
-          missingFiles = true;
-        }
+      final client = HttpClient(context: context);
 
-        if (missingFiles) {
-          _log.severe('Aborting mTLS setup due to missing files.');
-          // Fallback to standard connection or throw?
-          // If mTLS is explicitly requested, we probably shouldn't fallback silently,
-          // but for now let's allow the catch block to handle it or proceed to fallback.
-          throw const FileSystemException('Missing mTLS certificate files');
-        }
+      // Enforce certificate verification.
+      // Since we use withTrustedRoots: false and setTrustedCertificatesBytes,
+      // this effectively pins the connection to our CA.
+      client.badCertificateCallback = (cert, host, port) {
+        _log.warning('Certificate verification failed for $host:$port');
+        _log.warning('Subject: ${cert.subject}');
+        _log.warning('Issuer: ${cert.issuer}');
+        return false; // Enforce validation
+      };
 
-        final context = SecurityContext(withTrustedRoots: false)
-          ..useCertificateChain(clientCertFile.path)
-          ..usePrivateKey(clientKeyFile.path)
-          ..setTrustedCertificates(caCertFile.path);
-
-        _log.info('SecurityContext created successfully.');
-
-        final client = HttpClient(context: context);
-
-        _log.info('Connecting with mTLS to $uri');
-        return IOWebSocketChannel.connect(uri, customClient: client);
-      }
+      _log.info('Connecting with mTLS to $uri');
+      return IOWebSocketChannel.connect(uri, customClient: client);
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
       rethrow;
     }
-
-    _log.info('Connecting with standard WebSocket to $uri');
-    return WebSocketChannel.connect(uri);
   }
 }
 
