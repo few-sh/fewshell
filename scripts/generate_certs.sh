@@ -37,4 +37,45 @@ openssl pkcs12 -export -out client.p12 -inkey client.key -in client.crt -certfil
 # Clean up intermediate files
 rm server.csr client.csr ca.srl
 
-echo "Done! Certificates are in the 'certs' directory."
+# 7. Update Dart files with embedded certificates
+
+AGENT_CERTS_FILE="../../decamp-agent/lib/certs.dart"
+APP_CERTS_FILE="../../decamp-app/lib/certs.dart"
+
+echo "Updating $AGENT_CERTS_FILE..."
+cat > "$AGENT_CERTS_FILE" <<EOF
+/// Certificate Authority Certificate
+const String caCert = r'''
+$(cat ca.crt)
+''';
+
+/// Server Certificate
+const String serverCert = r'''
+$(cat server.crt)
+''';
+
+/// Server Private Key
+const String serverKey = r'''
+$(cat server.key)
+''';
+EOF
+
+echo "Updating $APP_CERTS_FILE..."
+cat > "$APP_CERTS_FILE" <<EOF
+/// Certificate Authority Certificate
+const String caCert = r'''
+$(cat ca.crt)
+''';
+
+/// Client Certificate
+const String clientCert = r'''
+$(cat client.crt)
+''';
+
+/// Client Private Key
+const String clientKey = r'''
+$(cat client.key)
+''';
+EOF
+
+echo "Done! Certificates are in the 'certs' directory and Dart files have been updated."
