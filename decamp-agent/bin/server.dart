@@ -5,6 +5,7 @@ import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:asn1lib/asn1lib.dart';
 import 'package:decamp_agent/router.dart';
 import 'package:decamp_agent/services/database_manager.dart';
 import 'package:decamp_agent/certs.dart';
@@ -42,11 +43,27 @@ void main(List<String> args) async {
 
     // Configure SecurityContext for mTLS
     _log.info('Initializing mTLS with embedded certificates');
+
+    try {
+      _log.info(_parseCertificateInfo(caCert, 'CA Certificate'));
+    } catch (e) {
+      _log.warning('Could not parse CA certificate details: $e');
+      _log.info('CA Certificate PEM:\n$caCert');
+    }
+
+    try {
+      _log.info(_parseCertificateInfo(serverCert, 'Server Certificate'));
+    } catch (e) {
+      _log.warning('Could not parse Server certificate details: $e');
+      _log.info('Server Certificate PEM:\n$serverCert');
+    }
+
     final securityContext = SecurityContext(withTrustedRoots: true)
       ..useCertificateChainBytes(utf8.encode(serverCert))
       ..usePrivateKeyBytes(utf8.encode(serverKey))
       ..setClientAuthoritiesBytes(utf8.encode(caCert));
-    _log.info('SecurityContext initialized successfully');
+    _log.info(
+        'SecurityContext initialized successfully ${securityContext.toString()}');
 
     // Add middleware for logging and CORS
     final handler = const shelf.Pipeline()
@@ -82,6 +99,127 @@ void main(List<String> args) async {
     _log.severe('CRITICAL FAILURE', e, st);
     exit(1);
   }
+}
+
+String _parseCertificateInfo(String pem, String label) {
+  try {
+    // Remove PEM headers and newlines
+    final lines = pem
+        .split('\n')
+        .where((line) => !line.startsWith('-----') && line.trim().isNotEmpty)
+        .join('');
+    final bytes = base64.decode(lines);
+
+    final parser = ASN1Parser(bytes);
+    final topSequence = parser.nextObject() as ASN1Sequence;
+    final tbsCertificate = topSequence.elements[0] as ASN1Sequence;
+
+    // Iterate through TBSCertificate elements to find Subject and Issuer
+    // Structure varies slightly by version, but usually:
+    // [0] Version (optional)
+    // [1] Serial Number
+    // [2] Signature Algorithm
+    // [3] Issuer (Sequence)
+    // [4] Validity (Sequence)
+    // [5] Subject (Sequence)
+
+    // We'll look for Sequences that look like DNs (Distinguished Names)
+    // A simple heuristic: The 4th sequence is usually Issuer, 6th is Subject (if version is present)
+
+    // Let's just try to find them by inspecting elements
+    String issuer = 'Unknown';
+    String subject = 'Unknown';
+    String validFrom = 'Unknown';
+    String validTo = 'Unknown';
+
+    // Skip version (tagged 0) if present
+    int index = 0;
+    if ((tbsCertificate.elements[0].tag & 0xC0) == 0x80) {
+      index++; // Skip version
+    }
+    index++; // Skip Serial Number (Integer)
+    index++; // Skip Signature (Sequence)
+
+    if (index < tbsCertificate.elements.length) {
+      final issuerSeq = tbsCertificate.elements[index];
+      if (issuerSeq is ASN1Sequence) {
+        issuer = _formatDN(issuerSeq);
+      }
+      index++; // Move to Validity
+    }
+
+    if (index < tbsCertificate.elements.length) {
+      final validitySeq = tbsCertificate.elements[index];
+      if (validitySeq is ASN1Sequence && validitySeq.elements.length >= 2) {
+        validFrom = _formatTime(validitySeq.elements[0]);
+        validTo = _formatTime(validitySeq.elements[1]);
+      }
+      index++; // Move to Subject
+    }
+
+    if (index < tbsCertificate.elements.length) {
+      final subjectSeq = tbsCertificate.elements[index];
+      if (subjectSeq is ASN1Sequence) {
+        subject = _formatDN(subjectSeq);
+      }
+    }
+
+    return '$label Details:\n  Subject:    $subject\n  Issuer:     $issuer\n  Valid From: $validFrom\n  Valid To:   $validTo';
+  } catch (e) {
+    return 'Error parsing certificate: $e';
+  }
+}
+
+String _formatTime(ASN1Object time) {
+  if (time is ASN1UtcTime) {
+    return time.dateTimeValue.toIso8601String();
+  } else if (time is ASN1GeneralizedTime) {
+    return time.dateTimeValue.toIso8601String();
+  }
+  return 'Unknown Time Format';
+}
+
+String _formatDN(ASN1Sequence dnSequence) {
+  final parts = <String>[];
+  for (final set in dnSequence.elements) {
+    if (set is ASN1Set && set.elements.isNotEmpty) {
+      final seq = set.elements.first as ASN1Sequence;
+      if (seq.elements.length >= 2) {
+        final oid = seq.elements[0] as ASN1ObjectIdentifier;
+        final value = seq.elements[1];
+
+        String label = oid.identifier ?? 'Unknown';
+        // Map common OIDs to names
+        if (label == '2.5.4.3') {
+          label = 'CN';
+        } else if (label == '2.5.4.10') {
+          label = 'O';
+        } else if (label == '2.5.4.11') {
+          label = 'OU';
+        } else if (label == '2.5.4.6') {
+          label = 'C';
+        } else if (label == '2.5.4.8') {
+          label = 'ST';
+        } else if (label == '2.5.4.7') {
+          label = 'L';
+        }
+
+        String valStr = '';
+        if (value is ASN1UTF8String) {
+          valStr = value.utf8StringValue;
+        } else if (value is ASN1PrintableString) {
+          valStr = value.stringValue;
+        } else if (value is ASN1IA5String) {
+          valStr = value.stringValue;
+        } else {
+          valStr = value.toString();
+        }
+
+        parts.add('$label=$valStr');
+      }
+    }
+  }
+  return parts.join(', ');
 }
 
 /// CORS middleware for cross-origin requests
