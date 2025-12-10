@@ -4,7 +4,7 @@ Future<bool?> showConfirmationDialog({
   required BuildContext context,
   required String title,
   required String content,
-  String confirmLabel = 'Delete',
+  String confirmLabel = 'Confirm',
   String cancelLabel = 'Cancel',
   bool isDestructive = true,
 }) {
