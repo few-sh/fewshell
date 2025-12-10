@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:decamp/components/confirmation_dialog.dart';
 import '../providers/project_provider.dart';
 
 const _descriptors = [
@@ -60,27 +61,12 @@ Future<void> showDeleteProjectDialog({
   VoidCallback? onDeleted,
 }) async {
   final theme = Theme.of(context);
-  final confirmed = await showDialog<bool>(
+  final confirmed = await showConfirmationDialog(
     context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Delete Project'),
-      content: Text(
+    title: 'Delete Project',
+    content:
         'Are you sure you want to delete "$projectName"?\n\nThis will also delete all sessions and messages associated with this project. This action cannot be undone.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(
-            backgroundColor: theme.colorScheme.error,
-          ),
-          child: const Text('Delete'),
-        ),
-      ],
-    ),
+    confirmLabel: 'Delete',
   );
 
   if (confirmed == true) {

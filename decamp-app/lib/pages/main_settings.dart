@@ -16,6 +16,8 @@ import '../utils/project_utils.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
+import '../components/empty_placeholder.dart';
+import '../components/confirmation_dialog.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -367,29 +369,11 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             ),
           )
         else if (llmSettings.isEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No AI models configured yet. Click "Add Model" to get started.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const EmptyPlaceholder(
+            icon: Icons.info_outline,
+            title: 'No AI Models',
+            subtitle:
+                'No AI models configured yet. Click "Add Model" to get started.',
           )
         else
           ...llmSettings.map(
@@ -622,43 +606,23 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
     if (sshSettings == null) {
       // No SSH configuration yet
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: theme.colorScheme.outline),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.terminal,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'No remote shell configured yet.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
-                  ),
-                ),
-              ],
+      return Column(
+        children: [
+          const EmptyPlaceholder(
+            icon: Icons.terminal,
+            title: 'No Remote Shell',
+            subtitle: 'No remote shell configured yet.',
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => _showSshSettingsDialog(projectId: projectId),
+              icon: const Icon(Icons.add),
+              label: const Text('Configure Connection'),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _showSshSettingsDialog(projectId: projectId),
-                icon: const Icon(Icons.add),
-                label: const Text('Configure Connection'),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -782,57 +746,37 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-  void _showDeleteSshConfirmation({required String projectId}) {
-    showDialog(
+  void _showDeleteSshConfirmation({required String projectId}) async {
+    final confirmed = await showConfirmationDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Remote Shell Configuration'),
-        content: const Text(
-          'Are you sure you want to delete the remote shell configuration? '
-          'This will also delete all associated credentials.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await ref
-                    .read(projectSshSettingsProvider(projectId).notifier)
-                    .deleteSshSettings();
+      title: 'Delete Remote Shell Configuration',
+      content:
+          'Are you sure you want to delete the remote shell configuration? This will also delete all associated credentials.',
+      confirmLabel: 'Delete',
+    );
 
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Remote shell configuration deleted'),
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (dialogContext.mounted) {
-                  Navigator.of(dialogContext).pop();
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting configuration: $e'),
-                      backgroundColor: Theme.of(
-                        dialogContext,
-                      ).colorScheme.error,
-                    ),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(
+    if (confirmed == true) {
+      try {
+        await ref
+            .read(projectSshSettingsProvider(projectId).notifier)
+            .deleteSshSettings();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Remote shell configuration deleted')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting configuration: $e'),
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+          );
+        }
+      }
+    }
   }
 
   Widget _buildThemeSection() {

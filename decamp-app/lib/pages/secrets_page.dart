@@ -4,6 +4,8 @@ import '../providers/secret_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/secret_dialog.dart';
 import '../components/project_title_bar.dart';
+import '../components/confirmation_dialog.dart';
+import '../components/empty_placeholder.dart';
 
 /// Secrets management page with User Secrets and Project Secrets tabs
 class SecretsPage extends ConsumerStatefulWidget {
@@ -267,26 +269,10 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   }
 
   Widget _buildEmptyState(String message) {
-    final theme = Theme.of(context);
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.key_off,
-            size: 64,
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-        ],
-      ),
+    return EmptyPlaceholder(
+      icon: Icons.key_off,
+      title: 'No Secrets',
+      subtitle: message,
     );
   }
 
@@ -434,22 +420,11 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     required bool isGlobal,
     String? projectId,
   }) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showConfirmationDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Secret'),
-        content: Text('Are you sure you want to delete "$key"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Secret',
+      content: 'Are you sure you want to delete "$key"?',
+      confirmLabel: 'Delete',
     );
 
     if (confirmed == true) {
