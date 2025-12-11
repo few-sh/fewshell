@@ -95,6 +95,11 @@ void main(List<String> args) async {
             _log.warning(
               'Client connection from $clientIp - NO CERTIFICATE PRESENTED',
             );
+            request.response
+              ..statusCode = HttpStatus.unauthorized
+              ..write('Unauthized.')
+              ..close();
+            return;
           }
         } catch (e) {
           _log.warning('Error logging client info: $e');
