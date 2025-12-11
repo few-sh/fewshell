@@ -73,7 +73,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -117,7 +117,7 @@ class ProjectDatabase extends _$ProjectDatabase {
           );
         }
 
-        // Ensure is_visible_to_llm column exists
+        // Ensure is_visible_to_llm column exists in messages
         final messageColumns = await executor
             .runSelect("SELECT * FROM pragma_table_info('messages');", []);
         final hasIsVisibleToLlm =
@@ -125,6 +125,17 @@ class ProjectDatabase extends _$ProjectDatabase {
         if (!hasIsVisibleToLlm) {
           await executor.runCustom(
             'ALTER TABLE messages ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
+          );
+        }
+
+        // Ensure is_visible_to_llm column exists in snippets
+        final snippetColumns = await executor
+            .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
+        final hasSnippetIsVisibleToLlm =
+            snippetColumns.any((row) => row['name'] == 'is_visible_to_llm');
+        if (!hasSnippetIsVisibleToLlm) {
+          await executor.runCustom(
+            'ALTER TABLE snippets ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
           );
         }
 
@@ -189,6 +200,18 @@ class ProjectDatabase extends _$ProjectDatabase {
 
           if (!hasIsVisibleToLlm) {
             await m.addColumn(messages, messages.isVisibleToLlm);
+          }
+        }
+
+        // Migration from version 9 to 10: Add isVisibleToLlm column to snippets
+        if (from < 10) {
+          final columns = await executor
+              .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
+          final hasIsVisibleToLlm =
+              columns.any((row) => row['name'] == 'is_visible_to_llm');
+
+          if (!hasIsVisibleToLlm) {
+            await m.addColumn(projectSnippets, projectSnippets.isVisibleToLlm);
           }
         }
       },

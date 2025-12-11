@@ -464,6 +464,16 @@ class $SnippetsTable extends Snippets
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _isVisibleToLlmMeta =
+      const VerificationMeta('isVisibleToLlm');
+  @override
+  late final GeneratedColumn<bool> isVisibleToLlm = GeneratedColumn<bool>(
+      'is_visible_to_llm', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_visible_to_llm" IN (0, 1))'),
+      defaultValue: const Constant(true));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -485,6 +495,7 @@ class $SnippetsTable extends Snippets
         description,
         tags,
         position,
+        isVisibleToLlm,
         createdAt,
         updatedAt
       ];
@@ -533,6 +544,12 @@ class $SnippetsTable extends Snippets
       context.handle(_positionMeta,
           position.isAcceptableOrUnknown(data['position']!, _positionMeta));
     }
+    if (data.containsKey('is_visible_to_llm')) {
+      context.handle(
+          _isVisibleToLlmMeta,
+          isVisibleToLlm.isAcceptableOrUnknown(
+              data['is_visible_to_llm']!, _isVisibleToLlmMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -568,6 +585,8 @@ class $SnippetsTable extends Snippets
           .read(DriftSqlType.string, data['${effectivePrefix}tags'])!,
       position: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}position'])!,
+      isVisibleToLlm: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_visible_to_llm'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -589,6 +608,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
   final Value<String?> description;
   final Value<String> tags;
   final Value<int> position;
+  final Value<bool> isVisibleToLlm;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -600,6 +620,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
     this.position = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -612,6 +633,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
     this.position = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -628,6 +650,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     Expression<String>? description,
     Expression<String>? tags,
     Expression<int>? position,
+    Expression<bool>? isVisibleToLlm,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -640,6 +663,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
       if (description != null) 'description': description,
       if (tags != null) 'tags': tags,
       if (position != null) 'position': position,
+      if (isVisibleToLlm != null) 'is_visible_to_llm': isVisibleToLlm,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -654,6 +678,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
       Value<String?>? description,
       Value<String>? tags,
       Value<int>? position,
+      Value<bool>? isVisibleToLlm,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
@@ -665,6 +690,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
       description: description ?? this.description,
       tags: tags ?? this.tags,
       position: position ?? this.position,
+      isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -695,6 +721,9 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
     if (position.present) {
       map['position'] = Variable<int>(position.value);
     }
+    if (isVisibleToLlm.present) {
+      map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -717,6 +746,7 @@ class SnippetEntityCompanion extends UpdateCompanion<SnippetEntity> {
           ..write('description: $description, ')
           ..write('tags: $tags, ')
           ..write('position: $position, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -951,6 +981,7 @@ typedef $$SnippetsTableCreateCompanionBuilder = SnippetEntityCompanion
   Value<String?> description,
   Value<String> tags,
   Value<int> position,
+  Value<bool> isVisibleToLlm,
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<int> rowid,
@@ -964,6 +995,7 @@ typedef $$SnippetsTableUpdateCompanionBuilder = SnippetEntityCompanion
   Value<String?> description,
   Value<String> tags,
   Value<int> position,
+  Value<bool> isVisibleToLlm,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -998,6 +1030,10 @@ class $$SnippetsTableFilterComposer
 
   ColumnFilters<int> get position => $composableBuilder(
       column: $table.position, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -1036,6 +1072,10 @@ class $$SnippetsTableOrderingComposer
   ColumnOrderings<int> get position => $composableBuilder(
       column: $table.position, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -1072,6 +1112,9 @@ class $$SnippetsTableAnnotationComposer
 
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -1113,6 +1156,7 @@ class $$SnippetsTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<String> tags = const Value.absent(),
             Value<int> position = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -1125,6 +1169,7 @@ class $$SnippetsTableTableManager extends RootTableManager<
             description: description,
             tags: tags,
             position: position,
+            isVisibleToLlm: isVisibleToLlm,
             createdAt: createdAt,
             updatedAt: updatedAt,
             rowid: rowid,
@@ -1137,6 +1182,7 @@ class $$SnippetsTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<String> tags = const Value.absent(),
             Value<int> position = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
@@ -1149,6 +1195,7 @@ class $$SnippetsTableTableManager extends RootTableManager<
             description: description,
             tags: tags,
             position: position,
+            isVisibleToLlm: isVisibleToLlm,
             createdAt: createdAt,
             updatedAt: updatedAt,
             rowid: rowid,

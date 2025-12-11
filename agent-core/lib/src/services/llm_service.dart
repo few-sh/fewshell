@@ -173,11 +173,15 @@ class LlmService {
     List<SnippetEntity> projectSnippets = [];
 
     if (snippetDao != null) {
-      userSnippets = await snippetDao!.getGlobalSnippets();
+      final allUserSnippets = await snippetDao!.getGlobalSnippets();
+      userSnippets = allUserSnippets.where((s) => s.isVisibleToLlm).toList();
+
       if (currentProjectId != null) {
-        projectSnippets = await snippetDao!.getProjectSnippets(
+        final allProjectSnippets = await snippetDao!.getProjectSnippets(
           currentProjectId!,
         );
+        projectSnippets =
+            allProjectSnippets.where((s) => s.isVisibleToLlm).toList();
       }
     }
 

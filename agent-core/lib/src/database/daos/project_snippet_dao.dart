@@ -21,6 +21,7 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
       description: s.description,
       tags: s.tags,
       position: s.position,
+      isVisibleToLlm: s.isVisibleToLlm,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
     );
@@ -35,6 +36,7 @@ class ProjectSnippetDao extends DatabaseAccessor<ProjectDatabase>
       description: c.description,
       tags: c.tags,
       position: c.position,
+      isVisibleToLlm: c.isVisibleToLlm,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     );
