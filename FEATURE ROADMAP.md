@@ -28,6 +28,7 @@ Smoother onboarding:
 
 General papercuts:
 [ ] Add a context menu button to re-run command
+[ ] Tool result should carry information about the original tool that we invoked
 [X] Eliminate all non-expandable ellipsis in any of the text controls
 [X] Show currently active project on the projects page
 [X] When selecting a peroject from projects list, close the projects page
