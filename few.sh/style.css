@@ -233,7 +233,7 @@ section.visible {
     border-color: var(--accent-violet);
 }
 
-.faq-question {
+.list-title {
     font-weight: bold;
     color: var(--accent-green);
     margin-bottom: 0.5rem;
@@ -241,8 +241,8 @@ section.visible {
     align-items: flex-start;
 }
 
-.faq-question::before {
-    content: "Q. ";
+.list-title::before {
+    content: "⭢ ";
     color: var(--accent-violet);
     margin-right: 0.5rem;
 }

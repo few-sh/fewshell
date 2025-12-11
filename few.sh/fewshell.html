@@ -1,225 +1,190 @@
 <!doctype html>
 <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Fewshell - AI Assistant for DevOps</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="style.css" />
+        <script src="script.js" defer></script>
+    </head>
 
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Fewshell - AI Assistant for DevOps</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;600;700&display=swap"
-        rel="stylesheet" />
-    <link rel="stylesheet" href="style.css" />
-    <script src="script.js" defer></script>
-</head>
+    <body>
+        <div class="grid-bg"></div>
+        <div class="spotlight"></div>
 
-<body>
-    <div class="grid-bg"></div>
-    <div class="spotlight"></div>
+        <div class="container">
+            <header>
+                <div class="logo">Fewshot Corp</div>
+                <nav>
+                    <a href="index.html">Home</a> &nbsp;/&nbsp;
+                    <a href="fewshell.html">Fewshell</a> &nbsp;/&nbsp;
+                    <a href="mailto:support@few.sh">Contact</a>
+                </nav>
+            </header>
 
-    <div class="container">
-        <header>
-            <div class="logo">Fewshot Corp</div>
-            <nav>
-                <a href="index.html">Home</a> &nbsp;/&nbsp;
-                <a href="fewshell.html">Fewshell</a> &nbsp;/&nbsp;
-                <a href="mailto:support@few.sh">Contact</a>
-            </nav>
-        </header>
+            <main>
+                <section class="hero visible">
+                    <h1>Fewshell</h1>
+                    <p class="subtitle">
+                        Mobile assistant for DevOps, On-Calls, and AI
+                        Researchers. Safely manage your infrastructure from
+                        anywhere.
+                    </p>
 
-        <main>
-            <section class="hero visible">
-                <h1>Fewshell</h1>
-                <p class="subtitle">
-                    The mobile AI-assistant for DevOps practitioners and
-                    on-calls.
-                </p>
-
-                <form class="signup-form" action="/api/signup" method="POST">
-                    <input type="email" name="email" placeholder="Enter your email" class="signup-input" required />
-                    <button type="submit" class="signup-button">
-                        Sign Up
-                    </button>
-                </form>
-                <p style="
+                    <form
+                        class="signup-form"
+                        action="/api/signup"
+                        method="POST"
+                    >
+                        <input
+                            type="email"
+                            name="email"
+                            placeholder="Enter your email"
+                            class="signup-input"
+                            required
+                        />
+                        <button type="submit" class="signup-button">
+                            Sign Up
+                        </button>
+                    </form>
+                    <p
+                        style="
                             margin-top: 1rem;
                             font-size: 0.9rem;
                             color: #8b949e;
-                        ">
-                    Already have Fewshell? <a href="qr.html">Set it up</a>
-                </p>
-            </section>
+                        "
+                    >
+                        Already have Fewshell? <a href="qr.html">Set it up</a>
+                    </p>
+                </section>
 
-            <nav style="margin-bottom: 3rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-                <a href="#about">About</a> &nbsp;/&nbsp;
-                <a href="#features">Features</a> &nbsp;/&nbsp;
-                <a href="#faq">FAQ</a> &nbsp;/&nbsp;
-                <a href="qr.html">QR Generator</a>
-            </nav>
+                <nav
+                    style="
+                        margin-bottom: 3rem;
+                        border-bottom: 1px solid var(--border-color);
+                        padding-bottom: 1rem;
+                    "
+                >
+                    <a href="#about">About</a> &nbsp;/&nbsp;
+                    <a href="#features">Features</a> &nbsp;/&nbsp;
+                    <a href="#faq">FAQ</a> &nbsp;/&nbsp;
+                    <a href="qr.html">QR Generator</a>
+                </nav>
 
-            <section id="about">
+                <section id="about">
+                    <p>
+                        <strong>Fewshell</strong> is an AI-assistant for devops
+                        practitioners and on-calls with a strong emphasis on
+                        safety, allowing full management of cloud and on-premise
+                        infrastructure on the go without sacrificing
+                        effectiveness.
+                    </p>
+                    <p>
+                        Infrastructure management and on-call has been a
+                        long-standing pain point for engineering teams across
+                        industries. Being on-call is a particularly dreaded part
+                        of the job for many software engineers and devops,
+                        requiring the on-call engineer to be within minutes of
+                        their laptop at all times.
+                    </p>
+                    <p>
+                        AI researchers are also confronted with complex
+                        infrastructure. Training models involves highly
+                        parallelized workloads, such as RL with verifiable
+                        rewards, and distributing weights across many GPUs. With
+                        training runs that take hours or days, having visibility
+                        and being able to remotely stop a training run is
+                        essential.
+                    </p>
+                </section>
+
+                <section id="features">
+                    <h2>Features</h2>
+                    <div class="faq-item">
+                        <div class="list-title">Secure-by-default design</div>
+                        <div class="faq-answer">
+                            Full end-to-end encryption along with secrets
+                            storage on your device's keychain and automated
+                            redaction of secrets from all logs and AI.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">First-class AI safety</div>
+                        <div class="faq-answer">
+                            You are always in control - no command is ever run
+                            without your approval.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">
+                            A powerful sysadmin in your pocket
+                        </div>
+                        <div class="faq-answer">
+                            Familiar coding/shell assistant interface, optimized
+                            for mobile efficiency and ergonomics.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">Full session history</div>
+                        <div class="faq-answer">
+                            Maintains a complete record of every interaction.
+                            Say goodbye to keeping a manual journal of what you
+                            changed and when.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">Flexible architecture</div>
+                        <div class="faq-answer">
+                            Supports direct SSH or secure client-server
+                            WebSocket agent deployment.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">Real-time collaboration</div>
+                        <div class="faq-answer">
+                            Optional support for team collaboration in
+                            client-server mode to keep your team in the loop and
+                            maintain full history of all sessions.
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">BYO Intelligence</div>
+                        <div class="faq-answer">
+                            Deploy in your own cloud and use your own language
+                            model (supports most frontier models, including
+                            Claude, OpenAI, and open weight models).
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <div class="list-title">Secure sync</div>
+                        <div class="faq-answer">
+                            Synchronizes securely in real time between mobile,
+                            desktop, and tablet.
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <footer>
+                <p>&copy; 2025 Fewshot Corp. All rights reserved.</p>
                 <p>
-                    Fewshot Corp announced the private beta of
-                    <strong>Fewshell</strong>, a mobile AI-assistant for
-                    devops practitioners and on-calls that focuses on
-                    quality-of-life allowing full management of cloud and
-                    on-premise infrastructure on the go without sacrificing
-                    effectiveness, speed and security.
+                    <a href="privacy.html">Privacy Policy</a> |
+                    <a href="terms.html">Terms of Service</a>
                 </p>
-                <p>
-                    Infrastructure management and on-call has been a
-                    long-standing pain point for engineering teams across
-                    industries. Being on-call is a particularly dreaded part
-                    of the job for many software engineers and devops,
-                    requiring the on-call engineer to be within minutes of
-                    their laptop at all times.
-                </p>
-            </section>
-
-            <section id="features">
-                <h2>Features</h2>
-                <div class="faq-item">
-                    <div class="faq-question">AI-Assisted Interface</div>
-                    <div class="faq-answer">
-                        Chat with an AI copilot to manage your infrastructure
-                        using natural language instructions.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Mobile-First Design</div>
-                    <div class="faq-answer">
-                        Built specifically for iOS, allowing you to manage
-                        infrastructure from anywhere without needing a laptop.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Secure by Default</div>
-                    <div class="faq-answer">
-                        All keys and credentials stored in your device's secure
-                        keychain. Every command requires your approval before
-                        execution.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Universal Cloud Support</div>
-                    <div class="faq-answer">
-                        Works with any cloud provider that has a CLI tool or API.
-                        AWS, GCP, Azure, and more.
-                    </div>
-                </div>
-            </section>
-
-            <section id="faq">
-                <h2>FAQ</h2>
-
-                <div class="faq-item">
-                    <div class="faq-question">How does it work?</div>
-                    <div class="faq-answer">
-                        The app combines an AI-assisted chat interface, a
-                        copilot for infrastructure control, allowing you to
-                        manage infrastructure using instructions to the AI
-                        and approving every command as you would normally do
-                        in an AI-assisted environment.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Is it reliable?</div>
-                    <div class="faq-answer">
-                        We believe that the most reliable systems are the
-                        ones that have the least amount of moving parts. In
-                        its default deployment, Fewshell runs locally on
-                        your phone. The only other requirement is that it
-                        has access to an LLM provider and to your cloud.
-                        That's it. There are no cloud-based management or
-                        control planes involved, no wrappers or services.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Is it safe?</div>
-                    <div class="faq-answer">
-                        Yes, you get to approve and/or edit every command
-                        before it's run. Even if you do not believe in AI
-                        agents or don't trust AI, you can simply use it to
-                        speed up your typing of shell commands.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Is it secure?</div>
-                    <div class="faq-answer">
-                        It is as secure as you allow your phone to be. The
-                        execution environment runs locally on your phone and
-                        any keys/secrets such as AWS account keys are stored
-                        in your device's secure keychain. There is no
-                        third-party cloud that asks for your keys. The keys
-                        are always redacted from the AI agent. In some ways
-                        it can be more secure than a laptop, because iOS is
-                        a more restricted execution environment. As long as
-                        you do not approve any command that sends the key to
-                        some unauthorized actor, it can be as secure as you
-                        need.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Is it fast?</div>
-                    <div class="faq-answer">
-                        It is as fast as your local network allows you to
-                        be. While an iOS device might not necessarily match
-                        with the power of a desktop or a laptop, for most
-                        infrastructure and shell commands, it is more than
-                        enough. Alternatively, we offer a control plane
-                        appliance agent that allows you to run the
-                        environment on premise or in your cloud, Fewshell
-                        would act as the thin client and allow you to
-                        control the environment through the appliance.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        Which cloud providers does it work with?
-                    </div>
-                    <div class="faq-answer">
-                        Any cloud provider that has a CLI tool or an API. If
-                        it can be controlled from a linux shell environment,
-                        it should work.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">
-                        Does it work on premises?
-                    </div>
-                    <div class="faq-answer">
-                        As long as your network allows it. For example, if
-                        you are using VPN to connect to your on-premise
-                        infrastructure, it should work.
-                    </div>
-                </div>
-
-                <div class="faq-item">
-                    <div class="faq-question">Does it work on Android?</div>
-                    <div class="faq-answer">
-                        We are targeting an Android release at a later date.
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <footer>
-            <p>&copy; 2025 Fewshot Corp. All rights reserved.</p>
-            <p>
-                <a href="privacy.html">Privacy Policy</a> |
-                <a href="terms.html">Terms of Service</a>
-            </p>
-        </footer>
-    </div>
-</body>
-
+            </footer>
+        </div>
+    </body>
 </html>
