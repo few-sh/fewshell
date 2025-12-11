@@ -235,7 +235,7 @@ class _AgentSession {
             return jsonEncode(result);
           } else if (toolCall.function.name == kFetch) {
             final result = await FetchTool.execute(params);
-            return jsonEncode(result);
+            return jsonEncode(result['data']);
           }
 
           return jsonEncode({'error': 'Unknown tool'});
