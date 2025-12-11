@@ -234,7 +234,8 @@ class _AgentSession {
             final result = await _executeLocalCommand(command);
             return jsonEncode(result);
           } else if (toolCall.function.name == kFetch) {
-            return jsonEncode({'error': 'Fetch not implemented on server yet'});
+            final result = await FetchTool.execute(params);
+            return jsonEncode(result);
           }
 
           return jsonEncode({'error': 'Unknown tool'});
