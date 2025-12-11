@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{%- block main -%}
+{%- filter indent -%}{%- filter indent -%}
+<article class="content">
+    <header>
+        <h1>{{ page.title }}</h1>
+        {%- if page.extra.last_updated %}
+        <p>Last updated: {{ page.extra.last_updated }}</p>
+        {%- endif %}
+    </header>
+
+    <div class="legal-content">
+        {{ page.content | safe }}
+    </div>
+</article>
+{%- endfilter -%}{%- endfilter -%}
+{%- endblock -%}

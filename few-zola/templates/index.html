@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{%- block main -%}
+{%- filter indent -%}{%- filter indent -%}
+{%- if section.content -%}
+<div class="content {%- if section.extra.framed %} framed{%- endif -%}">
+    {{ section.content | indent | safe }}
+</div>
+{% endif -%}
+{%- endfilter -%}{%- endfilter -%}
+{%- endblock -%}

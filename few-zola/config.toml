@@ -1,0 +1,57 @@
+# The URL the site will be built for
+base_url = "https://few.sh"
+
+# The site title and description; used in feeds by default.
+title = "Fewshot Corp"
+description = "A mobile AI-assistant for DevOps practitioners and on-calls."
+
+# The theme to use
+theme = "terminus"
+
+# Whether to automatically compile all Sass files in the sass directory
+compile_sass = true
+
+# When set to "true", a feed is automatically generated.
+generate_feeds = false
+
+# The default author for pages
+author = "Fewshot Corp"
+
+[markdown]
+# Whether to do syntax highlighting
+highlight_code = true
+highlight_theme = "monokai"
+
+# When set to "true", emoji aliases translated to their corresponding
+# Unicode emoji equivalent in the rendered Markdown files.
+render_emoji = true
+
+# Whether footnotes are rendered in the GitHub-style
+bottom_footnotes = true
+
+# When set to "true", support for GitHub-style alerts
+github_alerts = true
+
+[extra]
+close_responsive_menu_on_resize = true
+copy_button = true
+favicon_emoji = "🐚"
+layout = "center"
+show_default_author = false
+
+main_menu = [
+    { name = "Home", url = "", trailing_slash = true },
+    { name = "Fewshell", url = "fewshell", trailing_slash = true },
+    { name = "Contact", url = "contact", trailing_slash = true },
+]
+
+# Leaving socials empty for now as existing site doesn't have social icons,
+# just footer links which we've added to main_menu for visibility or can handle in templates
+socials = []
+
+[extra.content_security_policy]
+enable = true
+allowed_domains = [
+    { directive = "connect-src", domains = ["'self'"] },
+    { directive = "script-src", domains = ["'self'"] },
+]

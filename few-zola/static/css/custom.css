@@ -1,0 +1,221 @@
+:root {
+    --background-color: #0d1117;
+    --text-color: #c9d1d9;
+    --accent-color: #3fb950;
+    --accent-violet: #d2a8ff;
+    --border-color: #30363d;
+    --font-mono: "Fira Code", monospace;
+    --cursor-color: #3fb950;
+}
+
+body {
+    font-family: var(--font-mono);
+}
+
+/* Signup Form */
+.signup-form {
+    margin-top: 2rem;
+    display: flex;
+    gap: 1rem;
+    max-width: 500px;
+}
+
+/* Contact Form */
+.contact-form {
+    margin-top: 2rem;
+    max-width: 600px;
+}
+
+.signup-input {
+    flex: 1;
+    background: rgba(13, 17, 23, 0.8);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 1rem;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    border-radius: 4px;
+    transition: border-color 0.3s ease;
+}
+
+.signup-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(63, 185, 80, 0.2);
+}
+
+.signup-button {
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+    font-weight: bold;
+    padding: 0 2rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.signup-button:hover {
+    background: var(--accent-color);
+    color: var(--background-color);
+    box-shadow: 0 0 20px rgba(63, 185, 80, 0.4);
+}
+
+/* Form Styles */
+.form-section {
+    margin-top: 2rem;
+}
+
+.form-group {
+    margin-bottom: 2rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.8rem;
+    color: var(--accent-violet);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.form-hint {
+    font-size: 0.8rem;
+    color: #8b949e;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+    width: 100%;
+    background: rgba(13, 17, 23, 0.8);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 1rem;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    border-radius: 4px;
+    transition:
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 10px rgba(63, 185, 80, 0.2);
+}
+
+.form-textarea {
+    min-height: 120px;
+    resize: vertical;
+    font-size: 0.85rem;
+}
+
+/* Button Styles */
+.btn-generate {
+    background: transparent;
+    border: 2px solid var(--accent-color);
+    color: var(--accent-color);
+    font-weight: bold;
+    padding: 1rem 2rem;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    display: block;
+    text-align: center;
+    margin-top: 3rem;
+}
+
+.btn-generate:hover {
+    background: var(--accent-color);
+    color: var(--background-color);
+    box-shadow: 0 0 20px rgba(63, 185, 80, 0.4);
+}
+
+/* QR Code Results */
+#qr-result {
+    margin-top: 4rem;
+    text-align: center;
+    display: none;
+    animation: fadeIn 0.5s ease;
+}
+
+#qr-canvas-container {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    display: inline-block;
+    margin: 2rem 0;
+}
+
+#qr-error {
+    color: #ff7b72;
+    margin-top: 1rem;
+    display: none;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Feature Boxes */
+.content h5 {
+    color: var(--accent-color);
+    font-weight: bold;
+    margin-bottom: 0;
+    margin-top: 2rem;
+    display: flex;
+    align-items: flex-start;
+    padding: 1.5rem;
+    padding-bottom: 1rem;
+    border: 1px solid var(--accent-violet);
+    border-radius: 4px;
+    background: rgba(210, 168, 255, 0.05);
+    transition: border-color 0.3s ease;
+}
+
+.content h5:has(+ p) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+}
+
+.content h5:hover {
+    background: rgba(210, 168, 255, 0.08);
+}
+
+.content h5::before {
+    content: "⭢ ";
+    color: var(--accent-violet);
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+}
+
+.content h5 + p {
+    margin-top: 0;
+    margin-bottom: 2rem;
+    padding: 0 1.5rem 1.5rem 3.15rem;
+    border: 1px solid var(--accent-violet);
+    border-top: none;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+    background: rgba(210, 168, 255, 0.05);
+}
+
+.content h5:hover + p {
+    background: rgba(210, 168, 255, 0.08);
+}
