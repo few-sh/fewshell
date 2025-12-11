@@ -73,8 +73,6 @@ dependencies:
   stream_channel: ^2.1.4
 
 dependency_overrides:
-  sqlite_crdt: 3.0.3
-  sql_crdt: 3.0.3
   postgres_crdt: 3.0.0
 
   # Utilities
