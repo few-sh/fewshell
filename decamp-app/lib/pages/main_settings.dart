@@ -292,6 +292,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: controller,
+              autocorrect: false,
+              enableSuggestions: false,
               decoration: InputDecoration(
                 labelText: 'Name',
                 border: OutlineInputBorder(
@@ -1037,6 +1039,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               children: [
                 TextField(
                   controller: controller,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   decoration: InputDecoration(
                     labelText: 'Server URL',
                     hintText: 'ws://localhost:3123',

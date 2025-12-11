@@ -62,6 +62,8 @@ class _SearchControlsState extends State<SearchControls> {
                 controller: _controller,
                 focusNode: _focusNode,
                 autofocus: widget.autofocus,
+                autocorrect: false,
+                enableSuggestions: false,
                 decoration: InputDecoration(
                   hintText: 'Search messages (supports regex)...',
                   border: InputBorder.none,

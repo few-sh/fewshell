@@ -60,6 +60,8 @@ class _SshPromptDialogState extends State<_SshPromptDialog> {
             controller: _controller,
             obscureText: !widget.echo,
             autofocus: true,
+            autocorrect: false,
+            enableSuggestions: false,
             decoration: const InputDecoration(
               border: OutlineInputBorder(),
               hintText: 'Enter response',

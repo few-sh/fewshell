@@ -679,6 +679,8 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
             controller: widget.controller,
             maxLines: null,
             minLines: 8,
+            autocorrect: false,
+            enableSuggestions: false,
             decoration: const InputDecoration(
               hintText: 'Enter instruction in markdown format...',
               border: OutlineInputBorder(),
@@ -842,6 +844,8 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
                 controller: widget.controller,
                 maxLines: null,
                 minLines: 6,
+                autocorrect: false,
+                enableSuggestions: false,
                 decoration: const InputDecoration(
                   hintText: 'Enter model-specific instruction...',
                   border: OutlineInputBorder(),

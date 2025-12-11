@@ -359,6 +359,8 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
             TextField(
               controller: _descriptionController,
               focusNode: _descriptionFocus,
+              autocorrect: false,
+              enableSuggestions: false,
               decoration: InputDecoration(
                 hintText: 'Description (e.g., List all pods)',
                 isDense: true,
@@ -375,6 +377,8 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
             const SizedBox(height: 12),
             TextField(
               controller: _contentController,
+              autocorrect: false,
+              enableSuggestions: false,
               decoration: InputDecoration(
                 hintText: 'Command (e.g., kubectl get pods)',
                 hintStyle: TextStyle(
@@ -576,6 +580,8 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
               Expanded(
                 child: TextField(
                   controller: _descriptionController,
+                  autocorrect: false,
+                  enableSuggestions: false,
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintText: 'Description',
@@ -594,6 +600,8 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
           const SizedBox(height: 12),
           TextField(
             controller: _contentController,
+            autocorrect: false,
+            enableSuggestions: false,
             decoration: InputDecoration(
               hintText: 'Command',
               hintStyle: TextStyle(

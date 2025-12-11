@@ -83,6 +83,8 @@ class _MessageEditFieldState extends State<MessageEditField> {
             maxLines: null,
             keyboardType: TextInputType.multiline,
             textInputAction: TextInputAction.newline,
+            autocorrect: false,
+            enableSuggestions: false,
             style: theme.textTheme.bodyMedium,
             decoration: InputDecoration(
               hintText: 'Edit your message...',

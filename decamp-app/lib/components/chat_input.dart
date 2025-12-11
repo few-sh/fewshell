@@ -75,6 +75,8 @@ class _ChatInputState extends State<ChatInput> {
               focusNode: _focusNode,
               enabled: widget.enabled,
               autofocus: false,
+              autocorrect: false,
+              enableSuggestions: false,
               stylusHandwritingEnabled: false,
               maxLines: null, // Allow multiple lines
               textInputAction: TextInputAction.send,

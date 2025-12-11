@@ -417,6 +417,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                     hintText: 'https://api.example.com/v1',
                     isDense: true,
                   ),
+                  autocorrect: false,
+                  enableSuggestions: false,
                   minLines: 1,
                   maxLines: null,
                   validator: (value) {
@@ -460,6 +462,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                       ],
                     ),
                   ),
+                  autocorrect: false,
+                  enableSuggestions: false,
                   style: const TextStyle(
                     fontFamily: 'Courier New',
                     fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
@@ -488,6 +492,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                           isDense: true,
                         ),
                         keyboardType: TextInputType.number,
+                        autocorrect: false,
+                        enableSuggestions: false,
                         validator: (value) {
                           if (value != null && value.isNotEmpty) {
                             final number = int.tryParse(value);
@@ -511,6 +517,8 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
+                        autocorrect: false,
+                        enableSuggestions: false,
                         validator: (value) {
                           if (value != null && value.isNotEmpty) {
                             final number = double.tryParse(value);

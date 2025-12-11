@@ -63,6 +63,8 @@ class UserBadge extends ConsumerWidget {
           controller: controller,
           decoration: const InputDecoration(hintText: 'Enter username'),
           autofocus: true,
+          autocorrect: false,
+          enableSuggestions: false,
           onSubmitted: (_) {
             final newName = controller.text.trim();
             if (newName.isNotEmpty) {

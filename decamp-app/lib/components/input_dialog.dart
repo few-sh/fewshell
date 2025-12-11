@@ -19,6 +19,8 @@ Future<String?> showInputDialog({
           border: const OutlineInputBorder(),
         ),
         autofocus: true,
+        autocorrect: false,
+        enableSuggestions: false,
         textCapitalization: TextCapitalization.sentences,
         onSubmitted: (value) {
           Navigator.pop(context, value.trim());

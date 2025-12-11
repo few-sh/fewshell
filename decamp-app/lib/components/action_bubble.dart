@@ -223,6 +223,8 @@ class _ActionBubbleState extends State<ActionBubble> {
             TextField(
               controller: _explanationController,
               enabled: !_isExecuting,
+              autocorrect: false,
+              enableSuggestions: false,
               decoration: InputDecoration(
                 labelText: 'Explanation',
                 border: const OutlineInputBorder(),
@@ -237,6 +239,8 @@ class _ActionBubbleState extends State<ActionBubble> {
             TextField(
               controller: _commandController,
               enabled: !_isExecuting,
+              autocorrect: false,
+              enableSuggestions: false,
               decoration: InputDecoration(
                 labelText: 'Command',
                 border: const OutlineInputBorder(),

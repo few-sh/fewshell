@@ -85,6 +85,8 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                   helperText: 'Must be uppercase with underscores',
                 ),
                 enabled: !_isEditMode,
+                autocorrect: false,
+                enableSuggestions: false,
                 textCapitalization: TextCapitalization.characters,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -123,6 +125,8 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                     ],
                   ),
                 ),
+                autocorrect: false,
+                enableSuggestions: false,
                 obscureText: _obscureValue,
                 maxLines: _obscureValue ? 1 : 5,
                 minLines: 1,
