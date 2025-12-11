@@ -172,9 +172,10 @@ class _AgentSession {
 
       // Always load conversation from database (single source of truth)
       // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
+      // Also filter out messages not visible to LLM
       final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
       final conversation = dbMessages
-          .where((m) => !m.isStreaming)
+          .where((m) => !m.isStreaming && m.isVisibleToLlm)
           .map((m) => m.toChatMessage())
           .toList();
 
