@@ -1,8 +1,11 @@
 import 'dart:convert';
 
 import 'package:llm_dart/llm_dart.dart';
+import 'package:logging/logging.dart';
 
 import 'types.dart';
+
+final _log = Logger('agentLoop');
 
 /// Runs the agent loop: LLM → tool calls → approval → execution → repeat
 ///
@@ -170,7 +173,8 @@ Future<AgentLoopResult> runAgentLoop({
 
       // Loop continues with updated conversation
     }
-  } catch (e) {
+  } catch (e, st) {
+    _log.severe('Error in agent loop: $e, $st');
     return AgentLoopError('Unexpected error in agent loop: $e');
   }
 }
@@ -210,14 +214,16 @@ Future<_StreamResult> _streamFromLlm({
           if (toolCallMap.containsKey(id)) {
             // Aggregate arguments
             final existing = toolCallMap[id]!;
-            final newArgs = existing.function.arguments + delta.function.arguments;
-            
+            final newArgs =
+                existing.function.arguments + delta.function.arguments;
+
             // Create updated tool call
             toolCallMap[id] = ToolCall(
               id: id,
               callType: existing.callType,
               function: FunctionCall(
-                name: existing.function.name, // Name usually comes in first delta
+                name:
+                    existing.function.name, // Name usually comes in first delta
                 arguments: newArgs,
               ),
             );
@@ -248,6 +254,7 @@ Future<_StreamResult> _streamFromLlm({
       toolCalls: toolCallMap.values.toList(),
     );
   } catch (e) {
+    // TODO: Add severe log with stack trace
     return _StreamResult(
       text: buffer.toString(),
       toolCalls: [],
