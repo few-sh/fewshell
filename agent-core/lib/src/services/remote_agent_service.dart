@@ -54,7 +54,8 @@ Future<AgentLoopResult> runRemoteAgentLoop({
           }
         } else if (type == 'error') {
           if (!completer.isCompleted) {
-            completer.complete(AgentLoopError(data['message']));
+            completer.complete(
+                AgentLoopError(data['message'], messageId: data['message_id']));
           }
         }
       } catch (e) {

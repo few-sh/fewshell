@@ -399,15 +399,20 @@ class ChatController extends StateNotifier<ChatState> {
           _log.info(
             '🚨 User cancelled tool execution',
           );
-        case AgentLoopError(message: final errorMsg):
-          final errorMessage = 'Sorry, I encountered an error: $errorMsg';
+        case AgentLoopError(
+            message: final errorMsg,
+            messageId: final messageId
+          ):
+          final errorMessage = 'Sorry, I encountered an error+: $errorMsg';
           final redactedError = await _secretRedactor.redact(errorMessage);
           final aiUserName = await _getAiUserName();
           await _messageDao.insertMessageWithId(
+            id: messageId,
             sessionId: sessionId,
             userId: _kAiUserId,
             userName: aiUserName,
             content: redactedError,
+            isVisibleToLlm: false,
           );
           if (mounted) {
             state = state.copyWith(isLoading: false, error: errorMsg);
@@ -425,6 +430,7 @@ class ChatController extends StateNotifier<ChatState> {
         userId: _kAiUserId,
         userName: aiUserName,
         content: redactedError,
+        isVisibleToLlm: false,
       );
       if (mounted) {
         state = state.copyWith(isLoading: false, error: e.toString());

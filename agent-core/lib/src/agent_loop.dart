@@ -1,11 +1,8 @@
 import 'dart:convert';
 
 import 'package:llm_dart/llm_dart.dart';
-import 'package:logging/logging.dart';
 
 import 'types.dart';
-
-final _log = Logger('agentLoop');
 
 /// Runs the agent loop: LLM → tool calls → approval → execution → repeat
 ///
@@ -58,124 +55,117 @@ Future<AgentLoopResult> runAgentLoop({
       ? List<ChatMessage>.from(conversation)
       : <ChatMessage>[];
 
-  try {
-    while (true) {
-      // Get fresh conversation if provider is available (e.g., from database)
-      if (getConversation != null) {
-        messages = await getConversation();
-      }
-
-      // Stream from LLM
-      final streamResult = await _streamFromLlm(
-        llmStream: llmStream,
-        tools: tools,
-        conversation: messages,
-        onTextDelta: onTextDelta,
-      );
-
-      // Check for error
-      if (streamResult.error != null) {
-        return AgentLoopError(streamResult.error!);
-      }
-
-      // If no tool calls, we're done
-      if (streamResult.toolCalls.isEmpty) {
-        // Notify about final text message if there is one
-        if (streamResult.text.isNotEmpty && onAssistantMessage != null) {
-          await onAssistantMessage(ChatMessage.assistant(streamResult.text));
-        }
-        return const AgentLoopCompleted();
-      }
-
-      // Convert to pending tool calls for approval
-      final pendingCalls = <PendingToolCall>[];
-      for (final tc in streamResult.toolCalls) {
-        Map<String, dynamic> args;
-        try {
-          args = tc.function.arguments.isNotEmpty
-              ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
-              : <String, dynamic>{};
-        } catch (e) {
-          return AgentLoopError(
-            'Failed to parse JSON arguments for tool ${tc.function.name}: $e',
-          );
-        }
-        pendingCalls.add(
-          PendingToolCall(
-            id: tc.id,
-            name: tc.function.name,
-            arguments: args,
-            originalToolCall: tc,
-          ),
-        );
-      }
-
-      // Request approval
-      final approved = await requestApproval(pendingCalls);
-
-      // User cancelled
-      if (approved == null) {
-        return const AgentLoopCancelled();
-      }
-
-      // Get the approved ToolCalls
-      final approvedToolCalls =
-          approved.map((p) => p.originalToolCall).toList();
-
-      // Build and save assistant message with tool use
-      final assistantMessage = ChatMessage.toolUse(
-        toolCalls: approvedToolCalls,
-        content: streamResult.text,
-      );
-      // Add to in-memory conversation (will be overwritten if using getConversation)
-      messages.add(assistantMessage);
-      if (onAssistantMessage != null) {
-        await onAssistantMessage(assistantMessage);
-      }
-
-      // Execute each approved tool call
-      final results = <ToolCall>[];
-      for (final toolCall in approvedToolCalls) {
-        String resultString;
-        try {
-          resultString = await executeToolCall(toolCall);
-        } catch (e) {
-          // Return error as result so LLM can reason about it
-          resultString = jsonEncode({
-            'error': 'Tool "${toolCall.function.name}" failed to execute.',
-            'details': e.toString(),
-          });
-        }
-        results.add(
-          ToolCall(
-            id: toolCall.id,
-            callType: toolCall.callType,
-            function: FunctionCall(
-              name: toolCall.function.name,
-              arguments: resultString,
-            ),
-          ),
-        );
-      }
-
-      // Build tool result message
-      final combinedContent =
-          results.map((r) => r.function.arguments).join('\n---\n');
-      final toolResultMessage = ChatMessage.toolResult(
-        results: results,
-        content: combinedContent,
-      );
-      // Add to in-memory conversation (will be overwritten if using getConversation)
-      messages.add(toolResultMessage);
-      if (onToolResultMessage != null) {
-        await onToolResultMessage(toolResultMessage);
-      }
-
-      // Loop continues with updated conversation
+  while (true) {
+    // Get fresh conversation if provider is available (e.g., from database)
+    if (getConversation != null) {
+      messages = await getConversation();
     }
-  } catch (e, st) {
-    _log.severe('Error in agent loop: $e, $st');
-    return AgentLoopError('Unexpected error in agent loop: $e');
+
+    // Stream from LLM
+    final streamResult = await _streamFromLlm(
+      llmStream: llmStream,
+      tools: tools,
+      conversation: messages,
+      onTextDelta: onTextDelta,
+    );
+
+    // If no tool calls, we're done
+    if (streamResult.toolCalls.isEmpty) {
+      // Notify about final text message if there is one
+      if (streamResult.text.isNotEmpty && onAssistantMessage != null) {
+        await onAssistantMessage(ChatMessage.assistant(streamResult.text));
+      }
+      return const AgentLoopCompleted();
+    }
+
+    // Convert to pending tool calls for approval
+    final pendingCalls = <PendingToolCall>[];
+    for (final tc in streamResult.toolCalls) {
+      Map<String, dynamic> args;
+      try {
+        args = tc.function.arguments.isNotEmpty
+            ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
+            : <String, dynamic>{};
+      } catch (e) {
+        // This is a data error, not an execution error, so maybe we should throw?
+        // Or return AgentLoopError?
+        // The user said "remove most of the places".
+        // If we throw here, the caller handles it.
+        throw Exception(
+          'Failed to parse JSON arguments for tool ${tc.function.name}: $e',
+        );
+      }
+      pendingCalls.add(
+        PendingToolCall(
+          id: tc.id,
+          name: tc.function.name,
+          arguments: args,
+          originalToolCall: tc,
+        ),
+      );
+    }
+
+    // Request approval
+    final approved = await requestApproval(pendingCalls);
+
+    // User cancelled
+    if (approved == null) {
+      return const AgentLoopCancelled();
+    }
+
+    // Get the approved ToolCalls
+    final approvedToolCalls = approved.map((p) => p.originalToolCall).toList();
+
+    // Build and save assistant message with tool use
+    final assistantMessage = ChatMessage.toolUse(
+      toolCalls: approvedToolCalls,
+      content: streamResult.text,
+    );
+    // Add to in-memory conversation (will be overwritten if using getConversation)
+    messages.add(assistantMessage);
+    if (onAssistantMessage != null) {
+      await onAssistantMessage(assistantMessage);
+    }
+
+    // Execute each approved tool call
+    final results = <ToolCall>[];
+    for (final toolCall in approvedToolCalls) {
+      String resultString;
+      try {
+        resultString = await executeToolCall(toolCall);
+      } catch (e) {
+        // Return error as result so LLM can reason about it
+        resultString = jsonEncode({
+          'error': 'Tool "${toolCall.function.name}" failed to execute.',
+          'details': e.toString(),
+        });
+      }
+      results.add(
+        ToolCall(
+          id: toolCall.id,
+          callType: toolCall.callType,
+          function: FunctionCall(
+            name: toolCall.function.name,
+            arguments: resultString,
+          ),
+        ),
+      );
+    }
+
+    // Build tool result message
+    final combinedContent =
+        results.map((r) => r.function.arguments).join('\n---\n');
+    final toolResultMessage = ChatMessage.toolResult(
+      results: results,
+      content: combinedContent,
+    );
+    // Add to in-memory conversation (will be overwritten if using getConversation)
+    messages.add(toolResultMessage);
+    if (onToolResultMessage != null) {
+      await onToolResultMessage(toolResultMessage);
+    }
+
+    // Loop continues with updated conversation
   }
 }
 
@@ -183,12 +173,10 @@ Future<AgentLoopResult> runAgentLoop({
 class _StreamResult {
   final String text;
   final List<ToolCall> toolCalls;
-  final String? error;
 
   _StreamResult({
     required this.text,
     required this.toolCalls,
-    this.error,
   });
 }
 
@@ -202,63 +190,49 @@ Future<_StreamResult> _streamFromLlm({
   final buffer = StringBuffer();
   final toolCallMap = <String, ToolCall>{};
 
-  try {
-    await for (final event in llmStream(conversation, tools)) {
-      switch (event) {
-        case TextDeltaEvent(delta: final delta):
-          buffer.write(delta);
-          onTextDelta?.call(delta);
+  await for (final event in llmStream(conversation, tools)) {
+    switch (event) {
+      case TextDeltaEvent(delta: final delta):
+        buffer.write(delta);
+        onTextDelta?.call(delta);
 
-        case ToolCallDeltaEvent(toolCall: final delta):
-          final id = delta.id;
-          if (toolCallMap.containsKey(id)) {
-            // Aggregate arguments
-            final existing = toolCallMap[id]!;
-            final newArgs =
-                existing.function.arguments + delta.function.arguments;
+      case ToolCallDeltaEvent(toolCall: final delta):
+        final id = delta.id;
+        if (toolCallMap.containsKey(id)) {
+          // Aggregate arguments
+          final existing = toolCallMap[id]!;
+          final newArgs =
+              existing.function.arguments + delta.function.arguments;
 
-            // Create updated tool call
-            toolCallMap[id] = ToolCall(
-              id: id,
-              callType: existing.callType,
-              function: FunctionCall(
-                name:
-                    existing.function.name, // Name usually comes in first delta
-                arguments: newArgs,
-              ),
-            );
-          } else {
-            // New tool call
-            toolCallMap[id] = delta;
-          }
-
-        case ThinkingDeltaEvent():
-          // Ignore thinking events for now
-          break;
-
-        case CompletionEvent():
-          // Stream complete
-          break;
-
-        case ErrorEvent(error: final error):
-          return _StreamResult(
-            text: buffer.toString(),
-            toolCalls: [],
-            error: error.message,
+          // Create updated tool call
+          toolCallMap[id] = ToolCall(
+            id: id,
+            callType: existing.callType,
+            function: FunctionCall(
+              name: existing.function.name, // Name usually comes in first delta
+              arguments: newArgs,
+            ),
           );
-      }
-    }
+        } else {
+          // New tool call
+          toolCallMap[id] = delta;
+        }
 
-    return _StreamResult(
-      text: buffer.toString(),
-      toolCalls: toolCallMap.values.toList(),
-    );
-  } catch (e) {
-    // TODO: Add severe log with stack trace
-    return _StreamResult(
-      text: buffer.toString(),
-      toolCalls: [],
-      error: e.toString(),
-    );
+      case ThinkingDeltaEvent():
+        // Ignore thinking events for now
+        break;
+
+      case CompletionEvent():
+        // Stream complete
+        break;
+
+      case ErrorEvent(error: final error):
+        throw Exception(error.message);
+    }
   }
+
+  return _StreamResult(
+    text: buffer.toString(),
+    toolCalls: toolCallMap.values.toList(),
+  );
 }

@@ -327,7 +327,31 @@ class _AgentSession {
       channel.sendCustomMessage({'type': 'complete'});
     } catch (e, st) {
       _log.severe('Error running agent loop: $e, $st');
-      channel.sendCustomMessage({'type': 'error', 'message': e.toString()});
+
+      final messageId = db!.messageDao.generateMessageId();
+
+      // Try to insert error message if we have session ID and DB
+      final sessionId = data['sessionId'] as String?;
+      if (sessionId != null && db != null) {
+        try {
+          final config = data['config'] as Map<String, dynamic>?;
+          final model = config?['model'] as String? ?? 'Ops Agent';
+
+          await db!.messageDao.insertMessageWithId(
+            id: messageId,
+            sessionId: sessionId,
+            userId: 'ai',
+            userName: model,
+            content: 'Sorry, I encountered an error: $e',
+            isVisibleToLlm: false,
+          );
+        } catch (innerE) {
+          _log.severe('Failed to insert error message: $innerE');
+        }
+      }
+
+      channel.sendCustomMessage(
+          {'type': 'error', 'message_id': messageId, 'message': e.toString()});
     }
   }
 
