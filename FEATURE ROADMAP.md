@@ -10,28 +10,32 @@ MVP (Version 0 - private alpha) - Typical use-case
 4. Decamp queries the logs via ssh + google cloud logs
 5. Decamp provides the log output and the summary.
 
-[ ] Feedback button
+[ ] Project settings replication for LLM settings and secrets
 
-TODOS:
+
+[ ] Feedback button
+[ ] Shared activity indicator (when a command is in progress or streaming is in progress, all clients should see the activity indicator)
+[ ] Support for thoughts streaming and display (expandable)
+[ ] A stop button (ability to cancel a chat stream or any command)
+
 
 Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
 [X] Replace the OCR-based scan buttons with QR-based - (simplify to allow single field replacement)
-[ ] When no model configuration exists, guide the user through setting up.*
+[X] When no model configuration exists, guide the user through setting up.*
 
-[ ] Support sudo for local command execution at the remote agent side
+[X] Support sudo for local command execution at the remote agent side
 
 General papercuts:
 [ ] Add a context menu button to re-run command
-[ ] Eliminate all non-expandable ellipsis in any of the text controls
-[ ] Show currently active project on the projects page
-[ ] When selecting a peroject from projects list, close the projects page
+[X] Eliminate all non-expandable ellipsis in any of the text controls
+[X] Show currently active project on the projects page
+[X] When selecting a peroject from projects list, close the projects page
 
 [X] An indicator/icon when a project is remote
 [X] A connection and activity indicator for remote project (eg when connected/disconnected, whebn sending data)
 
-[ ] Only sync the remote projects that belong to the agent
-
+[X] Only sync the remote projects that belong to the agent
 
 [ ] Auto-detect when SUDO fails and prompt for password, allow a checkbox to save the sudo password to secrets
 
