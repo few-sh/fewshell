@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:logging/logging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -384,7 +385,8 @@ class SyncService {
 
         // We might get a callback for the CA certificate (self-signed error)
         // or the Server certificate (hostname mismatch error).
-        // We validate that the certificate is either our Server Cert or our CA Cert.
+        // We validate that the certificate is either our Server Cert or our CA Cert
+        // by comparing the DER bytes.
 
         final isServerCert =
             cert.subject.contains('localhost') &&
@@ -394,15 +396,51 @@ class SyncService {
             cert.subject.contains('Decamp CA') &&
             cert.issuer.contains('Decamp CA');
 
-        if (isServerCert || isCaCert) {
-          _log.info(
-            'Certificate validation successful: Trusted certificate encountered (${isServerCert ? "Server" : "CA"}). Allowing connection.',
+        if (!isServerCert && !isCaCert) {
+          _log.severe(
+            'Certificate validation FAILED: Unknown certificate subject/issuer.',
           );
-          return true;
-        } else {
-          _log.severe('Certificate validation FAILED: Unknown certificate.');
           _log.severe('Subject: ${cert.subject}');
           _log.severe('Issuer: ${cert.issuer}');
+          return false;
+        }
+
+        try {
+          String pemToCompare;
+          if (isServerCert) {
+            // serverCert contains the chain, we only want the first cert (the server cert)
+            final endMarker = '-----END CERTIFICATE-----';
+            final endIndex = serverCert.indexOf(endMarker);
+            if (endIndex == -1) {
+              throw FormatException('Invalid serverCert format');
+            }
+            pemToCompare = serverCert.substring(0, endIndex + endMarker.length);
+          } else {
+            // caCert contains only the CA cert
+            pemToCompare = caCert;
+          }
+
+          final cleanPem = pemToCompare
+              .replaceAll(RegExp(r'-----.*-----'), '')
+              .replaceAll(RegExp(r'\s+'), '');
+
+          final pinnedBytes = base64.decode(cleanPem);
+          final receivedBytes = cert.der;
+
+          if (listEquals(pinnedBytes, receivedBytes)) {
+            _log.info(
+              'Certificate pinning successful: Trusted certificate encountered (${isServerCert ? "Server" : "CA"}). Allowing connection.',
+            );
+            return true;
+          } else {
+            _log.severe(
+              'Certificate pinning FAILED: Certificate bytes do not match pinned certificate.',
+            );
+            _log.severe('Certificate type: ${isServerCert ? "Server" : "CA"}');
+            return false;
+          }
+        } catch (e) {
+          _log.severe('Error during certificate pinning check', e);
           return false;
         }
       };
