@@ -151,7 +151,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
         _NewSnippetCard(
           key: ValueKey(_newSnippetId),
           isGlobal: isGlobal,
-          onSave: (description, content) async {
+          onSave: (description, content, isVisibleToLlm) async {
             try {
               await ref
                   .read(snippetControllerProvider)
@@ -160,6 +160,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
                     content: content,
                     description: description,
                     projectId: isGlobal ? null : currentProjectId,
+                    isVisibleToLlm: isVisibleToLlm,
                   );
               setState(() {
                 _newSnippetId = null;
@@ -262,7 +263,12 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 /// Widget for creating a new snippet inline
 class _NewSnippetCard extends StatefulWidget {
   final bool isGlobal;
-  final Future<void> Function(String description, String content) onSave;
+  final Future<void> Function(
+    String description,
+    String content,
+    bool isVisibleToLlm,
+  )
+  onSave;
   final VoidCallback onCancel;
 
   const _NewSnippetCard({
@@ -281,6 +287,7 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
   final _contentController = TextEditingController();
   final _descriptionFocus = FocusNode();
   bool _isSaving = false;
+  bool _isVisibleToLlm = true;
 
   @override
   void initState() {
@@ -309,6 +316,7 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
     await widget.onSave(
       _descriptionController.text.trim(),
       _contentController.text.trim(),
+      _isVisibleToLlm,
     );
     setState(() => _isSaving = false);
   }
@@ -430,6 +438,22 @@ class _NewSnippetCardState extends State<_NewSnippetCard> {
               onSubmitted: (_) => _save(),
             ),
             const SizedBox(height: 12),
+            SwitchListTile(
+              title: const Text('Visible to AI'),
+              subtitle: const Text(
+                'Include this snippet in the AI context',
+                style: TextStyle(fontSize: 12),
+              ),
+              value: _isVisibleToLlm,
+              onChanged: (value) {
+                setState(() {
+                  _isVisibleToLlm = value;
+                });
+              },
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -465,6 +489,7 @@ class _SnippetCardContent extends ConsumerStatefulWidget {
 class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
   late TextEditingController _contentController;
   late TextEditingController _descriptionController;
+  late bool _isVisibleToLlm;
   bool _hasChanges = false;
   bool _isSaving = false;
 
@@ -475,6 +500,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
     _descriptionController = TextEditingController(
       text: widget.snippet.description ?? '',
     );
+    _isVisibleToLlm = widget.snippet.isVisibleToLlm;
 
     // Listen for changes
     _contentController.addListener(_markChanged);
@@ -511,6 +537,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             name: _descriptionController.text.trim(),
             content: _contentController.text.trim(),
             description: _descriptionController.text.trim(),
+            isVisibleToLlm: _isVisibleToLlm,
           );
 
       if (mounted) {
@@ -651,6 +678,24 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             ),
             onSubmitted: (_) => _autoSave(),
             onTapOutside: (_) => _autoSave(),
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            title: const Text('Visible to AI'),
+            subtitle: const Text(
+              'Include this snippet in the AI context',
+              style: TextStyle(fontSize: 12),
+            ),
+            value: _isVisibleToLlm,
+            onChanged: (value) {
+              setState(() {
+                _isVisibleToLlm = value;
+                _hasChanges = true;
+              });
+              _autoSave();
+            },
+            dense: true,
+            contentPadding: EdgeInsets.zero,
           ),
         ],
       ),
