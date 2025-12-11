@@ -73,7 +73,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -107,12 +107,24 @@ class ProjectDatabase extends _$ProjectDatabase {
         // await executor.runCustom('PRAGMA foreign_keys = ON');
 
         // Ensure is_starred column exists (for CRDT databases that may skip migrations)
-        final columns = await executor
+        final sessionColumns = await executor
             .runSelect("SELECT * FROM pragma_table_info('sessions');", []);
-        final hasIsStarred = columns.any((row) => row['name'] == 'is_starred');
+        final hasIsStarred =
+            sessionColumns.any((row) => row['name'] == 'is_starred');
         if (!hasIsStarred) {
           await executor.runCustom(
             'ALTER TABLE sessions ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0 CHECK (is_starred IN (0, 1));',
+          );
+        }
+
+        // Ensure is_visible_to_llm column exists
+        final messageColumns = await executor
+            .runSelect("SELECT * FROM pragma_table_info('messages');", []);
+        final hasIsVisibleToLlm =
+            messageColumns.any((row) => row['name'] == 'is_visible_to_llm');
+        if (!hasIsVisibleToLlm) {
+          await executor.runCustom(
+            'ALTER TABLE messages ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
           );
         }
 
@@ -165,6 +177,18 @@ class ProjectDatabase extends _$ProjectDatabase {
 
           if (!hasIsStarred) {
             await m.addColumn(sessions, sessions.isStarred);
+          }
+        }
+
+        // Migration from version 8 to 9: Add isVisibleToLlm column to messages
+        if (from < 9) {
+          final columns = await executor
+              .runSelect("SELECT * FROM pragma_table_info('messages');", []);
+          final hasIsVisibleToLlm =
+              columns.any((row) => row['name'] == 'is_visible_to_llm');
+
+          if (!hasIsVisibleToLlm) {
+            await m.addColumn(messages, messages.isVisibleToLlm);
           }
         }
       },

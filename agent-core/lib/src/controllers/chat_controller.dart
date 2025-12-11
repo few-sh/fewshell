@@ -90,6 +90,11 @@ class ChatController extends StateNotifier<ChatState> {
         continue;
       }
 
+      // Skip messages that are not visible to LLM
+      if (!messageEntity.isVisibleToLlm) {
+        continue;
+      }
+
       // Use the extension method to convert to ChatMessage
       final chatMessage = messageEntity.toChatMessage();
 

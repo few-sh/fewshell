@@ -520,6 +520,16 @@ class $MessagesTable extends Messages
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_streaming" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isVisibleToLlmMeta =
+      const VerificationMeta('isVisibleToLlm');
+  @override
+  late final GeneratedColumn<bool> isVisibleToLlm = GeneratedColumn<bool>(
+      'is_visible_to_llm', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_visible_to_llm" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   late final GeneratedColumnWithTypeConverter<MessageKind, int> messageKind =
       GeneratedColumn<int>('message_kind', aliasedName, false,
@@ -558,6 +568,7 @@ class $MessagesTable extends Messages
         createdAt,
         editedAt,
         isStreaming,
+        isVisibleToLlm,
         messageKind,
         imageUrl,
         toolCallsJson,
@@ -624,6 +635,12 @@ class $MessagesTable extends Messages
           isStreaming.isAcceptableOrUnknown(
               data['is_streaming']!, _isStreamingMeta));
     }
+    if (data.containsKey('is_visible_to_llm')) {
+      context.handle(
+          _isVisibleToLlmMeta,
+          isVisibleToLlm.isAcceptableOrUnknown(
+              data['is_visible_to_llm']!, _isVisibleToLlmMeta));
+    }
     if (data.containsKey('image_url')) {
       context.handle(_imageUrlMeta,
           imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta));
@@ -655,6 +672,8 @@ class $MessagesTable extends Messages
           .read(DriftSqlType.dateTime, data['${effectivePrefix}edited_at']),
       isStreaming: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_streaming'])!,
+      isVisibleToLlm: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_visible_to_llm'])!,
       messageKind: $MessagesTable.$convertermessageKind.fromSql(attachedDatabase
           .typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}message_kind'])!),
@@ -710,6 +729,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
   /// Whether the message is currently streaming
   final bool isStreaming;
 
+  /// Whether the message should be visible to the LLM (included in conversation history)
+  final bool isVisibleToLlm;
+
   /// Discriminator: what kind of message is this?
   final MessageKind messageKind;
 
@@ -727,6 +749,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       required this.createdAt,
       this.editedAt,
       required this.isStreaming,
+      required this.isVisibleToLlm,
       required this.messageKind,
       this.imageUrl,
       this.toolCallsJson,
@@ -745,6 +768,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       map['edited_at'] = Variable<DateTime>(editedAt);
     }
     map['is_streaming'] = Variable<bool>(isStreaming);
+    map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm);
     {
       map['message_kind'] = Variable<int>(
           $MessagesTable.$convertermessageKind.toSql(messageKind));
@@ -776,6 +800,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ? const Value.absent()
           : Value(editedAt),
       isStreaming: Value(isStreaming),
+      isVisibleToLlm: Value(isVisibleToLlm),
       messageKind: Value(messageKind),
       imageUrl: imageUrl == null && nullToAbsent
           ? const Value.absent()
@@ -802,6 +827,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       editedAt: serializer.fromJson<DateTime?>(json['editedAt']),
       isStreaming: serializer.fromJson<bool>(json['isStreaming']),
+      isVisibleToLlm: serializer.fromJson<bool>(json['isVisibleToLlm']),
       messageKind: $MessagesTable.$convertermessageKind
           .fromJson(serializer.fromJson<int>(json['messageKind'])),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
@@ -824,6 +850,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'editedAt': serializer.toJson<DateTime?>(editedAt),
       'isStreaming': serializer.toJson<bool>(isStreaming),
+      'isVisibleToLlm': serializer.toJson<bool>(isVisibleToLlm),
       'messageKind': serializer.toJson<int>(
           $MessagesTable.$convertermessageKind.toJson(messageKind)),
       'imageUrl': serializer.toJson<String?>(imageUrl),
@@ -842,6 +869,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           DateTime? createdAt,
           Value<DateTime?> editedAt = const Value.absent(),
           bool? isStreaming,
+          bool? isVisibleToLlm,
           MessageKind? messageKind,
           Value<String?> imageUrl = const Value.absent(),
           Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
@@ -856,6 +884,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
         createdAt: createdAt ?? this.createdAt,
         editedAt: editedAt.present ? editedAt.value : this.editedAt,
         isStreaming: isStreaming ?? this.isStreaming,
+        isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
         messageKind: messageKind ?? this.messageKind,
         imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
         toolCallsJson:
@@ -876,6 +905,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
       isStreaming:
           data.isStreaming.present ? data.isStreaming.value : this.isStreaming,
+      isVisibleToLlm: data.isVisibleToLlm.present
+          ? data.isVisibleToLlm.value
+          : this.isVisibleToLlm,
       messageKind:
           data.messageKind.present ? data.messageKind.value : this.messageKind,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
@@ -900,6 +932,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('isStreaming: $isStreaming, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('toolCallsJson: $toolCallsJson, ')
@@ -919,6 +952,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       createdAt,
       editedAt,
       isStreaming,
+      isVisibleToLlm,
       messageKind,
       imageUrl,
       toolCallsJson,
@@ -936,6 +970,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           other.createdAt == this.createdAt &&
           other.editedAt == this.editedAt &&
           other.isStreaming == this.isStreaming &&
+          other.isVisibleToLlm == this.isVisibleToLlm &&
           other.messageKind == this.messageKind &&
           other.imageUrl == this.imageUrl &&
           other.toolCallsJson == this.toolCallsJson &&
@@ -952,6 +987,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
   final Value<DateTime> createdAt;
   final Value<DateTime?> editedAt;
   final Value<bool> isStreaming;
+  final Value<bool> isVisibleToLlm;
   final Value<MessageKind> messageKind;
   final Value<String?> imageUrl;
   final Value<List<ToolCall>?> toolCallsJson;
@@ -967,6 +1003,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.createdAt = const Value.absent(),
     this.editedAt = const Value.absent(),
     this.isStreaming = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.toolCallsJson = const Value.absent(),
@@ -983,6 +1020,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     required DateTime createdAt,
     this.editedAt = const Value.absent(),
     this.isStreaming = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.toolCallsJson = const Value.absent(),
@@ -1005,6 +1043,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? editedAt,
     Expression<bool>? isStreaming,
+    Expression<bool>? isVisibleToLlm,
     Expression<int>? messageKind,
     Expression<String>? imageUrl,
     Expression<String>? toolCallsJson,
@@ -1021,6 +1060,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       if (createdAt != null) 'created_at': createdAt,
       if (editedAt != null) 'edited_at': editedAt,
       if (isStreaming != null) 'is_streaming': isStreaming,
+      if (isVisibleToLlm != null) 'is_visible_to_llm': isVisibleToLlm,
       if (messageKind != null) 'message_kind': messageKind,
       if (imageUrl != null) 'image_url': imageUrl,
       if (toolCallsJson != null) 'tool_calls_json': toolCallsJson,
@@ -1039,6 +1079,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       Value<DateTime>? createdAt,
       Value<DateTime?>? editedAt,
       Value<bool>? isStreaming,
+      Value<bool>? isVisibleToLlm,
       Value<MessageKind>? messageKind,
       Value<String?>? imageUrl,
       Value<List<ToolCall>?>? toolCallsJson,
@@ -1054,6 +1095,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       isStreaming: isStreaming ?? this.isStreaming,
+      isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
       messageKind: messageKind ?? this.messageKind,
       imageUrl: imageUrl ?? this.imageUrl,
       toolCallsJson: toolCallsJson ?? this.toolCallsJson,
@@ -1092,6 +1134,9 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     if (isStreaming.present) {
       map['is_streaming'] = Variable<bool>(isStreaming.value);
     }
+    if (isVisibleToLlm.present) {
+      map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm.value);
+    }
     if (messageKind.present) {
       map['message_kind'] = Variable<int>(
           $MessagesTable.$convertermessageKind.toSql(messageKind.value));
@@ -1126,6 +1171,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('isStreaming: $isStreaming, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('toolCallsJson: $toolCallsJson, ')
@@ -1868,6 +1914,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessageEntityCompanion
   required DateTime createdAt,
   Value<DateTime?> editedAt,
   Value<bool> isStreaming,
+  Value<bool> isVisibleToLlm,
   Value<MessageKind> messageKind,
   Value<String?> imageUrl,
   Value<List<ToolCall>?> toolCallsJson,
@@ -1885,6 +1932,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessageEntityCompanion
   Value<DateTime> createdAt,
   Value<DateTime?> editedAt,
   Value<bool> isStreaming,
+  Value<bool> isVisibleToLlm,
   Value<MessageKind> messageKind,
   Value<String?> imageUrl,
   Value<List<ToolCall>?> toolCallsJson,
@@ -1927,6 +1975,10 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnFilters(column));
 
   ColumnWithTypeConverterFilters<MessageKind, MessageKind, int>
       get messageKind => $composableBuilder(
@@ -1983,6 +2035,10 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get messageKind => $composableBuilder(
       column: $table.messageKind, builder: (column) => ColumnOrderings(column));
 
@@ -2033,6 +2089,9 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => column);
+
+  GeneratedColumn<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<MessageKind, int> get messageKind =>
       $composableBuilder(
@@ -2085,6 +2144,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime?> editedAt = const Value.absent(),
             Value<bool> isStreaming = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             Value<MessageKind> messageKind = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
             Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
@@ -2101,6 +2161,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             editedAt: editedAt,
             isStreaming: isStreaming,
+            isVisibleToLlm: isVisibleToLlm,
             messageKind: messageKind,
             imageUrl: imageUrl,
             toolCallsJson: toolCallsJson,
@@ -2117,6 +2178,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             required DateTime createdAt,
             Value<DateTime?> editedAt = const Value.absent(),
             Value<bool> isStreaming = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             Value<MessageKind> messageKind = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
             Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
@@ -2133,6 +2195,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             editedAt: editedAt,
             isStreaming: isStreaming,
+            isVisibleToLlm: isVisibleToLlm,
             messageKind: messageKind,
             imageUrl: imageUrl,
             toolCallsJson: toolCallsJson,
