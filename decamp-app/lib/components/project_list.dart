@@ -108,6 +108,41 @@ class ProjectList extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 8),
                               ],
+                              if (project.serverUrl != null &&
+                                  project.serverUrl!.isNotEmpty) ...[
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.dns,
+                                      size: 14,
+                                      color: isCurrentProject
+                                          ? theme.colorScheme.onPrimaryContainer
+                                                .withValues(alpha: 0.7)
+                                          : theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.7),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        project.serverUrl!,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isCurrentProject
+                                              ? theme
+                                                    .colorScheme
+                                                    .onPrimaryContainer
+                                                    .withValues(alpha: 0.7)
+                                              : theme.colorScheme.onSurface
+                                                    .withValues(alpha: 0.7),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                              ],
                               Text(
                                 'Last session: $absoluteDateTime',
                                 style: TextStyle(
