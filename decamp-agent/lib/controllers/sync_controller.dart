@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
@@ -12,6 +12,8 @@ import 'package:drift/drift.dart';
 import '../services/database_manager.dart';
 
 class SyncController {
+  static final _log = Logger('SyncController');
+
   final DatabaseManager dbManager;
 
   SyncController(this.dbManager);
@@ -25,7 +27,7 @@ class SyncController {
           final multiplexed = MultiplexedWebSocketChannel(channel);
           _setupCustomMessageHandling(multiplexed, 'Global');
 
-          developer.log('Starting CrdtSync for global', name: 'SyncController');
+          _log.info('Starting CrdtSync for global');
           final sync = CrdtSync.server(
             dbManager.globalDatabase.crdt,
             multiplexed,
@@ -34,9 +36,8 @@ class SyncController {
 
           unawaited(
             multiplexed.sink.done.then((_) {
-              developer.log(
+              _log.info(
                 'Channel closed for global',
-                name: 'SyncController',
               );
               sync.close();
             }),
@@ -52,9 +53,8 @@ class SyncController {
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
 
-            developer.log(
+            _log.info(
               'Starting CrdtSync for project $projectId',
-              name: 'SyncController',
             );
             final sync = CrdtSync.server(
               db.crdt,
@@ -65,9 +65,8 @@ class SyncController {
             // Ensure sync is closed when channel is closed
             unawaited(
               multiplexed.sink.done.then((_) {
-                developer.log(
+                _log.info(
                   'Channel closed for project $projectId',
-                  name: 'SyncController',
                 );
                 sync.close();
               }),
@@ -90,7 +89,7 @@ class SyncController {
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
     channel.onCustomMessage.listen((msg) {
-      developer.log('Server ($context): Received custom message: $msg');
+      _log.info('Server ($context): Received custom message: $msg');
       if (msg['type'] == 'PING') {
         channel.sendCustomMessage({
           'type': 'PONG',
@@ -105,6 +104,8 @@ class SyncController {
 }
 
 class _AgentSession {
+  static final _log = Logger('AgentSession');
+
   final MultiplexedWebSocketChannel channel;
   final ProjectDatabase? db;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
@@ -127,7 +128,7 @@ class _AgentSession {
   }
 
   void _handleApproval(Map<String, dynamic> data) {
-    developer.log('✅ Received approval response', name: 'AgentSession');
+    _log.info('✅ Received approval response');
     final approvedIds = (data['approvedIds'] as List?)?.cast<String>();
 
     if (_approvalCompleter != null && !_approvalCompleter!.isCompleted) {
@@ -144,7 +145,7 @@ class _AgentSession {
   }
 
   Future<void> _startChat(Map<String, dynamic> data) async {
-    developer.log('🚀 Starting agent loop', name: 'AgentSession');
+    _log.info('🚀 Starting agent loop');
     try {
       final config = data['config'] as Map<String, dynamic>;
       final sessionId = data['sessionId'] as String?;
@@ -159,15 +160,13 @@ class _AgentSession {
 
       // If we have a trigger message, upsert it immediately to ensure we have the latest context
       if (triggerMessageJson != null) {
-        developer.log(
+        _log.info(
           '📥 Received trigger message, upserting...',
-          name: 'AgentSession',
         );
         final triggerMessage = MessageEntity.fromJson(triggerMessageJson);
         await db!.messageDao.insertMessage(triggerMessage.toCompanion(true));
-        developer.log(
+        _log.info(
           '✅ Trigger message ${triggerMessage.id} upserted!',
-          name: 'AgentSession',
         );
       }
 
@@ -266,9 +265,8 @@ class _AgentSession {
           _lastDbWrite = _lastDbWrite.then((_) async {
             await db!.messageDao.insertMessage(companion);
           }).catchError((e) {
-            developer.log(
+            _log.warning(
               'Error writing streaming message: $e',
-              name: 'AgentSession',
             );
             // Return void to satisfy the Future<void> chain
           });
@@ -320,7 +318,7 @@ class _AgentSession {
 
       channel.sendCustomMessage({'type': 'complete'});
     } catch (e) {
-      developer.log('Error in agent loop: $e', name: 'AgentSession');
+      _log.warning('Error in agent loop: $e');
       channel.sendCustomMessage({'type': 'error', 'message': e.toString()});
     }
   }

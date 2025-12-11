@@ -1,11 +1,13 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
 
 /// Type converter for `List<ToolCall>` to/from JSON string
 /// Provides type-safe serialization of tool calls for database storage
 class ToolCallListConverter extends TypeConverter<List<ToolCall>?, String?> {
+  static final _log = Logger('ToolCallListConverter');
+
   const ToolCallListConverter();
 
   @override
@@ -19,9 +21,8 @@ class ToolCallListConverter extends TypeConverter<List<ToolCall>?, String?> {
           .toList();
     } catch (e) {
       // Log error but return null to prevent crashes
-      developer.log(
+      _log.warning(
         'Error deserializing tool calls: $e',
-        name: 'ToolCallConverter',
       );
       return null;
     }
@@ -35,9 +36,8 @@ class ToolCallListConverter extends TypeConverter<List<ToolCall>?, String?> {
       return jsonEncode(value.map((tc) => tc.toJson()).toList());
     } catch (e) {
       // Log error but return null to prevent crashes
-      developer.log(
+      _log.warning(
         'Error serializing tool calls: $e',
-        name: 'ToolCallConverter',
       );
       return null;
     }

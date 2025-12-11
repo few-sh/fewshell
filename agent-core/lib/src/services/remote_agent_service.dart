@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 
 import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
+
+final _log = Logger('RemoteAgentService');
 
 /// Runs the agent loop remotely on the server using the existing sync channel
 Future<AgentLoopResult> runRemoteAgentLoop({
@@ -13,9 +15,8 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   required MessageEntity triggerMessage,
   required ApprovalFunction requestApproval,
 }) async {
-  developer.log(
-      'Starting remote agent loop with sessionId: $sessionId triggerMessage: ${triggerMessage.toJsonString()}',
-      name: 'RemoteAgentService');
+  _log.info(
+      'Starting remote agent loop with sessionId: $sessionId triggerMessage: ${triggerMessage.toJsonString()}');
 
   final completer = Completer<AgentLoopResult>();
 
@@ -57,8 +58,7 @@ Future<AgentLoopResult> runRemoteAgentLoop({
           }
         }
       } catch (e) {
-        developer.log('Error handling remote message: $e',
-            name: 'RemoteAgentService');
+        _log.warning('Error handling remote message: $e');
         if (!completer.isCompleted) {
           completer.complete(AgentLoopError(e.toString()));
         }

@@ -2,7 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 // ignore: implementation_imports
@@ -15,6 +15,8 @@ typedef UserPromptCallback = Future<String> Function(String prompt, bool echo);
 
 /// Service for executing shell commands via SSH
 class ShellService {
+  static final _log = Logger('ShellService');
+
   SSHClient? _client;
   final SshSettings? _sshSettings;
   final KeychainService? _keychain;
@@ -37,9 +39,8 @@ class ShellService {
     String? inlinePassphrase,
   }) async {
     try {
-      developer.log(
+      _log.info(
         'Connecting to SSH: ${sshSettings.username}@${sshSettings.host}:${sshSettings.port}',
-        name: 'ShellService',
       );
 
       // Get credentials from inline or keychain
@@ -87,9 +88,9 @@ class ShellService {
       // Wait for authentication to complete
       await _client!.authenticated;
 
-      developer.log('SSH connection established', name: 'ShellService');
+      _log.info('SSH connection established');
     } catch (e) {
-      developer.log('SSH connection failed: $e', name: 'ShellService');
+      _log.warning('SSH connection failed: $e');
       _client?.close();
       _client = null;
       rethrow;
@@ -113,25 +114,24 @@ class ShellService {
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
-    developer.log('Executing command: $command', name: 'ShellService');
+    _log.info('Executing command: $command');
 
     // Auto-connect if not connected or connection is stale
     if (!isConnected) {
       if (_sshSettings == null) {
-        developer.log(
+        _log.warning(
           'No SSH settings configured for this project',
-          name: 'ShellService',
         );
         throw Exception('SSH settings not configured for this project');
       }
 
       // Clean up stale client if it exists
       if (_client != null) {
-        developer.log('Cleaning up stale connection...', name: 'ShellService');
+        _log.info('Cleaning up stale connection...');
         _client = null;
       }
 
-      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      _log.info('Auto-connecting to SSH server...');
       await connect(_sshSettings);
     }
 
@@ -147,9 +147,8 @@ class ShellService {
           if (entry.value.isNotEmpty) {
             // Validate environment variable name to prevent injection
             if (!_isValidEnvVarName(entry.key)) {
-              developer.log(
+              _log.warning(
                 'Invalid environment variable name: ${entry.key}',
-                name: 'ShellService',
               );
               continue;
             }
@@ -212,9 +211,8 @@ ${envExports}DECAMP_SECRETS
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
       final exitCode = session.exitCode ?? 0;
 
-      developer.log(
+      _log.info(
         'Command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
-        name: 'ShellService',
       );
 
       return {
@@ -226,18 +224,16 @@ ${envExports}DECAMP_SECRETS
     } catch (e) {
       // Check if this is a connection-related error that we can retry
       if (!isRetry && _isConnectionError(e) && _sshSettings != null) {
-        developer.log(
+        _log.warning(
           'Command failed due to connection error: $e. Attempting reconnect...',
-          name: 'ShellService',
         );
 
         // Clean up and try to reconnect
         _client = null;
         await connect(_sshSettings);
 
-        developer.log(
+        _log.info(
           'Reconnected, retrying command...',
-          name: 'ShellService',
         );
         // Retry the command once
         return executeCommand(
@@ -249,7 +245,7 @@ ${envExports}DECAMP_SECRETS
         );
       }
 
-      developer.log('Command execution failed: $e', name: 'ShellService');
+      _log.warning('Command execution failed: $e');
       rethrow;
     }
   }
@@ -260,29 +256,28 @@ ${envExports}DECAMP_SECRETS
     // Auto-connect if not connected or connection is stale
     if (!isConnected) {
       if (_sshSettings == null) {
-        developer.log(
+        _log.warning(
           'No SSH settings configured for this project',
-          name: 'ShellService',
         );
         throw Exception('SSH settings not configured for this project');
       }
 
       // Clean up stale client if it exists
       if (_client != null) {
-        developer.log('Cleaning up stale connection...', name: 'ShellService');
+        _log.info('Cleaning up stale connection...');
         _client = null;
       }
 
-      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      _log.info('Auto-connecting to SSH server...');
       await connect(_sshSettings);
     }
 
     try {
       final session = await _client!.shell();
-      developer.log('Interactive session created', name: 'ShellService');
+      _log.info('Interactive session created');
       return session;
     } catch (e) {
-      developer.log('Failed to create session: $e', name: 'ShellService');
+      _log.warning('Failed to create session: $e');
       rethrow;
     }
   }
@@ -290,7 +285,7 @@ ${envExports}DECAMP_SECRETS
   /// Disconnect from SSH server
   void disconnect() {
     if (_client != null) {
-      developer.log('Disconnecting from SSH', name: 'ShellService');
+      _log.info('Disconnecting from SSH');
       _client!.close();
       _client = null;
     }
@@ -359,20 +354,19 @@ ${envExports}DECAMP_SECRETS
     // Auto-connect if not connected or connection is stale
     if (!isConnected) {
       if (_sshSettings == null) {
-        developer.log(
+        _log.warning(
           'No SSH settings configured for this project',
-          name: 'ShellService',
         );
         throw Exception('SSH settings not configured for this project');
       }
 
       // Clean up stale client if it exists
       if (_client != null) {
-        developer.log('Cleaning up stale connection...', name: 'ShellService');
+        _log.info('Cleaning up stale connection...');
         _client = null;
       }
 
-      developer.log('Auto-connecting to SSH server...', name: 'ShellService');
+      _log.info('Auto-connecting to SSH server...');
       await connect(_sshSettings);
     }
 
@@ -386,9 +380,8 @@ ${envExports}DECAMP_SECRETS
         sudoPasswordSecretId,
       );
       if (sudoPassword == null || sudoPassword.isEmpty) {
-        developer.log(
+        _log.warning(
           'Sudo password not found in secrets',
-          name: 'ShellService',
         );
         throw Exception('Sudo password not found in secrets');
       }
@@ -406,9 +399,8 @@ ${envExports}DECAMP_SECRETS
         if (entry.value.isNotEmpty) {
           // Validate environment variable name to prevent injection
           if (!_isValidEnvVarName(entry.key)) {
-            developer.log(
+            _log.warning(
               'Invalid environment variable name: ${entry.key}',
-              name: 'ShellService',
             );
             continue;
           }
@@ -464,9 +456,8 @@ ${envExports}DECAMP_SECRETS
     }
 
     // Log command with redacted secrets
-    developer.log(
+    _log.info(
       'Executing sudo command: sudo $command (secrets redacted)',
-      name: 'ShellService',
     );
 
     try {
@@ -507,9 +498,8 @@ ${envExports}DECAMP_SECRETS
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
       final exitCode = session.exitCode ?? -1;
 
-      developer.log(
+      _log.info(
         'Sudo command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
-        name: 'ShellService',
       );
 
       return {
@@ -521,18 +511,16 @@ ${envExports}DECAMP_SECRETS
     } catch (e) {
       // Check if this is a connection-related error that we can retry
       if (!isRetry && _isConnectionError(e) && _sshSettings != null) {
-        developer.log(
+        _log.warning(
           'Sudo command failed due to connection error: $e. Attempting reconnect...',
-          name: 'ShellService',
         );
 
         // Clean up and try to reconnect
         _client = null;
         await connect(_sshSettings);
 
-        developer.log(
+        _log.info(
           'Reconnected, retrying sudo command...',
-          name: 'ShellService',
         );
         // Retry the command once
         return executeWithSudo(
@@ -545,7 +533,7 @@ ${envExports}DECAMP_SECRETS
         );
       }
 
-      developer.log('Sudo command execution failed: $e', name: 'ShellService');
+      _log.warning('Sudo command execution failed: $e');
       rethrow;
     }
   }

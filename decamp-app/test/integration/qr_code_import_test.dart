@@ -10,7 +10,9 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
 import 'package:decamp/providers/theme_provider.dart';
 import 'package:decamp/services/storage/flutter_secure_storage_impl.dart';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
+
+final _log = Logger('QrCodeImportTest');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +74,7 @@ void main() {
         isEmpty,
         reason: 'Project should start with no LLM models',
       );
-      developer.log('Initial models count: ${initialModels.length}');
+      _log.info('Initial models count: ${initialModels.length}');
 
       // 2. Create QR code data (matching the format from get.few.sh)
       final qrData = {
@@ -81,17 +83,17 @@ void main() {
       };
       final qrJson = jsonEncode(qrData);
 
-      developer.log('QR JSON: $qrJson');
+      _log.info('QR JSON: $qrJson');
 
       // 3. Import the QR code
       final importer = container.read(projectImporterProvider);
 
       try {
         await importer.importFromQrCode(qrJson, targetProjectId: testProjectId);
-        developer.log('Import completed without throwing');
+        _log.info('Import completed without throwing');
       } catch (e, stackTrace) {
-        developer.log('Import threw error: $e');
-        developer.log('Stack trace: $stackTrace');
+        _log.info('Import threw error: $e');
+        _log.info('Stack trace: $stackTrace');
         fail('Import should not throw: $e');
       }
 
@@ -99,7 +101,7 @@ void main() {
       final updatedModels = container.read(
         projectLlmSettingsProvider(testProjectId),
       );
-      developer.log('Updated models count: ${updatedModels.length}');
+      _log.info('Updated models count: ${updatedModels.length}');
 
       if (updatedModels.isEmpty) {
         fail(
@@ -110,9 +112,9 @@ void main() {
       expect(updatedModels.length, 1, reason: 'Should have exactly 1 model');
 
       final model = updatedModels.first;
-      developer.log('Model identifier: ${model.identifier}');
-      developer.log('Model apiType: ${model.apiType}');
-      developer.log('Model baseUrl: ${model.baseUrl}');
+      _log.info('Model identifier: ${model.identifier}');
+      _log.info('Model apiType: ${model.apiType}');
+      _log.info('Model baseUrl: ${model.baseUrl}');
 
       expect(model.apiType, LlmApiType.openai);
 

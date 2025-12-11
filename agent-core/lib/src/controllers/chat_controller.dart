@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 import 'package:dio/dio.dart';
 import 'package:state_notifier/state_notifier.dart';
 import 'package:llm_dart/llm_dart.dart';
@@ -19,6 +19,8 @@ const String _kAiUserName = 'Ops Agent';
 /// Handles all business logic for chat interactions, tool execution, and message syncing
 /// Directly calls DAOs and services without unnecessary repository layer
 class ChatController extends StateNotifier<ChatState> {
+  static final _log = Logger('ChatController');
+
   final MessageDao _messageDao;
   final SessionDao _sessionDao;
   final LlmService _llmService;
@@ -76,9 +78,8 @@ class ChatController extends StateNotifier<ChatState> {
   List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
     final conversation = <ChatMessage>[];
 
-    developer.log(
+    _log.info(
       '🔄 Building conversation history from ${dbMessages.length} messages',
-      name: 'ChatController',
     );
 
     for (final msg in dbMessages) {
@@ -93,32 +94,28 @@ class ChatController extends StateNotifier<ChatState> {
       // Use the extension method to convert to ChatMessage
       final chatMessage = messageEntity.toChatMessage();
 
-      developer.log(
+      _log.info(
         '✅ Reconstructed ${chatMessage.role.name} message with kind: ${messageEntity.messageKind.name}',
-        name: 'ChatController',
       );
 
       // Log tool calls and results for debugging
       if (chatMessage.messageType is ToolUseMessage) {
         final toolUse = chatMessage.messageType as ToolUseMessage;
-        developer.log(
+        _log.info(
           '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
-          name: 'ChatController',
         );
       } else if (chatMessage.messageType is ToolResultMessage) {
         final toolResult = chatMessage.messageType as ToolResultMessage;
-        developer.log(
+        _log.info(
           '  📊 Tool results: ${toolResult.results.length} result(s)',
-          name: 'ChatController',
         );
       }
 
       conversation.add(chatMessage);
     }
 
-    developer.log(
+    _log.info(
       '✅ Built conversation with ${conversation.length} messages',
-      name: 'ChatController',
     );
 
     return conversation;
@@ -234,9 +231,8 @@ class ChatController extends StateNotifier<ChatState> {
           return null; // User cancelled
         }
 
-        developer.log(
+        _log.info(
           '✅ User approved ${selectedActions.length} tool calls',
-          name: 'ChatController',
         );
 
         // Return the approved subset of PendingToolCalls
@@ -394,11 +390,10 @@ class ChatController extends StateNotifier<ChatState> {
       // Handle result
       switch (result) {
         case AgentLoopCompleted():
-          developer.log('✅ Agent loop completed', name: 'ChatController');
+          _log.info('✅ Agent loop completed');
         case AgentLoopCancelled():
-          developer.log(
+          _log.info(
             '🚨 User cancelled tool execution',
-            name: 'ChatController',
           );
         case AgentLoopError(message: final errorMsg):
           final errorMessage = 'Sorry, I encountered an error: $errorMsg';
@@ -563,12 +558,12 @@ class ChatController extends StateNotifier<ChatState> {
         requestApproval,
     MultiplexedWebSocketChannel? syncChannel,
   }) async {
-    developer.log('✏️ Editing message: $messageId', name: 'ChatController');
+    _log.info('✏️ Editing message: $messageId');
 
     // Get the message to find its timestamp
     final message = await _messageDao.getMessage(messageId);
     if (message == null) {
-      developer.log('❌ Message not found: $messageId', name: 'ChatController');
+      _log.warning('❌ Message not found: $messageId');
       return;
     }
 
@@ -578,7 +573,7 @@ class ChatController extends StateNotifier<ChatState> {
       newContent: newContent,
     );
 
-    developer.log('💾 Updated message content', name: 'ChatController');
+    _log.info('💾 Updated message content');
 
     // Delete all messages AFTER this one (keep the edited message)
     final deletedCount = await _messageDao.deleteMessagesAfter(
@@ -586,9 +581,8 @@ class ChatController extends StateNotifier<ChatState> {
       afterTimestamp: message.timestamp,
     );
 
-    developer.log(
+    _log.info(
       '🗑️ Deleted $deletedCount messages after edit, now resending',
-      name: 'ChatController',
     );
 
     // Resend from the edited message
@@ -609,15 +603,14 @@ class ChatController extends StateNotifier<ChatState> {
         requestApproval,
     MultiplexedWebSocketChannel? syncChannel,
   }) async {
-    developer.log(
+    _log.info(
       '🔄 Resending from message: $messageId',
-      name: 'ChatController',
     );
 
     // Get the message to find its timestamp
     final message = await _messageDao.getMessage(messageId);
     if (message == null) {
-      developer.log('❌ Message not found: $messageId', name: 'ChatController');
+      _log.warning('❌ Message not found: $messageId');
       return;
     }
 
@@ -627,9 +620,8 @@ class ChatController extends StateNotifier<ChatState> {
       afterTimestamp: message.timestamp,
     );
 
-    developer.log(
+    _log.info(
       '🗑️ Deleted $deletedCount messages after target, now resending',
-      name: 'ChatController',
     );
 
     // Resend - conversation will include the message we're resending from
@@ -648,9 +640,8 @@ class ChatController extends StateNotifier<ChatState> {
     required String messageId,
     required String sessionId,
   }) async {
-    developer.log(
+    _log.info(
       '🌿 Branching session at message: $messageId',
-      name: 'ChatController',
     );
 
     final newSessionId = await _sessionDao.branchSession(
@@ -658,9 +649,8 @@ class ChatController extends StateNotifier<ChatState> {
       upToMessageId: messageId,
     );
 
-    developer.log(
+    _log.info(
       '✅ Created new session: $newSessionId',
-      name: 'ChatController',
     );
 
     return newSessionId;

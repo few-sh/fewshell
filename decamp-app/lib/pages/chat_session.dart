@@ -21,7 +21,7 @@ import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/components/no_llm_configured_overlay.dart';
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/sync_indicator.dart';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 
 class ChatSession extends ConsumerStatefulWidget {
   const ChatSession({super.key});
@@ -31,6 +31,8 @@ class ChatSession extends ConsumerStatefulWidget {
 }
 
 class _ChatSessionState extends ConsumerState<ChatSession> {
+  static final _log = Logger('ChatSession');
+
   bool _previousKeyboardVisible = false;
   final FocusNode _inputFocusNode = FocusNode();
 
@@ -152,11 +154,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   Future<void> _handleSendMessage(String content) async {
     final currentSessionId = ref.read(currentSessionIdProvider);
     if (currentSessionId == null) {
-      developer.log('No session selected', name: 'ChatSession');
+      _log.warning('No session selected');
       return;
     }
 
-    developer.log('📤 Sending message', name: 'ChatSession');
+    _log.info('📤 Sending message');
 
     // Handle /ping command
     final pingRegex = RegExp(r'^/ping(\s+(.*))?$');
@@ -208,7 +210,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentSessionId = ref.read(currentSessionIdProvider);
     if (currentSessionId == null) return;
 
-    developer.log('✏️ Editing message: $messageId', name: 'ChatSession');
+    _log.info('✏️ Editing message: $messageId');
 
     final controller = ref.read(
       chatControllerProvider(currentSessionId).notifier,
@@ -234,7 +236,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentSessionId = ref.read(currentSessionIdProvider);
     if (currentSessionId == null) return;
 
-    developer.log('🔄 Resending message: $messageId', name: 'ChatSession');
+    _log.info('🔄 Resending message: $messageId');
 
     final controller = ref.read(
       chatControllerProvider(currentSessionId).notifier,
@@ -259,10 +261,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentSessionId = ref.read(currentSessionIdProvider);
     if (currentSessionId == null) return;
 
-    developer.log(
-      '🌿 Branching session at message: $messageId',
-      name: 'ChatSession',
-    );
+    _log.info('🌿 Branching session at message: $messageId');
 
     final controller = ref.read(
       chatControllerProvider(currentSessionId).notifier,
@@ -276,10 +275,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Switch to the new session
     ref.read(currentSessionIdProvider.notifier).select(newSessionId);
 
-    developer.log(
-      '✅ Switched to new session: $newSessionId',
-      name: 'ChatSession',
-    );
+    _log.info('✅ Switched to new session: $newSessionId');
   }
 
   /// Handle SSH interactive prompts (e.g. 2FA, password)

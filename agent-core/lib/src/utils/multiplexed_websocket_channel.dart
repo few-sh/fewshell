@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as developer;
+import 'package:logging/logging.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 class MultiplexedWebSocketChannel extends StreamChannelMixin
     implements WebSocketChannel {
+  static final _log = Logger('MultiplexedWebSocketChannel');
+
   final WebSocketChannel _inner;
   final StreamController _inboundController = StreamController();
   final StreamController<Map<String, dynamic>> _customMessageController =
@@ -24,13 +26,14 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
           if (decoded is Map<String, dynamic>) {
             _customMessageController.add(decoded);
           } else {
-            developer.log('Custom message payload is not a Map: $decoded');
+            _log.warning('Custom message payload is not a Map: $decoded');
           }
         } catch (e, stackTrace) {
           // Ignore malformed custom messages
-          developer.log(
+          _log.warning(
             'Error parsing custom message: $e',
-            stackTrace: stackTrace,
+            e,
+            stackTrace,
           );
         }
       } else {
