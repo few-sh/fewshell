@@ -177,6 +177,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     required String content,
     String? imageUrl,
     bool isStreaming = false,
+    bool isVisibleToLlm = true,
   }) async {
     final now = DateTime.now();
     final messageId = id ?? generateMessageId();
@@ -196,6 +197,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       toolCallsJson: const Value(null),
       toolResultsJson: const Value(null),
       isStreaming: Value(isStreaming),
+      isVisibleToLlm: Value(isVisibleToLlm),
     );
 
     await insertMessage(companion);
@@ -225,6 +227,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       imageUrl: Value(message.imageUrl),
       toolCallsJson: Value(message.toolCallsJson),
       toolResultsJson: Value(message.toolResultsJson),
+      isVisibleToLlm: Value(message.isVisibleToLlm),
     );
 
     return await updateMessage(companion);

@@ -174,6 +174,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         userId: 'system',
         userName: 'System',
         content: 'Sent ping: $message',
+        isVisibleToLlm: false,
       );
       return;
     }
