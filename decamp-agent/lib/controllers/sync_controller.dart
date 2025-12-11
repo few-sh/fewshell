@@ -185,6 +185,7 @@ class _AgentSession {
       final baseUrl = config['baseUrl'] as String?;
       final temperature = config['temperature'] as double?;
       final maxTokens = config['maxTokens'] as int?;
+      final systemInstruction = config['systemInstruction'] as String?;
 
       final apiType = LlmApiType.values.firstWhere(
         (e) => e.name == providerTypeStr,
@@ -200,7 +201,11 @@ class _AgentSession {
         maxTokens: maxTokens,
       );
 
-      final provider = await LlmService.createProvider(settings, apiKey);
+      final provider = await LlmService.createProvider(
+        settings,
+        apiKey,
+        systemInstruction: systemInstruction,
+      );
 
       await runAgentLoop(
         llmStream: (conv, tools) {

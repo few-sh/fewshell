@@ -353,6 +353,10 @@ class LlmService {
     final activeConfig = await _getActiveConfig();
     if (activeConfig == null) return null;
 
+    final instruction = await getAgentInstruction(
+      activeConfig.config.identifier,
+    );
+
     return {
       'apiKey': activeConfig.apiKey,
       'provider': activeConfig.config.apiType.name,
@@ -360,6 +364,7 @@ class LlmService {
       'baseUrl': activeConfig.config.baseUrl,
       'temperature': activeConfig.config.temperature,
       'maxTokens': activeConfig.config.maxTokens,
+      'systemInstruction': instruction,
     };
   }
 
