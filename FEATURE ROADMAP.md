@@ -67,23 +67,22 @@ Error handling:
 
 Feature brainstorm (random ideas in no particular order)
 
-[ ] Sync with desktop
-[ ] Sync across multiple users (live collaborative sessions)
+[X] Sync with desktop
+[X] Sync across multiple users (live collaborative sessions)
 [ ] Runbooks
-[ ] Snippets
+[X] Snippets
 [ ] Push notifications - we could set up our own service
 [ ] Slack integration
 [ ] Export sessions as markdown files
 [ ] Import sessions from markdown files
 [ ] Compact/summarize session
 [ ] Display token usage
-[ ] Built-in fetch/curl tool for direct api calls without a shell box
+[X] Built-in fetch/curl tool for direct api calls without a shell box
 [ ] A set of pre-made quick API references in a compressed, summarized format that the LLM can search/include
 [ ] Ability to set up multiple SSH configurations (just like we have for models)
-[ ] Abulity to add attach note to anything, eg a note for an SSH configuration that LLM would see
-[ ] A toggle switch to toggle a segret to be "Available to agent", with a help tooltip: available means the agent can use it to provide to commands. SSH keys should not be available to the agent by default, but
-is available for use by the underlying connection. All secrets are redacted from the LLM itself in the conversation.
-
+[ ] Ability to attach a note to anything, eg a note for an SSH configuration that LLM would see
+[ ] Run a session inside a docker or podman environment
+[ ] Integration with claude code CLI, exposing it as a tool
 
 Background agent:
 [ ] Reactive system to alerts (Webhooks)
