@@ -520,6 +520,16 @@ class $MessagesTable extends Messages
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_streaming" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isVisibleToLlmMeta =
+      const VerificationMeta('isVisibleToLlm');
+  @override
+  late final GeneratedColumn<bool> isVisibleToLlm = GeneratedColumn<bool>(
+      'is_visible_to_llm', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_visible_to_llm" IN (0, 1))'),
+      defaultValue: const Constant(true));
   @override
   late final GeneratedColumnWithTypeConverter<MessageKind, int> messageKind =
       GeneratedColumn<int>('message_kind', aliasedName, false,
@@ -558,6 +568,7 @@ class $MessagesTable extends Messages
         createdAt,
         editedAt,
         isStreaming,
+        isVisibleToLlm,
         messageKind,
         imageUrl,
         toolCallsJson,
@@ -624,6 +635,12 @@ class $MessagesTable extends Messages
           isStreaming.isAcceptableOrUnknown(
               data['is_streaming']!, _isStreamingMeta));
     }
+    if (data.containsKey('is_visible_to_llm')) {
+      context.handle(
+          _isVisibleToLlmMeta,
+          isVisibleToLlm.isAcceptableOrUnknown(
+              data['is_visible_to_llm']!, _isVisibleToLlmMeta));
+    }
     if (data.containsKey('image_url')) {
       context.handle(_imageUrlMeta,
           imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta));
@@ -655,6 +672,8 @@ class $MessagesTable extends Messages
           .read(DriftSqlType.dateTime, data['${effectivePrefix}edited_at']),
       isStreaming: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_streaming'])!,
+      isVisibleToLlm: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_visible_to_llm'])!,
       messageKind: $MessagesTable.$convertermessageKind.fromSql(attachedDatabase
           .typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}message_kind'])!),
@@ -710,6 +729,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
   /// Whether the message is currently streaming
   final bool isStreaming;
 
+  /// Whether the message should be visible to the LLM (included in conversation history)
+  final bool isVisibleToLlm;
+
   /// Discriminator: what kind of message is this?
   final MessageKind messageKind;
 
@@ -727,6 +749,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       required this.createdAt,
       this.editedAt,
       required this.isStreaming,
+      required this.isVisibleToLlm,
       required this.messageKind,
       this.imageUrl,
       this.toolCallsJson,
@@ -745,6 +768,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       map['edited_at'] = Variable<DateTime>(editedAt);
     }
     map['is_streaming'] = Variable<bool>(isStreaming);
+    map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm);
     {
       map['message_kind'] = Variable<int>(
           $MessagesTable.$convertermessageKind.toSql(messageKind));
@@ -776,6 +800,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ? const Value.absent()
           : Value(editedAt),
       isStreaming: Value(isStreaming),
+      isVisibleToLlm: Value(isVisibleToLlm),
       messageKind: Value(messageKind),
       imageUrl: imageUrl == null && nullToAbsent
           ? const Value.absent()
@@ -802,6 +827,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       editedAt: serializer.fromJson<DateTime?>(json['editedAt']),
       isStreaming: serializer.fromJson<bool>(json['isStreaming']),
+      isVisibleToLlm: serializer.fromJson<bool>(json['isVisibleToLlm']),
       messageKind: $MessagesTable.$convertermessageKind
           .fromJson(serializer.fromJson<int>(json['messageKind'])),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
@@ -824,6 +850,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'editedAt': serializer.toJson<DateTime?>(editedAt),
       'isStreaming': serializer.toJson<bool>(isStreaming),
+      'isVisibleToLlm': serializer.toJson<bool>(isVisibleToLlm),
       'messageKind': serializer.toJson<int>(
           $MessagesTable.$convertermessageKind.toJson(messageKind)),
       'imageUrl': serializer.toJson<String?>(imageUrl),
@@ -842,6 +869,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           DateTime? createdAt,
           Value<DateTime?> editedAt = const Value.absent(),
           bool? isStreaming,
+          bool? isVisibleToLlm,
           MessageKind? messageKind,
           Value<String?> imageUrl = const Value.absent(),
           Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
@@ -856,6 +884,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
         createdAt: createdAt ?? this.createdAt,
         editedAt: editedAt.present ? editedAt.value : this.editedAt,
         isStreaming: isStreaming ?? this.isStreaming,
+        isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
         messageKind: messageKind ?? this.messageKind,
         imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
         toolCallsJson:
@@ -876,6 +905,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       editedAt: data.editedAt.present ? data.editedAt.value : this.editedAt,
       isStreaming:
           data.isStreaming.present ? data.isStreaming.value : this.isStreaming,
+      isVisibleToLlm: data.isVisibleToLlm.present
+          ? data.isVisibleToLlm.value
+          : this.isVisibleToLlm,
       messageKind:
           data.messageKind.present ? data.messageKind.value : this.messageKind,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
@@ -900,6 +932,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('isStreaming: $isStreaming, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('toolCallsJson: $toolCallsJson, ')
@@ -919,6 +952,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       createdAt,
       editedAt,
       isStreaming,
+      isVisibleToLlm,
       messageKind,
       imageUrl,
       toolCallsJson,
@@ -936,6 +970,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           other.createdAt == this.createdAt &&
           other.editedAt == this.editedAt &&
           other.isStreaming == this.isStreaming &&
+          other.isVisibleToLlm == this.isVisibleToLlm &&
           other.messageKind == this.messageKind &&
           other.imageUrl == this.imageUrl &&
           other.toolCallsJson == this.toolCallsJson &&
@@ -952,6 +987,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
   final Value<DateTime> createdAt;
   final Value<DateTime?> editedAt;
   final Value<bool> isStreaming;
+  final Value<bool> isVisibleToLlm;
   final Value<MessageKind> messageKind;
   final Value<String?> imageUrl;
   final Value<List<ToolCall>?> toolCallsJson;
@@ -967,6 +1003,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.createdAt = const Value.absent(),
     this.editedAt = const Value.absent(),
     this.isStreaming = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.toolCallsJson = const Value.absent(),
@@ -983,6 +1020,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     required DateTime createdAt,
     this.editedAt = const Value.absent(),
     this.isStreaming = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     this.messageKind = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.toolCallsJson = const Value.absent(),
@@ -1005,6 +1043,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? editedAt,
     Expression<bool>? isStreaming,
+    Expression<bool>? isVisibleToLlm,
     Expression<int>? messageKind,
     Expression<String>? imageUrl,
     Expression<String>? toolCallsJson,
@@ -1021,6 +1060,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       if (createdAt != null) 'created_at': createdAt,
       if (editedAt != null) 'edited_at': editedAt,
       if (isStreaming != null) 'is_streaming': isStreaming,
+      if (isVisibleToLlm != null) 'is_visible_to_llm': isVisibleToLlm,
       if (messageKind != null) 'message_kind': messageKind,
       if (imageUrl != null) 'image_url': imageUrl,
       if (toolCallsJson != null) 'tool_calls_json': toolCallsJson,
@@ -1039,6 +1079,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       Value<DateTime>? createdAt,
       Value<DateTime?>? editedAt,
       Value<bool>? isStreaming,
+      Value<bool>? isVisibleToLlm,
       Value<MessageKind>? messageKind,
       Value<String?>? imageUrl,
       Value<List<ToolCall>?>? toolCallsJson,
@@ -1054,6 +1095,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       createdAt: createdAt ?? this.createdAt,
       editedAt: editedAt ?? this.editedAt,
       isStreaming: isStreaming ?? this.isStreaming,
+      isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
       messageKind: messageKind ?? this.messageKind,
       imageUrl: imageUrl ?? this.imageUrl,
       toolCallsJson: toolCallsJson ?? this.toolCallsJson,
@@ -1092,6 +1134,9 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     if (isStreaming.present) {
       map['is_streaming'] = Variable<bool>(isStreaming.value);
     }
+    if (isVisibleToLlm.present) {
+      map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm.value);
+    }
     if (messageKind.present) {
       map['message_kind'] = Variable<int>(
           $MessagesTable.$convertermessageKind.toSql(messageKind.value));
@@ -1126,6 +1171,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
           ..write('createdAt: $createdAt, ')
           ..write('editedAt: $editedAt, ')
           ..write('isStreaming: $isStreaming, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('toolCallsJson: $toolCallsJson, ')
@@ -1188,6 +1234,16 @@ class $ProjectSnippetsTable extends ProjectSnippets
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _isVisibleToLlmMeta =
+      const VerificationMeta('isVisibleToLlm');
+  @override
+  late final GeneratedColumn<bool> isVisibleToLlm = GeneratedColumn<bool>(
+      'is_visible_to_llm', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_visible_to_llm" IN (0, 1))'),
+      defaultValue: const Constant(true));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -1209,6 +1265,7 @@ class $ProjectSnippetsTable extends ProjectSnippets
         description,
         tags,
         position,
+        isVisibleToLlm,
         createdAt,
         updatedAt
       ];
@@ -1257,6 +1314,12 @@ class $ProjectSnippetsTable extends ProjectSnippets
       context.handle(_positionMeta,
           position.isAcceptableOrUnknown(data['position']!, _positionMeta));
     }
+    if (data.containsKey('is_visible_to_llm')) {
+      context.handle(
+          _isVisibleToLlmMeta,
+          isVisibleToLlm.isAcceptableOrUnknown(
+              data['is_visible_to_llm']!, _isVisibleToLlmMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -1292,6 +1355,8 @@ class $ProjectSnippetsTable extends ProjectSnippets
           .read(DriftSqlType.string, data['${effectivePrefix}tags'])!,
       position: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}position'])!,
+      isVisibleToLlm: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}is_visible_to_llm'])!,
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -1327,6 +1392,9 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
   /// Position for ordering snippets (lower = higher in list)
   final int position;
 
+  /// Whether the snippet should be visible to the LLM (included in system prompt/context)
+  final bool isVisibleToLlm;
+
   /// Timestamp when the snippet was created
   final DateTime createdAt;
 
@@ -1340,6 +1408,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
       this.description,
       required this.tags,
       required this.position,
+      required this.isVisibleToLlm,
       required this.createdAt,
       required this.updatedAt});
   @override
@@ -1356,6 +1425,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
     }
     map['tags'] = Variable<String>(tags);
     map['position'] = Variable<int>(position);
+    map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -1374,6 +1444,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
           : Value(description),
       tags: Value(tags),
       position: Value(position),
+      isVisibleToLlm: Value(isVisibleToLlm),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -1390,6 +1461,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
       description: serializer.fromJson<String?>(json['description']),
       tags: serializer.fromJson<String>(json['tags']),
       position: serializer.fromJson<int>(json['position']),
+      isVisibleToLlm: serializer.fromJson<bool>(json['isVisibleToLlm']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -1405,6 +1477,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
       'description': serializer.toJson<String?>(description),
       'tags': serializer.toJson<String>(tags),
       'position': serializer.toJson<int>(position),
+      'isVisibleToLlm': serializer.toJson<bool>(isVisibleToLlm),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -1418,6 +1491,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
           Value<String?> description = const Value.absent(),
           String? tags,
           int? position,
+          bool? isVisibleToLlm,
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       ProjectSnippet(
@@ -1428,6 +1502,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
         description: description.present ? description.value : this.description,
         tags: tags ?? this.tags,
         position: position ?? this.position,
+        isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -1441,6 +1516,9 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
           data.description.present ? data.description.value : this.description,
       tags: data.tags.present ? data.tags.value : this.tags,
       position: data.position.present ? data.position.value : this.position,
+      isVisibleToLlm: data.isVisibleToLlm.present
+          ? data.isVisibleToLlm.value
+          : this.isVisibleToLlm,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -1456,6 +1534,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
           ..write('description: $description, ')
           ..write('tags: $tags, ')
           ..write('position: $position, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -1464,7 +1543,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
 
   @override
   int get hashCode => Object.hash(id, projectId, name, content, description,
-      tags, position, createdAt, updatedAt);
+      tags, position, isVisibleToLlm, createdAt, updatedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1476,6 +1555,7 @@ class ProjectSnippet extends DataClass implements Insertable<ProjectSnippet> {
           other.description == this.description &&
           other.tags == this.tags &&
           other.position == this.position &&
+          other.isVisibleToLlm == this.isVisibleToLlm &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -1488,6 +1568,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
   final Value<String?> description;
   final Value<String> tags;
   final Value<int> position;
+  final Value<bool> isVisibleToLlm;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -1499,6 +1580,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
     this.position = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -1511,6 +1593,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
     this.description = const Value.absent(),
     this.tags = const Value.absent(),
     this.position = const Value.absent(),
+    this.isVisibleToLlm = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
@@ -1527,6 +1610,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
     Expression<String>? description,
     Expression<String>? tags,
     Expression<int>? position,
+    Expression<bool>? isVisibleToLlm,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -1539,6 +1623,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
       if (description != null) 'description': description,
       if (tags != null) 'tags': tags,
       if (position != null) 'position': position,
+      if (isVisibleToLlm != null) 'is_visible_to_llm': isVisibleToLlm,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -1553,6 +1638,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
       Value<String?>? description,
       Value<String>? tags,
       Value<int>? position,
+      Value<bool>? isVisibleToLlm,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
       Value<int>? rowid}) {
@@ -1564,6 +1650,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
       description: description ?? this.description,
       tags: tags ?? this.tags,
       position: position ?? this.position,
+      isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -1594,6 +1681,9 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
     if (position.present) {
       map['position'] = Variable<int>(position.value);
     }
+    if (isVisibleToLlm.present) {
+      map['is_visible_to_llm'] = Variable<bool>(isVisibleToLlm.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1616,6 +1706,7 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
           ..write('description: $description, ')
           ..write('tags: $tags, ')
           ..write('position: $position, ')
+          ..write('isVisibleToLlm: $isVisibleToLlm, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -1868,6 +1959,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessageEntityCompanion
   required DateTime createdAt,
   Value<DateTime?> editedAt,
   Value<bool> isStreaming,
+  Value<bool> isVisibleToLlm,
   Value<MessageKind> messageKind,
   Value<String?> imageUrl,
   Value<List<ToolCall>?> toolCallsJson,
@@ -1885,6 +1977,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessageEntityCompanion
   Value<DateTime> createdAt,
   Value<DateTime?> editedAt,
   Value<bool> isStreaming,
+  Value<bool> isVisibleToLlm,
   Value<MessageKind> messageKind,
   Value<String?> imageUrl,
   Value<List<ToolCall>?> toolCallsJson,
@@ -1927,6 +2020,10 @@ class $$MessagesTableFilterComposer
 
   ColumnFilters<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnFilters(column));
 
   ColumnWithTypeConverterFilters<MessageKind, MessageKind, int>
       get messageKind => $composableBuilder(
@@ -1983,6 +2080,10 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get messageKind => $composableBuilder(
       column: $table.messageKind, builder: (column) => ColumnOrderings(column));
 
@@ -2033,6 +2134,9 @@ class $$MessagesTableAnnotationComposer
 
   GeneratedColumn<bool> get isStreaming => $composableBuilder(
       column: $table.isStreaming, builder: (column) => column);
+
+  GeneratedColumn<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<MessageKind, int> get messageKind =>
       $composableBuilder(
@@ -2085,6 +2189,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime?> editedAt = const Value.absent(),
             Value<bool> isStreaming = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             Value<MessageKind> messageKind = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
             Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
@@ -2101,6 +2206,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             editedAt: editedAt,
             isStreaming: isStreaming,
+            isVisibleToLlm: isVisibleToLlm,
             messageKind: messageKind,
             imageUrl: imageUrl,
             toolCallsJson: toolCallsJson,
@@ -2117,6 +2223,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             required DateTime createdAt,
             Value<DateTime?> editedAt = const Value.absent(),
             Value<bool> isStreaming = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             Value<MessageKind> messageKind = const Value.absent(),
             Value<String?> imageUrl = const Value.absent(),
             Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
@@ -2133,6 +2240,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             createdAt: createdAt,
             editedAt: editedAt,
             isStreaming: isStreaming,
+            isVisibleToLlm: isVisibleToLlm,
             messageKind: messageKind,
             imageUrl: imageUrl,
             toolCallsJson: toolCallsJson,
@@ -2170,6 +2278,7 @@ typedef $$ProjectSnippetsTableCreateCompanionBuilder = ProjectSnippetCompanion
   Value<String?> description,
   Value<String> tags,
   Value<int> position,
+  Value<bool> isVisibleToLlm,
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<int> rowid,
@@ -2183,6 +2292,7 @@ typedef $$ProjectSnippetsTableUpdateCompanionBuilder = ProjectSnippetCompanion
   Value<String?> description,
   Value<String> tags,
   Value<int> position,
+  Value<bool> isVisibleToLlm,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<int> rowid,
@@ -2217,6 +2327,10 @@ class $$ProjectSnippetsTableFilterComposer
 
   ColumnFilters<int> get position => $composableBuilder(
       column: $table.position, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -2255,6 +2369,10 @@ class $$ProjectSnippetsTableOrderingComposer
   ColumnOrderings<int> get position => $composableBuilder(
       column: $table.position, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -2291,6 +2409,9 @@ class $$ProjectSnippetsTableAnnotationComposer
 
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<bool> get isVisibleToLlm => $composableBuilder(
+      column: $table.isVisibleToLlm, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -2333,6 +2454,7 @@ class $$ProjectSnippetsTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<String> tags = const Value.absent(),
             Value<int> position = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
@@ -2345,6 +2467,7 @@ class $$ProjectSnippetsTableTableManager extends RootTableManager<
             description: description,
             tags: tags,
             position: position,
+            isVisibleToLlm: isVisibleToLlm,
             createdAt: createdAt,
             updatedAt: updatedAt,
             rowid: rowid,
@@ -2357,6 +2480,7 @@ class $$ProjectSnippetsTableTableManager extends RootTableManager<
             Value<String?> description = const Value.absent(),
             Value<String> tags = const Value.absent(),
             Value<int> position = const Value.absent(),
+            Value<bool> isVisibleToLlm = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
             Value<int> rowid = const Value.absent(),
@@ -2369,6 +2493,7 @@ class $$ProjectSnippetsTableTableManager extends RootTableManager<
             description: description,
             tags: tags,
             position: position,
+            isVisibleToLlm: isVisibleToLlm,
             createdAt: createdAt,
             updatedAt: updatedAt,
             rowid: rowid,

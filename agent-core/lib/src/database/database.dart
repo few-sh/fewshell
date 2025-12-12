@@ -72,7 +72,7 @@ class GlobalDatabase extends _$GlobalDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -98,6 +98,17 @@ class GlobalDatabase extends _$GlobalDatabase {
         // Enable foreign keys
         // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
         // await executor.runCustom('PRAGMA foreign_keys = ON');
+
+        // Ensure is_visible_to_llm column exists
+        final columns = await executor
+            .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
+        final hasIsVisibleToLlm =
+            columns.any((row) => row['name'] == 'is_visible_to_llm');
+        if (!hasIsVisibleToLlm) {
+          await executor.runCustom(
+            'ALTER TABLE snippets ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
+          );
+        }
 
         // Setup CRDT listener now that the DB is open and CRDT should be ready
         _setupCrdtListener();
@@ -135,6 +146,18 @@ class GlobalDatabase extends _$GlobalDatabase {
         // Migration from version 5 to 6: Add serverUrl column to projects
         if (from < 6) {
           await m.addColumn(projects, projects.serverUrl);
+        }
+
+        // Migration from version 6 to 7: Add isVisibleToLlm column to snippets
+        if (from < 7) {
+          final columns = await executor
+              .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
+          final hasIsVisibleToLlm =
+              columns.any((row) => row['name'] == 'is_visible_to_llm');
+
+          if (!hasIsVisibleToLlm) {
+            await m.addColumn(snippets, snippets.isVisibleToLlm);
+          }
         }
       },
     );

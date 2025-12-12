@@ -28,6 +28,7 @@ class SnippetController {
     String? description,
     List<String> tags = const [],
     String? projectId,
+    bool isVisibleToLlm = true,
   }) async {
     final db = _ref.read(databaseProvider);
     final now = DateTime.now();
@@ -46,6 +47,7 @@ class SnippetController {
       description: Value(description),
       tags: Value(tags.join(',')),
       position: Value(nextPosition),
+      isVisibleToLlm: Value(isVisibleToLlm),
       createdAt: Value(now),
       updatedAt: Value(now),
     );
@@ -59,6 +61,7 @@ class SnippetController {
     String? content,
     String? description,
     List<String>? tags,
+    bool? isVisibleToLlm,
   }) async {
     final db = _ref.read(databaseProvider);
     final snippet = SnippetEntityCompanion(
@@ -69,6 +72,9 @@ class SnippetController {
           ? Value(description)
           : const Value.absent(),
       tags: tags != null ? Value(tags.join(',')) : const Value.absent(),
+      isVisibleToLlm: isVisibleToLlm != null
+          ? Value(isVisibleToLlm)
+          : const Value.absent(),
       updatedAt: Value(DateTime.now()),
     );
 

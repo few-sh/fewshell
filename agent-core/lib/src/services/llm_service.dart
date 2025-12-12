@@ -173,11 +173,15 @@ class LlmService {
     List<SnippetEntity> projectSnippets = [];
 
     if (snippetDao != null) {
-      userSnippets = await snippetDao!.getGlobalSnippets();
+      final allUserSnippets = await snippetDao!.getGlobalSnippets();
+      userSnippets = allUserSnippets.where((s) => s.isVisibleToLlm).toList();
+
       if (currentProjectId != null) {
-        projectSnippets = await snippetDao!.getProjectSnippets(
+        final allProjectSnippets = await snippetDao!.getProjectSnippets(
           currentProjectId!,
         );
+        projectSnippets =
+            allProjectSnippets.where((s) => s.isVisibleToLlm).toList();
       }
     }
 
@@ -349,6 +353,10 @@ class LlmService {
     final activeConfig = await _getActiveConfig();
     if (activeConfig == null) return null;
 
+    final instruction = await getAgentInstruction(
+      activeConfig.config.identifier,
+    );
+
     return {
       'apiKey': activeConfig.apiKey,
       'provider': activeConfig.config.apiType.name,
@@ -356,6 +364,7 @@ class LlmService {
       'baseUrl': activeConfig.config.baseUrl,
       'temperature': activeConfig.config.temperature,
       'maxTokens': activeConfig.config.maxTokens,
+      'systemInstruction': instruction,
     };
   }
 

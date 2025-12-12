@@ -36,6 +36,10 @@ class Messages extends Table {
   /// Whether the message is currently streaming
   BoolColumn get isStreaming => boolean().withDefault(const Constant(false))();
 
+  /// Whether the message should be visible to the LLM (included in conversation history)
+  BoolColumn get isVisibleToLlm =>
+      boolean().withDefault(const Constant(true))();
+
   /// Discriminator: what kind of message is this?
   IntColumn get messageKind =>
       intEnum<MessageKind>().withDefault(const Constant(0))();

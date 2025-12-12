@@ -174,6 +174,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         userId: 'system',
         userName: 'System',
         content: 'Sent ping: $message',
+        isVisibleToLlm: false,
       );
       return;
     }
@@ -419,6 +420,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
                           error: (error, stack) => Center(
+                            // TODO: Log this error to our logging service
                             child: Text('Error loading messages: $error'),
                           ),
                         ),

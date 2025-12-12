@@ -33,7 +33,8 @@ class AgentLoopCancelled extends AgentLoopResult {
 /// An error occurred
 class AgentLoopError extends AgentLoopResult {
   final String message;
-  const AgentLoopError(this.message);
+  final String? messageId;
+  const AgentLoopError(this.message, {this.messageId});
 }
 
 /// Callback types for the agent loop

@@ -8,6 +8,7 @@ class SnippetEntity implements Insertable<SnippetEntity> {
   final String? description;
   final String tags;
   final int position;
+  final bool isVisibleToLlm;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -19,6 +20,7 @@ class SnippetEntity implements Insertable<SnippetEntity> {
     this.description,
     required this.tags,
     required this.position,
+    this.isVisibleToLlm = true,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -33,6 +35,7 @@ class SnippetEntity implements Insertable<SnippetEntity> {
       'description': Variable<String>(description),
       'tags': Variable<String>(tags),
       'position': Variable<int>(position),
+      'is_visible_to_llm': Variable<bool>(isVisibleToLlm),
       'created_at': Variable<DateTime>(createdAt),
       'updated_at': Variable<DateTime>(updatedAt),
     };
@@ -46,6 +49,7 @@ class SnippetEntity implements Insertable<SnippetEntity> {
     String? description,
     String? tags,
     int? position,
+    bool? isVisibleToLlm,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -57,6 +61,7 @@ class SnippetEntity implements Insertable<SnippetEntity> {
       description: description ?? this.description,
       tags: tags ?? this.tags,
       position: position ?? this.position,
+      isVisibleToLlm: isVisibleToLlm ?? this.isVisibleToLlm,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

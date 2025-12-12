@@ -26,6 +26,10 @@ class Snippets extends Table {
   /// Position for ordering snippets (lower = higher in list)
   IntColumn get position => integer().withDefault(const Constant(0))();
 
+  /// Whether the snippet should be visible to the LLM (included in system prompt/context)
+  BoolColumn get isVisibleToLlm =>
+      boolean().withDefault(const Constant(true))();
+
   /// Timestamp when the snippet was created
   DateTimeColumn get createdAt => dateTime()();
 
