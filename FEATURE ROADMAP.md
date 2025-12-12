@@ -46,6 +46,12 @@ General papercuts:
 * Display step-by-step instructions in the app: eg instruct the user that they need a server
 and access, "Open a terminal and ssh to your development machine, type curl ... get.few.sh | bash"
 
+## Bugs
+
+[ ] If a remote project disconnects (eg server down), it falls back to using local mode. | Expected: Should block the user from typing messages, should have a clearer connection indication.
+
+-----------------------------------
+
 
 [ ] +-- Add choice/action buttons to rich-chat-content.
 
