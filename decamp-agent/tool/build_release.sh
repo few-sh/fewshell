@@ -144,8 +144,6 @@ if gh release view "v$VERSION" &> /dev/null; then
 else
     echo "✨ Creating new release v$VERSION..."
     gh release create "v$VERSION" \
-    echo "✨ Creating new release v$VERSION..."
-    gh release create "v$VERSION" \
         "$BUILD_DIR/fewshell-agent-"* \
         --title "v$VERSION" \
         --notes "Release v$VERSION of fewshell-agent (Linux AMD64/ARM64 + macOS ARM64)"
@@ -183,3 +181,11 @@ echo "🧹 Restoring local environment..."
 cd "$PROJECT_ROOT"
 flutter pub get
 
+echo ""
+echo "🔗 Release URLs:"
+for FILE in "$BUILD_DIR"/fewshell-agent-*; do
+    if [ -f "$FILE" ]; then
+        FILENAME=$(basename "$FILE")
+        echo "https://release.few.sh/releases/$VERSION/$FILENAME"
+    fi
+done

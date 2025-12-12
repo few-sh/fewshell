@@ -5,9 +5,9 @@ import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:decamp_agent/router.dart';
-import 'package:decamp_agent/services/database_manager.dart';
-import 'package:decamp_agent/certs.dart';
+import 'package:fewshell_agent/router.dart';
+import 'package:fewshell_agent/services/database_manager.dart';
+import 'package:fewshell_agent/certs.dart';
 
 final _log = Logger('FewshellAgent');
 
