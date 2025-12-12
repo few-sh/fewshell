@@ -71,12 +71,12 @@ build_arch() {
         /bin/bash -c "
             echo '📦 resolving dependencies...' && \
             flutter pub get && \
-            echo '🔌 Compiling server...' && \
+            echo '🔌 Compiling fewshell-server...' && \
             mkdir -p build/bin && \
             VERSION=\$(sed -n 's/^version: //p' pubspec.yaml) && \
-            dart compile exe bin/server.dart -DAPP_VERSION=\$VERSION -o build/bin/server && \
+            dart compile exe bin/server.dart -DAPP_VERSION=\$VERSION -o build/bin/fewshell-server && \
             echo '🔧 Patching binary...' && \
-            patchelf --set-rpath '\$ORIGIN' build/bin/server && \
+            patchelf --set-rpath '\$ORIGIN' build/bin/fewshell-server && \
             echo '📦 Bundling system library...' && \
             cp /usr/lib/*-linux-gnu/libsqlite3.so.0 build/bin/libsqlite3.so
         "
@@ -87,10 +87,10 @@ build_arch() {
     
     echo "🤐 Zipping binary and library..."
     # CD into build/bin so the zip structure is flat
-    (cd "$PROJECT_ROOT/build/bin" && zip -r "$ZIP_PATH" server libsqlite3.so)
+    (cd "$PROJECT_ROOT/build/bin" && zip -r "$ZIP_PATH" fewshell-server libsqlite3.so)
     
     # Also keep the raw binary for reference (or if user wants just that)
-    cp "$PROJECT_ROOT/build/bin/server" "$OUTPUT_PATH"
+    cp "$PROJECT_ROOT/build/bin/fewshell-server" "$OUTPUT_PATH"
     chmod +x "$OUTPUT_PATH"
 }
 
