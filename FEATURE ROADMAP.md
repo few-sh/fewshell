@@ -80,12 +80,20 @@ Basic architecture:
 [Phone] -> SSH -> [Appliance(Docker or micro isntance*) + gcloud CLI]
 *NOTE: Micro instance preferred
 
-Error handling:
+### Error handling:
 [ ] When not connected to server  
 
 [X] When SSH throws an error
 
-Feature brainstorm (random ideas in no particular order)
+### Feature brainstorm (random ideas in no particular order)
+
+[ ] Allow editing/viewing each chat section in raw JSON using https://pub.dev/packages/json_editor_flutter, ensure JSON is validated before saving
+
+[ ] Ability to toggle a message as being visible/not visible to LLM
+
+[ ] Built-in interactive terminal screen https://pub.dev/packages/xterm
+
++ [ Support for interactive and persistent sessions ] 
 
 [X] Sync with desktop
 
