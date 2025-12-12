@@ -22,6 +22,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Support for thoughts streaming and display (expandable)
 
+[ ] "App needs an update"  Check app version and schema when connecting
 
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
@@ -62,6 +63,8 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 [ ] Loading state tends to get stuck for a whole session after a message gets interrupted (eg server goes down)
 
 [ ] (Claude only) If a tool call is interrupted, it's not possible to send messages in that session again. We get an error: "tool_use ids were found without tool_result blocks"
+
+[ ] Tool call is not working for gpt-5 (it tries execute_shell_command as the command)
 
 -----------------------------------
 
@@ -126,6 +129,10 @@ Basic architecture:
 [ ] Run a session inside a docker or podman environment
 
 [ ] Integration with claude code CLI, exposing it as a tool
+
+[ ] Display who is viewing/interacting with a session on the session card
+
+
 
 Background agent:
 [ ] Reactive system to alerts (Webhooks)
