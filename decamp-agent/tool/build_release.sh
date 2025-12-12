@@ -73,7 +73,8 @@ build_arch() {
             flutter pub get && \
             echo '🔌 Compiling server...' && \
             mkdir -p build/bin && \
-            dart compile exe bin/server.dart -o build/bin/server && \
+            VERSION=\$(sed -n 's/^version: //p' pubspec.yaml) && \
+            dart compile exe bin/server.dart -DAPP_VERSION=\$VERSION -o build/bin/server && \
             echo '🔧 Patching binary...' && \
             patchelf --set-rpath '\$ORIGIN' build/bin/server && \
             echo '📦 Bundling system library...' && \

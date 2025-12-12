@@ -9,7 +9,7 @@ import 'package:decamp_agent/router.dart';
 import 'package:decamp_agent/services/database_manager.dart';
 import 'package:decamp_agent/certs.dart';
 
-final _log = Logger('DecampAgent');
+final _log = Logger('FewshellAgent');
 
 void main(List<String> args) async {
   // Configure logging
@@ -26,6 +26,9 @@ void main(List<String> args) async {
       stdout.writeln(message);
     }
   });
+
+  const version = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
+  _log.info('Starting Fewshell Agent v$version');
 
   try {
     // Initialize FFI for sqflite explicitly

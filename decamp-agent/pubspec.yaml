@@ -1,6 +1,6 @@
-name: decamp_agent
+name: fewshell_agent
 description: Agent service for Decamp - handles shell commands and real-time communication
-version: 0.1.0
+version: 0.1.1
 publish_to: none
 
 environment:
