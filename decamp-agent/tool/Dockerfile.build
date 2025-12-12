@@ -22,7 +22,7 @@ ENV FLUTTER_ROOT=/sdk/flutter
 ENV PATH="${FLUTTER_ROOT}/bin:${PATH}"
 
 # Download and install Flutter
-RUN git clone https://github.com/flutter/flutter.git -b 3.38.4 --depth 1 $FLUTTER_ROOT
+RUN git clone https://github.com/flutter/flutter.git -b 3.38.5 --depth 1 $FLUTTER_ROOT
 
 # Configure git to be safe for the /app mount (fixes potential ownership issues in dev)
 RUN git config --global --add safe.directory '*'
