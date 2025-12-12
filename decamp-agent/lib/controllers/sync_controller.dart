@@ -314,7 +314,6 @@ class _AgentSession {
           }
         },
         onToolResultMessage: (message, {String? messageId}) async {
-          // TODO: Code Smell: Why are we inserting an empty message here?
           String? id;
           // db and sessionId are guaranteed to be non-null here due to checks at start of method
           id = db!.messageDao.generateMessageId();
