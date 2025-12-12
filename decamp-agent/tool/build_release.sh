@@ -48,7 +48,7 @@ build_arch() {
     local ARCH=$1
     local PLATFORM=$2 # Renamed from DOCKER_PLATFORM to PLATFORM
     local IMAGE_TAG="${IMAGE_NAME}:${ARCH}"
-    local OUTPUT_NAME="decamp-agent-linux-$ARCH"
+    local OUTPUT_NAME="fewshell-agent-linux-$ARCH"
     local OUTPUT_PATH="$BUILD_DIR/$OUTPUT_NAME"
     local OUTPUT_DIR="$BUILD_DIR" # Directory where the binary and libs will go
 
@@ -63,7 +63,7 @@ build_arch() {
     echo "🔨 Building binary for $ARCH..."
 
     # We mount REPO_ROOT (the parent with all packages) to /app
-    # default WORKDIR in Dockerfile is /app/decamp-agent
+    # default WORKDIR in Dockerfile is /app/fewshell-agent
     docker run --rm \
         --platform "$PLATFORM" \
         -v "$REPO_ROOT:/app" \
@@ -81,8 +81,8 @@ build_arch() {
             cp /usr/lib/*-linux-gnu/libsqlite3.so.0 build/bin/libsqlite3.so
         "
 
-    # Copy binary to release artifact name (e.g. decamp-agent-linux-amd64)
-    local ZIP_NAME="decamp-agent-linux-$ARCH.zip"
+    # Copy binary to release artifact name (e.g. fewshell-agent-linux-amd64)
+    local ZIP_NAME="fewshell-agent-linux-$ARCH.zip"
     local ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
     
     echo "🤐 Zipping binary and library..."
@@ -108,12 +108,12 @@ if [[ "$(uname)" == "Darwin" ]]; then
     
     # Assuming Apple Silicon (arm64) for M-class macs
     MACOS_ARCH="arm64"
-    MACOS_OUTPUT_NAME="decamp-agent-macos-$MACOS_ARCH"
+    MACOS_OUTPUT_NAME="fewshell-agent-macos-$MACOS_ARCH"
     MACOS_OUTPUT_PATH="$BUILD_DIR/$MACOS_OUTPUT_NAME"
     
     echo "🔨 Building binary for macOS ($MACOS_ARCH)..."
     
-    # Native compilation - must run inside decamp-agent dir
+    # Native compilation - must run inside fewshell-agent dir
     (
         cd "$PROJECT_ROOT"
         dart pub get
@@ -122,7 +122,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
     
     # Zip it (no need to bundle sqlite on macOS, it uses system framework)
     echo "🤐 Zipping macOS binary..."
-    ZIP_NAME="decamp-agent-macos-$MACOS_ARCH.zip"
+    ZIP_NAME="fewshell-agent-macos-$MACOS_ARCH.zip"
     ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
     (cd "$BUILD_DIR" && zip -r "$ZIP_PATH" "$MACOS_OUTPUT_NAME")
     
@@ -140,15 +140,15 @@ echo "📤 Pushing release v$VERSION to GitHub..."
 # Check if release exists
 if gh release view "v$VERSION" &> /dev/null; then
     echo "⚠️ Release v$VERSION already exists. Uploading assets to existing release..."
-    gh release upload "v$VERSION" "$BUILD_DIR/decamp-agent-linux-"* --clobber
+    gh release upload "v$VERSION" "$BUILD_DIR/fewshell-agent-linux-"* --clobber
 else
     echo "✨ Creating new release v$VERSION..."
     gh release create "v$VERSION" \
     echo "✨ Creating new release v$VERSION..."
     gh release create "v$VERSION" \
-        "$BUILD_DIR/decamp-agent-"* \
+        "$BUILD_DIR/fewshell-agent-"* \
         --title "v$VERSION" \
-        --notes "Release v$VERSION of decamp-agent (Linux AMD64/ARM64 + macOS ARM64)"
+        --notes "Release v$VERSION of fewshell-agent (Linux AMD64/ARM64 + macOS ARM64)"
 fi
 
 echo "✅ Done! Release v$VERSION is live."
@@ -162,7 +162,7 @@ if ! command -v npx &> /dev/null; then
     echo "⚠️  npx not found. Skipping R2 upload."
 else
     # Upload binary files
-    for FILE in "$BUILD_DIR"/decamp-agent-*; do
+    for FILE in "$BUILD_DIR"/fewshell-agent-*; do
         if [ -f "$FILE" ]; then
             FILENAME=$(basename "$FILE")
             OBJECT_KEY="releases/$VERSION/$FILENAME"
