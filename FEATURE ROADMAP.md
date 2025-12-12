@@ -24,6 +24,8 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] "App needs an update"  Check app version and schema when connecting
 
+[ ] Ability to connect to a remote server without creating a project. (To allow getting all of the project information from the remote server)
+
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
 
