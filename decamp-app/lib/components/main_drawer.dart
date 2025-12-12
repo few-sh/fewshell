@@ -193,7 +193,7 @@ class MainDrawer extends ConsumerWidget {
                       final packageInfo = ref.watch(packageInfoProvider);
                       return packageInfo.when(
                         data: (info) => Text(
-                          'Version ${info.version} (Build ${info.buildNumber})',
+                          'Version ${info.version}+${info.buildNumber}',
                           style: TextStyle(
                             fontSize: 11,
                             color: Theme.of(
