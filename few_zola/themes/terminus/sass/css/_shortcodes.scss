@@ -1,0 +1,43 @@
+figure.mastodon-post {
+    position: relative;
+    border: 1px solid var(--accent-color);
+    margin: 0;
+    padding: 60px 25px 25px;
+
+    &::before {
+        content: '> From Mastodon:';
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: block;
+        color: var(--accent-color);
+        font-weight: bold;
+    }
+
+    blockquote {
+        padding: unset;
+        border: unset;
+        overflow-wrap: anywhere;
+
+        &::before {
+            content: none;
+        }
+    }
+
+    figcaption {
+        margin-top: 25px;
+    }
+}
+
+.references-list p {
+    text-indent: -2.4rem;
+    margin-inline-start: 2.4rem;
+}
+
+.wide-container {
+    margin: 0;
+
+    @media (max-width: 684px) {
+        overflow-x: auto;
+    }
+}

@@ -1,0 +1,104 @@
+// FIXME: Refactor this giant mess of CSS to use flexbox and/or relative
+// elements only once Zola outputs proper HTML for code block headings and/or a
+// "copy to clipboard" button. Until then, we make do with `::before`/`::after`
+// pseudo-elements and many hacks (absolute positioning, negative margins).
+//
+// Links to relevant Zola issues:
+//
+// https://github.com/getzola/zola/issues/1851
+// https://github.com/getzola/zola/issues/2586
+
+:root {
+    --code-border: color-mix(in srgb, var(--text-color) 10%, transparent);
+}
+
+$header-padding-vertical: 6px;
+$header-border-thickness: 1px;
+$line-number-color: color-mix(in srgb, var(--text-color) 53%, transparent);
+
+.copy-button {
+    position: absolute;
+    top: $header-padding-vertical;
+    right: 10px;
+    padding: 3px 8px;
+    width: 4.5rem;
+    border: 1px solid color-mix(in srgb, var(--accent-color) 15%, transparent);
+    font-size: calc(var(--font-size) * 0.8);
+    font-weight: normal;
+    line-height: 1em;
+
+    @media print {
+        display: none;
+    }
+}
+
+pre[data-lang] {
+    display: block;
+    position: relative;
+    padding: 0;
+    overflow-y: hidden;
+
+    &::before {
+        content: attr(data-lang);
+        display: block;
+        padding: $header-padding-vertical 10px;
+        border-bottom: $header-border-thickness solid var(--code-border);
+        color: $line-number-color;
+        font-size: calc(var(--font-size) * 0.8);
+        text-transform: uppercase;
+        line-height: 21px;
+    }
+
+    code[data-lang] {
+        display: block;
+        overflow-x: auto;
+        padding: 10px;
+
+        &[data-name]::before {
+            content: attr(data-name);
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: block;
+            padding: $header-padding-vertical 10px;
+            max-width: 60%;
+            color: $line-number-color;
+            font-size: calc(var(--font-size) * 0.8);
+            line-height: 21px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        &:has(.copy-button)::before {
+            @media screen {
+                right: calc(4.5rem + 10px);
+            }
+        }
+
+        mark {
+            margin-inline: -10px;
+            padding-inline: 10px;
+            color: unset;
+        }
+
+        table {
+            margin-block: 0;
+            width: 100%;
+            border-collapse: collapse;
+
+            td,
+            th,
+            tr {
+                border: none;
+                padding: 0;
+            }
+
+            tr td:first-child {
+                color: $line-number-color;
+                text-align: end;
+                user-select: none;
+                padding-inline-end: 20px;
+            }
+        }
+    }
+}
