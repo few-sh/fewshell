@@ -43,6 +43,7 @@ dependencies:
   intl: ^0.20.2
   timeago: ^3.7.0
   shared_preferences: ^2.3.3
+  package_info_plus: ^8.0.0
 
   # State Management
   flutter_riverpod: ^2.5.1
