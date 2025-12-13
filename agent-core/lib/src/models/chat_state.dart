@@ -2,6 +2,9 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'chat_state.freezed.dart';
 
+// DEPRECATED: ChatState should not be used because it does not persist across app restarts and
+// does not replicate. We should rely strictly on the SQLite database for determining the chat state.
+
 /// Execution progress information
 @freezed
 class ExecutionProgress with _$ExecutionProgress {
