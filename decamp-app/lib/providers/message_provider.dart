@@ -14,3 +14,16 @@ final currentSessionMessagesProvider = StreamProvider<List<MessageEntity>>((
   final messageDao = ref.watch(databaseProvider).messageDao;
   return messageDao.watchCompletedMessagesBySession(sessionId);
 });
+
+/// Provider to check if the last message is in progress (streaming)
+final isLastMessageInProgressProvider = StreamProvider<bool>((ref) {
+  final sessionId = ref.watch(currentSessionIdProvider);
+  if (sessionId == null) {
+    return Stream.value(false);
+  }
+  final messageDao = ref.watch(databaseProvider).messageDao;
+  // Watch streaming messages. If there are any, it means generation is in progress.
+  return messageDao.watchStreamingMessagesBySession(sessionId).map((messages) {
+    return messages.isNotEmpty;
+  });
+});

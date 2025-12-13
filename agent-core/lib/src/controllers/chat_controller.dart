@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:logging/logging.dart';
-import 'package:state_notifier/state_notifier.dart';
+// import 'package:state_notifier/state_notifier.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import 'package:async/async.dart';
@@ -17,7 +17,7 @@ const String _kAiUserName = 'Ops Agent';
 /// Controller for chat session state management
 /// Handles all business logic for chat interactions, tool execution, and message syncing
 /// Directly calls DAOs and services without unnecessary repository layer
-class ChatController extends StateNotifier<ChatState> {
+class ChatController {
   static final _log = Logger('ChatController');
 
   final MessageDao _messageDao;
@@ -58,18 +58,15 @@ class ChatController extends StateNotifier<ChatState> {
         _llmService = llmService,
         _shellService = shellService,
         _secretRedactor = secretRedactor,
-        _sshSettings = sshSettings,
-        super(const ChatState());
+        _sshSettings = sshSettings;
 
-  @override
   void dispose() {
     _activeMessageController.close();
-    super.dispose();
   }
 
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
-    state = const ChatState();
+    // No local state to reset
   }
 
   /// Build conversation history from database messages
@@ -190,7 +187,7 @@ class ChatController extends StateNotifier<ChatState> {
     void Function()? onNoConfig,
     MultiplexedWebSocketChannel? syncChannel,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    // state = state.copyWith(isLoading: true, error: null);
 
     try {
       // If content is provided, validate and save the new user message
@@ -201,7 +198,7 @@ class ChatController extends StateNotifier<ChatState> {
           userName: userName,
         );
         if (triggerMessage == null) {
-          if (mounted) state = state.copyWith(isLoading: false);
+          // if (mounted) state = state.copyWith(isLoading: false);
           onNoConfig?.call();
           return;
         }
@@ -219,7 +216,7 @@ class ChatController extends StateNotifier<ChatState> {
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
       if (config == null) {
-        if (mounted) state = state.copyWith(isLoading: false);
+        // if (mounted) state = state.copyWith(isLoading: false);
         onNoConfig?.call();
         return;
       }
@@ -326,12 +323,12 @@ class ChatController extends StateNotifier<ChatState> {
         triggerMessage ??= await _messageDao.getLastMessage(sessionId);
 
         if (triggerMessage == null) {
-          if (mounted) {
-            state = state.copyWith(
-              isLoading: false,
-              error: 'Cannot start remote chat: no context',
-            );
-          }
+          // if (mounted) {
+          //   state = state.copyWith(
+          //     isLoading: false,
+          //     error: 'Cannot start remote chat: no context',
+          //   );
+          // }
           return;
         }
 
@@ -414,13 +411,13 @@ class ChatController extends StateNotifier<ChatState> {
             content: redactedError,
             isVisibleToLlm: false,
           );
-          if (mounted) {
-            state = state.copyWith(isLoading: false, error: errorMsg);
-          }
+          // if (mounted) {
+          //   state = state.copyWith(isLoading: false, error: errorMsg);
+          // }
           return;
       }
 
-      if (mounted) state = state.copyWith(isLoading: false);
+      // if (mounted) state = state.copyWith(isLoading: false);
     } catch (e) {
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);
@@ -432,9 +429,9 @@ class ChatController extends StateNotifier<ChatState> {
         content: redactedError,
         isVisibleToLlm: false,
       );
-      if (mounted) {
-        state = state.copyWith(isLoading: false, error: e.toString());
-      }
+      // if (mounted) {
+      //   state = state.copyWith(isLoading: false, error: e.toString());
+      // }
     }
   }
 
@@ -620,7 +617,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Clear error state
   void clearError() {
-    if (mounted) state = state.copyWith(error: null);
+    // if (mounted) state = state.copyWith(error: null);
   }
 
   /// Get the AI username based on the active model identifier

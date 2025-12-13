@@ -4,7 +4,7 @@ import 'package:decamp/providers/shell_service_provider.dart';
 import 'package:decamp/components/ssh_prompt_dialog.dart';
 import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
-import 'package:decamp/components/execution_progress_overlay.dart';
+// import 'package:decamp/components/execution_progress_overlay.dart';
 import 'package:decamp/components/chat_list.dart';
 import 'package:decamp/components/chat_input.dart';
 import 'package:decamp/components/search_controls.dart';
@@ -180,9 +180,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     }
 
     // Get the controller
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
+    final controller = ref.read(chatControllerProvider(currentSessionId));
 
     // Get sync channel
     final syncChannel = ref.read(syncServiceProvider).projectChannel;
@@ -213,9 +211,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     _log.info('✏️ Editing message: $messageId');
 
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
+    final controller = ref.read(chatControllerProvider(currentSessionId));
 
     // Get sync channel
     final syncChannel = ref.read(syncServiceProvider).projectChannel;
@@ -239,9 +235,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     _log.info('🔄 Resending message: $messageId');
 
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
+    final controller = ref.read(chatControllerProvider(currentSessionId));
 
     // Get sync channel
     final syncChannel = ref.read(syncServiceProvider).projectChannel;
@@ -264,9 +258,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     _log.info('🌿 Branching session at message: $messageId');
 
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
+    final controller = ref.read(chatControllerProvider(currentSessionId));
 
     final newSessionId = await controller.branchSession(
       messageId: messageId,
@@ -312,11 +304,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     });
 
     // Watch chat state and messages
-    final chatState = ref.watch(chatControllerProvider(currentSessionId));
-    final chatController = ref.watch(
-      chatControllerProvider(currentSessionId).notifier,
-    );
+    // final chatState = ref.watch(chatControllerProvider(currentSessionId));
+    final chatController = ref.watch(chatControllerProvider(currentSessionId));
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
+    final isLastMessageInProgress =
+        ref.watch(isLastMessageInProgressProvider).value ?? false;
 
     // Refresh search results when messages change
     ref.listen(currentSessionMessagesProvider, (previous, next) {
@@ -402,7 +394,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                         messagesAsync.when(
                           data: (messages) => ChatList(
                             messages: messages,
-                            isLoading: chatState.isLoading,
+                            isLoading: isLastMessageInProgress,
                             streamingMessageStream:
                                 chatController.streamingMessageStream,
                             onEditMessage: _handleEditMessage,
@@ -456,19 +448,20 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                   else
                     ChatInput(
                       onSend: _handleSendMessage,
-                      enabled: !chatState.isLoading && hasProject,
+                      enabled: !isLastMessageInProgress && hasProject,
                       focusNode: _inputFocusNode,
                     ),
                 ],
               ),
 
               // Execution progress overlay
-              if (chatState.isExecuting)
-                ExecutionProgressOverlay(
-                  currentCommand: chatState.executionProgress!.currentCommand,
-                  totalCommands: chatState.executionProgress!.totalCommands,
-                  commandName: chatState.executionProgress!.commandName,
-                ),
+              // TODO: Re-implement execution progress without ChatState
+              // if (chatState.isExecuting)
+              //   ExecutionProgressOverlay(
+              //     currentCommand: chatState.executionProgress!.currentCommand,
+              //     totalCommands: chatState.executionProgress!.totalCommands,
+              //     commandName: chatState.executionProgress!.commandName,
+              //   ),
             ],
           ),
         ),

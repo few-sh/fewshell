@@ -9,30 +9,29 @@ import 'secret_provider.dart';
 
 /// Provider for ChatController
 /// Uses family provider to scope controller to specific session
-final chatControllerProvider =
-    StateNotifierProvider.family<ChatController, ChatState, String?>((
-      ref,
-      sessionId,
-    ) {
-      // Get current project to access shell service and SSH settings
-      final currentProject = ref.watch(currentProjectProvider);
-      final projectId = currentProject?.id;
+final chatControllerProvider = Provider.family<ChatController, String?>((
+  ref,
+  sessionId,
+) {
+  // Get current project to access shell service and SSH settings
+  final currentProject = ref.watch(currentProjectProvider);
+  final projectId = currentProject?.id;
 
-      final sshSettings = projectId != null
-          ? ref.watch(projectSshSettingsProvider(projectId))
-          : null;
+  final sshSettings = projectId != null
+      ? ref.watch(projectSshSettingsProvider(projectId))
+      : null;
 
-      // Create secret redactor for this project
-      final keychain = ref.watch(keychainServiceProvider);
-      final secretRedactor = SecretRedactor(keychain, projectId);
+  // Create secret redactor for this project
+  final keychain = ref.watch(keychainServiceProvider);
+  final secretRedactor = SecretRedactor(keychain, projectId);
 
-      return ChatController(
-        messageDao: ref.watch(databaseProvider).messageDao,
-        sessionDao: ref.watch(databaseProvider).sessionDao,
-        llmService: ref.watch(llmServiceProvider),
-        shellService: ref.watch(shellServiceProvider(projectId)),
-        secretRedactor: secretRedactor,
-        sshSettings: sshSettings,
-        sessionId: sessionId,
-      );
-    });
+  return ChatController(
+    messageDao: ref.watch(databaseProvider).messageDao,
+    sessionDao: ref.watch(databaseProvider).sessionDao,
+    llmService: ref.watch(llmServiceProvider),
+    shellService: ref.watch(shellServiceProvider(projectId)),
+    secretRedactor: secretRedactor,
+    sshSettings: sshSettings,
+    sessionId: sessionId,
+  );
+});
