@@ -299,6 +299,8 @@ class ChatController extends StateNotifier<ChatState> {
           currentToolMessageId = null;
         }
 
+        await _sessionDao.touchSession(sessionId);
+
         // Update current entity for next steps
         currentEntity = await _messageDao.getMessage(idToUse);
 
@@ -314,6 +316,8 @@ class ChatController extends StateNotifier<ChatState> {
         await _messageDao.insertMessage(
           message.toMessageCompanion(sessionId: sessionId, id: idToUse),
         );
+
+        await _sessionDao.touchSession(sessionId);
 
         // Update current entity
         currentEntity = await _messageDao.getMessage(idToUse);
@@ -383,6 +387,7 @@ class ChatController extends StateNotifier<ChatState> {
 
             // Execute and return result as JSON string
             final result = await _executeToolCall(toolCall, onOutput: onOutput);
+            await _sessionDao.touchSession(sessionId);
             return jsonEncode(result);
           },
           onTextDelta: handleTextDelta,
@@ -414,6 +419,7 @@ class ChatController extends StateNotifier<ChatState> {
             content: redactedError,
             isVisibleToLlm: false,
           );
+          await _sessionDao.touchSession(sessionId);
           if (mounted) {
             state = state.copyWith(isLoading: false, error: errorMsg);
           }
@@ -432,6 +438,7 @@ class ChatController extends StateNotifier<ChatState> {
         content: redactedError,
         isVisibleToLlm: false,
       );
+      await _sessionDao.touchSession(sessionId);
       if (mounted) {
         state = state.copyWith(isLoading: false, error: e.toString());
       }
