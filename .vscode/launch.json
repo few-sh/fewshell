@@ -44,6 +44,10 @@
         {
             "name": "Full Stack (Server + App)",
             "configurations": ["decamp-agent (server)", "decamp-app"]
+        },
+        {
+        "name": "Full Stack Plus Mac(Server + App)",
+            "configurations": ["decamp-agent (server)", "decamp-app", "decamp-app (macOS)"]
         }
     ]
 }
