@@ -205,13 +205,15 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   }
 
   /// Update message content and set editedAt timestamp
-  Future<bool> updateMessageContent({
+  Future<MessageEntity?> updateMessageContent({
     required String messageId,
     required String newContent,
   }) async {
     // Get the current message
     final message = await getMessage(messageId);
-    if (message == null) return false;
+    if (message == null) return null;
+
+    final now = DateTime.now();
 
     // Build the update companion
     final companion = MessageEntityCompanion(
@@ -222,7 +224,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       content: Value(newContent),
       timestamp: Value(message.timestamp),
       createdAt: Value(message.createdAt),
-      editedAt: Value(DateTime.now()),
+      editedAt: Value(now),
       messageKind: Value(message.messageKind),
       imageUrl: Value(message.imageUrl),
       toolCallsJson: Value(message.toolCallsJson),
@@ -230,7 +232,13 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       isVisibleToLlm: Value(message.isVisibleToLlm),
     );
 
-    return await updateMessage(companion);
+    final success = await updateMessage(companion);
+    if (!success) return null;
+
+    return message.copyWith(
+      content: newContent,
+      editedAt: Value(now),
+    );
   }
 
   /// Delete all messages after a specific message (by timestamp)

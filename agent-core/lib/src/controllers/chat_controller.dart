@@ -530,17 +530,22 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     // Update the message content
-    await _messageDao.updateMessageContent(
+    final updatedMessage = await _messageDao.updateMessageContent(
       messageId: messageId,
       newContent: newContent,
     );
+
+    if (updatedMessage == null) {
+      _log.warning('❌ Failed to update message: $messageId');
+      return;
+    }
 
     _log.info('💾 Updated message content');
 
     // Delete all messages AFTER this one (keep the edited message)
     final deletedCount = await _messageDao.deleteMessagesAfter(
       sessionId: sessionId,
-      afterTimestamp: message.timestamp,
+      afterTimestamp: updatedMessage.timestamp,
     );
 
     _log.info(
@@ -550,7 +555,7 @@ class ChatController extends StateNotifier<ChatState> {
     // Resend from the edited message
     await sendMessage(
       content: null, // Use existing conversation (now with edited message)
-      triggerMessage: message,
+      triggerMessage: updatedMessage,
       sessionId: sessionId,
       requestApproval: requestApproval,
       syncChannel: syncChannel,
