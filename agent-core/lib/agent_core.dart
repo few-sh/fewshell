@@ -49,6 +49,7 @@ export 'src/database/tables/sessions_table.dart';
 export 'src/database/tables/messages_table.dart';
 export 'src/database/tables/project_snippets_table.dart';
 export 'src/database/entities/snippet_entity.dart';
+export 'src/database/entities/listable_entity.dart';
 export 'src/database/database_facade.dart';
 
 // Extensions

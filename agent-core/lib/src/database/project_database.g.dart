@@ -57,27 +57,9 @@ class $SessionsTable extends Sessions
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_archived" IN (0, 1))'),
       defaultValue: const Constant(false));
-  static const VerificationMeta _isStarredMeta =
-      const VerificationMeta('isStarred');
   @override
-  late final GeneratedColumn<bool> isStarred = GeneratedColumn<bool>(
-      'is_starred', aliasedName, false,
-      type: DriftSqlType.bool,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('CHECK ("is_starred" IN (0, 1))'),
-      defaultValue: const Constant(false));
-  @override
-  List<GeneratedColumn> get $columns => [
-        id,
-        projectId,
-        description,
-        timestamp,
-        createdAt,
-        updatedAt,
-        isArchived,
-        isStarred
-      ];
+  List<GeneratedColumn> get $columns =>
+      [id, projectId, description, timestamp, createdAt, updatedAt, isArchived];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -131,10 +113,6 @@ class $SessionsTable extends Sessions
           isArchived.isAcceptableOrUnknown(
               data['is_archived']!, _isArchivedMeta));
     }
-    if (data.containsKey('is_starred')) {
-      context.handle(_isStarredMeta,
-          isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta));
-    }
     return context;
   }
 
@@ -158,8 +136,6 @@ class $SessionsTable extends Sessions
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
       isArchived: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
-      isStarred: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}is_starred'])!,
     );
   }
 
@@ -190,9 +166,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
 
   /// Whether the session is archived
   final bool isArchived;
-
-  /// Whether the session is starred
-  final bool isStarred;
   const SessionEntity(
       {required this.id,
       required this.projectId,
@@ -200,8 +173,7 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
       required this.timestamp,
       required this.createdAt,
       required this.updatedAt,
-      required this.isArchived,
-      required this.isStarred});
+      required this.isArchived});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -212,7 +184,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     map['is_archived'] = Variable<bool>(isArchived);
-    map['is_starred'] = Variable<bool>(isStarred);
     return map;
   }
 
@@ -225,7 +196,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
       isArchived: Value(isArchived),
-      isStarred: Value(isStarred),
     );
   }
 
@@ -240,7 +210,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
-      isStarred: serializer.fromJson<bool>(json['isStarred']),
     );
   }
   @override
@@ -254,7 +223,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
       'isArchived': serializer.toJson<bool>(isArchived),
-      'isStarred': serializer.toJson<bool>(isStarred),
     };
   }
 
@@ -265,8 +233,7 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
           DateTime? timestamp,
           DateTime? createdAt,
           DateTime? updatedAt,
-          bool? isArchived,
-          bool? isStarred}) =>
+          bool? isArchived}) =>
       SessionEntity(
         id: id ?? this.id,
         projectId: projectId ?? this.projectId,
@@ -275,7 +242,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         isArchived: isArchived ?? this.isArchived,
-        isStarred: isStarred ?? this.isStarred,
       );
   SessionEntity copyWithCompanion(SessionEntityCompanion data) {
     return SessionEntity(
@@ -288,7 +254,6 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       isArchived:
           data.isArchived.present ? data.isArchived.value : this.isArchived,
-      isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
     );
   }
 
@@ -301,15 +266,14 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
           ..write('timestamp: $timestamp, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('isArchived: $isArchived, ')
-          ..write('isStarred: $isStarred')
+          ..write('isArchived: $isArchived')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, projectId, description, timestamp,
-      createdAt, updatedAt, isArchived, isStarred);
+  int get hashCode => Object.hash(
+      id, projectId, description, timestamp, createdAt, updatedAt, isArchived);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -320,8 +284,7 @@ class SessionEntity extends DataClass implements Insertable<SessionEntity> {
           other.timestamp == this.timestamp &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.isArchived == this.isArchived &&
-          other.isStarred == this.isStarred);
+          other.isArchived == this.isArchived);
 }
 
 class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
@@ -332,7 +295,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   final Value<bool> isArchived;
-  final Value<bool> isStarred;
   final Value<int> rowid;
   const SessionEntityCompanion({
     this.id = const Value.absent(),
@@ -342,7 +304,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.isArchived = const Value.absent(),
-    this.isStarred = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SessionEntityCompanion.insert({
@@ -353,7 +314,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
     required DateTime createdAt,
     required DateTime updatedAt,
     this.isArchived = const Value.absent(),
-    this.isStarred = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         projectId = Value(projectId),
@@ -369,7 +329,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
     Expression<bool>? isArchived,
-    Expression<bool>? isStarred,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -380,7 +339,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (isArchived != null) 'is_archived': isArchived,
-      if (isStarred != null) 'is_starred': isStarred,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -393,7 +351,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
       Value<bool>? isArchived,
-      Value<bool>? isStarred,
       Value<int>? rowid}) {
     return SessionEntityCompanion(
       id: id ?? this.id,
@@ -403,7 +360,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       isArchived: isArchived ?? this.isArchived,
-      isStarred: isStarred ?? this.isStarred,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -432,9 +388,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
     if (isArchived.present) {
       map['is_archived'] = Variable<bool>(isArchived.value);
     }
-    if (isStarred.present) {
-      map['is_starred'] = Variable<bool>(isStarred.value);
-    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -451,7 +404,6 @@ class SessionEntityCompanion extends UpdateCompanion<SessionEntity> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('isArchived: $isArchived, ')
-          ..write('isStarred: $isStarred, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1741,7 +1693,6 @@ typedef $$SessionsTableCreateCompanionBuilder = SessionEntityCompanion
   required DateTime createdAt,
   required DateTime updatedAt,
   Value<bool> isArchived,
-  Value<bool> isStarred,
   Value<int> rowid,
 });
 typedef $$SessionsTableUpdateCompanionBuilder = SessionEntityCompanion
@@ -1753,7 +1704,6 @@ typedef $$SessionsTableUpdateCompanionBuilder = SessionEntityCompanion
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
   Value<bool> isArchived,
-  Value<bool> isStarred,
   Value<int> rowid,
 });
 
@@ -1786,9 +1736,6 @@ class $$SessionsTableFilterComposer
 
   ColumnFilters<bool> get isArchived => $composableBuilder(
       column: $table.isArchived, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<bool> get isStarred => $composableBuilder(
-      column: $table.isStarred, builder: (column) => ColumnFilters(column));
 }
 
 class $$SessionsTableOrderingComposer
@@ -1820,9 +1767,6 @@ class $$SessionsTableOrderingComposer
 
   ColumnOrderings<bool> get isArchived => $composableBuilder(
       column: $table.isArchived, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<bool> get isStarred => $composableBuilder(
-      column: $table.isStarred, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SessionsTableAnnotationComposer
@@ -1854,9 +1798,6 @@ class $$SessionsTableAnnotationComposer
 
   GeneratedColumn<bool> get isArchived => $composableBuilder(
       column: $table.isArchived, builder: (column) => column);
-
-  GeneratedColumn<bool> get isStarred =>
-      $composableBuilder(column: $table.isStarred, builder: (column) => column);
 }
 
 class $$SessionsTableTableManager extends RootTableManager<
@@ -1892,7 +1833,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
             Value<bool> isArchived = const Value.absent(),
-            Value<bool> isStarred = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SessionEntityCompanion(
@@ -1903,7 +1843,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             updatedAt: updatedAt,
             isArchived: isArchived,
-            isStarred: isStarred,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1914,7 +1853,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             required DateTime createdAt,
             required DateTime updatedAt,
             Value<bool> isArchived = const Value.absent(),
-            Value<bool> isStarred = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SessionEntityCompanion.insert(
@@ -1925,7 +1863,6 @@ class $$SessionsTableTableManager extends RootTableManager<
             createdAt: createdAt,
             updatedAt: updatedAt,
             isArchived: isArchived,
-            isStarred: isStarred,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

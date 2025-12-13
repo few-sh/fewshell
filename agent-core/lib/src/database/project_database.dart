@@ -73,7 +73,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -105,39 +105,6 @@ class ProjectDatabase extends _$ProjectDatabase {
         // Enable foreign keys
         // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
         // await executor.runCustom('PRAGMA foreign_keys = ON');
-
-        // Ensure is_starred column exists (for CRDT databases that may skip migrations)
-        final sessionColumns = await executor
-            .runSelect("SELECT * FROM pragma_table_info('sessions');", []);
-        final hasIsStarred =
-            sessionColumns.any((row) => row['name'] == 'is_starred');
-        if (!hasIsStarred) {
-          await executor.runCustom(
-            'ALTER TABLE sessions ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0 CHECK (is_starred IN (0, 1));',
-          );
-        }
-
-        // Ensure is_visible_to_llm column exists in messages
-        final messageColumns = await executor
-            .runSelect("SELECT * FROM pragma_table_info('messages');", []);
-        final hasIsVisibleToLlm =
-            messageColumns.any((row) => row['name'] == 'is_visible_to_llm');
-        if (!hasIsVisibleToLlm) {
-          await executor.runCustom(
-            'ALTER TABLE messages ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
-          );
-        }
-
-        // Ensure is_visible_to_llm column exists in snippets
-        final snippetColumns = await executor
-            .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
-        final hasSnippetIsVisibleToLlm =
-            snippetColumns.any((row) => row['name'] == 'is_visible_to_llm');
-        if (!hasSnippetIsVisibleToLlm) {
-          await executor.runCustom(
-            'ALTER TABLE snippets ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
-          );
-        }
 
         // Setup CRDT listener now that the DB is open and CRDT should be ready
         _setupCrdtListener();
@@ -179,16 +146,9 @@ class ProjectDatabase extends _$ProjectDatabase {
           }
         }
 
-        // Migration from version 7 to 8: Add isStarred column to sessions
+        // Migration from version 7 to 8: Add isStarred column to sessions (Removed)
         if (from < 8) {
-          final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('sessions');", []);
-          final hasIsStarred =
-              columns.any((row) => row['name'] == 'is_starred');
-
-          if (!hasIsStarred) {
-            await m.addColumn(sessions, sessions.isStarred);
-          }
+          // isStarred column was removed in invalidation plan
         }
 
         // Migration from version 8 to 9: Add isVisibleToLlm column to messages
