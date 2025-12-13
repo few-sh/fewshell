@@ -695,10 +695,10 @@ class $MessagesTable extends Messages
 
   static JsonTypeConverter2<MessageKind, int, int> $convertermessageKind =
       const EnumIndexConverter<MessageKind>(MessageKind.values);
-  static TypeConverter<List<ToolCall>?, String?> $convertertoolCallsJson =
-      const ToolCallListConverter();
-  static TypeConverter<List<ToolCall>?, String?> $convertertoolResultsJson =
-      const ToolCallListConverter();
+  static JsonTypeConverter2<List<ToolCall>?, String?, Object?>
+      $convertertoolCallsJson = const ToolCallListConverter();
+  static JsonTypeConverter2<List<ToolCall>?, String?, Object?>
+      $convertertoolResultsJson = const ToolCallListConverter();
 }
 
 class MessageEntity extends DataClass implements Insertable<MessageEntity> {
@@ -831,10 +831,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       messageKind: $MessagesTable.$convertermessageKind
           .fromJson(serializer.fromJson<int>(json['messageKind'])),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
-      toolCallsJson:
-          serializer.fromJson<List<ToolCall>?>(json['toolCallsJson']),
-      toolResultsJson:
-          serializer.fromJson<List<ToolCall>?>(json['toolResultsJson']),
+      toolCallsJson: $MessagesTable.$convertertoolCallsJson
+          .fromJson(serializer.fromJson<Object?>(json['toolCallsJson'])),
+      toolResultsJson: $MessagesTable.$convertertoolResultsJson
+          .fromJson(serializer.fromJson<Object?>(json['toolResultsJson'])),
     );
   }
   @override
@@ -854,8 +854,10 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       'messageKind': serializer.toJson<int>(
           $MessagesTable.$convertermessageKind.toJson(messageKind)),
       'imageUrl': serializer.toJson<String?>(imageUrl),
-      'toolCallsJson': serializer.toJson<List<ToolCall>?>(toolCallsJson),
-      'toolResultsJson': serializer.toJson<List<ToolCall>?>(toolResultsJson),
+      'toolCallsJson': serializer.toJson<Object?>(
+          $MessagesTable.$convertertoolCallsJson.toJson(toolCallsJson)),
+      'toolResultsJson': serializer.toJson<Object?>(
+          $MessagesTable.$convertertoolResultsJson.toJson(toolResultsJson)),
     };
   }
 
