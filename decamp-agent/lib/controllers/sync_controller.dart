@@ -267,11 +267,11 @@ class _AgentSession {
             if (toolCall.function.name == kExecuteShellCommand) {
               final command = params['command'] as String;
               final result = await _executeLocalCommand(command);
-              await db!.sessionDao.touchSession(sessionId);
+              await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
               final result = await FetchTool.execute(params);
-              await db!.sessionDao.touchSession(sessionId);
+              await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result['data']);
             }
 
@@ -328,7 +328,7 @@ class _AgentSession {
             if (messageType is ToolUseMessage) {
               await db!.messageDao.insertMessage(
                 message.toMessageCompanion(
-                  sessionId: sessionId,
+                  sessionId: currentSessionId,
                   id: id,
                   userName: model,
                 ),
@@ -336,23 +336,23 @@ class _AgentSession {
             } else {
               await db!.messageDao.insertMessageWithId(
                 id: id,
-                sessionId: sessionId,
+                sessionId: currentSessionId,
                 userId: 'ai',
                 userName: model,
                 content: message.content,
                 isStreaming: false,
               );
             }
-            await db!.sessionDao.touchSession(sessionId);
+            await db!.sessionDao.touchSession(currentSessionId);
           },
           onToolResultMessage: (message, {String? messageId}) async {
             String? id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             id = db!.messageDao.generateMessageId();
             await db!.messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: sessionId, id: id),
+              message.toMessageCompanion(sessionId: currentSessionId, id: id),
             );
-            await db!.sessionDao.touchSession(sessionId);
+            await db!.sessionDao.touchSession(currentSessionId);
           },
         );
 
@@ -385,7 +385,7 @@ class _AgentSession {
         channel.sendCustomMessage({
           'type': 'error',
           'message_id': messageId,
-          'message': e.toString()
+          'message': e.toString(),
         });
       }
     } finally {
