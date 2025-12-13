@@ -182,11 +182,8 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
     final isSelected = widget.isSelected?.call(item) ?? false;
 
     // Date display
-    final dateDisplay = DateFormatter.formatSessionDateRange(
-      widget.getCreatedAt(item),
-      widget.getUpdatedAt(item),
-    );
-    final relativeTime = DateFormatter.formatRelativeTime(
+    final dateDisplay = DateFormatter.format(widget.getUpdatedAt(item));
+    final relativeTime = DateFormatter.formatRelative(
       widget.getUpdatedAt(item),
     );
 
