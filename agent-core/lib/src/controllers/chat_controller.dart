@@ -118,6 +118,28 @@ class ChatController extends StateNotifier<ChatState> {
       conversation.add(chatMessage);
     }
 
+    if (conversation.isNotEmpty) {
+      for (int i = conversation.length - 1; i >= 0; i--) {
+        if (conversation[i].messageType is TextMessage) {
+          // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
+          // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
+          conversation[i] = conversation[i].withExtension(
+            'anthropic',
+            {
+              'contentBlocks': [
+                {
+                  'type': 'text',
+                  'text': '',
+                  'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
+                },
+              ],
+            },
+          );
+          break; // Only cache the last text message
+        }
+      }
+    }
+
     _log.info(
       '✅ Built conversation with ${conversation.length} messages',
     );
