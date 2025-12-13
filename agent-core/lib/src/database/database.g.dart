@@ -52,9 +52,38 @@ class $ProjectsTable extends Projects
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _isArchivedMeta =
+      const VerificationMeta('isArchived');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, name, description, serverUrl, lastSessionDate, createdAt, updatedAt];
+  late final GeneratedColumn<bool> isArchived = GeneratedColumn<bool>(
+      'is_archived', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_archived" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _isStarredMeta =
+      const VerificationMeta('isStarred');
+  @override
+  late final GeneratedColumn<bool> isStarred = GeneratedColumn<bool>(
+      'is_starred', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_starred" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        name,
+        description,
+        serverUrl,
+        lastSessionDate,
+        createdAt,
+        updatedAt,
+        isArchived,
+        isStarred
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -106,6 +135,16 @@ class $ProjectsTable extends Projects
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('is_archived')) {
+      context.handle(
+          _isArchivedMeta,
+          isArchived.isAcceptableOrUnknown(
+              data['is_archived']!, _isArchivedMeta));
+    }
+    if (data.containsKey('is_starred')) {
+      context.handle(_isStarredMeta,
+          isStarred.isAcceptableOrUnknown(data['is_starred']!, _isStarredMeta));
+    }
     return context;
   }
 
@@ -129,6 +168,10 @@ class $ProjectsTable extends Projects
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      isArchived: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_archived'])!,
+      isStarred: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_starred'])!,
     );
   }
 
@@ -160,6 +203,12 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
 
   /// Timestamp when the project was last updated
   final DateTime updatedAt;
+
+  /// Whether the project is archived
+  final bool isArchived;
+
+  /// Whether the project is starred/favorited
+  final bool isStarred;
   const ProjectEntity(
       {required this.id,
       required this.name,
@@ -167,7 +216,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       this.serverUrl,
       required this.lastSessionDate,
       required this.createdAt,
-      required this.updatedAt});
+      required this.updatedAt,
+      required this.isArchived,
+      required this.isStarred});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -182,6 +233,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
     map['last_session_date'] = Variable<DateTime>(lastSessionDate);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    map['is_archived'] = Variable<bool>(isArchived);
+    map['is_starred'] = Variable<bool>(isStarred);
     return map;
   }
 
@@ -198,6 +251,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       lastSessionDate: Value(lastSessionDate),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      isArchived: Value(isArchived),
+      isStarred: Value(isStarred),
     );
   }
 
@@ -212,6 +267,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       lastSessionDate: serializer.fromJson<DateTime>(json['lastSessionDate']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      isArchived: serializer.fromJson<bool>(json['isArchived']),
+      isStarred: serializer.fromJson<bool>(json['isStarred']),
     );
   }
   @override
@@ -225,6 +282,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       'lastSessionDate': serializer.toJson<DateTime>(lastSessionDate),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'isArchived': serializer.toJson<bool>(isArchived),
+      'isStarred': serializer.toJson<bool>(isStarred),
     };
   }
 
@@ -235,7 +294,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           Value<String?> serverUrl = const Value.absent(),
           DateTime? lastSessionDate,
           DateTime? createdAt,
-          DateTime? updatedAt}) =>
+          DateTime? updatedAt,
+          bool? isArchived,
+          bool? isStarred}) =>
       ProjectEntity(
         id: id ?? this.id,
         name: name ?? this.name,
@@ -244,6 +305,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
         lastSessionDate: lastSessionDate ?? this.lastSessionDate,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        isArchived: isArchived ?? this.isArchived,
+        isStarred: isStarred ?? this.isStarred,
       );
   ProjectEntity copyWithCompanion(ProjectEntityCompanion data) {
     return ProjectEntity(
@@ -257,6 +320,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           : this.lastSessionDate,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      isArchived:
+          data.isArchived.present ? data.isArchived.value : this.isArchived,
+      isStarred: data.isStarred.present ? data.isStarred.value : this.isStarred,
     );
   }
 
@@ -269,14 +335,16 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           ..write('serverUrl: $serverUrl, ')
           ..write('lastSessionDate: $lastSessionDate, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('isStarred: $isStarred')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, name, description, serverUrl, lastSessionDate, createdAt, updatedAt);
+  int get hashCode => Object.hash(id, name, description, serverUrl,
+      lastSessionDate, createdAt, updatedAt, isArchived, isStarred);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -287,7 +355,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           other.serverUrl == this.serverUrl &&
           other.lastSessionDate == this.lastSessionDate &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.isArchived == this.isArchived &&
+          other.isStarred == this.isStarred);
 }
 
 class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
@@ -298,6 +368,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
   final Value<DateTime> lastSessionDate;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<bool> isArchived;
+  final Value<bool> isStarred;
   final Value<int> rowid;
   const ProjectEntityCompanion({
     this.id = const Value.absent(),
@@ -307,6 +379,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     this.lastSessionDate = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.isArchived = const Value.absent(),
+    this.isStarred = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProjectEntityCompanion.insert({
@@ -317,6 +391,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     required DateTime lastSessionDate,
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.isArchived = const Value.absent(),
+    this.isStarred = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         name = Value(name),
@@ -331,6 +407,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     Expression<DateTime>? lastSessionDate,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<bool>? isArchived,
+    Expression<bool>? isStarred,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -341,6 +419,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
       if (lastSessionDate != null) 'last_session_date': lastSessionDate,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (isArchived != null) 'is_archived': isArchived,
+      if (isStarred != null) 'is_starred': isStarred,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -353,6 +433,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
       Value<DateTime>? lastSessionDate,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
+      Value<bool>? isArchived,
+      Value<bool>? isStarred,
       Value<int>? rowid}) {
     return ProjectEntityCompanion(
       id: id ?? this.id,
@@ -362,6 +444,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
       lastSessionDate: lastSessionDate ?? this.lastSessionDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isArchived: isArchived ?? this.isArchived,
+      isStarred: isStarred ?? this.isStarred,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -390,6 +474,12 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (isArchived.present) {
+      map['is_archived'] = Variable<bool>(isArchived.value);
+    }
+    if (isStarred.present) {
+      map['is_starred'] = Variable<bool>(isStarred.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -406,6 +496,8 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
           ..write('lastSessionDate: $lastSessionDate, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('isArchived: $isArchived, ')
+          ..write('isStarred: $isStarred, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -776,6 +868,8 @@ typedef $$ProjectsTableCreateCompanionBuilder = ProjectEntityCompanion
   required DateTime lastSessionDate,
   required DateTime createdAt,
   required DateTime updatedAt,
+  Value<bool> isArchived,
+  Value<bool> isStarred,
   Value<int> rowid,
 });
 typedef $$ProjectsTableUpdateCompanionBuilder = ProjectEntityCompanion
@@ -787,6 +881,8 @@ typedef $$ProjectsTableUpdateCompanionBuilder = ProjectEntityCompanion
   Value<DateTime> lastSessionDate,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<bool> isArchived,
+  Value<bool> isStarred,
   Value<int> rowid,
 });
 
@@ -820,6 +916,12 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isStarred => $composableBuilder(
+      column: $table.isStarred, builder: (column) => ColumnFilters(column));
 }
 
 class $$ProjectsTableOrderingComposer
@@ -852,6 +954,12 @@ class $$ProjectsTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isStarred => $composableBuilder(
+      column: $table.isStarred, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ProjectsTableAnnotationComposer
@@ -883,6 +991,12 @@ class $$ProjectsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isArchived => $composableBuilder(
+      column: $table.isArchived, builder: (column) => column);
+
+  GeneratedColumn<bool> get isStarred =>
+      $composableBuilder(column: $table.isStarred, builder: (column) => column);
 }
 
 class $$ProjectsTableTableManager extends RootTableManager<
@@ -918,6 +1032,8 @@ class $$ProjectsTableTableManager extends RootTableManager<
             Value<DateTime> lastSessionDate = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<bool> isArchived = const Value.absent(),
+            Value<bool> isStarred = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ProjectEntityCompanion(
@@ -928,6 +1044,8 @@ class $$ProjectsTableTableManager extends RootTableManager<
             lastSessionDate: lastSessionDate,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            isArchived: isArchived,
+            isStarred: isStarred,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -938,6 +1056,8 @@ class $$ProjectsTableTableManager extends RootTableManager<
             required DateTime lastSessionDate,
             required DateTime createdAt,
             required DateTime updatedAt,
+            Value<bool> isArchived = const Value.absent(),
+            Value<bool> isStarred = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ProjectEntityCompanion.insert(
@@ -948,6 +1068,8 @@ class $$ProjectsTableTableManager extends RootTableManager<
             lastSessionDate: lastSessionDate,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            isArchived: isArchived,
+            isStarred: isStarred,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

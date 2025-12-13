@@ -54,6 +54,8 @@ void main() {
               createdAt: DateTime.now(),
               updatedAt: DateTime.now(),
               lastSessionDate: DateTime.now(),
+              isArchived: false,
+              isStarred: false,
             );
           }),
         ],

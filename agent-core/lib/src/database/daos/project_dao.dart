@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:agent_core/agent_core.dart';
+import '../entities/listable_entity.dart';
 
 part 'project_dao.g.dart';
 
@@ -7,14 +8,16 @@ part 'project_dao.g.dart';
 /// Provides CRUD operations and reactive queries.
 @DriftAccessor(tables: [Projects])
 class ProjectDao extends DatabaseAccessor<GlobalDatabase>
-    with _$ProjectDaoMixin {
+    with _$ProjectDaoMixin
+    implements ListableEntityDao<ProjectEntity> {
   ProjectDao(super.db);
 
-  /// Watch all projects, ordered by last session date
-  Stream<List<ProjectEntity>> watchAllProjects() {
+  /// Watch all projects (active only by default, or archived)
+  Stream<List<ProjectEntity>> watchAllProjects({bool isArchived = false}) {
     return (select(projects)
-          ..where(
-              (p) => const CustomExpression<bool>('is_deleted').equals(false))
+          ..where((p) =>
+              p.isArchived.equals(isArchived) &
+              const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (p) => OrderingTerm(
                   expression: p.lastSessionDate,
@@ -98,6 +101,27 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
   /// Generate a unique project ID
   String generateProjectId() => IdGenerator.projectId();
 
+  /// Archive a project
+  Future<int> archiveProject(String id) {
+    return (update(projects)..where((p) => p.id.equals(id))).write(
+      const ProjectEntityCompanion(isArchived: Value(true)),
+    );
+  }
+
+  /// Unarchive a project
+  Future<int> unarchiveProject(String id) {
+    return (update(projects)..where((p) => p.id.equals(id))).write(
+      const ProjectEntityCompanion(isArchived: Value(false)),
+    );
+  }
+
+  /// Toggle star status
+  Future<int> toggleProjectStar(String id, bool isStarred) {
+    return (update(projects)..where((p) => p.id.equals(id))).write(
+      ProjectEntityCompanion(isStarred: Value(isStarred)),
+    );
+  }
+
   /// Create a new project with all parameters
   Future<String> createProjectWithId({
     required String name,
@@ -117,5 +141,30 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
 
     await insertProject(companion);
     return id;
+  }
+
+  // --- ListableEntityDao interface implementation ---
+
+  @override
+  Future<void> toggleStarItem(String id, bool isStarred) =>
+      toggleProjectStar(id, isStarred);
+
+  @override
+  Future<void> archiveItem(String id) => archiveProject(id);
+
+  @override
+  Future<void> unarchiveItem(String id) => unarchiveProject(id);
+
+  @override
+  Future<void> deleteItem(String id) => deleteProject(id);
+
+  @override
+  Future<void> renameItem(String id, String newName) {
+    return (update(projects)..where((p) => p.id.equals(id))).write(
+      ProjectEntityCompanion(
+        name: Value(newName),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
   }
 }

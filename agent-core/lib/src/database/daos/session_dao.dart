@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:agent_core/agent_core.dart';
+import '../entities/listable_entity.dart';
 
 part 'session_dao.g.dart';
 
@@ -7,7 +8,8 @@ part 'session_dao.g.dart';
 /// Provides CRUD operations and reactive queries.
 @DriftAccessor(tables: [Sessions])
 class SessionDao extends DatabaseAccessor<ProjectDatabase>
-    with _$SessionDaoMixin {
+    with _$SessionDaoMixin
+    implements ListableEntityDao<SessionEntity> {
   SessionDao(super.db);
 
   /// Watch sessions for a specific project, ordered by timestamp desc
@@ -279,4 +281,23 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
 
     return newSessionId;
   }
+
+  // --- ListableEntityDao interface implementation ---
+
+  @override
+  Future<void> toggleStarItem(String id, bool isStarred) =>
+      toggleSessionStar(id, isStarred);
+
+  @override
+  Future<void> archiveItem(String id) => archiveSession(id);
+
+  @override
+  Future<void> unarchiveItem(String id) => unarchiveSession(id);
+
+  @override
+  Future<void> deleteItem(String id) => deleteSession(id);
+
+  @override
+  Future<void> renameItem(String id, String newName) =>
+      renameSession(id, newName);
 }
