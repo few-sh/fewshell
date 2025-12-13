@@ -73,28 +73,17 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   Future<int> insertMessage(MessageEntityCompanion message) async {
     final result =
         await into(messages).insert(message, mode: InsertMode.insertOrReplace);
-    // Touch the session to update its updatedAt timestamp
-    if (message.sessionId.present) {
-      await db.sessionDao.touchSession(message.sessionId.value);
-    }
     return result;
   }
 
   /// Update an existing message
   Future<bool> updateMessage(MessageEntityCompanion message) async {
     final result = await update(messages).replace(message);
-    // Touch the session to update its updatedAt timestamp
-    if (message.sessionId.present) {
-      await db.sessionDao.touchSession(message.sessionId.value);
-    }
     return result;
   }
 
   /// Delete a message by ID
   Future<int> deleteMessage(String id) async {
-    // Get the message first to know which session to touch
-    final message = await getMessage(id);
-
     // Explicitly perform soft delete by setting is_deleted = 1.
     // We use customUpdate because the isDeleted column is managed by sqlite_crdt
     // and not exposed in the Drift table definition.
@@ -103,11 +92,6 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       variables: [Variable.withString(id)],
       updates: {messages},
     );
-
-    // Touch the session to update its updatedAt timestamp
-    if (message != null) {
-      await db.sessionDao.touchSession(message.sessionId);
-    }
     return result;
   }
 
@@ -205,13 +189,15 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
   }
 
   /// Update message content and set editedAt timestamp
-  Future<bool> updateMessageContent({
+  Future<MessageEntity?> updateMessageContent({
     required String messageId,
     required String newContent,
   }) async {
     // Get the current message
     final message = await getMessage(messageId);
-    if (message == null) return false;
+    if (message == null) return null;
+
+    final now = DateTime.now();
 
     // Build the update companion
     final companion = MessageEntityCompanion(
@@ -222,7 +208,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       content: Value(newContent),
       timestamp: Value(message.timestamp),
       createdAt: Value(message.createdAt),
-      editedAt: Value(DateTime.now()),
+      editedAt: Value(now),
       messageKind: Value(message.messageKind),
       imageUrl: Value(message.imageUrl),
       toolCallsJson: Value(message.toolCallsJson),
@@ -230,7 +216,13 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       isVisibleToLlm: Value(message.isVisibleToLlm),
     );
 
-    return await updateMessage(companion);
+    final success = await updateMessage(companion);
+    if (!success) return null;
+
+    return message.copyWith(
+      content: newContent,
+      editedAt: Value(now),
+    );
   }
 
   /// Delete all messages after a specific message (by timestamp)
@@ -250,10 +242,6 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       ],
       updates: {messages},
     );
-
-    // Touch the session to update its updatedAt timestamp
-    await db.sessionDao.touchSession(sessionId);
-
     return result;
   }
 }

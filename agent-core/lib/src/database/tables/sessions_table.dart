@@ -25,9 +25,6 @@ class Sessions extends Table {
   /// Whether the session is archived
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
 
-  /// Whether the session is starred
-  BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
-
   @override
   Set<Column> get primaryKey => {id};
 }

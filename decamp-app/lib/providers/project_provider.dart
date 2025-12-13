@@ -6,12 +6,21 @@ import 'database_provider.dart';
 import 'theme_provider.dart';
 import 'session_provider.dart';
 
-/// Provider for streaming all projects from the database
-/// OPTIMIZED: Depends only on Global DB. Does not rebuild when selection changes.
-final projectsStreamProvider = StreamProvider<List<ProjectEntity>>((ref) {
+/// Provider for streaming active projects
+final activeProjectsProvider = StreamProvider<List<ProjectEntity>>((ref) {
   final globalDb = ref.watch(globalDatabaseProvider);
-  return globalDb.projectDao.watchAllProjects();
+  return globalDb.projectDao.watchAllProjects(isArchived: false);
 });
+
+/// Provider for streaming archived projects
+final archivedProjectsProvider = StreamProvider<List<ProjectEntity>>((ref) {
+  final globalDb = ref.watch(globalDatabaseProvider);
+  return globalDb.projectDao.watchAllProjects(isArchived: true);
+});
+
+// Deprecated: Alias to active for backward compatibility inside this refactor step if needed,
+// though we should switch usages.
+final projectsStreamProvider = activeProjectsProvider;
 
 /// StateNotifier for the currently selected project ID
 class SelectedProjectNotifier extends StateNotifier<String?> {

@@ -26,6 +26,9 @@ class Projects extends Table {
   /// Timestamp when the project was last updated
   DateTimeColumn get updatedAt => dateTime()();
 
+  /// Whether the project is archived
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

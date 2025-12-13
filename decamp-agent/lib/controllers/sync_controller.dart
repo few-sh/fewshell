@@ -267,9 +267,11 @@ class _AgentSession {
             if (toolCall.function.name == kExecuteShellCommand) {
               final command = params['command'] as String;
               final result = await _executeLocalCommand(command);
+              await db!.sessionDao.touchSession(sessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
               final result = await FetchTool.execute(params);
+              await db!.sessionDao.touchSession(sessionId);
               return jsonEncode(result['data']);
             }
 
@@ -326,7 +328,7 @@ class _AgentSession {
             if (messageType is ToolUseMessage) {
               await db!.messageDao.insertMessage(
                 message.toMessageCompanion(
-                  sessionId: currentSessionId,
+                  sessionId: sessionId,
                   id: id,
                   userName: model,
                 ),
@@ -334,21 +336,23 @@ class _AgentSession {
             } else {
               await db!.messageDao.insertMessageWithId(
                 id: id,
-                sessionId: currentSessionId,
+                sessionId: sessionId,
                 userId: 'ai',
                 userName: model,
                 content: message.content,
                 isStreaming: false,
               );
             }
+            await db!.sessionDao.touchSession(sessionId);
           },
           onToolResultMessage: (message, {String? messageId}) async {
             String? id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             id = db!.messageDao.generateMessageId();
             await db!.messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: currentSessionId, id: id),
+              message.toMessageCompanion(sessionId: sessionId, id: id),
             );
+            await db!.sessionDao.touchSession(sessionId);
           },
         );
 
@@ -372,6 +376,7 @@ class _AgentSession {
               content: 'Sorry, I encountered an error: $e',
               isVisibleToLlm: false,
             );
+            await db!.sessionDao.touchSession(sessionId);
           } catch (innerE) {
             _log.severe('Failed to insert error message: $innerE');
           }
