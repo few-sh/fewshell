@@ -110,14 +110,10 @@ class GlobalDatabase extends _$GlobalDatabase {
           );
         }
 
-        // Ensure is_archived and is_starred columns exist on projects (manual check for resiliency)
+        // Ensure is_archived column exists on projects (manual check for resiliency)
         final projectColumns = await executor
             .runSelect("SELECT * FROM pragma_table_info('projects');", []);
 
-        if (!projectColumns.any((row) => row['name'] == 'is_archived')) {
-          await executor.runCustom(
-              'ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1));');
-        }
         if (!projectColumns.any((row) => row['name'] == 'is_archived')) {
           await executor.runCustom(
               'ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1));');
@@ -175,7 +171,14 @@ class GlobalDatabase extends _$GlobalDatabase {
 
         // Migration from version 7 to 8: Add isArchived to projects
         if (from < 8) {
-          await m.addColumn(projects, projects.isArchived);
+          final columns = await executor
+              .runSelect("SELECT * FROM pragma_table_info('projects');", []);
+          final hasIsArchived =
+              columns.any((row) => row['name'] == 'is_archived');
+
+          if (!hasIsArchived) {
+            await m.addColumn(projects, projects.isArchived);
+          }
           // Removed isStarred column
         }
       },
