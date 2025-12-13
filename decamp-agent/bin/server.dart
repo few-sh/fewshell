@@ -7,6 +7,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:fewshell_agent/router.dart';
 import 'package:fewshell_agent/services/database_manager.dart';
+import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 
 final _log = Logger('FewshellAgent');
@@ -43,6 +44,9 @@ void main(List<String> args) async {
     final dbManager = DatabaseManager('${Directory.current.path}/data');
     await dbManager.init();
 
+    // Initialize SyncController
+    final syncController = SyncController(dbManager);
+
     // Configure SecurityContext for mTLS
     _log.info('Initializing mTLS with embedded certificates');
 
@@ -69,7 +73,7 @@ void main(List<String> args) async {
           ),
         )
         .addMiddleware(_corsMiddleware())
-        .addHandler(createRouter(dbManager).call);
+        .addHandler(createRouter(syncController).call);
 
     // Start the server
     _log.info('Starting server on port $port...');

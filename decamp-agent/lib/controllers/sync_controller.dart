@@ -15,6 +15,7 @@ class SyncController {
   static final _log = Logger('SyncController');
 
   final DatabaseManager dbManager;
+  final Set<String> _activeSessions = {};
 
   SyncController(this.dbManager);
 
@@ -84,7 +85,7 @@ class SyncController {
     String context, [
     ProjectDatabase? db,
   ]) {
-    final agentSession = _AgentSession(channel, db);
+    final agentSession = _AgentSession(channel, db, _activeSessions);
 
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
@@ -108,6 +109,7 @@ class _AgentSession {
 
   final MultiplexedWebSocketChannel channel;
   final ProjectDatabase? db;
+  final Set<String> _activeSessions;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
 
@@ -117,7 +119,7 @@ class _AgentSession {
   DateTime? _streamingCreatedAt;
   Future<void> _lastDbWrite = Future.value();
 
-  _AgentSession(this.channel, this.db);
+  _AgentSession(this.channel, this.db, this._activeSessions);
 
   void handleMessage(Map<String, dynamic> msg) {
     if (msg['type'] == 'start_chat') {
@@ -146,241 +148,275 @@ class _AgentSession {
 
   Future<void> _startChat(Map<String, dynamic> data) async {
     _log.info('🚀 Starting agent loop');
+    String? sessionId;
+
     try {
-      final config = data['config'] as Map<String, dynamic>;
-      final sessionId = data['sessionId'] as String?;
-      final triggerMessageJson =
-          data['triggerMessage'] as Map<String, dynamic>?;
+      sessionId = data['sessionId'] as String?;
+    } catch (e) {
+      channel.sendCustomMessage({
+        'type': 'error',
+        'message': 'Invalid session ID format: $e',
+      });
+      return;
+    }
 
-      if (sessionId == null || db == null) {
-        throw Exception(
-          'Session ID and Database required',
-        );
+    if (sessionId != null) {
+      if (_activeSessions.contains(sessionId)) {
+        _log.warning('Chat already in progress for session $sessionId');
+        channel.sendCustomMessage({
+          'type': 'error',
+          'message': 'Chat already in progress for session $sessionId',
+        });
+        return;
       }
+      _activeSessions.add(sessionId);
+    }
 
-      // If we have a trigger message, upsert it immediately to ensure we have the latest context
-      if (triggerMessageJson != null) {
-        _log.info(
-          '📥 Received trigger message, upserting...',
-        );
-        final triggerMessage = MessageEntity.fromJson(triggerMessageJson);
-        await db!.messageDao.insertMessage(triggerMessage.toCompanion(true));
-        _log.info(
-          '✅ Trigger message ${triggerMessage.id} upserted!',
-        );
-      }
+    try {
+      try {
+        final config = data['config'] as Map<String, dynamic>;
+        final triggerMessageJson =
+            data['triggerMessage'] as Map<String, dynamic>?;
 
-      // Always load conversation from database (single source of truth)
-      // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
-      // Also filter out messages not visible to LLM
-      final dbMessages = await db!.messageDao.getMessagesBySession(sessionId);
-      final conversation = dbMessages
-          .where((m) => !m.isStreaming && m.isVisibleToLlm)
-          .map((m) => m.toChatMessage())
-          .toList();
+        if (sessionId == null || db == null) {
+          throw Exception(
+            'Session ID and Database required',
+          );
+        }
+        final currentSessionId = sessionId;
 
-      // Add cache control to the last text message for Anthropic prompt caching
-      // Search backwards to find the last TextMessage, as conversation may end with tool calls
-      // Use cache control marker pattern: Empty text block with cache_control
-      if (conversation.isNotEmpty) {
-        for (int i = conversation.length - 1; i >= 0; i--) {
-          if (conversation[i].messageType is TextMessage) {
-            // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
-            // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
-            conversation[i] = conversation[i].withExtension(
-              'anthropic',
-              {
-                'contentBlocks': [
-                  {
-                    'type': 'text',
-                    'text': '',
-                    'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
-                  },
-                ],
-              },
-            );
-            break; // Only cache the last text message
+        // If we have a trigger message, upsert it immediately to ensure we have the latest context
+        if (triggerMessageJson != null) {
+          _log.info(
+            '📥 Received trigger message, upserting...',
+          );
+          final triggerMessage = MessageEntity.fromJson(triggerMessageJson);
+          await db!.messageDao.insertMessage(triggerMessage.toCompanion(true));
+          _log.info(
+            '✅ Trigger message ${triggerMessage.id} upserted!',
+          );
+        }
+
+        // Always load conversation from database (single source of truth)
+        // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
+        // Also filter out messages not visible to LLM
+        final dbMessages =
+            await db!.messageDao.getMessagesBySession(currentSessionId);
+        final conversation = dbMessages
+            .where((m) => !m.isStreaming && m.isVisibleToLlm)
+            .map((m) => m.toChatMessage())
+            .toList();
+
+        // Add cache control to the last text message for Anthropic prompt caching
+        // Search backwards to find the last TextMessage, as conversation may end with tool calls
+        // Use cache control marker pattern: Empty text block with cache_control
+        if (conversation.isNotEmpty) {
+          for (int i = conversation.length - 1; i >= 0; i--) {
+            if (conversation[i].messageType is TextMessage) {
+              // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
+              // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
+              conversation[i] = conversation[i].withExtension(
+                'anthropic',
+                {
+                  'contentBlocks': [
+                    {
+                      'type': 'text',
+                      'text': '',
+                      'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
+                    },
+                  ],
+                },
+              );
+              break; // Only cache the last text message
+            }
           }
         }
-      }
 
-      final apiKey = config['apiKey'] as String;
-      final providerTypeStr = config['provider'] as String;
-      final model = config['model'] as String;
-      final baseUrl = config['baseUrl'] as String?;
-      final temperature = config['temperature'] as double?;
-      final maxTokens = config['maxTokens'] as int?;
-      final systemInstruction = config['systemInstruction'] as String?;
+        final apiKey = config['apiKey'] as String;
+        final providerTypeStr = config['provider'] as String;
+        final model = config['model'] as String;
+        final baseUrl = config['baseUrl'] as String?;
+        final temperature = config['temperature'] as double?;
+        final maxTokens = config['maxTokens'] as int?;
+        final systemInstruction = config['systemInstruction'] as String?;
 
-      final apiType = LlmApiType.values.firstWhere(
-        (e) => e.name == providerTypeStr,
-        orElse: () =>
-            throw Exception('Unknown provider type: $providerTypeStr'),
-      );
+        final apiType = LlmApiType.values.firstWhere(
+          (e) => e.name == providerTypeStr,
+          orElse: () =>
+              throw Exception('Unknown provider type: $providerTypeStr'),
+        );
 
-      final settings = LlmApiSettings(
-        identifier: model,
-        apiType: apiType,
-        baseUrl: baseUrl ?? apiType.defaultBaseUrl,
-        temperature: temperature,
-        maxTokens: maxTokens,
-      );
+        final settings = LlmApiSettings(
+          identifier: model,
+          apiType: apiType,
+          baseUrl: baseUrl ?? apiType.defaultBaseUrl,
+          temperature: temperature,
+          maxTokens: maxTokens,
+        );
 
-      final provider = await LlmService.createProvider(
-        settings,
-        apiKey,
-        systemInstruction: systemInstruction,
-      );
+        final provider = await LlmService.createProvider(
+          settings,
+          apiKey,
+          systemInstruction: systemInstruction,
+        );
 
-      await runAgentLoop(
-        llmStream: (conv, tools) {
-          return provider.chatStream(conv, tools: tools);
-        },
-        tools: shellTools,
-        conversation: conversation,
-        requestApproval: (pendingCalls) {
-          _currentPendingCalls = pendingCalls;
+        await runAgentLoop(
+          llmStream: (conv, tools) {
+            return provider.chatStream(conv, tools: tools);
+          },
+          tools: shellTools,
+          conversation: conversation,
+          requestApproval: (pendingCalls) {
+            _currentPendingCalls = pendingCalls;
 
-          channel.sendCustomMessage({
-            'type': 'request_approval',
-            'tools': pendingCalls
-                .map(
-                  (c) => {'id': c.id, 'name': c.name, 'arguments': c.arguments},
-                )
-                .toList(),
-          });
+            channel.sendCustomMessage({
+              'type': 'request_approval',
+              'tools': pendingCalls
+                  .map(
+                    (c) =>
+                        {'id': c.id, 'name': c.name, 'arguments': c.arguments},
+                  )
+                  .toList(),
+            });
 
-          final completer = Completer<List<PendingToolCall>?>();
-          _approvalCompleter = completer;
-          return completer.future;
-        },
-        executeToolCall: (toolCall) async {
-          final argumentsJson = toolCall.function.arguments;
-          final params = argumentsJson.isNotEmpty
-              ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-              : <String, dynamic>{};
+            final completer = Completer<List<PendingToolCall>?>();
+            _approvalCompleter = completer;
+            return completer.future;
+          },
+          executeToolCall: (toolCall) async {
+            final argumentsJson = toolCall.function.arguments;
+            final params = argumentsJson.isNotEmpty
+                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+                : <String, dynamic>{};
 
-          if (toolCall.function.name == kExecuteShellCommand) {
-            final command = params['command'] as String;
-            final result = await _executeLocalCommand(command);
-            await db!.sessionDao.touchSession(sessionId);
-            return jsonEncode(result);
-          } else if (toolCall.function.name == kFetch) {
-            final result = await FetchTool.execute(params);
-            await db!.sessionDao.touchSession(sessionId);
-            return jsonEncode(result['data']);
-          }
+            if (toolCall.function.name == kExecuteShellCommand) {
+              final command = params['command'] as String;
+              final result = await _executeLocalCommand(command);
+              await db!.sessionDao.touchSession(currentSessionId);
+              return jsonEncode(result);
+            } else if (toolCall.function.name == kFetch) {
+              final result = await FetchTool.execute(params);
+              await db!.sessionDao.touchSession(currentSessionId);
+              return jsonEncode(result['data']);
+            }
 
-          return jsonEncode({'error': 'Unknown tool'});
-        },
-        onTextDelta: (delta) {
-          if (_streamingMessageId == null) {
-            _streamingMessageId = db!.messageDao.generateMessageId();
-            _streamingCreatedAt = DateTime.now();
-          }
-          _streamingContent.write(delta);
-          final content = _streamingContent.toString();
-          final id = _streamingMessageId!;
-          final createdAt = _streamingCreatedAt!;
+            return jsonEncode({'error': 'Unknown tool'});
+          },
+          onTextDelta: (delta) {
+            if (_streamingMessageId == null) {
+              _streamingMessageId = db!.messageDao.generateMessageId();
+              _streamingCreatedAt = DateTime.now();
+            }
+            _streamingContent.write(delta);
+            final content = _streamingContent.toString();
+            final id = _streamingMessageId!;
+            final createdAt = _streamingCreatedAt!;
 
-          // Capture values for the closure
-          final companion = MessageEntityCompanion(
-            id: Value(id),
-            sessionId: Value(sessionId),
-            userId: const Value('ai'),
-            userName: Value(model),
-            content: Value(content),
-            timestamp: Value(createdAt),
-            createdAt: Value(createdAt),
-            messageKind: const Value(MessageKind.text),
-            isStreaming: const Value(true),
-          );
-
-          _lastDbWrite = _lastDbWrite.then((_) async {
-            await db!.messageDao.insertMessage(companion);
-          }).catchError((e) {
-            _log.warning(
-              'Error writing streaming message: $e',
+            // Capture values for the closure
+            final companion = MessageEntityCompanion(
+              id: Value(id),
+              sessionId: Value(currentSessionId),
+              userId: const Value('ai'),
+              userName: Value(model),
+              content: Value(content),
+              timestamp: Value(createdAt),
+              createdAt: Value(createdAt),
+              messageKind: const Value(MessageKind.text),
+              isStreaming: const Value(true),
             );
-            // Return void to satisfy the Future<void> chain
-          });
-        },
-        onAssistantMessage: (message, {String? messageId}) async {
-          // Wait for any pending streaming writes to finish
-          await _lastDbWrite;
 
-          String? id =
-              _streamingMessageId ?? db!.messageDao.generateMessageId();
+            _lastDbWrite = _lastDbWrite.then((_) async {
+              await db!.messageDao.insertMessage(companion);
+            }).catchError((e) {
+              _log.warning(
+                'Error writing streaming message: $e',
+              );
+              // Return void to satisfy the Future<void> chain
+            });
+          },
+          onAssistantMessage: (message, {String? messageId}) async {
+            // Wait for any pending streaming writes to finish
+            await _lastDbWrite;
 
-          // Reset streaming state
-          _streamingMessageId = null;
-          _streamingContent.clear();
-          _streamingCreatedAt = null;
-          _lastDbWrite = Future.value(); // Reset chain
+            String? id =
+                _streamingMessageId ?? db!.messageDao.generateMessageId();
 
-          // db and sessionId are guaranteed to be non-null here due to checks at start of method
-          // Determine if this is a tool use message or a text message
-          final messageType = message.messageType;
-          if (messageType is ToolUseMessage) {
-            await db!.messageDao.insertMessage(
-              message.toMessageCompanion(
-                sessionId: sessionId,
+            // Reset streaming state
+            _streamingMessageId = null;
+            _streamingContent.clear();
+            _streamingCreatedAt = null;
+            _lastDbWrite = Future.value(); // Reset chain
+
+            // db and sessionId are guaranteed to be non-null here due to checks at start of method
+            // Determine if this is a tool use message or a text message
+            final messageType = message.messageType;
+            if (messageType is ToolUseMessage) {
+              await db!.messageDao.insertMessage(
+                message.toMessageCompanion(
+                  sessionId: currentSessionId,
+                  id: id,
+                  userName: model,
+                ),
+              );
+            } else {
+              await db!.messageDao.insertMessageWithId(
                 id: id,
+                sessionId: currentSessionId,
+                userId: 'ai',
                 userName: model,
-              ),
+                content: message.content,
+                isStreaming: false,
+              );
+            }
+            await db!.sessionDao.touchSession(currentSessionId);
+          },
+          onToolResultMessage: (message, {String? messageId}) async {
+            String? id;
+            // db and sessionId are guaranteed to be non-null here due to checks at start of method
+            id = db!.messageDao.generateMessageId();
+            await db!.messageDao.insertMessage(
+              message.toMessageCompanion(sessionId: currentSessionId, id: id),
             );
-          } else {
+            await db!.sessionDao.touchSession(currentSessionId);
+          },
+        );
+
+        channel.sendCustomMessage({'type': 'complete'});
+      } catch (e, st) {
+        _log.severe('Error running agent loop: $e, $st');
+
+        final messageId = db!.messageDao.generateMessageId();
+
+        // Try to insert error message if we have session ID and DB
+        if (sessionId != null && db != null) {
+          try {
+            final config = data['config'] as Map<String, dynamic>?;
+            final model = config?['model'] as String? ?? 'Ops Agent';
+
             await db!.messageDao.insertMessageWithId(
-              id: id,
+              id: messageId,
               sessionId: sessionId,
               userId: 'ai',
               userName: model,
-              content: message.content,
-              isStreaming: false,
+              content: 'Sorry, I encountered an error: $e',
+              isVisibleToLlm: false,
             );
+            await db!.sessionDao.touchSession(sessionId);
+          } catch (innerE) {
+            _log.severe('Failed to insert error message: $innerE');
           }
-          await db!.sessionDao.touchSession(sessionId);
-        },
-        onToolResultMessage: (message, {String? messageId}) async {
-          String? id;
-          // db and sessionId are guaranteed to be non-null here due to checks at start of method
-          id = db!.messageDao.generateMessageId();
-          await db!.messageDao.insertMessage(
-            message.toMessageCompanion(sessionId: sessionId, id: id),
-          );
-          await db!.sessionDao.touchSession(sessionId);
-        },
-      );
-
-      channel.sendCustomMessage({'type': 'complete'});
-    } catch (e, st) {
-      _log.severe('Error running agent loop: $e, $st');
-
-      final messageId = db!.messageDao.generateMessageId();
-
-      // Try to insert error message if we have session ID and DB
-      final sessionId = data['sessionId'] as String?;
-      if (sessionId != null && db != null) {
-        try {
-          final config = data['config'] as Map<String, dynamic>?;
-          final model = config?['model'] as String? ?? 'Ops Agent';
-
-          await db!.messageDao.insertMessageWithId(
-            id: messageId,
-            sessionId: sessionId,
-            userId: 'ai',
-            userName: model,
-            content: 'Sorry, I encountered an error: $e',
-            isVisibleToLlm: false,
-          );
-          await db!.sessionDao.touchSession(sessionId);
-        } catch (innerE) {
-          _log.severe('Failed to insert error message: $innerE');
         }
-      }
 
-      channel.sendCustomMessage(
-          {'type': 'error', 'message_id': messageId, 'message': e.toString()});
+        channel.sendCustomMessage({
+          'type': 'error',
+          'message_id': messageId,
+          'message': e.toString(),
+        });
+      }
+    } finally {
+      if (sessionId != null) {
+        _activeSessions.remove(sessionId);
+      }
     }
   }
 
