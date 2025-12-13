@@ -238,9 +238,11 @@ class _AgentSession {
           if (toolCall.function.name == kExecuteShellCommand) {
             final command = params['command'] as String;
             final result = await _executeLocalCommand(command);
+            await db!.sessionDao.touchSession(sessionId);
             return jsonEncode(result);
           } else if (toolCall.function.name == kFetch) {
             final result = await FetchTool.execute(params);
+            await db!.sessionDao.touchSession(sessionId);
             return jsonEncode(result['data']);
           }
 
@@ -312,6 +314,7 @@ class _AgentSession {
               isStreaming: false,
             );
           }
+          await db!.sessionDao.touchSession(sessionId);
         },
         onToolResultMessage: (message, {String? messageId}) async {
           String? id;
@@ -320,6 +323,7 @@ class _AgentSession {
           await db!.messageDao.insertMessage(
             message.toMessageCompanion(sessionId: sessionId, id: id),
           );
+          await db!.sessionDao.touchSession(sessionId);
         },
       );
 
@@ -344,6 +348,7 @@ class _AgentSession {
             content: 'Sorry, I encountered an error: $e',
             isVisibleToLlm: false,
           );
+          await db!.sessionDao.touchSession(sessionId);
         } catch (innerE) {
           _log.severe('Failed to insert error message: $innerE');
         }
