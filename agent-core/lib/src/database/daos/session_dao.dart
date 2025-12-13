@@ -146,13 +146,6 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
     );
   }
 
-  /// Toggle session star status
-  Future<int> toggleSessionStar(String id, bool isStarred) {
-    return (update(sessions)..where((s) => s.id.equals(id))).write(
-      SessionEntityCompanion(isStarred: Value(isStarred)),
-    );
-  }
-
   /// Rename a session
   Future<int> renameSession(String id, String newName) {
     return (update(sessions)..where((s) => s.id.equals(id))).write(
@@ -283,10 +276,6 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
   }
 
   // --- ListableEntityDao interface implementation ---
-
-  @override
-  Future<void> toggleStarItem(String id, bool isStarred) =>
-      toggleSessionStar(id, isStarred);
 
   @override
   Future<void> archiveItem(String id) => archiveSession(id);

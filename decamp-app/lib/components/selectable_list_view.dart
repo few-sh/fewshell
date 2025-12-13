@@ -30,13 +30,10 @@ class SelectableListView<T> extends ConsumerStatefulWidget {
   /// Extracts the display name from an item.
   final String Function(T) getName;
 
-  /// Extracts the starred status from an item.
-  final bool Function(T) getIsStarred;
-
-  /// Extracts createdAt from an item.
+  /// Extracts the creation date for display.
   final DateTime Function(T) getCreatedAt;
 
-  /// Extracts updatedAt from an item.
+  /// Extracts the update date for display.
   final DateTime Function(T) getUpdatedAt;
 
   /// Called when an item is selected (tapped).
@@ -68,7 +65,6 @@ class SelectableListView<T> extends ConsumerStatefulWidget {
     required this.archivedData,
     required this.getId,
     required this.getName,
-    required this.getIsStarred,
     required this.getCreatedAt,
     required this.getUpdatedAt,
     this.onSelect,
@@ -155,17 +151,7 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
             );
           }
 
-          // Sort starred items to top in active view
           final sortedItems = List<T>.from(items);
-          if (_viewMode == SelectableViewMode.active) {
-            sortedItems.sort((a, b) {
-              final aStarred = widget.getIsStarred(a);
-              final bStarred = widget.getIsStarred(b);
-              if (aStarred && !bStarred) return -1;
-              if (!aStarred && bStarred) return 1;
-              return 0;
-            });
-          }
 
           return ListView.builder(
             itemCount: sortedItems.length,
@@ -193,7 +179,6 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
     final theme = Theme.of(context);
     final id = widget.getId(item);
     final name = widget.getName(item);
-    final isStarred = widget.getIsStarred(item);
     final isSelected = widget.isSelected?.call(item) ?? false;
 
     // Date display
@@ -263,26 +248,10 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
               ],
             ),
           ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Star button (active mode only)
-              if (_viewMode == SelectableViewMode.active)
-                IconButton(
-                  icon: Icon(
-                    isStarred ? Icons.star : Icons.star_border,
-                    color: isStarred ? Colors.amber : null,
-                  ),
-                  tooltip: isStarred ? 'Unstar' : 'Star',
-                  onPressed: () => widget.dao.toggleStarItem(id, !isStarred),
-                ),
-              // Menu
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert),
-                onSelected: (value) => _handleMenuAction(value, item),
-                itemBuilder: (context) => _buildMenuItems(),
-              ),
-            ],
+          trailing: PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) => _handleMenuAction(value, item),
+            itemBuilder: (context) => _buildMenuItems(),
           ),
           onTap: () {
             if (_viewMode == SelectableViewMode.archived) return;

@@ -23,7 +23,7 @@ class ProjectsPage extends ConsumerWidget {
       // Getters for entity properties
       getId: (p) => p.id,
       getName: (p) => p.name,
-      getIsStarred: (p) => p.isStarred,
+
       getCreatedAt: (p) => p.createdAt,
       getUpdatedAt: (p) => p.lastSessionDate,
 

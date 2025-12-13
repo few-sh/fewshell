@@ -55,7 +55,6 @@ void main() {
               updatedAt: DateTime.now(),
               lastSessionDate: DateTime.now(),
               isArchived: false,
-              isStarred: false,
             );
           }),
         ],

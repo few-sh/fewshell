@@ -16,9 +16,6 @@
 ///
 /// Method names use "Item" suffix to avoid conflicts with Drift's built-in methods.
 abstract class ListableEntityDao<T> {
-  /// Toggles the star/favorite status of an entity.
-  Future<void> toggleStarItem(String id, bool isStarred);
-
   /// Archives an entity, hiding it from the active list.
   Future<void> archiveItem(String id);
 

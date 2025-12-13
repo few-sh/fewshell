@@ -48,7 +48,7 @@ class SessionsHistoryPage extends ConsumerWidget {
       // Getters for entity properties
       getId: (s) => s.id,
       getName: (s) => s.description,
-      getIsStarred: (s) => s.isStarred,
+
       getCreatedAt: (s) => s.createdAt,
       getUpdatedAt: (s) => s.updatedAt,
 

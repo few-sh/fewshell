@@ -72,7 +72,7 @@ class GlobalDatabase extends _$GlobalDatabase {
   }
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -118,9 +118,9 @@ class GlobalDatabase extends _$GlobalDatabase {
           await executor.runCustom(
               'ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1));');
         }
-        if (!projectColumns.any((row) => row['name'] == 'is_starred')) {
+        if (!projectColumns.any((row) => row['name'] == 'is_archived')) {
           await executor.runCustom(
-              'ALTER TABLE projects ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0 CHECK (is_starred IN (0, 1));');
+              'ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1));');
         }
 
         // Setup CRDT listener now that the DB is open and CRDT should be ready
@@ -173,10 +173,10 @@ class GlobalDatabase extends _$GlobalDatabase {
           }
         }
 
-        // Migration from version 7 to 8: Add isArchived and isStarred to projects
+        // Migration from version 7 to 8: Add isArchived to projects
         if (from < 8) {
           await m.addColumn(projects, projects.isArchived);
-          await m.addColumn(projects, projects.isStarred);
+          // Removed isStarred column
         }
       },
     );

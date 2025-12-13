@@ -115,13 +115,6 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
     );
   }
 
-  /// Toggle star status
-  Future<int> toggleProjectStar(String id, bool isStarred) {
-    return (update(projects)..where((p) => p.id.equals(id))).write(
-      ProjectEntityCompanion(isStarred: Value(isStarred)),
-    );
-  }
-
   /// Create a new project with all parameters
   Future<String> createProjectWithId({
     required String name,
@@ -144,10 +137,6 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
   }
 
   // --- ListableEntityDao interface implementation ---
-
-  @override
-  Future<void> toggleStarItem(String id, bool isStarred) =>
-      toggleProjectStar(id, isStarred);
 
   @override
   Future<void> archiveItem(String id) => archiveProject(id);
