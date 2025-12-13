@@ -26,6 +26,7 @@ class ChatController extends StateNotifier<ChatState> {
   final ShellService _shellService;
   final SecretRedactor _secretRedactor;
   final SshSettings? _sshSettings;
+  final ProjectEntity? _project;
   final String? sessionId;
 
   final _activeMessageController = StreamController<MessageEntity>.broadcast();
@@ -52,6 +53,7 @@ class ChatController extends StateNotifier<ChatState> {
     required ShellService shellService,
     required SecretRedactor secretRedactor,
     SshSettings? sshSettings,
+    ProjectEntity? project,
     this.sessionId,
   })  : _messageDao = messageDao,
         _sessionDao = sessionDao,
@@ -59,6 +61,7 @@ class ChatController extends StateNotifier<ChatState> {
         _shellService = shellService,
         _secretRedactor = secretRedactor,
         _sshSettings = sshSettings,
+        _project = project,
         super(const ChatState());
 
   @override
@@ -347,7 +350,21 @@ class ChatController extends StateNotifier<ChatState> {
 
       final AgentLoopResult result;
 
-      if (syncChannel != null) {
+      if (_project?.serverUrl != null) {
+        if (syncChannel == null) {
+          if (mounted) {
+            state = state.copyWith(
+              isLoading: false,
+
+              // TODO: Use a centralized error notification and logging system
+              error: 'Cannot start remote chat: not connected to server',
+            );
+          }
+          throw Exception(
+            'Cannot start remote chat: not connected to server',
+          );
+        }
+
         // Ensure we have a triggerMessage
         triggerMessage ??= await _messageDao.getLastMessage(sessionId);
 

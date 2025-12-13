@@ -33,6 +33,7 @@ final chatControllerProvider =
         shellService: ref.watch(shellServiceProvider(projectId)),
         secretRedactor: secretRedactor,
         sshSettings: sshSettings,
+        project: currentProject,
         sessionId: sessionId,
       );
     });
