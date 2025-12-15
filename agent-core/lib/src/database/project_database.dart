@@ -177,6 +177,11 @@ class ProjectDatabase extends _$ProjectDatabase {
             await m.addColumn(projectSnippets, projectSnippets.isVisibleToLlm);
           }
         }
+
+        // Migration from version 11 to 12: Add session_mutexes table
+        if (from < 11) {
+          await m.createTable(sessionMutexes);
+        }
       },
     );
   }
