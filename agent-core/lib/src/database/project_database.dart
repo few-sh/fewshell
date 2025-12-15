@@ -6,16 +6,18 @@ import 'package:llm_dart/llm_dart.dart';
 import 'tables/sessions_table.dart';
 import 'tables/messages_table.dart';
 import 'tables/project_snippets_table.dart';
+import 'tables/session_mutex_table.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/project_snippet_dao.dart';
+import 'daos/session_mutex_dao.dart';
 import 'converters/tool_call_converter.dart';
 
 part 'project_database.g.dart';
 
 /// Project-specific database class.
 /// Stores Sessions, Messages, and Project Snippets.
-@DriftDatabase(tables: [Sessions, Messages, ProjectSnippets])
+@DriftDatabase(tables: [Sessions, Messages, ProjectSnippets, SessionMutexes])
 class ProjectDatabase extends _$ProjectDatabase {
   final Crdt? _crdt;
   final Crdt Function()? _crdtProvider;
@@ -64,6 +66,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   late final SessionDao sessionDao = SessionDao(this);
   late final MessageDao messageDao = MessageDao(this);
   late final ProjectSnippetDao projectSnippetDao = ProjectSnippetDao(this);
+  late final SessionMutexDao sessionMutexDao = SessionMutexDao(this);
 
   /// Exposes the underlying CRDT store for sync.
   Crdt get crdt {
@@ -73,7 +76,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
