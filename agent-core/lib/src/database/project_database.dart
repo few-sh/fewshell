@@ -181,8 +181,8 @@ class ProjectDatabase extends _$ProjectDatabase {
           }
         }
 
-        // Migration from version 11 to 12: Add session_mutexes table
-        if (from < 11) {
+        // Migration to version 12: Add session_mutexes table
+        if (from < 12) {
           await m.createTable(sessionMutexes);
         }
       },
