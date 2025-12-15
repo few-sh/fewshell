@@ -1,4 +1,7 @@
+import 'dart:io';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/providers/settings_provider.dart';
 import 'package:decamp/providers/llm_settings_provider.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/secret_provider.dart';
@@ -16,11 +19,16 @@ void main() {
   group('LLM Settings Integration Test', () {
     late KeychainService keychainService;
     late ProviderContainer container;
+    late GlobalDatabase globalDb;
+    late ProjectDatabase projectDb;
+    late Directory tempDir;
     const testProjectId = 'test-project-123';
     const testModelId = 'gpt-test-model';
     const testApiKey = 'sk-test-key-12345';
 
     setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('decamp_test_');
+
       // 1. Mock Secure Storage
       FlutterSecureStorage.setMockInitialValues({});
       const storage = FlutterSecureStorage();
@@ -32,6 +40,25 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
 
+      // Initialize in-memory databases with CRDT support
+      final globalExecutorResult = await CrdtExecutorFactory.createExecutor(
+        ':memory:',
+        'test-node',
+      );
+      globalDb = GlobalDatabase(
+        globalExecutorResult.executor,
+        crdt: globalExecutorResult.crdt,
+      );
+
+      final projectExecutorResult = await CrdtExecutorFactory.createExecutor(
+        ':memory:',
+        'test-node',
+      );
+      projectDb = ProjectDatabase(
+        projectExecutorResult.executor,
+        crdt: projectExecutorResult.crdt,
+      );
+
       // 3. Setup Provider Container with overrides
       container = ProviderContainer(
         overrides: [
@@ -40,6 +67,12 @@ void main() {
 
           // Provide mocked SharedPreferences
           sharedPreferencesProvider.overrideWithValue(prefs),
+
+          globalDatabaseProvider.overrideWithValue(globalDb),
+          projectDatabaseProvider.overrideWithValue(projectDb),
+          tomlSettingsServiceProvider.overrideWith((ref) {
+            return TomlSettingsService(() async => tempDir);
+          }),
 
           // Set the current project to our test project initially
           currentProjectIdProvider.overrideWith((ref) {
@@ -65,16 +98,44 @@ void main() {
           }),
         ],
       );
+
+      // Wait for settings to be loaded for the test project
+      await Future.doWhile(() async {
+        final settings = container.read(projectSettingsProvider(testProjectId));
+        if (settings != null) return false;
+        await Future.delayed(const Duration(milliseconds: 50));
+        return true;
+      });
+
+      // Wait for global settings to be loaded
+      await Future.doWhile(() async {
+        final settings = container.read(globalSettingsProvider);
+        if (settings.agentInstruction != null) return false;
+        await Future.delayed(const Duration(milliseconds: 50));
+        return true;
+      });
     });
 
-    tearDown(() {
+    tearDown(() async {
+      await globalDb.close();
+      await projectDb.close();
       container.dispose();
+      await tempDir.delete(recursive: true);
     });
 
     // Helper function to verify settings flow
     Future<void> verifySettingsFlow({required bool isGlobal}) async {
       // Setup based on scope
-      final BaseLlmSettingsNotifier notifier;
+      BaseLlmSettingsNotifier getNotifier() {
+        if (isGlobal) {
+          return container.read(globalLlmSettingsProvider.notifier);
+        } else {
+          return container.read(
+            projectLlmSettingsProvider(testProjectId).notifier,
+          );
+        }
+      }
+
       List<LlmApiSettings> Function() getSettings;
       Future<String?> Function(String modelId) getStoredKey;
 
@@ -82,7 +143,6 @@ void main() {
         // Clear current project so LlmService falls back to global
         await container.read(currentProjectIdProvider.notifier).select(null);
 
-        notifier = container.read(globalLlmSettingsProvider.notifier);
         getSettings = () => container.read(globalLlmSettingsProvider);
         getStoredKey = (modelId) => keychainService.getGlobalSecret(
           LlmApiKeychainKeys.buildGlobalKey(modelId),
@@ -93,9 +153,6 @@ void main() {
             .read(currentProjectIdProvider.notifier)
             .select(testProjectId);
 
-        notifier = container.read(
-          projectLlmSettingsProvider(testProjectId).notifier,
-        );
         getSettings = () =>
             container.read(projectLlmSettingsProvider(testProjectId));
         getStoredKey = (modelId) => keychainService.getProjectSecret(
@@ -105,7 +162,7 @@ void main() {
       }
 
       // 1. Add Model
-      await notifier.addLlmSettings(
+      await getNotifier().addLlmSettings(
         identifier: testModelId,
         apiType: LlmApiType.openai,
         baseUrl: 'https://api.openai.com/v1',
@@ -133,7 +190,7 @@ void main() {
 
       // 2. Rename Model (Migration Test)
       const newModelId = 'gpt-renamed';
-      await notifier.updateLlmSettings(
+      await getNotifier().updateLlmSettings(
         identifier: newModelId,
         originalIdentifier: testModelId,
         baseUrl: 'https://api.openai.com/v1',

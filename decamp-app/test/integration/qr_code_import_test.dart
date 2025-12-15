@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/providers/settings_provider.dart';
 import 'package:decamp/services/project_importer.dart';
 import 'package:decamp/providers/llm_settings_provider.dart';
 import 'package:decamp/providers/project_provider.dart';
@@ -20,9 +23,14 @@ void main() {
   group('QR Code Import Integration Tests', () {
     late KeychainService keychainService;
     late ProviderContainer container;
+    late GlobalDatabase globalDb;
+    late ProjectDatabase projectDb;
+    late Directory tempDir;
     const testProjectId = 'test-project-qr-123';
 
     setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('decamp_test_');
+
       // 1. Mock Secure Storage
       FlutterSecureStorage.setMockInitialValues({});
       const storage = FlutterSecureStorage();
@@ -34,11 +42,35 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
 
+      // Initialize in-memory databases with CRDT support
+      final globalExecutorResult = await CrdtExecutorFactory.createExecutor(
+        ':memory:',
+        'test-node',
+      );
+      globalDb = GlobalDatabase(
+        globalExecutorResult.executor,
+        crdt: globalExecutorResult.crdt,
+      );
+
+      final projectExecutorResult = await CrdtExecutorFactory.createExecutor(
+        ':memory:',
+        'test-node',
+      );
+      projectDb = ProjectDatabase(
+        projectExecutorResult.executor,
+        crdt: projectExecutorResult.crdt,
+      );
+
       // 3. Setup Provider Container with overrides
       container = ProviderContainer(
         overrides: [
           keychainServiceProvider.overrideWithValue(keychainService),
           sharedPreferencesProvider.overrideWithValue(prefs),
+          globalDatabaseProvider.overrideWithValue(globalDb),
+          projectDatabaseProvider.overrideWithValue(projectDb),
+          tomlSettingsServiceProvider.overrideWith((ref) {
+            return TomlSettingsService(() async => tempDir);
+          }),
           currentProjectIdProvider.overrideWith((ref) {
             final prefs = ref.watch(sharedPreferencesProvider);
             final notifier = SelectedProjectNotifier(prefs, ref);
@@ -59,10 +91,21 @@ void main() {
           }),
         ],
       );
+
+      // Wait for settings to be loaded for the test project
+      await Future.doWhile(() async {
+        final settings = container.read(projectSettingsProvider(testProjectId));
+        if (settings != null) return false;
+        await Future.delayed(const Duration(milliseconds: 50));
+        return true;
+      });
     });
 
-    tearDown(() {
+    tearDown(() async {
+      await globalDb.close();
+      await projectDb.close();
       container.dispose();
+      await tempDir.delete(recursive: true);
     });
 
     test('Import QR code with only LLM settings to project', () async {
