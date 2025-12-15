@@ -24,7 +24,9 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
       final timeoutThreshold = now.subtract(lockTimeout);
 
       final existing = await (select(sessionMutexes)
-            ..where((t) => t.id.equals(id)))
+            ..where((t) =>
+                t.id.equals(id) &
+                const CustomExpression<bool>('is_deleted').equals(false)))
           .getSingleOrNull();
 
       if (existing != null) {
@@ -38,9 +40,11 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
           return false;
         }
       } else {
-        // No lock, take it
-        await into(sessionMutexes)
-            .insert(SessionMutexEntity(id: id, timestamp: now));
+        // No lock (or deleted), take it
+        await into(sessionMutexes).insert(
+          SessionMutexEntity(id: id, timestamp: now),
+          mode: InsertMode.insertOrReplace,
+        );
         return true;
       }
     });
@@ -56,9 +60,27 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
   Future<bool> refreshLock(String id) async {
     final now = DateTime.now();
     final rowsAffected = await (update(sessionMutexes)
-          ..where((t) => t.id.equals(id)))
+          ..where((t) =>
+              t.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
         .write(SessionMutexEntityCompanion(timestamp: Value(now)));
 
     return rowsAffected > 0;
+  }
+
+  /// Watch the lock status for a specific session [id].
+  /// Returns true if the session is locked and the lock is valid (not timed out).
+  Stream<bool> watchLock(String id) {
+    return (select(sessionMutexes)
+          ..where((t) =>
+              t.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
+        .watchSingleOrNull()
+        .map((entity) {
+      if (entity == null) return false;
+      final now = DateTime.now();
+      final threshold = now.subtract(lockTimeout);
+      return entity.timestamp.isAfter(threshold);
+    });
   }
 }
