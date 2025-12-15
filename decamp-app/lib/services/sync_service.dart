@@ -196,8 +196,10 @@ class SyncService {
     _closeProjectConnection();
 
     try {
+      _log.info('Verifying project DB connection for $projectId...');
       // Ensure DB is open
       await db.customSelect('SELECT 1;').get();
+      _log.info('Project DB connection verified for $projectId');
 
       if (token.isCancelled) return;
 

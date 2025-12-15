@@ -18,12 +18,18 @@ class CrdtExecutorFactory {
     String path,
     String nodeId,
   ) async {
-    final crdt = await SqliteCrdt.open(path);
-    _log.info('Crdt DB opened at $path with nodeId: $nodeId');
-    // Note: SqliteCrdt manages nodeId internally or generates it.
-    // If we need to set it explicitly, we might need to check SqliteCrdt API.
+    _log.info('Opening SqliteCrdt at $path with nodeId: $nodeId');
+    try {
+      final crdt = await SqliteCrdt.open(path);
+      _log.info('SqliteCrdt opened successfully at $path');
+      // Note: SqliteCrdt manages nodeId internally or generates it.
+      // If we need to set it explicitly, we might need to check SqliteCrdt API.
 
-    final executor = CrdtQueryExecutor(crdt);
-    return CrdtExecutorResult(executor, crdt);
+      final executor = CrdtQueryExecutor(crdt);
+      return CrdtExecutorResult(executor, crdt);
+    } catch (e, s) {
+      _log.severe('Failed to open SqliteCrdt at $path', e, s);
+      rethrow;
+    }
   }
 }

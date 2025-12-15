@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 import 'package:llm_dart/llm_dart.dart';
+import 'package:logging/logging.dart';
 
 import 'tables/sessions_table.dart';
 import 'tables/messages_table.dart';
@@ -19,6 +20,7 @@ part 'project_database.g.dart';
 /// Stores Sessions, Messages, and Project Snippets.
 @DriftDatabase(tables: [Sessions, Messages, ProjectSnippets, SessionMutexes])
 class ProjectDatabase extends _$ProjectDatabase {
+  final _log = Logger('ProjectDatabase');
   final Crdt? _crdt;
   final Crdt Function()? _crdtProvider;
   StreamSubscription? _crdtSubscription;
@@ -44,6 +46,7 @@ class ProjectDatabase extends _$ProjectDatabase {
 
   @override
   Future<void> close() {
+    _log.info('Closing ProjectDatabase');
     _crdtSubscription?.cancel();
     return super.close();
   }
