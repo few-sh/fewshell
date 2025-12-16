@@ -23,40 +23,54 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   MultiplexedWebSocketChannel(this._inner, {this.awaitSync}) {
     _inner.stream.listen((data) {
-      // Chain processing to ensure order
-      _pending = _pending.then((_) async {
-        if (data is String && data.startsWith(_customPrefix)) {
-          // If it's a custom message, wait for any pending sync operations
-          if (awaitSync != null) {
-            try {
-              await awaitSync!();
-            } catch (e) {
-              _log.warning('Error waiting for sync: $e');
-            }
-          }
-
-          try {
-            final payload = data.substring(_customPrefix.length);
-            final decoded = jsonDecode(payload);
-            if (decoded is Map<String, dynamic>) {
-              // Wait for registered handlers to complete
-              if (_customHandlers.isNotEmpty) {
-                await Future.wait(_customHandlers.map((h) => h(decoded)));
+      // Chain processing to ensure order.
+      // We use catchError to ensure the chain continues even if a previous task failed.
+      _pending = _pending.catchError((_) {}).then((_) async {
+        try {
+          if (data is String && data.startsWith(_customPrefix)) {
+            // If it's a custom message, wait for any pending sync operations
+            if (awaitSync != null) {
+              try {
+                await awaitSync!();
+              } catch (e) {
+                _log.warning('Error waiting for sync: $e');
               }
-              _customMessageController.add(decoded);
-            } else {
-              _log.warning('Custom message payload is not a Map: $decoded');
             }
-          } catch (e, stackTrace) {
-            // Ignore malformed custom messages
-            _log.warning(
-              'Error parsing custom message: $e',
-              e,
-              stackTrace,
-            );
+
+            try {
+              final payload = data.substring(_customPrefix.length);
+              final decoded = jsonDecode(payload);
+              if (decoded is Map<String, dynamic>) {
+                // Wait for registered handlers to complete
+                if (_customHandlers.isNotEmpty) {
+                  await Future.wait(_customHandlers.map((h) async {
+                    try {
+                      await h(decoded);
+                    } catch (e, st) {
+                      _log.warning('Error in custom message handler', e, st);
+                    }
+                  }));
+                }
+                _customMessageController.add(decoded);
+              } else {
+                _log.warning('Custom message payload is not a Map: $decoded');
+              }
+            } catch (e, stackTrace) {
+              // Ignore malformed custom messages
+              _log.warning(
+                'Error parsing custom message: $e',
+                e,
+                stackTrace,
+              );
+            }
+          } else {
+            if (!_inboundController.isClosed) {
+              _inboundController.add(data);
+            }
           }
-        } else {
-          _inboundController.add(data);
+        } catch (e, stackTrace) {
+          _log.severe(
+              'Error processing message in multiplexed channel', e, stackTrace);
         }
       });
     }, onError: (error, stackTrace) {
