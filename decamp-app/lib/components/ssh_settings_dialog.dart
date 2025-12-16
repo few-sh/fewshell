@@ -64,107 +64,8 @@ class SshSettingsDialog {
         initialPassphrase: passphrase,
         initialSudoPassword: sudoPassword,
         initialEnabled: existingSettings?.enabled,
-        onSave:
-            (
-              host,
-              port,
-              username,
-              authMethod,
-              password,
-              privateKey,
-              passphrase,
-              sudoPassword, {
-              enabled,
-            }) async {
-              await _saveSshSettings(
-                context,
-                ref,
-                projectId: projectId,
-                isEditMode: isEditMode,
-                host: host,
-                port: port,
-                username: username,
-                authMethod: authMethod,
-                password: password,
-                privateKey: privateKey,
-                passphrase: passphrase,
-                sudoPassword: sudoPassword,
-                enabled: enabled,
-              );
-            },
       ),
     );
-  }
-
-  /// Save SSH settings (create or update)
-  static Future<void> _saveSshSettings(
-    BuildContext context,
-    WidgetRef ref, {
-    required String projectId,
-    required bool isEditMode,
-    required String host,
-    required int port,
-    required String username,
-    required SshAuthMethod authMethod,
-    String? password,
-    String? privateKey,
-    String? passphrase,
-    String? sudoPassword,
-    bool? enabled,
-  }) async {
-    try {
-      final notifier = ref.read(projectSshSettingsProvider(projectId).notifier);
-
-      if (isEditMode) {
-        await notifier.updateSshSettings(
-          host: host,
-          port: port,
-          username: username,
-          authMethod: authMethod,
-          password: password,
-          privateKey: privateKey,
-          passphrase: passphrase,
-          sudoPassword: sudoPassword,
-          enabled: enabled,
-        );
-      } else {
-        await notifier.createSshSettings(
-          host: host,
-          port: port,
-          username: username,
-          authMethod: authMethod,
-          password: password,
-          privateKey: privateKey,
-          passphrase: passphrase,
-          sudoPassword: sudoPassword,
-        );
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isEditMode
-                  ? 'Remote shell configuration updated'
-                  : 'Remote shell configured successfully',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isEditMode
-                  ? 'Error updating configuration: $e'
-                  : 'Error configuring remote shell: $e',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
   }
 }
 
@@ -181,18 +82,6 @@ class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   final String? initialPassphrase;
   final String? initialSudoPassword;
   final bool? initialEnabled;
-  final Function(
-    String host,
-    int port,
-    String username,
-    SshAuthMethod authMethod,
-    String? password,
-    String? privateKey,
-    String? passphrase,
-    String? sudoPassword, {
-    bool? enabled,
-  })
-  onSave;
 
   const _SshSettingsDialogForm({
     required this.title,
@@ -206,7 +95,6 @@ class _SshSettingsDialogForm extends ConsumerStatefulWidget {
     this.initialPassphrase,
     this.initialSudoPassword,
     this.initialEnabled,
-    required this.onSave,
   });
 
   @override
@@ -804,29 +692,84 @@ class _SshSettingsDialogFormState
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_formKey.currentState!.validate()) {
       final port = int.parse(_portController.text);
+      final host = _hostController.text;
+      final username = _usernameController.text;
+      final authMethod = _authMethod;
+      final password = authMethod == SshAuthMethod.password
+          ? _passwordController.text
+          : null;
+      final privateKey = authMethod == SshAuthMethod.privateKey
+          ? _privateKeyController.text
+          : null;
+      final passphrase =
+          authMethod == SshAuthMethod.privateKey &&
+              _passphraseController.text.isNotEmpty
+          ? _passphraseController.text
+          : null;
+      final sudoPassword = _sudoPasswordController.text.isNotEmpty
+          ? _sudoPasswordController.text
+          : null;
+      final enabled = _isEditMode ? _enabled : null;
 
-      widget.onSave(
-        _hostController.text,
-        port,
-        _usernameController.text,
-        _authMethod,
-        _authMethod == SshAuthMethod.password ? _passwordController.text : null,
-        _authMethod == SshAuthMethod.privateKey
-            ? _privateKeyController.text
-            : null,
-        _authMethod == SshAuthMethod.privateKey &&
-                _passphraseController.text.isNotEmpty
-            ? _passphraseController.text
-            : null,
-        _sudoPasswordController.text.isNotEmpty
-            ? _sudoPasswordController.text
-            : null,
-        enabled: _isEditMode ? _enabled : null,
-      );
-      Navigator.of(context).pop();
+      try {
+        final notifier = ref.read(
+          projectSshSettingsProvider(widget.projectId).notifier,
+        );
+
+        if (_isEditMode) {
+          await notifier.updateSshSettings(
+            host: host,
+            port: port,
+            username: username,
+            authMethod: authMethod,
+            password: password,
+            privateKey: privateKey,
+            passphrase: passphrase,
+            sudoPassword: sudoPassword,
+            enabled: enabled,
+          );
+        } else {
+          await notifier.createSshSettings(
+            host: host,
+            port: port,
+            username: username,
+            authMethod: authMethod,
+            password: password,
+            privateKey: privateKey,
+            passphrase: passphrase,
+            sudoPassword: sudoPassword,
+          );
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isEditMode
+                    ? 'Remote shell configuration updated'
+                    : 'Remote shell configured successfully',
+              ),
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isEditMode
+                    ? 'Error updating configuration: $e'
+                    : 'Error configuring remote shell: $e',
+              ),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
     }
   }
 }
