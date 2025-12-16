@@ -43,6 +43,10 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 
 [ ] Tool result should carry information about the original tool that we invoked
 
+[ ] "Test SSH" button needs an ability to cancel the operation, or shorten the timeout.
+
+[ ] "Test LLM" button needs an ability to cancel the operation, or shorten the timeout.
+
 [X] Eliminate all non-expandable ellipsis in any of the text controls
 
 [X] Show currently active project on the projects page
