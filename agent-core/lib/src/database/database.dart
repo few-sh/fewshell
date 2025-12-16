@@ -79,45 +79,16 @@ class GlobalDatabase extends _$GlobalDatabase {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
-
-        // Create indexes for better query performance
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_projects_last_session ON projects(last_session_date DESC);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name COLLATE NOCASE);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_snippets_project_id ON snippets(project_id);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE);',
-        );
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        // No-op: Schema upgrades are handled in beforeOpen
       },
       beforeOpen: (details) async {
         // Enable foreign keys
         // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
         // await executor.runCustom('PRAGMA foreign_keys = ON');
 
-        // Ensure is_visible_to_llm column exists
-        final columns = await executor
-            .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
-        final hasIsVisibleToLlm =
-            columns.any((row) => row['name'] == 'is_visible_to_llm');
-        if (!hasIsVisibleToLlm) {
-          await executor.runCustom(
-            'ALTER TABLE snippets ADD COLUMN is_visible_to_llm INTEGER NOT NULL DEFAULT 1 CHECK (is_visible_to_llm IN (0, 1));',
-          );
-        }
-
-        // Ensure is_archived column exists on projects (manual check for resiliency)
-        final projectColumns = await executor
-            .runSelect("SELECT * FROM pragma_table_info('projects');", []);
-
-        if (!projectColumns.any((row) => row['name'] == 'is_archived')) {
-          await executor.runCustom(
-              'ALTER TABLE projects ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0 CHECK (is_archived IN (0, 1));');
-        }
+        await _reconcileDatabase();
 
         // Setup CRDT listener now that the DB is open and CRDT should be ready
         _setupCrdtListener();
@@ -127,61 +98,88 @@ class GlobalDatabase extends _$GlobalDatabase {
           await _seedInitialData();
         }
       },
-      onUpgrade: (Migrator m, int from, int to) async {
-        // Migration from version 1 to 2: Add position column to snippets
-        if (from < 2) {
-          // Add position column with default value 0
-          await m.addColumn(snippets, snippets.position);
+    );
+  }
 
-          // Initialize positions based on current updatedAt order
-          // For global snippets
-          await executor.runCustom('''
-            UPDATE snippets 
-            SET position = (
-              SELECT COUNT(*) 
-              FROM snippets s2 
-              WHERE s2.project_id IS NULL 
-              AND s2.updated_at > snippets.updated_at
-            )
-            WHERE project_id IS NULL;
-          ''');
+  Future<void> _reconcileDatabase() async {
+    final m = Migrator(this);
+    final existingTables = await _getExistingTables();
 
-          // Create index for position ordering
-          await executor.runCustom(
-            'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC);',
-          );
-        }
+    for (final table in allTables) {
+      if (!existingTables.contains(table.actualTableName)) {
+        await m.createTable(table);
+      } else {
+        await _reconcileTable(m, table);
+      }
+    }
 
-        // Migration from version 5 to 6: Add serverUrl column to projects
-        if (from < 6) {
-          await m.addColumn(projects, projects.serverUrl);
-        }
+    await _createIndexes();
+  }
 
-        // Migration from version 6 to 7: Add isVisibleToLlm column to snippets
-        if (from < 7) {
-          final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
-          final hasIsVisibleToLlm =
-              columns.any((row) => row['name'] == 'is_visible_to_llm');
+  Future<void> _reconcileTable(Migrator m, TableInfo table) async {
+    final existingColumns = await _getExistingColumns(table.actualTableName);
 
-          if (!hasIsVisibleToLlm) {
-            await m.addColumn(snippets, snippets.isVisibleToLlm);
-          }
-        }
+    // Get rid of old is_starred column.
+    await _safeDropColumn(m, table, 'is_starred', existingColumns);
 
-        // Migration from version 7 to 8: Add isArchived to projects
-        if (from < 8) {
-          final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('projects');", []);
-          final hasIsArchived =
-              columns.any((row) => row['name'] == 'is_archived');
+    for (final column in table.$columns) {
+      await _safeAddColumn(m, table, column, existingColumns);
+    }
+  }
 
-          if (!hasIsArchived) {
-            await m.addColumn(projects, projects.isArchived);
-          }
-          // Removed isStarred column
-        }
-      },
+  Future<void> _safeAddColumn(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+    Set<String> existingColumns,
+  ) async {
+    if (!existingColumns.contains(column.name)) {
+      await m.addColumn(table, column);
+    }
+  }
+
+  Future<void> _safeDropColumn(
+    Migrator m,
+    TableInfo table,
+    String columnName,
+    Set<String> existingColumns,
+  ) async {
+    if (existingColumns.contains(columnName)) {
+      await m.dropColumn(table, columnName);
+    }
+  }
+
+  Future<Set<String>> _getExistingTables() async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type='table'",
+      readsFrom: {},
+    ).get();
+    return rows.map((row) => row.read<String>('name')).toSet();
+  }
+
+  Future<Set<String>> _getExistingColumns(String tableName) async {
+    final rows = await customSelect(
+      "SELECT name FROM pragma_table_info('$tableName')",
+      readsFrom: {},
+    ).get();
+    return rows.map((row) => row.read<String>('name')).toSet();
+  }
+
+  Future<void> _createIndexes() async {
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_projects_last_session ON projects(last_session_date DESC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_projects_name ON projects(name COLLATE NOCASE);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_snippets_project_id ON snippets(project_id);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_snippets_name ON snippets(name COLLATE NOCASE);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC);',
     );
   }
 

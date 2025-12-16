@@ -86,106 +86,108 @@ class ProjectDatabase extends _$ProjectDatabase {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
-
-        // Create indexes for better query performance
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_sessions_project_timestamp ON sessions(project_id, timestamp DESC);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON snippets(project_id);',
-        );
-        await executor.runCustom(
-          'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON snippets(name COLLATE NOCASE);',
-        );
+      },
+      onUpgrade: (Migrator m, int from, int to) async {
+        // No-op: Schema upgrades are handled in beforeOpen
       },
       beforeOpen: (details) async {
         // Enable foreign keys
         // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
         // await executor.runCustom('PRAGMA foreign_keys = ON');
 
+        await _reconcileDatabase();
+
         // Setup CRDT listener now that the DB is open and CRDT should be ready
         _setupCrdtListener();
       },
-      onUpgrade: (Migrator m, int from, int to) async {
-        // Migration from version 1 to 2: Add position column to project_snippets
-        if (from < 2) {
-          // Add position column with default value 0
-          await m.addColumn(projectSnippets, projectSnippets.position);
+    );
+  }
 
-          // Initialize positions based on current updatedAt order
-          await executor.runCustom('''
-            UPDATE snippets 
-            SET position = (
-              SELECT COUNT(*) 
-              FROM snippets s2 
-              WHERE s2.project_id = snippets.project_id 
-              AND s2.updated_at > snippets.updated_at
-            );
-          ''');
+  Future<void> _reconcileDatabase() async {
+    final m = Migrator(this);
+    final existingTables = await _getExistingTables();
 
-          // Create index for position ordering
-          await executor.runCustom(
-            'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC);',
-          );
-        }
+    for (final table in allTables) {
+      if (!existingTables.contains(table.actualTableName)) {
+        await m.createTable(table);
+      } else {
+        await _reconcileTable(m, table);
+      }
+    }
 
-        // Migration from version 6 to 7: Add isStreaming column to messages
-        if (from < 7) {
-          // Check if column already exists to handle potential partial migrations
-          // Use SELECT from pragma_table_info to avoid ParsingError from sqlparser
-          final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('messages');", []);
-          final hasIsStreaming =
-              columns.any((row) => row['name'] == 'is_streaming');
+    await _createIndexes();
+  }
 
-          if (!hasIsStreaming) {
-            await m.addColumn(messages, messages.isStreaming);
-          }
-        }
+  Future<void> _reconcileTable(Migrator m, TableInfo table) async {
+    final existingColumns = await _getExistingColumns(table.actualTableName);
 
-        // Migration from version 7 to 8: Add isStarred column to sessions (Removed)
-        if (from < 8) {
-          // isStarred column was removed in invalidation plan
-        }
+    // Get rid of old is_starred column.
+    await _safeDropColumn(m, table, 'is_starred', existingColumns);
 
-        // Migration from version 8 to 9: Add isVisibleToLlm column to messages
-        if (from < 9) {
-          final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('messages');", []);
-          final hasIsVisibleToLlm =
-              columns.any((row) => row['name'] == 'is_visible_to_llm');
+    for (final column in table.$columns) {
+      await _safeAddColumn(m, table, column, existingColumns);
+    }
+  }
 
-          if (!hasIsVisibleToLlm) {
-            await m.addColumn(messages, messages.isVisibleToLlm);
-          }
-        }
+  Future<void> _safeAddColumn(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+    Set<String> existingColumns,
+  ) async {
+    if (!existingColumns.contains(column.name)) {
+      await m.addColumn(table, column);
+    }
+  }
 
-        // Migration from version 9 to 10: Add isVisibleToLlm column to snippets
-        if (from < 10) {
-          final columns = await executor
-              .runSelect("SELECT * FROM pragma_table_info('snippets');", []);
-          final hasIsVisibleToLlm =
-              columns.any((row) => row['name'] == 'is_visible_to_llm');
+  Future<void> _safeDropColumn(
+    Migrator m,
+    TableInfo table,
+    String columnName,
+    Set<String> existingColumns,
+  ) async {
+    if (existingColumns.contains(columnName)) {
+      await m.dropColumn(table, columnName);
+    }
+  }
 
-          if (!hasIsVisibleToLlm) {
-            await m.addColumn(projectSnippets, projectSnippets.isVisibleToLlm);
-          }
-        }
+  Future<Set<String>> _getExistingTables() async {
+    final rows = await customSelect(
+      "SELECT name FROM sqlite_master WHERE type='table'",
+      readsFrom: {},
+    ).get();
+    return rows.map((row) => row.read<String>('name')).toSet();
+  }
 
-        // Migration to version 12: Add session_mutexes table
-        if (from < 12) {
-          await m.createTable(sessionMutexes);
-        }
-      },
+  Future<Set<String>> _getExistingColumns(String tableName) async {
+    final rows = await customSelect(
+      "SELECT name FROM pragma_table_info('$tableName')",
+      readsFrom: {},
+    ).get();
+    return rows.map((row) => row.read<String>('name')).toSet();
+  }
+
+  Future<void> _createIndexes() async {
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_sessions_project_id ON sessions(project_id);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_sessions_project_timestamp ON sessions(project_id, timestamp DESC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON snippets(project_id);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_project_snippets_name ON snippets(name COLLATE NOCASE);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC);',
     );
   }
 }
