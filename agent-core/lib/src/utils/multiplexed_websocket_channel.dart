@@ -19,6 +19,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   final Future<void> Function()? awaitSync;
   Future<void> _pending = Future.value();
+  final List<Future<void> Function(Map<String, dynamic>)> _customHandlers = [];
 
   MultiplexedWebSocketChannel(this._inner, {this.awaitSync}) {
     _inner.stream.listen((data) {
@@ -38,6 +39,10 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
             final payload = data.substring(_customPrefix.length);
             final decoded = jsonDecode(payload);
             if (decoded is Map<String, dynamic>) {
+              // Wait for registered handlers to complete
+              if (_customHandlers.isNotEmpty) {
+                await Future.wait(_customHandlers.map((h) => h(decoded)));
+              }
               _customMessageController.add(decoded);
             } else {
               _log.warning('Custom message payload is not a Map: $decoded');
@@ -75,6 +80,16 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   Stream<Map<String, dynamic>> get onCustomMessage =>
       _customMessageController.stream;
+
+  void registerCustomHandler(
+      Future<void> Function(Map<String, dynamic>) handler) {
+    _customHandlers.add(handler);
+  }
+
+  void unregisterCustomHandler(
+      Future<void> Function(Map<String, dynamic>) handler) {
+    _customHandlers.remove(handler);
+  }
 
   @override
   String? get protocol => _inner.protocol;
