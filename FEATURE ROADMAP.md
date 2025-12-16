@@ -60,7 +60,9 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 
 ## Bugs
 
-[ ] If a remote project disconnects (eg server down), it falls back to using local mode. | Expected: Should block the user from typing messages, should have a clearer connection indication.
+[X] If a remote project disconnects (eg server down), it falls back to using local mode. | Expected: Should block the user from typing messages, should have a clearer connection indication.
+
+[ ] Concatenation of user-level agent instruction with project-level agent instruction does not work. When we enable the checkbox, it does not remember the setting.
 
 [ ] Loading state tends to get stuck for a whole session after a message gets interrupted (eg server goes down)
 
