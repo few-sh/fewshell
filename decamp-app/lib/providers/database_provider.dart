@@ -6,8 +6,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
+import 'package:logging/logging.dart';
 import 'project_provider.dart';
 import 'theme_provider.dart';
+
+final _log = Logger('DatabaseProvider');
 
 final nodeIdProvider = Provider<String>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider);
@@ -30,6 +33,7 @@ final globalDatabaseProvider = Provider<GlobalDatabase>((ref) {
 
   // Dispose database when provider is disposed
   ref.onDispose(() {
+    _log.info('Closing global database');
     database.close();
   });
 
@@ -41,8 +45,10 @@ LazyDatabase _openGlobalConnection(
   void Function(Crdt) onCrdtCreated,
 ) {
   return LazyDatabase(() async {
+    _log.info('Opening global database connection...');
     final dbFolder = await getApplicationDocumentsDirectory();
     final path = p.join(dbFolder.path, 'decamp.db');
+    _log.info('Global DB path: $path');
 
     final result = await CrdtExecutorFactory.createExecutor(path, nodeId);
     onCrdtCreated(result.crdt);
@@ -66,6 +72,7 @@ final projectDatabaseProvider = Provider<ProjectDatabase?>((ref) {
 
   // Dispose database when provider is disposed (e.g. project changed)
   ref.onDispose(() {
+    _log.info('Closing project database for $projectId');
     database.close();
   });
 
@@ -78,12 +85,14 @@ LazyDatabase _openProjectConnection(
   void Function(Crdt) onCrdtCreated,
 ) {
   return LazyDatabase(() async {
+    _log.info('Opening project database connection for $projectId...');
     final dbFolder = await getApplicationDocumentsDirectory();
     final projectDir = Directory(p.join(dbFolder.path, 'projects', projectId));
     if (!await projectDir.exists()) {
       await projectDir.create(recursive: true);
     }
     final path = p.join(projectDir.path, 'project.db');
+    _log.info('Project DB path: $path');
 
     final result = await CrdtExecutorFactory.createExecutor(path, nodeId);
     onCrdtCreated(result.crdt);

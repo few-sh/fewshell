@@ -1669,6 +1669,201 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
   }
 }
 
+class $SessionMutexesTable extends SessionMutexes
+    with TableInfo<$SessionMutexesTable, SessionMutexEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SessionMutexesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _timestampMeta =
+      const VerificationMeta('timestamp');
+  @override
+  late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
+      'timestamp', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns => [id, timestamp];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'session_mutexes';
+  @override
+  VerificationContext validateIntegrity(Insertable<SessionMutexEntity> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('timestamp')) {
+      context.handle(_timestampMeta,
+          timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta));
+    } else if (isInserting) {
+      context.missing(_timestampMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SessionMutexEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SessionMutexEntity(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      timestamp: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}timestamp'])!,
+    );
+  }
+
+  @override
+  $SessionMutexesTable createAlias(String alias) {
+    return $SessionMutexesTable(attachedDatabase, alias);
+  }
+}
+
+class SessionMutexEntity extends DataClass
+    implements Insertable<SessionMutexEntity> {
+  /// Unique identifier for the session (or mutex key)
+  final String id;
+
+  /// Timestamp when the lock was acquired or refreshed
+  final DateTime timestamp;
+  const SessionMutexEntity({required this.id, required this.timestamp});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['timestamp'] = Variable<DateTime>(timestamp);
+    return map;
+  }
+
+  SessionMutexEntityCompanion toCompanion(bool nullToAbsent) {
+    return SessionMutexEntityCompanion(
+      id: Value(id),
+      timestamp: Value(timestamp),
+    );
+  }
+
+  factory SessionMutexEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SessionMutexEntity(
+      id: serializer.fromJson<String>(json['id']),
+      timestamp: serializer.fromJson<DateTime>(json['timestamp']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'timestamp': serializer.toJson<DateTime>(timestamp),
+    };
+  }
+
+  SessionMutexEntity copyWith({String? id, DateTime? timestamp}) =>
+      SessionMutexEntity(
+        id: id ?? this.id,
+        timestamp: timestamp ?? this.timestamp,
+      );
+  SessionMutexEntity copyWithCompanion(SessionMutexEntityCompanion data) {
+    return SessionMutexEntity(
+      id: data.id.present ? data.id.value : this.id,
+      timestamp: data.timestamp.present ? data.timestamp.value : this.timestamp,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SessionMutexEntity(')
+          ..write('id: $id, ')
+          ..write('timestamp: $timestamp')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, timestamp);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SessionMutexEntity &&
+          other.id == this.id &&
+          other.timestamp == this.timestamp);
+}
+
+class SessionMutexEntityCompanion extends UpdateCompanion<SessionMutexEntity> {
+  final Value<String> id;
+  final Value<DateTime> timestamp;
+  final Value<int> rowid;
+  const SessionMutexEntityCompanion({
+    this.id = const Value.absent(),
+    this.timestamp = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SessionMutexEntityCompanion.insert({
+    required String id,
+    required DateTime timestamp,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        timestamp = Value(timestamp);
+  static Insertable<SessionMutexEntity> custom({
+    Expression<String>? id,
+    Expression<DateTime>? timestamp,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (timestamp != null) 'timestamp': timestamp,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SessionMutexEntityCompanion copyWith(
+      {Value<String>? id, Value<DateTime>? timestamp, Value<int>? rowid}) {
+    return SessionMutexEntityCompanion(
+      id: id ?? this.id,
+      timestamp: timestamp ?? this.timestamp,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (timestamp.present) {
+      map['timestamp'] = Variable<DateTime>(timestamp.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SessionMutexEntityCompanion(')
+          ..write('id: $id, ')
+          ..write('timestamp: $timestamp, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$ProjectDatabase extends GeneratedDatabase {
   _$ProjectDatabase(QueryExecutor e) : super(e);
   $ProjectDatabaseManager get managers => $ProjectDatabaseManager(this);
@@ -1676,12 +1871,13 @@ abstract class _$ProjectDatabase extends GeneratedDatabase {
   late final $MessagesTable messages = $MessagesTable(this);
   late final $ProjectSnippetsTable projectSnippets =
       $ProjectSnippetsTable(this);
+  late final $SessionMutexesTable sessionMutexes = $SessionMutexesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [sessions, messages, projectSnippets];
+      [sessions, messages, projectSnippets, sessionMutexes];
 }
 
 typedef $$SessionsTableCreateCompanionBuilder = SessionEntityCompanion
@@ -2459,6 +2655,137 @@ typedef $$ProjectSnippetsTableProcessedTableManager = ProcessedTableManager<
     ),
     ProjectSnippet,
     PrefetchHooks Function()>;
+typedef $$SessionMutexesTableCreateCompanionBuilder
+    = SessionMutexEntityCompanion Function({
+  required String id,
+  required DateTime timestamp,
+  Value<int> rowid,
+});
+typedef $$SessionMutexesTableUpdateCompanionBuilder
+    = SessionMutexEntityCompanion Function({
+  Value<String> id,
+  Value<DateTime> timestamp,
+  Value<int> rowid,
+});
+
+class $$SessionMutexesTableFilterComposer
+    extends Composer<_$ProjectDatabase, $SessionMutexesTable> {
+  $$SessionMutexesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get timestamp => $composableBuilder(
+      column: $table.timestamp, builder: (column) => ColumnFilters(column));
+}
+
+class $$SessionMutexesTableOrderingComposer
+    extends Composer<_$ProjectDatabase, $SessionMutexesTable> {
+  $$SessionMutexesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get timestamp => $composableBuilder(
+      column: $table.timestamp, builder: (column) => ColumnOrderings(column));
+}
+
+class $$SessionMutexesTableAnnotationComposer
+    extends Composer<_$ProjectDatabase, $SessionMutexesTable> {
+  $$SessionMutexesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get timestamp =>
+      $composableBuilder(column: $table.timestamp, builder: (column) => column);
+}
+
+class $$SessionMutexesTableTableManager extends RootTableManager<
+    _$ProjectDatabase,
+    $SessionMutexesTable,
+    SessionMutexEntity,
+    $$SessionMutexesTableFilterComposer,
+    $$SessionMutexesTableOrderingComposer,
+    $$SessionMutexesTableAnnotationComposer,
+    $$SessionMutexesTableCreateCompanionBuilder,
+    $$SessionMutexesTableUpdateCompanionBuilder,
+    (
+      SessionMutexEntity,
+      BaseReferences<_$ProjectDatabase, $SessionMutexesTable,
+          SessionMutexEntity>
+    ),
+    SessionMutexEntity,
+    PrefetchHooks Function()> {
+  $$SessionMutexesTableTableManager(
+      _$ProjectDatabase db, $SessionMutexesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SessionMutexesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SessionMutexesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SessionMutexesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<DateTime> timestamp = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionMutexEntityCompanion(
+            id: id,
+            timestamp: timestamp,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            required DateTime timestamp,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              SessionMutexEntityCompanion.insert(
+            id: id,
+            timestamp: timestamp,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$SessionMutexesTableProcessedTableManager = ProcessedTableManager<
+    _$ProjectDatabase,
+    $SessionMutexesTable,
+    SessionMutexEntity,
+    $$SessionMutexesTableFilterComposer,
+    $$SessionMutexesTableOrderingComposer,
+    $$SessionMutexesTableAnnotationComposer,
+    $$SessionMutexesTableCreateCompanionBuilder,
+    $$SessionMutexesTableUpdateCompanionBuilder,
+    (
+      SessionMutexEntity,
+      BaseReferences<_$ProjectDatabase, $SessionMutexesTable,
+          SessionMutexEntity>
+    ),
+    SessionMutexEntity,
+    PrefetchHooks Function()>;
 
 class $ProjectDatabaseManager {
   final _$ProjectDatabase _db;
@@ -2469,4 +2796,6 @@ class $ProjectDatabaseManager {
       $$MessagesTableTableManager(_db, _db.messages);
   $$ProjectSnippetsTableTableManager get projectSnippets =>
       $$ProjectSnippetsTableTableManager(_db, _db.projectSnippets);
+  $$SessionMutexesTableTableManager get sessionMutexes =>
+      $$SessionMutexesTableTableManager(_db, _db.sessionMutexes);
 }

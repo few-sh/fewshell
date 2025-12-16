@@ -4,6 +4,7 @@ import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/snippet_dao.dart';
 import 'daos/project_snippet_dao.dart';
+import 'daos/session_mutex_dao.dart';
 import 'entities/snippet_entity.dart';
 
 /// Facade to unify access to GlobalDatabase and ProjectDatabase.
@@ -29,6 +30,13 @@ class DatabaseFacade {
       throw Exception('No project selected or project database not loaded');
     }
     return projectDatabase!.messageDao;
+  }
+
+  SessionMutexDao get sessionMutexDao {
+    if (projectDatabase == null) {
+      throw Exception('No project selected or project database not loaded');
+    }
+    return projectDatabase!.sessionMutexDao;
   }
 
   late final SnippetDaoFacade snippetDao = SnippetDaoFacade(

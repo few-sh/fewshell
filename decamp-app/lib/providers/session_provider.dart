@@ -50,6 +50,18 @@ final currentSessionIdProvider =
       return SelectedSessionNotifier(prefs, ref);
     });
 
+/// Provider for the lock status of the current session
+final currentSessionLockProvider = StreamProvider<bool>((ref) {
+  final sessionId = ref.watch(currentSessionIdProvider);
+  if (sessionId == null) return Stream.value(false);
+
+  final db = ref.watch(databaseProvider);
+  // If project database is not loaded yet, return false
+  if (db.projectDatabase == null) return Stream.value(false);
+
+  return db.sessionMutexDao.watchLock(sessionId);
+});
+
 /// Controller for session logic
 class SessionController {
   final Ref _ref;

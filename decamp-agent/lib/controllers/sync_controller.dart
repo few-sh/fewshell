@@ -146,6 +146,29 @@ class _AgentSession {
     }
   }
 
+  Future<bool> _lockSession(String sessionId) async {
+    if (_activeSessions.contains(sessionId)) {
+      return false;
+    }
+
+    if (db != null) {
+      final acquired = await db!.sessionMutexDao.acquireLock(sessionId);
+      if (!acquired) {
+        return false;
+      }
+    }
+
+    _activeSessions.add(sessionId);
+    return true;
+  }
+
+  Future<void> _unlockSession(String sessionId) async {
+    _activeSessions.remove(sessionId);
+    if (db != null) {
+      await db!.sessionMutexDao.unlock(sessionId);
+    }
+  }
+
   Future<void> _startChat(Map<String, dynamic> data) async {
     _log.info('🚀 Starting agent loop');
     String? sessionId;
@@ -161,7 +184,8 @@ class _AgentSession {
     }
 
     if (sessionId != null) {
-      if (_activeSessions.contains(sessionId)) {
+      final locked = await _lockSession(sessionId);
+      if (!locked) {
         _log.warning('Chat already in progress for session $sessionId');
         channel.sendCustomMessage({
           'type': 'error',
@@ -169,7 +193,6 @@ class _AgentSession {
         });
         return;
       }
-      _activeSessions.add(sessionId);
     }
 
     try {
@@ -415,7 +438,7 @@ class _AgentSession {
       }
     } finally {
       if (sessionId != null) {
-        _activeSessions.remove(sessionId);
+        await _unlockSession(sessionId);
       }
     }
   }

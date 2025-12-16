@@ -2,21 +2,25 @@ import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 import 'package:llm_dart/llm_dart.dart';
+import 'package:logging/logging.dart';
 
 import 'tables/sessions_table.dart';
 import 'tables/messages_table.dart';
 import 'tables/project_snippets_table.dart';
+import 'tables/session_mutex_table.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/project_snippet_dao.dart';
+import 'daos/session_mutex_dao.dart';
 import 'converters/tool_call_converter.dart';
 
 part 'project_database.g.dart';
 
 /// Project-specific database class.
 /// Stores Sessions, Messages, and Project Snippets.
-@DriftDatabase(tables: [Sessions, Messages, ProjectSnippets])
+@DriftDatabase(tables: [Sessions, Messages, ProjectSnippets, SessionMutexes])
 class ProjectDatabase extends _$ProjectDatabase {
+  final _log = Logger('ProjectDatabase');
   final Crdt? _crdt;
   final Crdt Function()? _crdtProvider;
   StreamSubscription? _crdtSubscription;
@@ -42,6 +46,7 @@ class ProjectDatabase extends _$ProjectDatabase {
 
   @override
   Future<void> close() {
+    _log.info('Closing ProjectDatabase');
     _crdtSubscription?.cancel();
     return super.close();
   }
@@ -64,6 +69,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   late final SessionDao sessionDao = SessionDao(this);
   late final MessageDao messageDao = MessageDao(this);
   late final ProjectSnippetDao projectSnippetDao = ProjectSnippetDao(this);
+  late final SessionMutexDao sessionMutexDao = SessionMutexDao(this);
 
   /// Exposes the underlying CRDT store for sync.
   Crdt get crdt {
@@ -73,7 +79,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration {
@@ -173,6 +179,11 @@ class ProjectDatabase extends _$ProjectDatabase {
           if (!hasIsVisibleToLlm) {
             await m.addColumn(projectSnippets, projectSnippets.isVisibleToLlm);
           }
+        }
+
+        // Migration to version 12: Add session_mutexes table
+        if (from < 12) {
+          await m.createTable(sessionMutexes);
         }
       },
     );

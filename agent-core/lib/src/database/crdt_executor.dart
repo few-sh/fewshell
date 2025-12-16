@@ -144,6 +144,12 @@ class CrdtQueryExecutor extends QueryExecutor {
     _log.info('beginTransaction');
     return _CrdtTransactionExecutor(_crdt);
   }
+
+  @override
+  Future<void> close() async {
+    _log.info('Closing CrdtQueryExecutor');
+    await _crdt.close();
+  }
 }
 
 class _CrdtTransactionExecutor extends CrdtQueryExecutor
