@@ -647,6 +647,12 @@ class ChatController extends StateNotifier<ChatState> {
     );
   }
 
+  /// Delete a single message
+  Future<void> deleteMessage(String messageId) async {
+    _log.info('🗑️ Deleting message: $messageId');
+    await _messageDao.deleteMessage(messageId);
+  }
+
   /// Branch the session by creating a copy up to a specific message
   /// Returns the new session ID
   Future<String> branchSession({

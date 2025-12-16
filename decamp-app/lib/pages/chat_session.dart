@@ -279,6 +279,46 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     _log.info('✅ Switched to new session: $newSessionId');
   }
 
+  /// Handle deleting a message
+  Future<void> _handleDeleteMessage(String messageId) async {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    if (currentSessionId == null) return;
+
+    // Confirm deletion
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message'),
+        content: const Text(
+          'Are you sure you want to delete this message? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    _log.info('🗑️ Deleting message: $messageId');
+
+    final controller = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    await controller.deleteMessage(messageId);
+  }
+
   /// Handle SSH interactive prompts (e.g. 2FA, password)
   Future<String> _handleSshPrompt(String prompt, bool echo) async {
     if (!mounted) {
@@ -412,6 +452,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             onEditMessage: _handleEditMessage,
                             onResendMessage: _handleResendMessage,
                             onBranchSession: _handleBranchSession,
+                            onDeleteMessage: _handleDeleteMessage,
                             searchMatches: _searchMatches,
                             currentMatchIndex: _searchMatches.isNotEmpty
                                 ? _currentMatchIndex

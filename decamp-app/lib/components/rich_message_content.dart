@@ -21,6 +21,7 @@ class RichMessageContent extends StatefulWidget {
   final Function(String messageId, String newContent)? onEdit;
   final Function(String messageId)? onResend;
   final Function(String messageId)? onBranch;
+  final Function(String messageId)? onDelete;
   final List<HighlightRange>?
   highlights; // Pre-computed highlights for this message
   final int?
@@ -34,6 +35,7 @@ class RichMessageContent extends StatefulWidget {
     this.onEdit,
     this.onResend,
     this.onBranch,
+    this.onDelete,
     this.highlights,
     this.currentMatchIndex,
   });
@@ -111,6 +113,10 @@ class _RichMessageContentState extends State<RichMessageContent> {
     widget.onBranch?.call(widget.message.id);
   }
 
+  void _handleDelete() {
+    widget.onDelete?.call(widget.message.id);
+  }
+
   /// Get pre-computed highlights for this message
   List<HighlightRange> _getHighlights() {
     return widget.highlights ?? [];
@@ -150,6 +156,7 @@ class _RichMessageContentState extends State<RichMessageContent> {
           onEdit: _enterEditMode,
           onResend: _handleResend,
           onBranch: _handleBranch,
+          onDelete: _handleDelete,
           messageContent: widget.message.content,
           showResend: widget.isUser, // Only show re-send for user messages
         ),

@@ -7,6 +7,7 @@ class MessageContextMenu extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onResend;
   final VoidCallback onBranch;
+  final VoidCallback onDelete;
   final String messageContent;
   final bool showResend;
 
@@ -15,6 +16,7 @@ class MessageContextMenu extends StatelessWidget {
     required this.onEdit,
     required this.onResend,
     required this.onBranch,
+    required this.onDelete,
     required this.messageContent,
     this.showResend = true,
   });
@@ -80,6 +82,16 @@ class MessageContextMenu extends StatelessWidget {
             ],
           ),
         ),
+        PopupMenuItem<String>(
+          value: 'delete',
+          child: Row(
+            children: [
+              Icon(Icons.delete, size: 18, color: colorScheme.error),
+              const SizedBox(width: 12),
+              Text('Delete', style: TextStyle(color: colorScheme.error)),
+            ],
+          ),
+        ),
       ],
     );
 
@@ -102,6 +114,9 @@ class MessageContextMenu extends StatelessWidget {
           break;
         case 'branch':
           onBranch();
+          break;
+        case 'delete':
+          onDelete();
           break;
       }
     }

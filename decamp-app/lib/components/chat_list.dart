@@ -13,6 +13,7 @@ class ChatList extends StatefulWidget {
   final Function(String messageId, String newContent)? onEditMessage;
   final Function(String messageId)? onResendMessage;
   final Function(String messageId)? onBranchSession;
+  final Function(String messageId)? onDeleteMessage;
   final List<SearchMatch>? searchMatches;
   final int? currentMatchIndex; // Index of currently active match
   final double
@@ -26,6 +27,7 @@ class ChatList extends StatefulWidget {
     this.onEditMessage,
     this.onResendMessage,
     this.onBranchSession,
+    this.onDeleteMessage,
     this.searchMatches,
     this.currentMatchIndex,
     this.searchNavigatorHeight = 0,
@@ -328,6 +330,7 @@ class _ChatListState extends State<ChatList> {
                         onEditMessage: widget.onEditMessage,
                         onResendMessage: widget.onResendMessage,
                         onBranchSession: widget.onBranchSession,
+                        onDeleteMessage: widget.onDeleteMessage,
                         highlights: _highlightsByMessage[message.id],
                         currentMatchIndex: widget.currentMatchIndex,
                       );
@@ -371,6 +374,7 @@ class _ChatListState extends State<ChatList> {
                 onEditMessage: widget.onEditMessage,
                 onResendMessage: widget.onResendMessage,
                 onBranchSession: widget.onBranchSession,
+                onDeleteMessage: widget.onDeleteMessage,
                 highlights: _highlightsByMessage[message.id],
                 currentMatchIndex: widget.currentMatchIndex,
               );
@@ -389,6 +393,7 @@ class _MessageItem extends StatelessWidget {
   final Function(String, String)? onEditMessage;
   final Function(String)? onResendMessage;
   final Function(String)? onBranchSession;
+  final Function(String)? onDeleteMessage;
   final List<HighlightRange>? highlights;
   final int? currentMatchIndex;
 
@@ -396,10 +401,11 @@ class _MessageItem extends StatelessWidget {
     super.key,
     required this.message,
     required this.isStreaming,
-    required this.showDivider,
+    this.showDivider = true,
     this.onEditMessage,
     this.onResendMessage,
     this.onBranchSession,
+    this.onDeleteMessage,
     this.highlights,
     this.currentMatchIndex,
   });
@@ -437,6 +443,7 @@ class _MessageItem extends StatelessWidget {
                 onEdit: onEditMessage,
                 onResend: onResendMessage,
                 onBranch: onBranchSession,
+                onDelete: onDeleteMessage,
                 highlights: highlights,
                 currentMatchIndex: currentMatchIndex,
               ),
