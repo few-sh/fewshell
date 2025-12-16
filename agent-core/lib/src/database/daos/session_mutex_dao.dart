@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:drift/drift.dart';
 import 'package:agent_core/agent_core.dart';
 
@@ -70,17 +71,49 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
 
   /// Watch the lock status for a specific session [id].
   /// Returns true if the session is locked and the lock is valid (not timed out).
+  /// Emits false automatically when the lock expires.
   Stream<bool> watchLock(String id) {
-    return (select(sessionMutexes)
-          ..where((t) =>
-              t.id.equals(id) &
-              const CustomExpression<bool>('is_deleted').equals(false)))
-        .watchSingleOrNull()
-        .map((entity) {
-      if (entity == null) return false;
+    late StreamController<bool> controller;
+    StreamSubscription<SessionMutexEntity?>? dbSubscription;
+    Timer? timer;
+
+    void check(SessionMutexEntity? entity) {
+      timer?.cancel();
+
+      if (entity == null) {
+        controller.add(false);
+        return;
+      }
+
       final now = DateTime.now();
-      final threshold = now.subtract(lockTimeout);
-      return entity.timestamp.isAfter(threshold);
-    });
+      final expiry = entity.timestamp.add(lockTimeout);
+
+      if (now.isAfter(expiry)) {
+        controller.add(false);
+      } else {
+        controller.add(true);
+        final duration = expiry.difference(now);
+        timer = Timer(duration, () {
+          if (!controller.isClosed) controller.add(false);
+        });
+      }
+    }
+
+    controller = StreamController<bool>(
+      onListen: () {
+        dbSubscription = (select(sessionMutexes)
+              ..where((t) =>
+                  t.id.equals(id) &
+                  const CustomExpression<bool>('is_deleted').equals(false)))
+            .watchSingleOrNull()
+            .listen(check);
+      },
+      onCancel: () {
+        timer?.cancel();
+        dbSubscription?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 }
