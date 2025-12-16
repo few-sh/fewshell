@@ -18,7 +18,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Feedback button
 
-[ ] Shared activity indicator (when a command is in progress or streaming is in progress, all clients should see the activity indicator)
+[X] Shared activity indicator (when a command is in progress or streaming is in progress, all clients should see the activity indicator)
 
 [ ] Support for thoughts streaming and display (expandable)
 
