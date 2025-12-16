@@ -41,7 +41,6 @@ class AIModelDialog {
     await showDialog(
       context: context,
       builder: (context) => _AIModelDialogForm(
-        ref: ref,
         title: isEditMode ? 'Edit AI Model' : 'Add AI Model',
         isGlobal: isGlobal,
         initialIdentifier: existingSettings?.identifier,
@@ -51,142 +50,13 @@ class AIModelDialog {
         initialMaxTokens: existingSettings?.maxTokens,
         initialTemperature: existingSettings?.temperature,
         initialEnabled: existingSettings?.enabled,
-        onSave:
-            (
-              identifier,
-              apiType,
-              url,
-              apiKey, {
-              customHeaders,
-              maxTokens,
-              temperature,
-              enabled,
-            }) async {
-              await _saveModelSettings(
-                context,
-                ref,
-                isGlobal: isGlobal,
-                isEditMode: isEditMode,
-                identifier: identifier,
-                apiType: apiType,
-                url: url,
-                apiKey: apiKey,
-                customHeaders: customHeaders,
-                maxTokens: maxTokens,
-                temperature: temperature,
-                enabled: enabled,
-                originalIdentifier: existingSettings?.identifier,
-              );
-            },
       ),
     );
-  }
-
-  /// Save model settings (add or update)
-  static Future<void> _saveModelSettings(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool isGlobal,
-    required bool isEditMode,
-    required String identifier,
-    String? originalIdentifier,
-    required LlmApiType apiType,
-    required String url,
-    required String apiKey,
-    String? customHeaders,
-    int? maxTokens,
-    double? temperature,
-    bool? enabled,
-  }) async {
-    try {
-      if (isGlobal) {
-        final notifier = ref.read(globalLlmSettingsProvider.notifier);
-        if (isEditMode) {
-          await notifier.updateLlmSettings(
-            identifier: identifier,
-            originalIdentifier: originalIdentifier,
-            apiType: apiType,
-            baseUrl: url,
-            apiKey: apiKey.isNotEmpty ? apiKey : null,
-            customHeaders: customHeaders,
-            maxTokens: maxTokens,
-            temperature: temperature,
-            enabled: enabled,
-          );
-        } else {
-          await notifier.addLlmSettings(
-            identifier: identifier,
-            apiType: apiType,
-            baseUrl: url,
-            apiKey: apiKey,
-            customHeaders: customHeaders,
-            maxTokens: maxTokens,
-            temperature: temperature,
-          );
-        }
-      } else {
-        final projectId = ref.read(currentProjectIdProvider);
-        if (projectId != null) {
-          final notifier = ref.read(
-            projectLlmSettingsProvider(projectId).notifier,
-          );
-          if (isEditMode) {
-            await notifier.updateLlmSettings(
-              identifier: identifier,
-              originalIdentifier: originalIdentifier,
-              apiType: apiType,
-              baseUrl: url,
-              apiKey: apiKey.isNotEmpty ? apiKey : null,
-              customHeaders: customHeaders,
-              maxTokens: maxTokens,
-              temperature: temperature,
-              enabled: enabled,
-            );
-          } else {
-            await notifier.addLlmSettings(
-              identifier: identifier,
-              apiType: apiType,
-              baseUrl: url,
-              apiKey: apiKey,
-              customHeaders: customHeaders,
-              maxTokens: maxTokens,
-              temperature: temperature,
-            );
-          }
-        }
-      }
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isEditMode
-                  ? 'Updated model: $identifier'
-                  : 'Added model: $identifier',
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isEditMode
-                  ? 'Error updating model: $e'
-                  : 'Error adding model: $e',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
-    }
   }
 }
 
 /// Internal form widget for the AI model dialog
-class _AIModelDialogForm extends StatefulWidget {
-  final WidgetRef ref;
+class _AIModelDialogForm extends ConsumerStatefulWidget {
   final String title;
   final bool isGlobal;
   final String? initialIdentifier;
@@ -196,20 +66,8 @@ class _AIModelDialogForm extends StatefulWidget {
   final int? initialMaxTokens;
   final double? initialTemperature;
   final bool? initialEnabled;
-  final Function(
-    String identifier,
-    LlmApiType apiType,
-    String url,
-    String apiKey, {
-    String? customHeaders,
-    int? maxTokens,
-    double? temperature,
-    bool? enabled,
-  })
-  onSave;
 
   const _AIModelDialogForm({
-    required this.ref,
     required this.title,
     required this.isGlobal,
     this.initialIdentifier,
@@ -219,14 +77,13 @@ class _AIModelDialogForm extends StatefulWidget {
     this.initialMaxTokens,
     this.initialTemperature,
     this.initialEnabled,
-    required this.onSave,
   });
 
   @override
-  State<_AIModelDialogForm> createState() => _AIModelDialogFormState();
+  ConsumerState<_AIModelDialogForm> createState() => _AIModelDialogFormState();
 }
 
-class _AIModelDialogFormState extends State<_AIModelDialogForm> {
+class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
   late final TextEditingController _identifierController;
   late final TextEditingController _urlController;
   late final TextEditingController _apiKeyController;
@@ -671,7 +528,7 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
       }
 
       // Get LLM service and test connection
-      final llmService = widget.ref.read(llmServiceProvider);
+      final llmService = ref.read(llmServiceProvider);
       final errorMessage = await llmService.testConnection(
         config: testSettings,
         apiKey: apiKey,
@@ -710,18 +567,101 @@ class _AIModelDialogFormState extends State<_AIModelDialogForm> {
     });
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_formKey.currentState!.validate()) {
-      widget.onSave(
-        _identifierController.text,
-        _selectedApiType,
-        _urlController.text,
-        _apiKeyController.text,
-        maxTokens: int.tryParse(_maxTokensController.text),
-        temperature: double.tryParse(_temperatureController.text),
-        enabled: _isEditMode ? _enabled : null,
-      );
-      Navigator.of(context).pop();
+      final identifier = _identifierController.text;
+      final apiType = _selectedApiType;
+      final url = _urlController.text;
+      final apiKey = _apiKeyController.text;
+      final maxTokens = int.tryParse(_maxTokensController.text);
+      final temperature = double.tryParse(_temperatureController.text);
+      final enabled = _isEditMode ? _enabled : null;
+      final originalIdentifier = widget.initialIdentifier;
+
+      try {
+        if (widget.isGlobal) {
+          final notifier = ref.read(globalLlmSettingsProvider.notifier);
+          if (_isEditMode) {
+            await notifier.updateLlmSettings(
+              identifier: identifier,
+              originalIdentifier: originalIdentifier,
+              apiType: apiType,
+              baseUrl: url,
+              apiKey: apiKey.isNotEmpty ? apiKey : null,
+              customHeaders: null,
+              maxTokens: maxTokens,
+              temperature: temperature,
+              enabled: enabled,
+            );
+          } else {
+            await notifier.addLlmSettings(
+              identifier: identifier,
+              apiType: apiType,
+              baseUrl: url,
+              apiKey: apiKey,
+              customHeaders: null,
+              maxTokens: maxTokens,
+              temperature: temperature,
+            );
+          }
+        } else {
+          final projectId = ref.read(currentProjectIdProvider);
+          if (projectId != null) {
+            final notifier = ref.read(
+              projectLlmSettingsProvider(projectId).notifier,
+            );
+            if (_isEditMode) {
+              await notifier.updateLlmSettings(
+                identifier: identifier,
+                originalIdentifier: originalIdentifier,
+                apiType: apiType,
+                baseUrl: url,
+                apiKey: apiKey.isNotEmpty ? apiKey : null,
+                customHeaders: null,
+                maxTokens: maxTokens,
+                temperature: temperature,
+                enabled: enabled,
+              );
+            } else {
+              await notifier.addLlmSettings(
+                identifier: identifier,
+                apiType: apiType,
+                baseUrl: url,
+                apiKey: apiKey,
+                customHeaders: null,
+                maxTokens: maxTokens,
+                temperature: temperature,
+              );
+            }
+          }
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isEditMode
+                    ? 'Updated model: $identifier'
+                    : 'Added model: $identifier',
+              ),
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _isEditMode
+                    ? 'Error updating model: $e'
+                    : 'Error adding model: $e',
+              ),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
     }
   }
 }
