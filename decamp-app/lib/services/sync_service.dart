@@ -126,6 +126,7 @@ class SyncService {
       await db.customSelect('SELECT 1;').get();
 
       final crdt = db.crdt;
+      final adapter = CrdtFlowAdapter(crdt);
       // Remove trailing slash if present
       final cleanUrl = serverUrl.endsWith('/')
           ? serverUrl.substring(0, serverUrl.length - 1)
@@ -133,12 +134,15 @@ class SyncService {
       final uri = Uri.parse('$cleanUrl/sync/global');
 
       _log.info('Connecting to global sync at $uri');
-      _globalChannel = MultiplexedWebSocketChannel(_connectWebSocket(uri));
+      _globalChannel = MultiplexedWebSocketChannel(
+        _connectWebSocket(uri),
+        awaitSync: () => adapter.onIdle,
+      );
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         _log.fine('Global sync received custom message: $msg');
       });
       _globalSync = CrdtSync.client(
-        crdt,
+        adapter,
         _globalChannel!,
         verbose: true,
         validateRecord: (table, record) {
@@ -156,7 +160,7 @@ class SyncService {
               onlyNodeId,
               onlyTables,
             }) async {
-              final changeset = await crdt.getChangeset(
+              final changeset = await adapter.getChangeset(
                 onlyTables: onlyTables,
                 onlyNodeId: onlyNodeId,
                 exceptNodeId: exceptNodeId,
@@ -221,6 +225,7 @@ class SyncService {
       }
 
       final crdt = db.crdt;
+      final adapter = CrdtFlowAdapter(crdt);
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
       _log.info('Connecting to project sync at $uri');
@@ -253,14 +258,17 @@ class SyncService {
         return;
       }
 
-      _projectChannel = MultiplexedWebSocketChannel(monitoredChannel);
+      _projectChannel = MultiplexedWebSocketChannel(
+        monitoredChannel,
+        awaitSync: () => adapter.onIdle,
+      );
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
         _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
           _log.fine('PONG received: ${msg['payload']}');
         }
       });
-      _projectSync = CrdtSync.client(crdt, _projectChannel!, verbose: true);
+      _projectSync = CrdtSync.client(adapter, _projectChannel!, verbose: true);
     } catch (e) {
       if (token.isCancelled) return;
       _log.warning('Project DB not ready or error: $e');

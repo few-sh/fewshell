@@ -9,7 +9,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   static final _log = Logger('MultiplexedWebSocketChannel');
 
   final WebSocketChannel _inner;
-  final StreamController _inboundController = StreamController();
+  final StreamController _inboundController = StreamController(sync: true);
   final StreamController<Map<String, dynamic>> _customMessageController =
       StreamController.broadcast();
   // Use Unit Separator (ASCII 31) as a prefix to avoid collisions with JSON
@@ -17,28 +17,43 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   late final WebSocketSink _sink = _MultiplexedSink(_inner.sink);
 
-  MultiplexedWebSocketChannel(this._inner) {
+  final Future<void> Function()? awaitSync;
+  Future<void> _pending = Future.value();
+
+  MultiplexedWebSocketChannel(this._inner, {this.awaitSync}) {
     _inner.stream.listen((data) {
-      if (data is String && data.startsWith(_customPrefix)) {
-        try {
-          final payload = data.substring(_customPrefix.length);
-          final decoded = jsonDecode(payload);
-          if (decoded is Map<String, dynamic>) {
-            _customMessageController.add(decoded);
-          } else {
-            _log.warning('Custom message payload is not a Map: $decoded');
+      // Chain processing to ensure order
+      _pending = _pending.then((_) async {
+        if (data is String && data.startsWith(_customPrefix)) {
+          // If it's a custom message, wait for any pending sync operations
+          if (awaitSync != null) {
+            try {
+              await awaitSync!();
+            } catch (e) {
+              _log.warning('Error waiting for sync: $e');
+            }
           }
-        } catch (e, stackTrace) {
-          // Ignore malformed custom messages
-          _log.warning(
-            'Error parsing custom message: $e',
-            e,
-            stackTrace,
-          );
+
+          try {
+            final payload = data.substring(_customPrefix.length);
+            final decoded = jsonDecode(payload);
+            if (decoded is Map<String, dynamic>) {
+              _customMessageController.add(decoded);
+            } else {
+              _log.warning('Custom message payload is not a Map: $decoded');
+            }
+          } catch (e, stackTrace) {
+            // Ignore malformed custom messages
+            _log.warning(
+              'Error parsing custom message: $e',
+              e,
+              stackTrace,
+            );
+          }
+        } else {
+          _inboundController.add(data);
         }
-      } else {
-        _inboundController.add(data);
-      }
+      });
     }, onError: (error, stackTrace) {
       _inboundController.addError(error, stackTrace);
       _customMessageController.addError(error, stackTrace);

@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 import 'package:agent_core/agent_core.dart';
-import '../entities/listable_entity.dart';
 
 part 'project_dao.g.dart';
 
