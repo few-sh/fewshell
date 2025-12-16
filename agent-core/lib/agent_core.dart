@@ -21,6 +21,7 @@ export 'src/utils/id_generator.dart';
 export 'src/utils/template_processor.dart';
 export 'src/utils/tool_result_formatter.dart';
 export 'src/utils/multiplexed_websocket_channel.dart';
+export 'src/utils/crdt_flow_adapter.dart';
 
 // Secrets Storage
 export 'src/secrets_storage/secure_storage.dart';

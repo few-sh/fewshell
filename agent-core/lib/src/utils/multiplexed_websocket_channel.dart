@@ -9,7 +9,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   static final _log = Logger('MultiplexedWebSocketChannel');
 
   final WebSocketChannel _inner;
-  final StreamController _inboundController = StreamController();
+  final StreamController _inboundController = StreamController(sync: true);
   final StreamController<Map<String, dynamic>> _customMessageController =
       StreamController.broadcast();
   // Use Unit Separator (ASCII 31) as a prefix to avoid collisions with JSON
@@ -17,28 +17,62 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   late final WebSocketSink _sink = _MultiplexedSink(_inner.sink);
 
-  MultiplexedWebSocketChannel(this._inner) {
+  final Future<void> Function()? awaitSync;
+  Future<void> _pending = Future.value();
+  final List<Future<void> Function(Map<String, dynamic>)> _customHandlers = [];
+
+  MultiplexedWebSocketChannel(this._inner, {this.awaitSync}) {
     _inner.stream.listen((data) {
-      if (data is String && data.startsWith(_customPrefix)) {
+      // Chain processing to ensure order.
+      // We use catchError to ensure the chain continues even if a previous task failed.
+      _pending = _pending.catchError((_) {}).then((_) async {
         try {
-          final payload = data.substring(_customPrefix.length);
-          final decoded = jsonDecode(payload);
-          if (decoded is Map<String, dynamic>) {
-            _customMessageController.add(decoded);
+          if (data is String && data.startsWith(_customPrefix)) {
+            // If it's a custom message, wait for any pending sync operations
+            if (awaitSync != null) {
+              try {
+                await awaitSync!();
+              } catch (e) {
+                _log.warning('Error waiting for sync: $e');
+              }
+            }
+
+            try {
+              final payload = data.substring(_customPrefix.length);
+              final decoded = jsonDecode(payload);
+              if (decoded is Map<String, dynamic>) {
+                // Wait for registered handlers to complete
+                if (_customHandlers.isNotEmpty) {
+                  await Future.wait(_customHandlers.map((h) async {
+                    try {
+                      await h(decoded);
+                    } catch (e, st) {
+                      _log.warning('Error in custom message handler', e, st);
+                    }
+                  }));
+                }
+                _customMessageController.add(decoded);
+              } else {
+                _log.warning('Custom message payload is not a Map: $decoded');
+              }
+            } catch (e, stackTrace) {
+              // Ignore malformed custom messages
+              _log.warning(
+                'Error parsing custom message: $e',
+                e,
+                stackTrace,
+              );
+            }
           } else {
-            _log.warning('Custom message payload is not a Map: $decoded');
+            if (!_inboundController.isClosed) {
+              _inboundController.add(data);
+            }
           }
         } catch (e, stackTrace) {
-          // Ignore malformed custom messages
-          _log.warning(
-            'Error parsing custom message: $e',
-            e,
-            stackTrace,
-          );
+          _log.severe(
+              'Error processing message in multiplexed channel', e, stackTrace);
         }
-      } else {
-        _inboundController.add(data);
-      }
+      });
     }, onError: (error, stackTrace) {
       _inboundController.addError(error, stackTrace);
       _customMessageController.addError(error, stackTrace);
@@ -60,6 +94,16 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   Stream<Map<String, dynamic>> get onCustomMessage =>
       _customMessageController.stream;
+
+  void registerCustomHandler(
+      Future<void> Function(Map<String, dynamic>) handler) {
+    _customHandlers.add(handler);
+  }
+
+  void unregisterCustomHandler(
+      Future<void> Function(Map<String, dynamic>) handler) {
+    _customHandlers.remove(handler);
+  }
 
   @override
   String? get protocol => _inner.protocol;

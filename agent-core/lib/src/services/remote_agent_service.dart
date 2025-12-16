@@ -21,56 +21,50 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   final completer = Completer<AgentLoopResult>();
 
   // Listen for messages on the custom channel
-  final subscription = channel.onCustomMessage.listen(
-    (data) async {
-      try {
-        final type = data['type'] as String;
+  Future<void> handleMessage(Map<String, dynamic> data) async {
+    try {
+      final type = data['type'] as String;
 
-        if (type == 'request_approval') {
-          final toolsJson =
-              (data['tools'] as List).cast<Map<String, dynamic>>();
-          final pendingCalls = toolsJson
-              .map((j) => PendingToolCall(
-                  id: j['id'],
-                  name: j['name'],
-                  arguments: j['arguments'],
-                  originalToolCall: ToolCall(
-                      id: j['id'],
-                      callType: 'function',
-                      function: FunctionCall(
-                          name: j['name'],
-                          arguments: jsonEncode(j['arguments'])))))
-              .toList();
+      if (type == 'request_approval') {
+        final toolsJson = (data['tools'] as List).cast<Map<String, dynamic>>();
+        final pendingCalls = toolsJson
+            .map((j) => PendingToolCall(
+                id: j['id'],
+                name: j['name'],
+                arguments: j['arguments'],
+                originalToolCall: ToolCall(
+                    id: j['id'],
+                    callType: 'function',
+                    function: FunctionCall(
+                        name: j['name'],
+                        arguments: jsonEncode(j['arguments'])))))
+            .toList();
 
-          final approved = await requestApproval(pendingCalls);
+        final approved = await requestApproval(pendingCalls);
 
-          channel.sendCustomMessage({
-            'type': 'approval_response',
-            'approvedIds': approved?.map((c) => c.id).toList()
-          });
-        } else if (type == 'complete') {
-          if (!completer.isCompleted) {
-            completer.complete(const AgentLoopCompleted());
-          }
-        } else if (type == 'error') {
-          if (!completer.isCompleted) {
-            completer.complete(
-                AgentLoopError(data['message'], messageId: data['message_id']));
-          }
-        }
-      } catch (e) {
-        _log.warning('Error handling remote message: $e');
+        channel.sendCustomMessage({
+          'type': 'approval_response',
+          'approvedIds': approved?.map((c) => c.id).toList()
+        });
+      } else if (type == 'complete') {
         if (!completer.isCompleted) {
-          completer.complete(AgentLoopError(e.toString()));
+          completer.complete(const AgentLoopCompleted());
+        }
+      } else if (type == 'error') {
+        if (!completer.isCompleted) {
+          completer.complete(
+              AgentLoopError(data['message'], messageId: data['message_id']));
         }
       }
-    },
-    onError: (e) {
+    } catch (e) {
+      _log.warning('Error handling remote message: $e');
       if (!completer.isCompleted) {
         completer.complete(AgentLoopError(e.toString()));
       }
-    },
-  );
+    }
+  }
+
+  channel.registerCustomHandler(handleMessage);
 
   // Start chat
   channel.sendCustomMessage({
@@ -83,6 +77,6 @@ Future<AgentLoopResult> runRemoteAgentLoop({
   try {
     return await completer.future;
   } finally {
-    await subscription.cancel();
+    channel.unregisterCustomHandler(handleMessage);
   }
 }

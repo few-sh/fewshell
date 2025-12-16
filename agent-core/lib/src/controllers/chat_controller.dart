@@ -447,7 +447,10 @@ class ChatController extends StateNotifier<ChatState> {
             message: final errorMsg,
             messageId: final messageId
           ):
-          final errorMessage = 'Sorry, I encountered an error+: $errorMsg';
+          if (mounted) {
+            state = state.copyWith(isLoading: false, error: errorMsg);
+          }
+          final errorMessage = 'Sorry, I encountered an error: $errorMsg';
           final redactedError = await _secretRedactor.redact(errorMessage);
           final aiUserName = await _getAiUserName();
           await _messageDao.insertMessageWithId(
@@ -459,9 +462,6 @@ class ChatController extends StateNotifier<ChatState> {
             isVisibleToLlm: false,
           );
           await _sessionDao.touchSession(sessionId);
-          if (mounted) {
-            state = state.copyWith(isLoading: false, error: errorMsg);
-          }
           return;
       }
 
