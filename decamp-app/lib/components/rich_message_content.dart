@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:intl/intl.dart';
 import 'package:agent_core/agent_core.dart';
@@ -10,18 +11,19 @@ import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/utils/highlight_injector.dart';
+import 'package:decamp/providers/chat_controller_provider.dart';
+import 'package:decamp/services/sync_service.dart';
+import 'package:decamp/components/multi_command_approval_overlay.dart';
+import 'package:decamp/providers/session_provider.dart';
+import 'package:logging/logging.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
 /// Supports inline editing with context menu and search highlighting
-class RichMessageContent extends StatefulWidget {
+class RichMessageContent extends ConsumerStatefulWidget {
   final MessageEntity message;
   final Stream<MessageEntity>? messageStream;
   final bool isUser;
-  final Function(String messageId, String newContent)? onEdit;
-  final Function(String messageId)? onResend;
-  final Function(String messageId)? onBranch;
-  final Function(String messageId)? onDelete;
   final List<HighlightRange>?
   highlights; // Pre-computed highlights for this message
   final int?
@@ -32,19 +34,16 @@ class RichMessageContent extends StatefulWidget {
     required this.message,
     this.messageStream,
     required this.isUser,
-    this.onEdit,
-    this.onResend,
-    this.onBranch,
-    this.onDelete,
     this.highlights,
     this.currentMatchIndex,
   });
 
   @override
-  State<RichMessageContent> createState() => _RichMessageContentState();
+  ConsumerState<RichMessageContent> createState() => _RichMessageContentState();
 }
 
-class _RichMessageContentState extends State<RichMessageContent> {
+class _RichMessageContentState extends ConsumerState<RichMessageContent> {
+  static final _log = Logger('RichMessageContent');
   bool _isEditMode = false;
   String _streamedContent = '';
   StreamSubscription? _messageSub;
@@ -100,21 +99,102 @@ class _RichMessageContentState extends State<RichMessageContent> {
     });
   }
 
-  void _handleSave(String newContent) {
-    widget.onEdit?.call(widget.message.id, newContent);
+  Future<void> _handleSave(String newContent) async {
+    _log.info('✏️ Editing message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    // Get sync channel
+    final syncChannel = ref.read(syncServiceProvider).projectChannel;
+
+    await controller.editMessage(
+      messageId: widget.message.id,
+      newContent: newContent,
+      sessionId: widget.message.sessionId,
+      requestApproval: (actions) {
+        if (!mounted) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(context, actions);
+      },
+      syncChannel: syncChannel,
+    );
     _exitEditMode();
   }
 
-  void _handleResend() {
-    widget.onResend?.call(widget.message.id);
+  Future<void> _handleResend() async {
+    _log.info('🔄 Resending message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    // Get sync channel
+    final syncChannel = ref.read(syncServiceProvider).projectChannel;
+
+    await controller.resendMessage(
+      messageId: widget.message.id,
+      sessionId: widget.message.sessionId,
+      requestApproval: (actions) {
+        if (!mounted) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(context, actions);
+      },
+      syncChannel: syncChannel,
+    );
   }
 
-  void _handleBranch() {
-    widget.onBranch?.call(widget.message.id);
+  Future<void> _handleBranch() async {
+    _log.info('🌿 Branching session at message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    final newSessionId = await controller.branchSession(
+      messageId: widget.message.id,
+      sessionId: widget.message.sessionId,
+    );
+
+    // Switch to the new session
+    ref.read(currentSessionIdProvider.notifier).select(newSessionId);
+
+    _log.info('✅ Switched to new session: $newSessionId');
   }
 
-  void _handleDelete() {
-    widget.onDelete?.call(widget.message.id);
+  Future<void> _handleDelete() async {
+    // Confirm deletion
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message'),
+        content: const Text(
+          'Are you sure you want to delete this message? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    _log.info('🗑️ Deleting message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    await controller.deleteMessage(widget.message.id);
   }
 
   /// Get pre-computed highlights for this message

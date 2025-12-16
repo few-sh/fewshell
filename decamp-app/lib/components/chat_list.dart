@@ -10,10 +10,6 @@ class ChatList extends StatefulWidget {
   final List<MessageEntity> messages;
   final bool isLoading;
   final Stream<MessageEntity?>? streamingMessageStream;
-  final Function(String messageId, String newContent)? onEditMessage;
-  final Function(String messageId)? onResendMessage;
-  final Function(String messageId)? onBranchSession;
-  final Function(String messageId)? onDeleteMessage;
   final List<SearchMatch>? searchMatches;
   final int? currentMatchIndex; // Index of currently active match
   final double
@@ -24,10 +20,6 @@ class ChatList extends StatefulWidget {
     required this.messages,
     this.isLoading = false,
     this.streamingMessageStream,
-    this.onEditMessage,
-    this.onResendMessage,
-    this.onBranchSession,
-    this.onDeleteMessage,
     this.searchMatches,
     this.currentMatchIndex,
     this.searchNavigatorHeight = 0,
@@ -327,10 +319,6 @@ class _ChatListState extends State<ChatList> {
                         message: message,
                         isStreaming: true,
                         showDivider: false,
-                        onEditMessage: widget.onEditMessage,
-                        onResendMessage: widget.onResendMessage,
-                        onBranchSession: widget.onBranchSession,
-                        onDeleteMessage: widget.onDeleteMessage,
                         highlights: _highlightsByMessage[message.id],
                         currentMatchIndex: widget.currentMatchIndex,
                       );
@@ -371,10 +359,6 @@ class _ChatListState extends State<ChatList> {
                 message: message,
                 isStreaming: false,
                 showDivider: index > 0,
-                onEditMessage: widget.onEditMessage,
-                onResendMessage: widget.onResendMessage,
-                onBranchSession: widget.onBranchSession,
-                onDeleteMessage: widget.onDeleteMessage,
                 highlights: _highlightsByMessage[message.id],
                 currentMatchIndex: widget.currentMatchIndex,
               );
@@ -390,10 +374,6 @@ class _MessageItem extends StatelessWidget {
   final MessageEntity message;
   final bool isStreaming;
   final bool showDivider;
-  final Function(String, String)? onEditMessage;
-  final Function(String)? onResendMessage;
-  final Function(String)? onBranchSession;
-  final Function(String)? onDeleteMessage;
   final List<HighlightRange>? highlights;
   final int? currentMatchIndex;
 
@@ -402,10 +382,6 @@ class _MessageItem extends StatelessWidget {
     required this.message,
     required this.isStreaming,
     this.showDivider = true,
-    this.onEditMessage,
-    this.onResendMessage,
-    this.onBranchSession,
-    this.onDeleteMessage,
     this.highlights,
     this.currentMatchIndex,
   });
@@ -440,10 +416,6 @@ class _MessageItem extends StatelessWidget {
                 message: message,
                 messageStream: null, // Handled by StreamBuilder
                 isUser: isUser,
-                onEdit: onEditMessage,
-                onResend: onResendMessage,
-                onBranch: onBranchSession,
-                onDelete: onDeleteMessage,
                 highlights: highlights,
                 currentMatchIndex: currentMatchIndex,
               ),

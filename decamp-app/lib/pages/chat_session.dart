@@ -206,119 +206,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
   }
 
-  /// Handle editing a message
-  Future<void> _handleEditMessage(String messageId, String newContent) async {
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId == null) return;
-
-    _log.info('✏️ Editing message: $messageId');
-
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
-
-    // Get sync channel
-    final syncChannel = ref.read(syncServiceProvider).projectChannel;
-
-    await controller.editMessage(
-      messageId: messageId,
-      newContent: newContent,
-      sessionId: currentSessionId,
-      requestApproval: (actions) {
-        if (!mounted) return Future.value(null);
-        return MultiCommandApprovalOverlay.show(context, actions);
-      },
-      syncChannel: syncChannel,
-    );
-  }
-
-  /// Handle resending a message
-  Future<void> _handleResendMessage(String messageId) async {
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId == null) return;
-
-    _log.info('🔄 Resending message: $messageId');
-
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
-
-    // Get sync channel
-    final syncChannel = ref.read(syncServiceProvider).projectChannel;
-
-    await controller.resendMessage(
-      messageId: messageId,
-      sessionId: currentSessionId,
-      requestApproval: (actions) {
-        if (!mounted) return Future.value(null);
-        return MultiCommandApprovalOverlay.show(context, actions);
-      },
-      syncChannel: syncChannel,
-    );
-  }
-
-  /// Handle branching a session at a specific message
-  Future<void> _handleBranchSession(String messageId) async {
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId == null) return;
-
-    _log.info('🌿 Branching session at message: $messageId');
-
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
-
-    final newSessionId = await controller.branchSession(
-      messageId: messageId,
-      sessionId: currentSessionId,
-    );
-
-    // Switch to the new session
-    ref.read(currentSessionIdProvider.notifier).select(newSessionId);
-
-    _log.info('✅ Switched to new session: $newSessionId');
-  }
-
-  /// Handle deleting a message
-  Future<void> _handleDeleteMessage(String messageId) async {
-    final currentSessionId = ref.read(currentSessionIdProvider);
-    if (currentSessionId == null) return;
-
-    // Confirm deletion
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: const Text(
-          'Are you sure you want to delete this message? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    _log.info('🗑️ Deleting message: $messageId');
-
-    final controller = ref.read(
-      chatControllerProvider(currentSessionId).notifier,
-    );
-
-    await controller.deleteMessage(messageId);
-  }
-
   /// Handle SSH interactive prompts (e.g. 2FA, password)
   Future<String> _handleSshPrompt(String prompt, bool echo) async {
     if (!mounted) {
@@ -449,10 +336,6 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                             isLoading: isLoading,
                             streamingMessageStream:
                                 chatController.streamingMessageStream,
-                            onEditMessage: _handleEditMessage,
-                            onResendMessage: _handleResendMessage,
-                            onBranchSession: _handleBranchSession,
-                            onDeleteMessage: _handleDeleteMessage,
                             searchMatches: _searchMatches,
                             currentMatchIndex: _searchMatches.isNotEmpty
                                 ? _currentMatchIndex
