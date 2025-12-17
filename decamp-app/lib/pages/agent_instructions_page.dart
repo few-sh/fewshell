@@ -36,6 +36,7 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currentProject = ref.watch(currentProjectProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -61,7 +62,20 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [_UserSettingsTab(), _ProjectSettingsTab()],
+              children: [
+                const _UserSettingsTab(),
+                if (currentProject != null)
+                  _ProjectSettingsTab(
+                    projectId: currentProject.id,
+                    key: ValueKey(currentProject.id),
+                  )
+                else
+                  const Center(
+                    child: Text(
+                      'No project selected. Please select a project first.',
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -292,7 +306,9 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
 
 /// Project Settings Tab - Project-level agent instructions
 class _ProjectSettingsTab extends ConsumerStatefulWidget {
-  const _ProjectSettingsTab();
+  final String projectId;
+
+  const _ProjectSettingsTab({required this.projectId, super.key});
 
   @override
   ConsumerState<_ProjectSettingsTab> createState() =>
@@ -305,11 +321,19 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   bool _showPreview = false;
   bool _hasChanges = false;
   bool _includeUserInstructions = false;
+  bool _settingsLoaded = false;
 
   @override
   void initState() {
     super.initState();
     _defaultController = TextEditingController();
+
+    // Try to load settings immediately if available
+    final settings = ref.read(projectSettingsProvider(widget.projectId));
+    if (settings != null) {
+      _loadSettings(settings);
+      _settingsLoaded = true;
+    }
   }
 
   @override
@@ -321,12 +345,11 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
     super.dispose();
   }
 
-  void _loadSettings(String projectId) {
-    final settings = ref.read(projectSettingsProvider(projectId));
-    final instruction = settings?.agentInstruction;
+  void _loadSettings(ProjectSettings settings) {
+    final instruction = settings.agentInstruction;
 
     _defaultController.text = instruction?.defaultInstruction ?? '';
-    _includeUserInstructions = settings?.includeUserInstructions ?? false;
+    _includeUserInstructions = settings.includeUserInstructions;
 
     // Clear and rebuild model controllers
     for (var controller in _modelControllers.values) {
@@ -418,23 +441,17 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final currentProject = ref.watch(currentProjectProvider);
-
-    if (currentProject == null) {
-      return const Center(
-        child: Text('No project selected. Please select a project first.'),
-      );
-    }
-
-    final projectId = currentProject.id;
-    final settings = ref.watch(projectSettingsProvider(projectId));
+    final projectId = widget.projectId;
     final llmSettings = ref.watch(projectLlmSettingsProvider(projectId));
 
-    // Load settings when they change (only if we haven't loaded yet or don't have unsaved changes)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_defaultController.text.isEmpty &&
-          settings?.agentInstruction != null) {
-        _loadSettings(projectId);
+    // Listen for settings updates (e.g. when they finish loading)
+    ref.listen<ProjectSettings?>(projectSettingsProvider(projectId), (
+      previous,
+      next,
+    ) {
+      if (!_settingsLoaded && next != null) {
+        _loadSettings(next);
+        setState(() => _settingsLoaded = true);
       }
     });
 
