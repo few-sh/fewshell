@@ -69,7 +69,9 @@ void main() {
           globalDatabaseProvider.overrideWithValue(globalDb),
           projectDatabaseProvider.overrideWithValue(projectDb),
           crdtSettingsServiceProvider.overrideWith((ref) {
-            return CrdtSettingsService(() async => tempDir);
+            final service = CrdtSettingsService(() async => tempDir);
+            ref.onDispose(() => service.close());
+            return service;
           }),
           currentProjectIdProvider.overrideWith((ref) {
             final prefs = ref.watch(sharedPreferencesProvider);

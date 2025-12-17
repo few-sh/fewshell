@@ -71,7 +71,9 @@ void main() {
           globalDatabaseProvider.overrideWithValue(globalDb),
           projectDatabaseProvider.overrideWithValue(projectDb),
           crdtSettingsServiceProvider.overrideWith((ref) {
-            return CrdtSettingsService(() async => tempDir);
+            final service = CrdtSettingsService(() async => tempDir);
+            ref.onDispose(() => service.close());
+            return service;
           }),
 
           // Set the current project to our test project initially

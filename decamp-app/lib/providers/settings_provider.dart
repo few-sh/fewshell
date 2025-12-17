@@ -5,7 +5,9 @@ import '../utils/default_prompt_loader.dart';
 
 /// Provider for CrdtSettingsService
 final crdtSettingsServiceProvider = Provider<CrdtSettingsService>((ref) {
-  return CrdtSettingsService(getApplicationDocumentsDirectory);
+  final service = CrdtSettingsService(getApplicationDocumentsDirectory);
+  ref.onDispose(() => service.close());
+  return service;
 });
 
 /// Provider for global app settings
@@ -25,6 +27,9 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
 
   Future<void> _init() async {
     await _service.init();
+
+    // Load initial value
+    _updateState(_service.getGlobalSettings());
 
     // Listen to stream
     _service.settingsStream.listen((settings) {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
@@ -68,17 +69,33 @@ class CrdtSettingsService {
     }
   }
 
+  AppSettings getGlobalSettings() {
+    final json = _crdt?.get('settings', _globalKey);
+    if (json != null) {
+      try {
+        return AppSettings.fromJson(Map<String, dynamic>.from(json));
+      } catch (e) {
+        _log.warning('Error parsing settings from CRDT: $e');
+      }
+    }
+    return const AppSettings();
+  }
+
   Future<void> saveGlobalSettings(AppSettings settings) async {
     if (_crdt == null) return;
-    await _crdt!.put('settings', _globalKey, settings.toJson());
+    // Ensure deep serialization by encoding/decoding
+    // This fixes issue where nested objects (like LlmApiSettings) are not converted to Maps
+    final json = jsonDecode(jsonEncode(settings.toJson()));
+    await _crdt!.put('settings', _globalKey, json);
   }
 
   static String _projectKey(String projectId) => 'project_$projectId';
 
   Future<void> saveProjectSettings(ProjectSettings settings) async {
     if (_crdt == null) return;
-    await _crdt!
-        .put('settings', _projectKey(settings.projectId), settings.toJson());
+    // Ensure deep serialization by encoding/decoding
+    final json = jsonDecode(jsonEncode(settings.toJson()));
+    await _crdt!.put('settings', _projectKey(settings.projectId), json);
   }
 
   ProjectSettings? getProjectSettings(String projectId) {
