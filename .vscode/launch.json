@@ -16,7 +16,8 @@
             "name": "decamp-app",
             "cwd": "decamp-app",
             "request": "launch",
-            "type": "dart"
+            "type": "dart",
+            "program": "lib/main.dart"
         },
         {
             "name": "decamp-app (macOS)",
