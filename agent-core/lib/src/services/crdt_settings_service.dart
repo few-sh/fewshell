@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
+import 'package:toml/toml.dart';
 import 'package:agent_core/agent_core.dart';
 
 class CrdtSettingsService {
   static final _log = Logger('CrdtSettingsService');
-  static const String _globalFilename = 'settings.json';
-  static const String _projectCrdtFilename = 'settings_crdt.json';
+  static const String _globalFilename = 'settings.toml';
+  static const String _projectCrdtFilename = 'settings_crdt.toml';
 
   final Future<Directory> Function() _getGlobalDir;
   final Future<Directory> Function(String projectId) _getProjectDir;
@@ -40,31 +41,13 @@ class CrdtSettingsService {
       if (await file.exists()) {
         final content = await file.readAsString();
         if (content.isNotEmpty) {
-          final json = jsonDecode(content);
-          _globalSettings = AppSettings.fromJson(json);
+          final toml = TomlDocument.parse(content).toMap();
+          _globalSettings = AppSettings.fromJson(toml);
           _globalSettingsController.add(_globalSettings);
         }
-      } else {
-        // Try migrating from TOML if JSON doesn't exist
-        await _migrateFromToml(dir);
       }
     } catch (e) {
       _log.warning('Error loading global settings: $e');
-    }
-  }
-
-  Future<void> _migrateFromToml(Directory dir) async {
-    final tomlService = TomlSettingsService(() async => dir);
-    final settings = await tomlService.loadGlobalSettings();
-    if (settings != null) {
-      _log.info('Migrating settings from TOML to JSON');
-      await saveGlobalSettings(settings);
-
-      // Rename old file
-      final file = File(p.join(dir.path, 'settings.toml'));
-      if (await file.exists()) {
-        await file.rename(p.join(dir.path, 'settings.toml.bak'));
-      }
     }
   }
 
@@ -79,7 +62,8 @@ class CrdtSettingsService {
     try {
       final dir = await _getGlobalDir();
       final file = File(p.join(dir.path, _globalFilename));
-      await file.writeAsString(jsonEncode(settings.toJson()));
+      final toml = TomlDocument.fromMap(settings.toJson()).toString();
+      await file.writeAsString(toml);
     } catch (e) {
       _log.severe('Error saving global settings: $e');
     }
@@ -96,7 +80,6 @@ class CrdtSettingsService {
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
-
     final crdt = await SettingsCrdt.load(dir, _projectCrdtFilename);
     _projectCrdts[projectId] = crdt;
 

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:crdt/map_crdt.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
+import 'package:toml/toml.dart';
 
 class SettingsCrdt extends MapCrdt {
   static final _log = Logger('SettingsCrdt');
@@ -27,8 +28,8 @@ class SettingsCrdt extends MapCrdt {
       try {
         final content = await _file.readAsString();
         if (content.isNotEmpty) {
-          final json = jsonDecode(content) as Map<String, dynamic>;
-          final changeset = json.map((table, records) {
+          final toml = TomlDocument.parse(content).toMap();
+          final changeset = toml.map((table, records) {
             return MapEntry(
                 table, (records as List).cast<Map<String, dynamic>>());
           });
@@ -63,7 +64,9 @@ class SettingsCrdt extends MapCrdt {
   Future<void> _save() async {
     try {
       final changeset = getChangeset();
-      await _file.writeAsString(jsonEncode(changeset));
+      final jsonCompatible = jsonDecode(jsonEncode(changeset));
+      final toml = TomlDocument.fromMap(jsonCompatible).toString();
+      await _file.writeAsString(toml);
     } catch (e) {
       _log.severe('Error saving settings CRDT: $e');
     }
