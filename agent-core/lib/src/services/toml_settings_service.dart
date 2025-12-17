@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'dart:convert';
 import 'package:logging/logging.dart';
 
+import 'package:agent_core/src/utils/map_utils.dart';
+
 class TomlSettingsService {
   static final _log = Logger('TomlSettingsService');
 
@@ -54,7 +56,7 @@ class TomlSettingsService {
     // TOML supports these. DateTime in JSON is usually a String.
     final map =
         jsonDecode(jsonEncode(settings.toJson())) as Map<String, dynamic>;
-    final cleanMap = _removeNullsFromMap(map);
+    final cleanMap = removeNullsFromMap(map);
 
     final toml = TomlDocument.fromMap(cleanMap).toString();
     await file.writeAsString(toml);
@@ -99,7 +101,7 @@ class TomlSettingsService {
 
     final map =
         jsonDecode(jsonEncode(settings.toJson())) as Map<String, dynamic>;
-    final cleanMap = _removeNullsFromMap(map);
+    final cleanMap = removeNullsFromMap(map);
     final toml = TomlDocument.fromMap(cleanMap).toString();
     await file.writeAsString(toml);
   }
@@ -113,27 +115,5 @@ class TomlSettingsService {
     if (await file.exists()) {
       await file.delete();
     }
-  }
-
-  /// Recursively remove null values from a map
-  Map<String, dynamic> _removeNullsFromMap(Map<String, dynamic> map) {
-    final newMap = <String, dynamic>{};
-    map.forEach((key, value) {
-      if (value != null) {
-        if (value is Map) {
-          newMap[key] = _removeNullsFromMap(Map<String, dynamic>.from(value));
-        } else if (value is List) {
-          newMap[key] = value.map((e) {
-            if (e is Map) {
-              return _removeNullsFromMap(Map<String, dynamic>.from(e));
-            }
-            return e;
-          }).toList();
-        } else {
-          newMap[key] = value;
-        }
-      }
-    });
-    return newMap;
   }
 }

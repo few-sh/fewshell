@@ -5,6 +5,7 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:toml/toml.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:agent_core/src/utils/map_utils.dart';
 
 class CrdtSettingsService {
   static final _log = Logger('CrdtSettingsService');
@@ -62,7 +63,8 @@ class CrdtSettingsService {
     try {
       final dir = await _getGlobalDir();
       final file = File(p.join(dir.path, _globalFilename));
-      final toml = TomlDocument.fromMap(settings.toJson()).toString();
+      final cleanMap = removeNullsFromMap(settings.toJson());
+      final toml = TomlDocument.fromMap(cleanMap).toString();
       await file.writeAsString(toml);
     } catch (e) {
       _log.severe('Error saving global settings: $e');
