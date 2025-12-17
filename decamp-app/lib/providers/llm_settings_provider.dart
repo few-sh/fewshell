@@ -69,6 +69,7 @@ abstract class BaseLlmSettingsNotifier
     int? maxTokens,
     double? temperature,
   }) async {
+    final currentState = [...state];
     final now = DateTime.now();
     final newSettings = LlmApiSettings(
       identifier: identifier,
@@ -84,10 +85,12 @@ abstract class BaseLlmSettingsNotifier
 
     await _saveSecret(identifier, apiKey);
 
-    final updatedList = [...state, newSettings];
-    state = updatedList;
+    final updatedList = [...currentState, newSettings];
+    if (mounted) {
+      state = updatedList;
+    }
 
-    final isFirstModel = state.length == 1;
+    final isFirstModel = updatedList.length == 1;
     final defaultLlmIdentifier = isFirstModel
         ? identifier
         : _currentDefaultIdentifier;
@@ -111,15 +114,16 @@ abstract class BaseLlmSettingsNotifier
     double? temperature,
     bool? enabled,
   }) async {
+    final currentState = [...state];
     final now = DateTime.now();
     final lookupId = originalIdentifier ?? identifier;
-    final index = state.indexWhere((s) => s.identifier == lookupId);
+    final index = currentState.indexWhere((s) => s.identifier == lookupId);
 
     if (index == -1) {
       throw Exception('LLM settings with identifier "$lookupId" not found');
     }
 
-    final existing = state[index];
+    final existing = currentState[index];
     final updatedSettings = existing.copyWith(
       identifier: identifier,
       apiType: apiType ?? existing.apiType,
@@ -146,19 +150,26 @@ abstract class BaseLlmSettingsNotifier
       await _deleteSecret(originalIdentifier);
     }
 
-    final updatedList = [...state];
+    final updatedList = currentState;
     updatedList[index] = updatedSettings;
-    state = updatedList;
+    if (mounted) {
+      state = updatedList;
+    }
 
     await _saveSettings(updatedList);
   }
 
   /// Delete an LLM configuration
   Future<void> deleteLlmSettings(String identifier) async {
+    final currentState = [...state];
     await _deleteSecret(identifier);
 
-    final updatedList = state.where((s) => s.identifier != identifier).toList();
-    state = updatedList;
+    final updatedList = currentState
+        .where((s) => s.identifier != identifier)
+        .toList();
+    if (mounted) {
+      state = updatedList;
+    }
 
     final currentDefault = _currentDefaultIdentifier;
     final newDefault = currentDefault == identifier ? null : currentDefault;

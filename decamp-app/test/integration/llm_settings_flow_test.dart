@@ -71,7 +71,11 @@ void main() {
           globalDatabaseProvider.overrideWithValue(globalDb),
           projectDatabaseProvider.overrideWithValue(projectDb),
           crdtSettingsServiceProvider.overrideWith((ref) {
-            final service = CrdtSettingsService(() async => tempDir);
+            final service = CrdtSettingsService(
+              () async => tempDir,
+              (projectId) async =>
+                  Directory('${tempDir.path}/projects/$projectId'),
+            );
             ref.onDispose(() => service.close());
             return service;
           }),
