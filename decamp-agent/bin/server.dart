@@ -10,6 +10,8 @@ import 'package:fewshell_agent/services/database_manager.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 
+import 'package:agent_core/agent_core.dart';
+
 final _log = Logger('FewshellAgent');
 
 void main(List<String> args) async {
@@ -44,8 +46,13 @@ void main(List<String> args) async {
     final dbManager = DatabaseManager('${Directory.current.path}/data');
     await dbManager.init();
 
+    // Initialize CrdtSettingsService
+    final settingsService = CrdtSettingsService(
+        () async => Directory('${Directory.current.path}/data'));
+    await settingsService.init();
+
     // Initialize SyncController
-    final syncController = SyncController(dbManager);
+    final syncController = SyncController(dbManager, settingsService);
 
     // Configure SecurityContext for mTLS
     _log.info('Initializing mTLS with embedded certificates');

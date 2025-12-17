@@ -12,6 +12,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:decamp/certs.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
+import '../providers/settings_provider.dart';
 
 final _log = Logger('SyncService');
 
@@ -24,6 +25,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 class SyncService {
   final Ref ref;
   CrdtSync? _globalSync;
+  CrdtSync? _settingsSync;
   MultiplexedWebSocketChannel? _globalChannel;
   StreamSubscription? _globalSubscription;
 
@@ -141,6 +143,19 @@ class SyncService {
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         _log.fine('Global sync received custom message: $msg');
       });
+
+      // Settings Sync
+      final settingsService = ref.read(crdtSettingsServiceProvider);
+      await settingsService.init();
+      if (settingsService.crdt != null) {
+        final settingsChannel = _globalChannel!.fork('\u001E');
+        _settingsSync = CrdtSync.client(
+          settingsService.crdt!,
+          settingsChannel,
+          verbose: true,
+        );
+      }
+
       _globalSync = CrdtSync.client(
         adapter,
         _globalChannel!,
@@ -277,6 +292,8 @@ class SyncService {
   }
 
   void _disconnectGlobal() {
+    _settingsSync?.close();
+    _settingsSync = null;
     _globalSync?.close();
     _globalSync = null;
     _globalChannel = null;

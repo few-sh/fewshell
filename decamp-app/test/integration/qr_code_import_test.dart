@@ -68,8 +68,8 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           globalDatabaseProvider.overrideWithValue(globalDb),
           projectDatabaseProvider.overrideWithValue(projectDb),
-          tomlSettingsServiceProvider.overrideWith((ref) {
-            return TomlSettingsService(() async => tempDir);
+          crdtSettingsServiceProvider.overrideWith((ref) {
+            return CrdtSettingsService(() async => tempDir);
           }),
           currentProjectIdProvider.overrideWith((ref) {
             final prefs = ref.watch(sharedPreferencesProvider);

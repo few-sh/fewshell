@@ -15,9 +15,10 @@ class SyncController {
   static final _log = Logger('SyncController');
 
   final DatabaseManager dbManager;
+  final CrdtSettingsService settingsService;
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager);
+  SyncController(this.dbManager, this.settingsService);
 
   Handler get handler {
     return (Request request) {
@@ -35,12 +36,21 @@ class SyncController {
             verbose: true,
           );
 
+          // Settings Sync
+          final settingsChannel = multiplexed.fork('\u001E');
+          final settingsSync = CrdtSync.server(
+            settingsService.crdt!,
+            settingsChannel,
+            verbose: true,
+          );
+
           unawaited(
             multiplexed.sink.done.then((_) {
               _log.info(
                 'Channel closed for global',
               );
               sync.close();
+              settingsSync.close();
             }),
           );
         })(request);

@@ -34,6 +34,8 @@ export 'src/services/shell_tools_provider.dart';
 export 'src/services/llm_service.dart';
 export 'src/services/remote_agent_service.dart';
 export 'src/services/toml_settings_service.dart';
+export 'src/services/crdt_settings_service.dart';
+export 'src/services/settings_crdt.dart';
 
 // Database
 export 'src/database/database.dart';
