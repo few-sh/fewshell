@@ -144,18 +144,6 @@ class SyncService {
         _log.fine('Global sync received custom message: $msg');
       });
 
-      // Settings Sync
-      final settingsService = ref.read(crdtSettingsServiceProvider);
-      await settingsService.init();
-      if (settingsService.crdt != null) {
-        final settingsChannel = _globalChannel!.fork('\u001E');
-        _settingsSync = CrdtSync.client(
-          settingsService.crdt!,
-          settingsChannel,
-          verbose: true,
-        );
-      }
-
       _globalSync = CrdtSync.client(
         adapter,
         _globalChannel!,
@@ -277,6 +265,17 @@ class SyncService {
         monitoredChannel,
         awaitSync: () => adapter.onIdle,
       );
+
+      // Settings Sync
+      final settingsService = ref.read(crdtSettingsServiceProvider);
+      final settingsCrdt = await settingsService.getProjectCrdt(projectId);
+      final settingsChannel = _projectChannel!.fork('\u001E');
+      _settingsSync = CrdtSync.client(
+        settingsCrdt,
+        settingsChannel,
+        verbose: true,
+      );
+
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
         _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
@@ -292,8 +291,6 @@ class SyncService {
   }
 
   void _disconnectGlobal() {
-    _settingsSync?.close();
-    _settingsSync = null;
     _globalSync?.close();
     _globalSync = null;
     _globalChannel = null;
@@ -341,6 +338,8 @@ class SyncService {
   }
 
   void _closeProjectConnection() {
+    _settingsSync?.close();
+    _settingsSync = null;
     _projectSync?.close();
     _projectSync = null;
     _projectChannel = null;

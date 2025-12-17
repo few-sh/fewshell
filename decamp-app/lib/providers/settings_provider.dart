@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:path_provider/path_provider.dart';
@@ -5,7 +6,12 @@ import '../utils/default_prompt_loader.dart';
 
 /// Provider for CrdtSettingsService
 final crdtSettingsServiceProvider = Provider<CrdtSettingsService>((ref) {
-  final service = CrdtSettingsService(getApplicationDocumentsDirectory);
+  final service = CrdtSettingsService(getApplicationDocumentsDirectory, (
+    projectId,
+  ) async {
+    final dir = await getApplicationDocumentsDirectory();
+    return Directory('${dir.path}/projects/$projectId');
+  });
   ref.onDispose(() => service.close());
   return service;
 });
@@ -32,7 +38,7 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
     _updateState(_service.getGlobalSettings());
 
     // Listen to stream
-    _service.settingsStream.listen((settings) {
+    _service.globalSettingsStream.listen((settings) {
       _updateState(settings);
     });
   }
@@ -82,15 +88,18 @@ class ProjectSettingsNotifier extends StateNotifier<ProjectSettings?> {
 
   Future<void> _init() async {
     await _service.init();
-    _loadSettings();
+    // Ensure project CRDT is loaded
+    await _service.getProjectCrdt(_projectId);
 
-    _service.onChange.listen((_) {
+    await _loadSettings();
+
+    _service.onProjectChange.listen((_) {
       _loadSettings();
     });
   }
 
-  void _loadSettings() {
-    final settings = _service.getProjectSettings(_projectId);
+  Future<void> _loadSettings() async {
+    final settings = await _service.getProjectSettings(_projectId);
     if (settings != null) {
       if (mounted) state = settings;
     } else {

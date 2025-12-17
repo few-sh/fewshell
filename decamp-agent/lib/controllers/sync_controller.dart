@@ -36,21 +36,12 @@ class SyncController {
             verbose: true,
           );
 
-          // Settings Sync
-          final settingsChannel = multiplexed.fork('\u001E');
-          final settingsSync = CrdtSync.server(
-            settingsService.crdt!,
-            settingsChannel,
-            verbose: true,
-          );
-
           unawaited(
             multiplexed.sink.done.then((_) {
               _log.info(
                 'Channel closed for global',
               );
               sync.close();
-              settingsSync.close();
             }),
           );
         })(request);
@@ -73,6 +64,16 @@ class SyncController {
               verbose: true,
             );
 
+            // Settings Sync
+            final settingsChannel = multiplexed.fork('\u001E');
+            final settingsCrdt =
+                await settingsService.getProjectCrdt(projectId);
+            final settingsSync = CrdtSync.server(
+              settingsCrdt,
+              settingsChannel,
+              verbose: true,
+            );
+
             // Ensure sync is closed when channel is closed
             unawaited(
               multiplexed.sink.done.then((_) {
@@ -80,6 +81,7 @@ class SyncController {
                   'Channel closed for project $projectId',
                 );
                 sync.close();
+                settingsSync.close();
               }),
             );
           })(request);

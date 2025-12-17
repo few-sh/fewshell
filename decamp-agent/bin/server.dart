@@ -48,7 +48,10 @@ void main(List<String> args) async {
 
     // Initialize CrdtSettingsService
     final settingsService = CrdtSettingsService(
-        () async => Directory('${Directory.current.path}/data'));
+      () async => Directory('${Directory.current.path}/data'),
+      (projectId) async =>
+          Directory('${Directory.current.path}/data/projects/$projectId'),
+    );
     await settingsService.init();
 
     // Initialize SyncController
