@@ -55,6 +55,7 @@ class SyncController {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
+            _setupSecretSync(multiplexed, projectId);
 
             _log.info(
               'Starting CrdtSync for project $projectId',
@@ -91,6 +92,64 @@ class SyncController {
 
       return Response.notFound('Not found');
     };
+  }
+
+  void _setupSecretSync(
+    MultiplexedWebSocketChannel channel,
+    String projectId,
+  ) {
+    // Handle incoming secrets
+    channel.onCustomMessage.listen((msg) async {
+      if (msg['type'] == 'provide_secrets') {
+        final secrets = msg['secrets'] as Map<String, dynamic>;
+        for (final entry in secrets.entries) {
+          // Only save secrets that belong to this project
+          if (entry.key.contains(':project:$projectId:')) {
+            await keychainService.saveSecret(entry.key, entry.value.toString());
+          }
+        }
+        _log.info('Saved ${secrets.length} secrets from client');
+      }
+    });
+
+    // Check for missing secrets
+    void checkSecrets() async {
+      final missingKeys = <String>[];
+      List<LlmApiSettings> llmSettings = [];
+
+      final settings = await settingsService.getProjectSettings(projectId);
+      if (settings != null) {
+        llmSettings = settings.llmSettings;
+      }
+
+      for (final setting in llmSettings) {
+        final key =
+            LlmApiKeychainKeys.buildProjectKey(projectId, setting.identifier);
+
+        if (!await keychainService.hasSecret(key)) {
+          missingKeys.add(key);
+        }
+      }
+
+      if (missingKeys.isNotEmpty) {
+        channel.sendCustomMessage({
+          'type': 'missing_secrets',
+          'keys': missingKeys,
+        });
+      }
+    }
+
+    // Initial check
+    checkSecrets();
+
+    // Listen for changes
+    final subscription =
+        settingsService.onProjectChange.listen((_) => checkSecrets());
+
+    // Cleanup
+    channel.sink.done.then((_) {
+      subscription.cancel();
+    });
   }
 
   void _setupCustomMessageHandling(

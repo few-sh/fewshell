@@ -13,6 +13,7 @@ import 'package:decamp/certs.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/settings_provider.dart';
+import '../providers/secret_provider.dart';
 
 final _log = Logger('SyncService');
 
@@ -281,6 +282,7 @@ class SyncService {
         if (msg['type'] == 'PONG') {
           _log.fine('PONG received: ${msg['payload']}');
         }
+        _handleSecretRequest(msg, _projectChannel!);
       });
       _projectSync = CrdtSync.client(adapter, _projectChannel!, verbose: true);
     } catch (e) {
@@ -296,6 +298,32 @@ class SyncService {
     _globalChannel = null;
     _globalSubscription?.cancel();
     _globalSubscription = null;
+  }
+
+  Future<void> _handleSecretRequest(
+    Map<String, dynamic> msg,
+    MultiplexedWebSocketChannel channel,
+  ) async {
+    if (msg['type'] == 'missing_secrets') {
+      final keys = (msg['keys'] as List).cast<String>();
+      final secrets = <String, String>{};
+      final keychain = ref.read(keychainServiceProvider);
+
+      for (final key in keys) {
+        final value = await keychain.getSecret(key);
+        if (value != null) {
+          secrets[key] = value;
+        }
+      }
+
+      if (secrets.isNotEmpty) {
+        channel.sendCustomMessage({
+          'type': 'provide_secrets',
+          'secrets': secrets,
+        });
+        _log.info('Sent ${secrets.length} secrets to server');
+      }
+    }
   }
 
   void _scheduleReconnect() {
