@@ -9,6 +9,7 @@ import 'providers/project_provider.dart';
 import 'services/sync_service.dart';
 import 'themes/neon_dark.dart';
 import 'themes/terminal_theme.dart';
+import 'utils/globals.dart';
 
 final _log = Logger('DecampApp');
 
@@ -65,6 +66,7 @@ class DecampApp extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'Decamp AI Chat',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),

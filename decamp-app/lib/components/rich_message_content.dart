@@ -15,6 +15,7 @@ import 'package:decamp/providers/chat_controller_provider.dart';
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/providers/session_provider.dart';
+import 'package:decamp/utils/globals.dart';
 import 'package:logging/logging.dart';
 
 /// Rich message content widget
@@ -114,8 +115,9 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
       newContent: newContent,
       sessionId: widget.message.sessionId,
       requestApproval: (actions) {
-        if (!mounted) return Future.value(null);
-        return MultiCommandApprovalOverlay.show(context, actions);
+        final overlayContext = navigatorKey.currentContext;
+        if (overlayContext == null) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(overlayContext, actions);
       },
       syncChannel: syncChannel,
     );
@@ -136,8 +138,9 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
       messageId: widget.message.id,
       sessionId: widget.message.sessionId,
       requestApproval: (actions) {
-        if (!mounted) return Future.value(null);
-        return MultiCommandApprovalOverlay.show(context, actions);
+        final overlayContext = navigatorKey.currentContext;
+        if (overlayContext == null) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(overlayContext, actions);
       },
       syncChannel: syncChannel,
     );
