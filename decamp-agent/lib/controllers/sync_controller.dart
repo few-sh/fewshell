@@ -16,9 +16,10 @@ class SyncController {
 
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
+  final KeychainService keychainService;
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager, this.settingsService);
+  SyncController(this.dbManager, this.settingsService, this.keychainService);
 
   Handler get handler {
     return (Request request) {

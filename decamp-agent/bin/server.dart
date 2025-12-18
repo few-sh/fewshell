@@ -54,8 +54,14 @@ void main(List<String> args) async {
     );
     await settingsService.init();
 
+    // Initialize KeychainService
+    final secretsFile = File('${Directory.current.path}/data/secrets.json');
+    final secureStorage = FileSecureStorageImpl(file: secretsFile);
+    final keychainService = KeychainService(secureStorage);
+
     // Initialize SyncController
-    final syncController = SyncController(dbManager, settingsService);
+    final syncController =
+        SyncController(dbManager, settingsService, keychainService);
 
     // Configure SecurityContext for mTLS
     _log.info('Initializing mTLS with embedded certificates');
