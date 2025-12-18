@@ -27,9 +27,9 @@ _$AppSettingsImpl _$$AppSettingsImplFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$$AppSettingsImplToJson(_$AppSettingsImpl instance) =>
     <String, dynamic>{
-      'llmSettings': instance.llmSettings,
+      'llmSettings': instance.llmSettings.map((e) => e.toJson()).toList(),
       'defaultLlmIdentifier': instance.defaultLlmIdentifier,
-      'agentInstruction': instance.agentInstruction,
+      'agentInstruction': instance.agentInstruction?.toJson(),
       'createdAt': instance.createdAt?.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),
     };
@@ -64,11 +64,11 @@ Map<String, dynamic> _$$ProjectSettingsImplToJson(
         _$ProjectSettingsImpl instance) =>
     <String, dynamic>{
       'projectId': instance.projectId,
-      'llmSettings': instance.llmSettings,
+      'llmSettings': instance.llmSettings.map((e) => e.toJson()).toList(),
       'defaultLlmIdentifier': instance.defaultLlmIdentifier,
-      'agentInstruction': instance.agentInstruction,
+      'agentInstruction': instance.agentInstruction?.toJson(),
       'includeUserInstructions': instance.includeUserInstructions,
-      'sshSettings': instance.sshSettings,
+      'sshSettings': instance.sshSettings?.toJson(),
       'createdAt': instance.createdAt?.toIso8601String(),
       'updatedAt': instance.updatedAt?.toIso8601String(),
     };

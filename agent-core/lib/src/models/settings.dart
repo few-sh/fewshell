@@ -10,6 +10,7 @@ part 'settings.g.dart';
 /// Includes LLM model configurations and other user-level settings.
 @freezed
 class AppSettings with _$AppSettings {
+  @JsonSerializable(explicitToJson: true)
   const factory AppSettings({
     /// List of configured LLM API endpoints at the global level
     @Default([]) List<LlmApiSettings> llmSettings,
@@ -32,6 +33,7 @@ class AppSettings with _$AppSettings {
 /// Allows per-project LLM configuration and other project-specific settings.
 @freezed
 class ProjectSettings with _$ProjectSettings {
+  @JsonSerializable(explicitToJson: true)
   const factory ProjectSettings({
     required String projectId,
 

@@ -181,7 +181,8 @@ class __$$AppSettingsImplCopyWithImpl<$Res>
 }
 
 /// @nodoc
-@JsonSerializable()
+
+@JsonSerializable(explicitToJson: true)
 class _$AppSettingsImpl implements _AppSettings {
   const _$AppSettingsImpl(
       {final List<LlmApiSettings> llmSettings = const [],
@@ -531,7 +532,8 @@ class __$$ProjectSettingsImplCopyWithImpl<$Res>
 }
 
 /// @nodoc
-@JsonSerializable()
+
+@JsonSerializable(explicitToJson: true)
 class _$ProjectSettingsImpl implements _ProjectSettings {
   const _$ProjectSettingsImpl(
       {required this.projectId,
