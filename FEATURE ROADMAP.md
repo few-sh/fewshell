@@ -26,6 +26,14 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Ability to connect to a remote server without creating a project. (To allow getting all of the project information from the remote server)
 
+[ ] Always SUMMARIZE log and HTML outputs that are larger than X (tool outputs in general). (IDEA: Add summarize as part of the request tool)
+
+[ ] ERROR HANDLING - stuck loading when error
+
+[ ] For the header, leave a small button to show it
+
+[ ] Be able to save certain prompts
+
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
 
