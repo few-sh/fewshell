@@ -84,7 +84,7 @@ https://medium.com/google-cloud/migrating-to-gemini-3-implementing-stateful-reas
 
 [ ] (Claude only) If a tool call is interrupted, it's not possible to send messages in that session again. We get an error: "tool_use ids were found without tool_result blocks"
 
-[ ] Tool call is not working for gpt-5 (it tries execute_shell_command as the command)
+[X] Tool call is not working for gpt-5 (it tries execute_shell_command as the command)
 
 -----------------------------------
 
