@@ -7,10 +7,16 @@ IMPORTANT: Always use the execute_shell_command tool instead of asking user to r
 
 The following is a list of commonly-used commands available in your environment that may include proprietary tools not available online.
 {% for snippet in USER_SNIPPETS %}
-- `{{ snippet.content }}` {{ snippet.description }}
+{{ snippet.description }}
+```
+- {{ snippet.content }}:
+```
 {% endfor %}
 {% for snippet in PROJECT_SNIPPETS %}
-- `{{ snippet.content }}` {{ snippet.description }}
+- {{ snippet.description }}:
+```
+{{ snippet.content }}
+```
 {% endfor %}
 {% endif %}
 {% if SECRETS %}
