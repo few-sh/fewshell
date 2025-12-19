@@ -54,14 +54,21 @@ void main(List<String> args) async {
     );
     await settingsService.init();
 
-    // Initialize KeychainService
-    final secretsFile = File('${Directory.current.path}/data/secrets.json');
-    final secureStorage = FileSecureStorageImpl(file: secretsFile);
-    final keychainService = KeychainService(secureStorage);
-
     // Initialize SyncController
-    final syncController =
-        SyncController(dbManager, settingsService, keychainService);
+    final syncController = SyncController(
+      dbManager,
+      settingsService,
+      (projectId) async {
+        final projectDir =
+            Directory('${Directory.current.path}/data/projects/$projectId');
+        if (!await projectDir.exists()) {
+          await projectDir.create(recursive: true);
+        }
+        final secretsFile = File('${projectDir.path}/secrets.json');
+        final secureStorage = FileSecureStorageImpl(file: secretsFile);
+        return KeychainService(secureStorage);
+      },
+    );
 
     // Configure SecurityContext for mTLS
     _log.info('Initializing mTLS with embedded certificates');

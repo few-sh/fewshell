@@ -16,10 +16,10 @@ class SyncController {
 
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
-  final KeychainService keychainService;
+  final Future<KeychainService> Function(String projectId) keychainFactory;
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager, this.settingsService, this.keychainService);
+  SyncController(this.dbManager, this.settingsService, this.keychainFactory);
 
   Handler get handler {
     return (Request request) {
@@ -55,7 +55,7 @@ class SyncController {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
-            _setupSecretSync(multiplexed, projectId);
+            await _setupSecretSync(multiplexed, projectId);
 
             _log.info(
               'Starting CrdtSync for project $projectId',
@@ -94,10 +94,12 @@ class SyncController {
     };
   }
 
-  void _setupSecretSync(
+  Future<void> _setupSecretSync(
     MultiplexedWebSocketChannel channel,
     String projectId,
-  ) {
+  ) async {
+    final keychainService = await keychainFactory(projectId);
+
     // Handle incoming secrets
     channel.onCustomMessage.listen((msg) async {
       if (msg['type'] == 'provide_secrets') {
@@ -113,7 +115,7 @@ class SyncController {
     });
 
     // Check for missing secrets
-    void checkSecrets() async {
+    Future<void> checkSecrets() async {
       final missingKeys = <String>[];
       List<LlmApiSettings> llmSettings = [];
 
@@ -140,16 +142,18 @@ class SyncController {
     }
 
     // Initial check
-    checkSecrets();
+    await checkSecrets();
 
     // Listen for changes
-    final subscription =
-        settingsService.onProjectChange.listen((_) => checkSecrets());
+    final subscription = settingsService.onProjectChange
+        .listen((_) => unawaited(checkSecrets()));
 
     // Cleanup
-    channel.sink.done.then((_) {
-      subscription.cancel();
-    });
+    unawaited(
+      channel.sink.done.then((_) {
+        subscription.cancel();
+      }),
+    );
   }
 
   void _setupCustomMessageHandling(
