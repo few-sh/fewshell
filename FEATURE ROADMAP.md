@@ -74,7 +74,11 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 
 [X] If a remote project disconnects (eg server down), it falls back to using local mode. | Expected: Should block the user from typing messages, should have a clearer connection indication.
 
-[ ] Concatenation of user-level agent instruction with project-level agent instruction does not work. When we enable the checkbox, it does not remember the setting.
+[X] Concatenation of user-level agent instruction with project-level agent instruction does not work. When we enable the checkbox, it does not remember the setting.
+
+[ ] Gemini 3 in llm_dart: tool calling does not work because is requires migration to support thoughtSignatures.
+https://medium.com/google-cloud/migrating-to-gemini-3-implementing-stateful-reasoning-with-thought-signatures-4f11b625a8c9
+
 
 [ ] Loading state tends to get stuck for a whole session after a message gets interrupted (eg server goes down)
 
