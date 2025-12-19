@@ -221,11 +221,15 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
         ? _streamedContent
         : MessageFormatter.formatMessageContent(widget.message);
 
-    // Build markdown content
-    final content = _buildMarkdownContent(
-      context,
-      text,
-    ); // Build timestamp with optional edit indicator
+    Widget content;
+    if (widget.message.messageKind == MessageKind.thinking) {
+      content = _buildThinkingContent(context, text);
+    } else {
+      // Build markdown content
+      content = _buildMarkdownContent(context, text);
+    }
+
+    // Build timestamp with optional edit indicator
     final timestamp = _buildTimestamp(context);
 
     // Build controls row (timestamp + menu)
@@ -336,6 +340,53 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
             style: baseStyle.copyWith(fontWeight: FontWeight.w600),
           ),
           TextSpan(text: ' | $formattedTime$editedIndicator', style: baseStyle),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThinkingContent(BuildContext context, String text) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.psychology,
+                size: 16,
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Thinking Process',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontStyle: FontStyle.italic,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );

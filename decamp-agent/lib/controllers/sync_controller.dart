@@ -115,6 +115,7 @@ class _AgentSession {
 
   // Streaming state
   String? _streamingMessageId;
+  MessageKind? _streamingKind;
   final StringBuffer _streamingContent = StringBuffer();
   DateTime? _streamingCreatedAt;
   Future<void> _lastDbWrite = Future.value();
@@ -277,6 +278,34 @@ class _AgentSession {
           maxTokens: maxTokens,
         );
 
+        void finalizePrevious() {
+          if (_streamingMessageId != null) {
+            final id = _streamingMessageId!;
+            final content = _streamingContent.toString();
+            final kind = _streamingKind ?? MessageKind.text;
+            final createdAt = _streamingCreatedAt!;
+
+            _lastDbWrite = _lastDbWrite.then((_) async {
+              await db!.messageDao.insertMessage(
+                MessageEntityCompanion(
+                  id: Value(id),
+                  sessionId: Value(currentSessionId),
+                  userId: const Value('ai'),
+                  userName: Value(model),
+                  content: Value(content),
+                  timestamp: Value(createdAt),
+                  createdAt: Value(createdAt),
+                  messageKind: Value(kind),
+                  isStreaming: const Value(false),
+                ),
+              );
+            });
+            _streamingMessageId = null;
+            _streamingContent.clear();
+            _streamingKind = null;
+          }
+        }
+
         final provider = await LlmService.createProvider(
           settings,
           apiKey,
@@ -290,6 +319,7 @@ class _AgentSession {
           tools: shellTools,
           conversation: conversation,
           requestApproval: (pendingCalls) {
+            finalizePrevious();
             _currentPendingCalls = pendingCalls;
 
             channel.sendCustomMessage({
@@ -325,7 +355,47 @@ class _AgentSession {
 
             return jsonEncode({'error': 'Unknown tool'});
           },
+          onThinkingDelta: (delta) {
+            if (_streamingKind != MessageKind.thinking) {
+              finalizePrevious();
+              _streamingKind = MessageKind.thinking;
+            }
+
+            if (_streamingMessageId == null) {
+              _streamingMessageId = db!.messageDao.generateMessageId();
+              _streamingCreatedAt = DateTime.now();
+            }
+            _streamingContent.write(delta);
+            final content = _streamingContent.toString();
+            final id = _streamingMessageId!;
+            final createdAt = _streamingCreatedAt!;
+
+            final companion = MessageEntityCompanion(
+              id: Value(id),
+              sessionId: Value(currentSessionId),
+              userId: const Value('ai'),
+              userName: Value(model),
+              content: Value(content),
+              timestamp: Value(createdAt),
+              createdAt: Value(createdAt),
+              messageKind: const Value(MessageKind.thinking),
+              isStreaming: const Value(true),
+            );
+
+            _lastDbWrite = _lastDbWrite.then((_) async {
+              await db!.messageDao.insertMessage(companion);
+            }).catchError((e) {
+              _log.warning(
+                'Error writing streaming thinking message: $e',
+              );
+            });
+          },
           onTextDelta: (delta) {
+            if (_streamingKind != MessageKind.text) {
+              finalizePrevious();
+              _streamingKind = MessageKind.text;
+            }
+
             if (_streamingMessageId == null) {
               _streamingMessageId = db!.messageDao.generateMessageId();
               _streamingCreatedAt = DateTime.now();
@@ -368,6 +438,7 @@ class _AgentSession {
             _streamingMessageId = null;
             _streamingContent.clear();
             _streamingCreatedAt = null;
+            _streamingKind = null;
             _lastDbWrite = Future.value(); // Reset chain
 
             // db and sessionId are guaranteed to be non-null here due to checks at start of method

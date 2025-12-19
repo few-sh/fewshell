@@ -2,7 +2,7 @@ import 'package:drift/drift.dart';
 import '../converters/tool_call_converter.dart';
 
 /// Message kind discriminator for sum type representation
-enum MessageKind { text, imageUrl, toolUse, toolResult }
+enum MessageKind { text, imageUrl, toolUse, toolResult, thinking }
 
 /// Messages table definition for Drift database.
 /// Stores chat messages with foreign key to sessions.

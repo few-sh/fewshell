@@ -51,6 +51,8 @@ typedef ToolExecutionFunction = Future<String> Function(ToolCall toolCall);
 
 typedef TextDeltaCallback = void Function(String delta);
 
+typedef ThinkingDeltaCallback = void Function(String delta);
+
 typedef MessageCallback = Future<void> Function(ChatMessage message,
     {String? messageId});
 

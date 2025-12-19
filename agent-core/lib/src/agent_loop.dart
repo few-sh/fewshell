@@ -47,6 +47,7 @@ Future<AgentLoopResult> runAgentLoop({
   required ApprovalFunction requestApproval,
   required ToolExecutionFunction executeToolCall,
   TextDeltaCallback? onTextDelta,
+  ThinkingDeltaCallback? onThinkingDelta,
   MessageCallback? onAssistantMessage,
   MessageCallback? onToolResultMessage,
 }) async {
@@ -67,6 +68,7 @@ Future<AgentLoopResult> runAgentLoop({
       tools: tools,
       conversation: messages,
       onTextDelta: onTextDelta,
+      onThinkingDelta: onThinkingDelta,
     );
 
     // If no tool calls, we're done
@@ -186,6 +188,7 @@ Future<_StreamResult> _streamFromLlm({
   required List<Tool> tools,
   required List<ChatMessage> conversation,
   TextDeltaCallback? onTextDelta,
+  ThinkingDeltaCallback? onThinkingDelta,
 }) async {
   final buffer = StringBuffer();
   final toolCallMap = <String, ToolCall>{};
@@ -218,8 +221,8 @@ Future<_StreamResult> _streamFromLlm({
           toolCallMap[id] = delta;
         }
 
-      case ThinkingDeltaEvent():
-        // Ignore thinking events for now
+      case ThinkingDeltaEvent(delta: final delta):
+        onThinkingDelta?.call(delta);
         break;
 
       case CompletionEvent():

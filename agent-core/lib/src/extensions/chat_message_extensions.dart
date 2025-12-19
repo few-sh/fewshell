@@ -108,6 +108,8 @@ extension MessageEntityToChat on MessageEntity {
           url: imageUrl!,
           content: content,
         ),
+      MessageKind.thinking =>
+        ChatMessage.assistant(content).withExtension('thinking', true),
       MessageKind.text => role == ChatRole.user
           ? ChatMessage.user(content)
           : ChatMessage.assistant(content),
