@@ -55,17 +55,6 @@ class SyncController {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
-            await _setupSecretSync(multiplexed, projectId);
-
-            _log.info(
-              'Starting CrdtSync for project $projectId',
-            );
-            final sync = CrdtSync.server(
-              db.crdt,
-              multiplexed,
-              verbose: true,
-            );
-
             // Settings Sync
             final settingsChannel = multiplexed.fork('\u001E');
             final settingsCrdt =
@@ -73,6 +62,17 @@ class SyncController {
             final settingsSync = CrdtSync.server(
               settingsCrdt,
               settingsChannel,
+              verbose: true,
+            );
+
+            await _setupSecretSync(multiplexed, projectId, settingsCrdt);
+
+            _log.info(
+              'Starting CrdtSync for project $projectId',
+            );
+            final sync = CrdtSync.server(
+              db.crdt,
+              multiplexed,
               verbose: true,
             );
 
@@ -97,6 +97,7 @@ class SyncController {
   Future<void> _setupSecretSync(
     MultiplexedWebSocketChannel channel,
     String projectId,
+    SettingsCrdt settingsCrdt,
   ) async {
     final keychainService = await keychainFactory(projectId);
 
@@ -119,9 +120,16 @@ class SyncController {
       final missingKeys = <String>[];
       List<LlmApiSettings> llmSettings = [];
 
-      final settings = await settingsService.getProjectSettings(projectId);
-      if (settings != null) {
-        llmSettings = settings.llmSettings;
+      // We can read directly from the CRDT since we have it
+      final json = settingsCrdt.get('settings', 'project_$projectId');
+      if (json != null) {
+        try {
+          final settings =
+              ProjectSettings.fromJson(Map<String, dynamic>.from(json));
+          llmSettings = settings.llmSettings;
+        } catch (e) {
+          _log.warning('Error parsing project settings for $projectId: $e');
+        }
       }
 
       for (final setting in llmSettings) {
@@ -145,8 +153,8 @@ class SyncController {
     await checkSecrets();
 
     // Listen for changes
-    final subscription = settingsService.onProjectChange
-        .listen((_) => unawaited(checkSecrets()));
+    final subscription =
+        settingsCrdt.onChange.listen((_) => unawaited(checkSecrets()));
 
     // Cleanup
     unawaited(
