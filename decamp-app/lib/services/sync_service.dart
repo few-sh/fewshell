@@ -240,6 +240,9 @@ class SyncService {
         wsChannel,
         onActivity: _handleSyncActivity,
         onDisconnect: () {
+          _log.info(
+            'Project sync disconnected for $projectId (current: $_currentProjectId)',
+          );
           if (_currentProjectId != projectId) return;
           _updateConnectionState(SyncConnectionState.disconnected);
           _scheduleReconnect();

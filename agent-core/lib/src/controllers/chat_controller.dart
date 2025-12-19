@@ -233,8 +233,6 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       var aiMessageId = _messageDao.generateMessageId();
-      var hasStartedStreaming = false;
-      final streamingBuffer = StringBuffer();
       String? currentToolMessageId;
       MessageEntity? currentEntity;
 
@@ -270,28 +268,8 @@ class ChatController extends StateNotifier<ChatState> {
             .toList();
       }
 
-      void handleTextDelta(String delta) {
-        streamingBuffer.write(delta);
-        if (!hasStartedStreaming) {
-          hasStartedStreaming = true;
-        }
-        if (currentEntity != null) {
-          // Update content for streaming
-          // Note: We don't update currentEntity here to avoid drift,
-          // but we emit a new entity with updated content
-          _activeMessageController.add(
-            currentEntity!.copyWith(content: streamingBuffer.toString()),
-          );
-        }
-      }
-
       Future<void> handleAssistantMessage(ChatMessage message,
           {String? messageId}) async {
-        if (hasStartedStreaming) {
-          hasStartedStreaming = false;
-          streamingBuffer.clear();
-        }
-
         // Use the ID provided by server, or generate one if local
         final idToUse = messageId ?? aiMessageId;
 
@@ -429,7 +407,6 @@ class ChatController extends StateNotifier<ChatState> {
             await _sessionDao.touchSession(sessionId);
             return jsonEncode(result);
           },
-          onTextDelta: handleTextDelta,
           onAssistantMessage: handleAssistantMessage,
           onToolResultMessage: handleToolResultMessage,
         );
