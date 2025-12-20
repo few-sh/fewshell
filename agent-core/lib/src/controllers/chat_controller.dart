@@ -538,10 +538,6 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> editMessage({
     required String messageId,
     required String newContent,
-    required String sessionId,
-    required Future<List<ToolAction>?> Function(List<ToolAction>)
-        requestApproval,
-    MultiplexedWebSocketChannel? syncChannel,
   }) async {
     _log.info('✏️ Editing message: $messageId');
 
@@ -564,25 +560,6 @@ class ChatController extends StateNotifier<ChatState> {
     }
 
     _log.info('💾 Updated message content');
-
-    // Delete all messages AFTER this one (keep the edited message)
-    final deletedCount = await _messageDao.deleteMessagesAfter(
-      sessionId: sessionId,
-      afterTimestamp: updatedMessage.timestamp,
-    );
-
-    _log.info(
-      '🗑️ Deleted $deletedCount messages after edit, now resending',
-    );
-
-    // Resend from the edited message
-    await sendMessage(
-      content: null, // Use existing conversation (now with edited message)
-      triggerMessage: updatedMessage,
-      sessionId: sessionId,
-      requestApproval: requestApproval,
-      syncChannel: syncChannel,
-    );
   }
 
   /// Resend a message: delete all messages after it, then resend from that point
