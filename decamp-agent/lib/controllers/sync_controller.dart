@@ -27,18 +27,15 @@ class SyncController {
 
       if (path == 'global') {
         return webSocketHandler((WebSocketChannel channel, String? protocol) {
-          final multiplexed = MultiplexedWebSocketChannel(channel);
-          _setupCustomMessageHandling(multiplexed, 'Global');
-
           _log.info('Starting CrdtSync for global');
           final sync = CrdtSync.server(
             dbManager.globalDatabase.crdt,
-            multiplexed,
+            channel,
             verbose: true,
           );
 
           unawaited(
-            multiplexed.sink.done.then((_) {
+            channel.sink.done.then((_) {
               _log.info(
                 'Channel closed for global',
               );
