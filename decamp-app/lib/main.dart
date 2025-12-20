@@ -85,21 +85,39 @@ class DecampApp extends ConsumerWidget {
     }
 
     final themeMode = ref.watch(themeProvider);
-    final shadcnThemeMode = switch (themeMode) {
-      ThemeMode.system => shadcn.ThemeMode.system,
-      ThemeMode.light => shadcn.ThemeMode.light,
-      ThemeMode.dark => shadcn.ThemeMode.dark,
-    };
 
-    return shadcn.ShadcnApp(
+    return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Decamp AI Chat',
-      materialTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+        ),
         useMaterial3: true,
         extensions: const <ThemeExtension<dynamic>>[TerminalTheme.light],
       ),
-      themeMode: shadcnThemeMode,
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        extensions: const <ThemeExtension<dynamic>>[TerminalTheme.dark],
+      ),
+      themeMode: themeMode,
+      builder: (context, child) {
+        final theme = Theme.of(context);
+        return shadcn.Theme(
+          data: shadcn.ThemeData(
+            colorScheme: theme.brightness == Brightness.dark
+                ? shadcn.LegacyColorSchemes.darkZinc()
+                : shadcn.LegacyColorSchemes.lightZinc(),
+            radius: 0.5,
+          ),
+          child: shadcn.ShadcnUI(child: child!),
+        );
+      },
       home: const _HomeSelector(),
     );
   }
