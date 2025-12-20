@@ -234,6 +234,7 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           widget.onEdit();
           break;
         case 'add_snippet':
+          // FIXME: Support multiple snippets from one messsage (as we have tool calls)
           await showNewSnippetDialog(
             context,
             initialDescription: shellCommandExplanation ?? 'Test Description',
