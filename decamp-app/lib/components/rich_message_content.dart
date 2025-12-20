@@ -12,10 +12,6 @@ import 'package:decamp/components/message_edit_field.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/utils/highlight_injector.dart';
 import 'package:decamp/providers/chat_controller_provider.dart';
-import 'package:decamp/services/sync_service.dart';
-import 'package:decamp/components/multi_command_approval_overlay.dart';
-import 'package:decamp/providers/session_provider.dart';
-import 'package:decamp/utils/globals.dart';
 import 'package:logging/logging.dart';
 
 /// Rich message content widget
@@ -114,82 +110,6 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     _exitEditMode();
   }
 
-  Future<void> _handleResend() async {
-    _log.info('🔄 Resending message: ${widget.message.id}');
-
-    final controller = ref.read(
-      chatControllerProvider(widget.message.sessionId).notifier,
-    );
-
-    // Get sync channel
-    final syncChannel = ref.read(syncServiceProvider).projectChannel;
-
-    await controller.resendMessage(
-      messageId: widget.message.id,
-      sessionId: widget.message.sessionId,
-      requestApproval: (actions) {
-        final overlayContext = navigatorKey.currentContext;
-        if (overlayContext == null) return Future.value(null);
-        return MultiCommandApprovalOverlay.show(overlayContext, actions);
-      },
-      syncChannel: syncChannel,
-    );
-  }
-
-  Future<void> _handleBranch() async {
-    _log.info('🌿 Branching session at message: ${widget.message.id}');
-
-    final controller = ref.read(
-      chatControllerProvider(widget.message.sessionId).notifier,
-    );
-
-    final newSessionId = await controller.branchSession(
-      messageId: widget.message.id,
-      sessionId: widget.message.sessionId,
-    );
-
-    // Switch to the new session
-    ref.read(currentSessionIdProvider.notifier).select(newSessionId);
-
-    _log.info('✅ Switched to new session: $newSessionId');
-  }
-
-  Future<void> _handleDelete() async {
-    // Confirm deletion
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: const Text(
-          'Are you sure you want to delete this message? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    _log.info('🗑️ Deleting message: ${widget.message.id}');
-
-    final controller = ref.read(
-      chatControllerProvider(widget.message.sessionId).notifier,
-    );
-
-    await controller.deleteMessage(widget.message.id);
-  }
-
   /// Get pre-computed highlights for this message
   List<HighlightRange> _getHighlights() {
     return widget.highlights ?? [];
@@ -225,14 +145,7 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
         timestamp,
         const SizedBox(width: 4),
         // Show context menu (always visible)
-        MessageContextMenu(
-          onEdit: _enterEditMode,
-          onResend: _handleResend,
-          onBranch: _handleBranch,
-          onDelete: _handleDelete,
-          messageContent: widget.message.content,
-          showResend: widget.isUser, // Only show re-send for user messages
-        ),
+        MessageContextMenu(message: widget.message, onEdit: _enterEditMode),
       ],
     );
 
