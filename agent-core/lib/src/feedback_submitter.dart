@@ -1,4 +1,8 @@
+import 'package:dio/dio.dart';
+
 class FeedbackSubmitter {
+  static const String _feedbackUrl = 'https://shell-feedback-api.few.sh/submit';
+
   static Future<void> submitFeedback({
     required String type, // 'feature' or 'bug'
     required String text,
@@ -7,10 +11,18 @@ class FeedbackSubmitter {
     String? email,
     bool canContact = false,
   }) async {
-    // TODO: Implement feedback submission
-    await Future.delayed(const Duration(seconds: 1));
-    print(
-      'Feedback submitted: $type, $text, logs: $includeLogs, name: $name, email: $email, contact: $canContact',
-    );
+    final dio = Dio();
+
+    final data = {
+      'type': type,
+      'text': text,
+      'includeLogs': includeLogs,
+      'name': name,
+      'email': email,
+      'canContact': canContact,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+
+    await dio.post(_feedbackUrl, data: data);
   }
 }
