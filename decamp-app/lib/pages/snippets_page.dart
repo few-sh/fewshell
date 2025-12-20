@@ -6,6 +6,7 @@ import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
+import '../components/new_snippet_card.dart';
 
 /// Snippets page with User and Project snippets tabs
 class SnippetsPage extends ConsumerStatefulWidget {
@@ -18,7 +19,7 @@ class SnippetsPage extends ConsumerStatefulWidget {
 class _SnippetsPageState extends ConsumerState<SnippetsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  String? _newSnippetId; // Track if we're adding a new snippet
+  bool _isAddingSnippet = false;
 
   @override
   void initState() {
@@ -90,7 +91,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 
   void _addNewSnippet() {
     setState(() {
-      _newSnippetId = 'new_${DateTime.now().millisecondsSinceEpoch}';
+      _isAddingSnippet = true;
     });
   }
 
@@ -132,10 +133,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     List<SnippetEntity> snippets, {
     required bool isGlobal,
   }) {
-    final currentProjectId = ref.watch(currentProjectIdProvider);
-
     // Show empty state only if no snippets AND not adding a new one
-    if (snippets.isEmpty && _newSnippetId == null) {
+    if (snippets.isEmpty && !_isAddingSnippet) {
       return Center(
         child: EmptyPlaceholder(
           icon: Icons.code_off,
@@ -147,43 +146,23 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 
     // Build list items with new snippet card at top if needed
     final listItems = <Widget>[
-      if (_newSnippetId != null)
-        _NewSnippetCard(
-          key: ValueKey(_newSnippetId),
+      if (_isAddingSnippet)
+        NewSnippetCard(
+          key: const ValueKey('new_snippet'),
           isGlobal: isGlobal,
-          onSave: (description, content, isVisibleToLlm) async {
-            try {
-              await ref
-                  .read(snippetControllerProvider)
-                  .addSnippet(
-                    name: description,
-                    content: content,
-                    description: description,
-                    projectId: isGlobal ? null : currentProjectId,
-                    isVisibleToLlm: isVisibleToLlm,
-                  );
-              setState(() {
-                _newSnippetId = null;
-              });
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error adding snippet: $e'),
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                  ),
-                );
-              }
-            }
+          onSuccess: () {
+            setState(() {
+              _isAddingSnippet = false;
+            });
           },
           onCancel: () {
             setState(() {
-              _newSnippetId = null;
+              _isAddingSnippet = false;
             });
           },
         ),
       ...snippets.asMap().entries.map((entry) {
-        final index = entry.key + (_newSnippetId != null ? 1 : 0);
+        final index = entry.key + (_isAddingSnippet ? 1 : 0);
         final snippet = entry.value;
         return _buildSnippetCard(
           key: ValueKey(snippet.id),
@@ -201,17 +180,13 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
       padding: const EdgeInsets.all(16),
       onReorder: (oldIndex, newIndex) async {
         // Skip reordering if trying to move the new snippet card
-        if (_newSnippetId != null && (oldIndex == 0 || newIndex == 0)) {
+        if (_isAddingSnippet && (oldIndex == 0 || newIndex == 0)) {
           return;
         }
 
         // Adjust indices if new snippet card is present
-        final adjustedOldIndex = _newSnippetId != null
-            ? oldIndex - 1
-            : oldIndex;
-        final adjustedNewIndex = _newSnippetId != null
-            ? newIndex - 1
-            : newIndex;
+        final adjustedOldIndex = _isAddingSnippet ? oldIndex - 1 : oldIndex;
+        final adjustedNewIndex = _isAddingSnippet ? newIndex - 1 : newIndex;
 
         // Update the order in the database
         await ref
@@ -254,215 +229,6 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           index: index,
           snippet: snippet,
           isGlobal: isGlobal,
-        ),
-      ),
-    );
-  }
-}
-
-/// Widget for creating a new snippet inline
-class _NewSnippetCard extends StatefulWidget {
-  final bool isGlobal;
-  final Future<void> Function(
-    String description,
-    String content,
-    bool isVisibleToLlm,
-  )
-  onSave;
-  final VoidCallback onCancel;
-
-  const _NewSnippetCard({
-    super.key,
-    required this.isGlobal,
-    required this.onSave,
-    required this.onCancel,
-  });
-
-  @override
-  State<_NewSnippetCard> createState() => _NewSnippetCardState();
-}
-
-class _NewSnippetCardState extends State<_NewSnippetCard> {
-  final _descriptionController = TextEditingController();
-  final _contentController = TextEditingController();
-  final _descriptionFocus = FocusNode();
-  bool _isSaving = false;
-  bool _isVisibleToLlm = true;
-
-  @override
-  void initState() {
-    super.initState();
-    // Auto-focus on description field
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _descriptionFocus.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _descriptionController.dispose();
-    _contentController.dispose();
-    _descriptionFocus.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (_descriptionController.text.trim().isEmpty ||
-        _contentController.text.trim().isEmpty) {
-      return; // Don't save if required fields are empty
-    }
-
-    setState(() => _isSaving = true);
-    await widget.onSave(
-      _descriptionController.text.trim(),
-      _contentController.text.trim(),
-      _isVisibleToLlm,
-    );
-    setState(() => _isSaving = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.add_circle_outline,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'New Snippet',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                if (_isSaving)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: widget.onCancel,
-                    tooltip: 'Cancel',
-                    iconSize: 20,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              focusNode: _descriptionFocus,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                hintText: 'Description (e.g., List all pods)',
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-              minLines: 1,
-              maxLines: null,
-              style: theme.textTheme.bodyMedium,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _contentController,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                hintText: 'Command (e.g., kubectl get pods)',
-                hintStyle: TextStyle(
-                  color:
-                      theme.extension<TerminalTheme>()?.hintColor ??
-                      Colors.grey.shade600,
-                ),
-                isDense: true,
-                filled: true,
-                fillColor:
-                    theme.extension<TerminalTheme>()?.backgroundColor ??
-                    Colors.black,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color:
-                        theme.extension<TerminalTheme>()?.borderColor ??
-                        Colors.grey.shade800,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color:
-                        theme.extension<TerminalTheme>()?.borderColor ??
-                        Colors.grey.shade800,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-              minLines: 2,
-              maxLines: null,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color:
-                    theme.extension<TerminalTheme>()?.textColor ??
-                    Colors.greenAccent.shade400,
-                height: 1.5,
-              ),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _save(),
-            ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              title: const Text('Visible to AI'),
-              subtitle: const Text(
-                'Include this snippet in the AI context',
-                style: TextStyle(fontSize: 12),
-              ),
-              value: _isVisibleToLlm,
-              onChanged: (value) {
-                setState(() {
-                  _isVisibleToLlm = value;
-                });
-              },
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _isSaving ? null : _save,
-                icon: const Icon(Icons.check),
-                label: const Text('Save Snippet'),
-              ),
-            ),
-          ],
         ),
       ),
     );
