@@ -19,6 +19,8 @@ class SnippetsPage extends ConsumerStatefulWidget {
 class _SnippetsPageState extends ConsumerState<SnippetsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ScrollController _userSnippetsScrollController = ScrollController();
+  final ScrollController _projectSnippetsScrollController = ScrollController();
   bool _isAddingSnippet = false;
 
   @override
@@ -30,6 +32,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   @override
   void dispose() {
     _tabController.dispose();
+    _userSnippetsScrollController.dispose();
+    _projectSnippetsScrollController.dispose();
     super.dispose();
   }
 
@@ -93,13 +97,31 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     setState(() {
       _isAddingSnippet = true;
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = _tabController.index == 0
+          ? _userSnippetsScrollController
+          : _projectSnippetsScrollController;
+
+      if (controller.hasClients) {
+        controller.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Widget _buildUserSnippets() {
     final snippetsAsync = ref.watch(globalSnippetsProvider);
 
     return snippetsAsync.when(
-      data: (snippets) => _buildSnippetsList(snippets, isGlobal: true),
+      data: (snippets) => _buildSnippetsList(
+        snippets,
+        isGlobal: true,
+        scrollController: _userSnippetsScrollController,
+      ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) =>
           Center(child: Text('Error loading snippets: $error')),
@@ -122,7 +144,11 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     final snippetsAsync = ref.watch(projectSnippetsProvider(currentProjectId));
 
     return snippetsAsync.when(
-      data: (snippets) => _buildSnippetsList(snippets, isGlobal: false),
+      data: (snippets) => _buildSnippetsList(
+        snippets,
+        isGlobal: false,
+        scrollController: _projectSnippetsScrollController,
+      ),
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, stack) =>
           Center(child: Text('Error loading snippets: $error')),
@@ -132,6 +158,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   Widget _buildSnippetsList(
     List<SnippetEntity> snippets, {
     required bool isGlobal,
+    required ScrollController scrollController,
   }) {
     // Show empty state only if no snippets AND not adding a new one
     if (snippets.isEmpty && !_isAddingSnippet) {
@@ -177,6 +204,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     ];
 
     return ReorderableListView(
+      scrollController: scrollController,
       padding: const EdgeInsets.all(16),
       onReorder: (oldIndex, newIndex) async {
         // Skip reordering if trying to move the new snippet card
