@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class FeedbackPage extends ConsumerStatefulWidget {
   const FeedbackPage({super.key});
@@ -15,8 +16,18 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   bool _includeLogs = true;
-  bool _canContact = false;
+  bool _canContact = true;
   bool _isSubmitting = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadState();
+    _textController.addListener(_saveState);
+    _nameController.addListener(_saveState);
+    _emailController.addListener(_saveState);
+  }
 
   @override
   void dispose() {
@@ -24,6 +35,40 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
     _nameController.dispose();
     _emailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadState() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    setState(() {
+      _nameController.text = prefs.getString('feedback_name') ?? '';
+      _emailController.text = prefs.getString('feedback_email') ?? '';
+      _feedbackType = prefs.getString('feedback_type') ?? 'bug';
+      _textController.text = prefs.getString('feedback_text') ?? '';
+      _includeLogs = prefs.getBool('feedback_include_logs') ?? true;
+      _canContact = prefs.getBool('feedback_can_contact') ?? true;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('feedback_name', _nameController.text);
+    await prefs.setString('feedback_email', _emailController.text);
+    await prefs.setString('feedback_type', _feedbackType);
+    await prefs.setString('feedback_text', _textController.text);
+    await prefs.setBool('feedback_include_logs', _includeLogs);
+    await prefs.setBool('feedback_can_contact', _canContact);
+  }
+
+  Future<void> _clearTransientState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('feedback_type');
+    await prefs.remove('feedback_text');
+    await prefs.remove('feedback_include_logs');
+    await prefs.remove('feedback_can_contact');
+    // Name and email are kept
   }
 
   Future<void> _submit() async {
@@ -47,6 +92,9 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
         email: _emailController.text.trim(),
         canContact: _canContact,
       );
+
+      await _clearTransientState();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Feedback submitted successfully')),
@@ -70,6 +118,10 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Feedback')),
       body: SingleChildScrollView(
@@ -104,6 +156,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
                       setState(() {
                         _feedbackType = 'bug';
                       });
+                      _saveState();
                     }
                   },
                 ),
@@ -116,6 +169,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
                       setState(() {
                         _feedbackType = 'feature';
                       });
+                      _saveState();
                     }
                   },
                 ),
@@ -142,23 +196,25 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
                 setState(() {
                   _canContact = value ?? false;
                 });
+                _saveState();
               },
               controlAffinity: ListTileControlAffinity.leading,
               contentPadding: EdgeInsets.zero,
             ),
-            if (_feedbackType == 'bug') ...[
-              CheckboxListTile(
-                title: const Text('Include debug logs'),
-                value: _includeLogs,
-                onChanged: (value) {
-                  setState(() {
-                    _includeLogs = value ?? false;
-                  });
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
+            CheckboxListTile(
+              title: const Text('Include debug logs'),
+              value: _feedbackType == 'bug' ? _includeLogs : false,
+              onChanged: _feedbackType == 'bug'
+                  ? (value) {
+                      setState(() {
+                        _includeLogs = value ?? false;
+                      });
+                      _saveState();
+                    }
+                  : null,
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
