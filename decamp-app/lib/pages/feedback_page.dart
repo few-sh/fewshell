@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:decamp/providers/user_provider.dart';
+import 'package:decamp/utils/globals.dart';
 
 class FeedbackPage extends ConsumerStatefulWidget {
   const FeedbackPage({super.key});
@@ -98,6 +99,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         canContact: _canContact,
+        logger: globalSqliteLogger,
       );
 
       await _clearTransientState();
