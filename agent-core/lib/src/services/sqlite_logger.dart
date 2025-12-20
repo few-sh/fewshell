@@ -49,6 +49,7 @@ class SqliteLogger {
       CREATE TABLE IF NOT EXISTS $tableName (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         time INTEGER NOT NULL,
+        pretty_time TEXT GENERATED ALWAYS AS (datetime(time / 1000000, 'unixepoch')) VIRTUAL,
         level INTEGER NOT NULL,
         level_name TEXT NOT NULL,
         message TEXT NOT NULL,
