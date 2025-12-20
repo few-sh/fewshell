@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logging/logging.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:agent_core/agent_core.dart';
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
 import 'providers/theme_provider.dart';
@@ -32,6 +36,23 @@ void main() async {
   // Ensure Flutter bindings are initialized before async operations
   WidgetsFlutterBinding.ensureInitialized();
   _log.info('WidgetsFlutterBinding initialized');
+
+  try {
+    final appDocDir = await getApplicationDocumentsDirectory();
+    final packageInfo = await PackageInfo.fromPlatform();
+
+    // Initialize SqliteLogger
+    // ignore: unused_local_variable
+    final sqliteLogger = SqliteLogger(
+      dbPath: '${appDocDir.path}/logs.db',
+      tableName: 'logs',
+      appVersion: '${packageInfo.version}+${packageInfo.buildNumber}',
+      processId: pid.toString(),
+    );
+    _log.info('SqliteLogger initialized at ${appDocDir.path}/');
+  } catch (e) {
+    _log.severe('Failed to initialize SqliteLogger', e);
+  }
 
   // Initialize SharedPreferences
   final sharedPreferences = await SharedPreferences.getInstance();
