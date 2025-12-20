@@ -661,7 +661,7 @@ packages:
       path: "../llm_dart"
       relative: true
     source: path
-    version: "0.10.4"
+    version: "0.10.5"
   logging:
     dependency: "direct main"
     description:

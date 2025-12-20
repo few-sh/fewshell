@@ -107,19 +107,9 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
       chatControllerProvider(widget.message.sessionId).notifier,
     );
 
-    // Get sync channel
-    final syncChannel = ref.read(syncServiceProvider).projectChannel;
-
     await controller.editMessage(
       messageId: widget.message.id,
       newContent: newContent,
-      sessionId: widget.message.sessionId,
-      requestApproval: (actions) {
-        final overlayContext = navigatorKey.currentContext;
-        if (overlayContext == null) return Future.value(null);
-        return MultiCommandApprovalOverlay.show(overlayContext, actions);
-      },
-      syncChannel: syncChannel,
     );
     _exitEditMode();
   }
