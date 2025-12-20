@@ -1,10 +1,13 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:agent_core/src/database/tables/messages_table.dart';
 import 'package:decamp/providers/chat_controller_provider.dart';
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
+import 'package:decamp/components/new_snippet_card.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/utils/globals.dart';
 import 'package:logging/logging.dart';
@@ -121,6 +124,31 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
     );
 
     final isUser = widget.message.userId == 'user';
+    final isToolCall = widget.message.messageKind == MessageKind.toolUse;
+    bool isShellCommand = false;
+    String? shellCommandContent;
+    String? shellCommandExplanation;
+
+    if (isToolCall && widget.message.toolCallsJson != null) {
+      for (final toolCall in widget.message.toolCallsJson!) {
+        if (toolCall.function.name == 'execute_shell_command') {
+          isShellCommand = true;
+          try {
+            final args =
+                jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
+            if (args.containsKey('command')) {
+              shellCommandContent = args['command'] as String?;
+            }
+            if (args.containsKey('explanation')) {
+              shellCommandExplanation = args['explanation'] as String?;
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+          break;
+        }
+      }
+    }
 
     final result = await showMenu<String>(
       context: context,
@@ -146,6 +174,17 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
             ],
           ),
         ),
+        if (isShellCommand)
+          PopupMenuItem<String>(
+            value: 'add_snippet',
+            child: Row(
+              children: [
+                Icon(Icons.code, size: 18, color: colorScheme.onSurface),
+                const SizedBox(width: 12),
+                const Text('Add to Snippets'),
+              ],
+            ),
+          ),
         if (isUser)
           PopupMenuItem<String>(
             value: 'resend',
@@ -193,6 +232,14 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           break;
         case 'edit':
           widget.onEdit();
+          break;
+        case 'add_snippet':
+          await showNewSnippetDialog(
+            context,
+            initialDescription: shellCommandExplanation ?? 'Test Description',
+            initialContent: shellCommandContent ?? 'Test Content',
+            isGlobal: null,
+          );
           break;
         case 'resend':
           await _handleResend();
