@@ -42,13 +42,13 @@ void main() async {
     final packageInfo = await PackageInfo.fromPlatform();
 
     // Initialize SqliteLogger
-    // ignore: unused_local_variable
     final sqliteLogger = SqliteLogger(
       dbPath: '${appDocDir.path}/logs.db',
       tableName: 'logs',
       appVersion: '${packageInfo.version}+${packageInfo.buildNumber}',
       processId: pid.toString(),
     );
+    globalSqliteLogger = sqliteLogger;
     _log.info('SqliteLogger initialized at ${appDocDir.path}/');
   } catch (e) {
     _log.severe('Failed to initialize SqliteLogger', e);

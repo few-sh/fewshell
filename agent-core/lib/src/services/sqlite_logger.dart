@@ -104,6 +104,31 @@ class SqliteLogger {
     }
   }
 
+  /// Creates a temporary copy of the log database.
+  /// Returns a [File] pointing to the temporary copy.
+  /// The caller is responsible for deleting the file (and its parent directory) when done.
+  Future<File> createLogSnapshot() async {
+    if (!_initialized) {
+      throw StateError('Logger not initialized');
+    }
+
+    // Flush the database to ensure all data is written to disk
+    try {
+      _db.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (e) {
+      // Ignore errors during checkpoint (e.g. if not in WAL mode)
+    }
+
+    // Create a temporary directory for the snapshot
+    final tempDir = Directory.systemTemp.createTempSync('decamp_logs_');
+    final tempPath = '${tempDir.path}/logs.db';
+
+    // Copy the database file
+    await File(dbPath).copy(tempPath);
+
+    return File(tempPath);
+  }
+
   /// Closes the database connection.
   void dispose() {
     if (_initialized) {
