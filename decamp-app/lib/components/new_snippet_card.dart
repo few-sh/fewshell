@@ -4,15 +4,44 @@ import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
 
+/// Shows a modal dialog to create a new snippet
+Future<void> showNewSnippetDialog(
+  BuildContext context, {
+  String? initialDescription,
+  String? initialContent,
+  bool? isGlobal,
+}) {
+  return showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      insetPadding: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: NewSnippetCard(
+          isGlobal: isGlobal,
+          initialDescription: initialDescription,
+          initialContent: initialContent,
+          onCancel: () => Navigator.of(context).pop(),
+          onSuccess: () => Navigator.of(context).pop(),
+        ),
+      ),
+    ),
+  );
+}
+
 /// Widget for creating a new snippet inline
 class NewSnippetCard extends ConsumerStatefulWidget {
-  final bool isGlobal;
+  final bool? isGlobal;
+  final String? initialDescription;
+  final String? initialContent;
   final VoidCallback onCancel;
   final VoidCallback onSuccess;
 
   const NewSnippetCard({
     super.key,
-    required this.isGlobal,
+    this.isGlobal,
+    this.initialDescription,
+    this.initialContent,
     required this.onCancel,
     required this.onSuccess,
   });
@@ -22,15 +51,22 @@ class NewSnippetCard extends ConsumerStatefulWidget {
 }
 
 class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
-  final _descriptionController = TextEditingController();
-  final _contentController = TextEditingController();
+  late final TextEditingController _descriptionController;
+  late final TextEditingController _contentController;
   final _descriptionFocus = FocusNode();
   bool _isSaving = false;
   bool _isVisibleToLlm = true;
+  late bool _isGlobalSelection;
 
   @override
   void initState() {
     super.initState();
+    _descriptionController = TextEditingController(
+      text: widget.initialDescription,
+    );
+    _contentController = TextEditingController(text: widget.initialContent);
+    _isGlobalSelection = widget.isGlobal ?? false;
+
     // Auto-focus on description field
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _descriptionFocus.requestFocus();
@@ -55,6 +91,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
 
     try {
       final currentProjectId = ref.read(currentProjectIdProvider);
+      final isGlobal = widget.isGlobal ?? _isGlobalSelection;
 
       await ref
           .read(snippetControllerProvider)
@@ -62,7 +99,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
             name: _descriptionController.text.trim(),
             content: _contentController.text.trim(),
             description: _descriptionController.text.trim(),
-            projectId: widget.isGlobal ? null : currentProjectId,
+            projectId: isGlobal ? null : currentProjectId,
             isVisibleToLlm: _isVisibleToLlm,
           );
 
@@ -87,11 +124,13 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     final theme = Theme.of(context);
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 4,
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: Colors.transparent,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -214,6 +253,35 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
               dense: true,
               contentPadding: EdgeInsets.zero,
             ),
+            if (widget.isGlobal == null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    'Scope:',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ChoiceChip(
+                    label: const Text('Project'),
+                    selected: !_isGlobalSelection,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _isGlobalSelection = false);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('User (Global)'),
+                    selected: _isGlobalSelection,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _isGlobalSelection = true);
+                    },
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
