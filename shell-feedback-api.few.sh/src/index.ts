@@ -1,4 +1,5 @@
 export interface Env {
+	FEWSHELL_BUCKET: R2Bucket;
 }
 
 export default {
