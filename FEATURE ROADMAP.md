@@ -34,6 +34,10 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Be able to save certain prompts
 
+[ ] Support adding multiple snippets from multi-tool command calls
+
+[ ] Make snippets searchable
+
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
 
