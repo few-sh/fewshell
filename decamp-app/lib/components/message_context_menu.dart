@@ -1,27 +1,110 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agent_core/agent_core.dart';
+import 'package:decamp/providers/chat_controller_provider.dart';
+import 'package:decamp/services/sync_service.dart';
+import 'package:decamp/components/multi_command_approval_overlay.dart';
+import 'package:decamp/providers/session_provider.dart';
+import 'package:decamp/utils/globals.dart';
+import 'package:logging/logging.dart';
 
 /// Context menu for message actions
 /// Shows Copy, Edit, Re-send, and Branch Session options
-class MessageContextMenu extends StatelessWidget {
+class MessageContextMenu extends ConsumerStatefulWidget {
+  final MessageEntity message;
   final VoidCallback onEdit;
-  final VoidCallback onResend;
-  final VoidCallback onBranch;
-  final VoidCallback onDelete;
-  final String messageContent;
-  final bool showResend;
 
   const MessageContextMenu({
     super.key,
+    required this.message,
     required this.onEdit,
-    required this.onResend,
-    required this.onBranch,
-    required this.onDelete,
-    required this.messageContent,
-    this.showResend = true,
   });
 
-  void _showMenu(BuildContext context) async {
+  @override
+  ConsumerState<MessageContextMenu> createState() => _MessageContextMenuState();
+}
+
+class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
+  static final _log = Logger('MessageContextMenu');
+
+  Future<void> _handleResend() async {
+    _log.info('🔄 Resending message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    // Get sync channel
+    final syncChannel = ref.read(syncServiceProvider).projectChannel;
+
+    await controller.resendMessage(
+      messageId: widget.message.id,
+      sessionId: widget.message.sessionId,
+      requestApproval: (actions) {
+        final overlayContext = navigatorKey.currentContext;
+        if (overlayContext == null) return Future.value(null);
+        return MultiCommandApprovalOverlay.show(overlayContext, actions);
+      },
+      syncChannel: syncChannel,
+    );
+  }
+
+  Future<void> _handleBranch() async {
+    _log.info('🌿 Branching session at message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    final newSessionId = await controller.branchSession(
+      messageId: widget.message.id,
+      sessionId: widget.message.sessionId,
+    );
+
+    // Switch to the new session
+    ref.read(currentSessionIdProvider.notifier).select(newSessionId);
+
+    _log.info('✅ Switched to new session: $newSessionId');
+  }
+
+  Future<void> _handleDelete() async {
+    // Confirm deletion
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message'),
+        content: const Text(
+          'Are you sure you want to delete this message? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    _log.info('🗑️ Deleting message: ${widget.message.id}');
+
+    final controller = ref.read(
+      chatControllerProvider(widget.message.sessionId).notifier,
+    );
+
+    await controller.deleteMessage(widget.message.id);
+  }
+
+  void _showMenu() async {
     final colorScheme = Theme.of(context).colorScheme;
     final RenderBox button = context.findRenderObject() as RenderBox;
     final RenderBox overlay =
@@ -36,6 +119,8 @@ class MessageContextMenu extends StatelessWidget {
       ),
       Offset.zero & overlay.size,
     );
+
+    final isUser = widget.message.userId == 'user';
 
     final result = await showMenu<String>(
       context: context,
@@ -61,7 +146,7 @@ class MessageContextMenu extends StatelessWidget {
             ],
           ),
         ),
-        if (showResend)
+        if (isUser)
           PopupMenuItem<String>(
             value: 'resend',
             child: Row(
@@ -95,10 +180,10 @@ class MessageContextMenu extends StatelessWidget {
       ],
     );
 
-    if (result != null && context.mounted) {
+    if (result != null && mounted) {
       switch (result) {
         case 'copy':
-          Clipboard.setData(ClipboardData(text: messageContent));
+          Clipboard.setData(ClipboardData(text: widget.message.content));
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Message copied to clipboard'),
@@ -107,16 +192,18 @@ class MessageContextMenu extends StatelessWidget {
           );
           break;
         case 'edit':
-          onEdit();
+          widget.onEdit();
           break;
         case 'resend':
-          onResend();
+          await _handleResend();
           break;
         case 'branch':
-          onBranch();
+          await _handleBranch();
           break;
         case 'delete':
-          onDelete();
+          if (mounted) {
+            await _handleDelete();
+          }
           break;
       }
     }
@@ -135,7 +222,7 @@ class MessageContextMenu extends StatelessWidget {
       padding: EdgeInsets.zero,
       constraints: const BoxConstraints(),
       tooltip: 'Message options',
-      onPressed: () => _showMenu(context),
+      onPressed: _showMenu,
       visualDensity: VisualDensity.compact,
     );
   }
