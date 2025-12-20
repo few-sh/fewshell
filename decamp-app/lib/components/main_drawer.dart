@@ -8,6 +8,7 @@ import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/snippets_page.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/providers/package_info_provider.dart';
+import 'package:decamp/pages/feedback_page.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key});
@@ -164,6 +165,19 @@ class MainDrawer extends ConsumerWidget {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const MainSettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.feedback),
+                  title: const Text('Feedback'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FeedbackPage(),
                       ),
                     );
                   },

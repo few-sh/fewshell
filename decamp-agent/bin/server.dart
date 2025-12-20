@@ -9,6 +9,7 @@ import 'package:fewshell_agent/router.dart';
 import 'package:fewshell_agent/services/database_manager.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
+import 'package:agent_core/agent_core.dart';
 
 import 'package:agent_core/agent_core.dart';
 
@@ -32,6 +33,15 @@ void main(List<String> args) async {
 
   const version = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
   _log.info('Starting Fewshell Agent v$version');
+
+  // Initialize SqliteLogger
+  // ignore: unused_local_variable
+  final sqliteLogger = SqliteLogger(
+    dbPath: '${Directory.current.path}/data/logs.db',
+    tableName: 'logs',
+    appVersion: version,
+    processId: pid.toString(),
+  );
 
   try {
     // Initialize FFI for sqflite explicitly

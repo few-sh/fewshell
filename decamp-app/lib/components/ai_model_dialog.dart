@@ -175,7 +175,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               children: [
                 // API Type dropdown (moved to top)
                 DropdownButtonFormField<LlmApiType>(
-                  value: _selectedApiType,
+                  initialValue: _selectedApiType,
                   decoration: const InputDecoration(
                     labelText: 'API Type',
                     isDense: true,

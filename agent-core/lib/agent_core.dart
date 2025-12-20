@@ -6,6 +6,8 @@ export 'src/controllers/chat_controller.dart';
 export 'src/models/tool_action.dart';
 export 'src/utils/secret_redactor.dart';
 export 'src/services/fetch_tool.dart';
+export 'src/services/sqlite_logger.dart';
+export 'src/feedback_submitter.dart';
 
 // Models
 export 'src/models/agent_instruction.dart';

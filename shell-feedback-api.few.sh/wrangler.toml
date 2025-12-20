@@ -1,0 +1,8 @@
+name = "shell-feedback-api-few-sh"
+main = "src/index.ts"
+compatibility_date = "2024-05-29"
+
+[[r2_buckets]]
+binding = "FEWSHELL_BUCKET"
+bucket_name = "fewshell-feedback"
+
