@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:decamp/providers/user_provider.dart';
 
 class FeedbackPage extends ConsumerStatefulWidget {
   const FeedbackPage({super.key});
@@ -42,7 +43,13 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
     if (!mounted) return;
 
     setState(() {
-      _nameController.text = prefs.getString('feedback_name') ?? '';
+      final savedName = prefs.getString('feedback_name');
+      if (savedName == null) {
+        _nameController.text = ref.read(userProvider);
+      } else {
+        _nameController.text = savedName;
+      }
+
       _emailController.text = prefs.getString('feedback_email') ?? '';
       _feedbackType = prefs.getString('feedback_type') ?? 'bug';
       _textController.text = prefs.getString('feedback_text') ?? '';
