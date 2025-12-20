@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:shadcn_flutter/shadcn_flutter.dart' as shadcn;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logging/logging.dart';
@@ -11,7 +12,6 @@ import 'pages/projects_page.dart';
 import 'providers/theme_provider.dart';
 import 'providers/project_provider.dart';
 import 'services/sync_service.dart';
-import 'themes/neon_dark.dart';
 import 'themes/terminal_theme.dart';
 import 'utils/globals.dart';
 
@@ -85,17 +85,21 @@ class DecampApp extends ConsumerWidget {
     }
 
     final themeMode = ref.watch(themeProvider);
+    final shadcnThemeMode = switch (themeMode) {
+      ThemeMode.system => shadcn.ThemeMode.system,
+      ThemeMode.light => shadcn.ThemeMode.light,
+      ThemeMode.dark => shadcn.ThemeMode.dark,
+    };
 
-    return MaterialApp(
+    return shadcn.ShadcnApp(
       navigatorKey: navigatorKey,
       title: 'Decamp AI Chat',
-      theme: ThemeData(
+      materialTheme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
         extensions: const <ThemeExtension<dynamic>>[TerminalTheme.light],
       ),
-      darkTheme: neonDarkTheme,
-      themeMode: themeMode,
+      themeMode: shadcnThemeMode,
       home: const _HomeSelector(),
     );
   }
