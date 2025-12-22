@@ -9,6 +9,7 @@ import 'package:decamp/pages/snippets_page.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/providers/package_info_provider.dart';
 import 'package:decamp/pages/feedback_page.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key});
@@ -18,108 +19,111 @@ class MainDrawer extends ConsumerWidget {
     final currentProject = ref.watch(currentProjectProvider);
     final currentProjectName = currentProject?.name ?? 'No Project';
     final hasProject = currentProject != null;
+    final theme = ShadTheme.of(context);
 
     return Drawer(
+      backgroundColor: theme.colorScheme.background,
       child: Column(
         children: [
           Expanded(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
-                DrawerHeader(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.inversePrimary,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const UserBadge(),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: hasProject
-                                  ? null
-                                  : () {
-                                      Navigator.pop(context);
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              const ProjectsPage(),
-                                        ),
-                                      );
-                                    },
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Flexible(
-                                        child: FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          alignment: Alignment.centerLeft,
-                                          child: Text(
-                                            currentProjectName,
-                                            style: const TextStyle(
-                                              fontSize: 24,
-                                              fontWeight: FontWeight.bold,
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  color: theme.colorScheme.card,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const UserBadge(),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: hasProject
+                                    ? null
+                                    : () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const ProjectsPage(),
+                                          ),
+                                        );
+                                      },
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              currentProjectName,
+                                              style: theme.textTheme.h4
+                                                  .copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                      if (!hasProject) ...[
-                                        const SizedBox(width: 8),
-                                        const Icon(
-                                          Icons.add_circle_outline,
-                                          size: 20,
-                                        ),
+                                        if (!hasProject) ...[
+                                          const SizedBox(width: 8),
+                                          Icon(
+                                            LucideIcons.plus,
+                                            size: 20,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ],
                                       ],
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    hasProject
-                                        ? (currentProject.description ?? '')
-                                        : 'Tap to create a project',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurface
-                                          .withValues(alpha: 0.6),
                                     ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      hasProject
+                                          ? (currentProject.description ?? '')
+                                          : 'Tap to create a project',
+                                      style: theme.textTheme.muted.copyWith(
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.swap_horiz),
-                            tooltip: 'Switch Project',
-                            iconSize: 28,
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ProjectsPage(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
+                            ShadButton.ghost(
+                              width: 40,
+                              height: 40,
+                              padding: EdgeInsets.zero,
+                              onPressed: () {
+                                Navigator.pop(context);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const ProjectsPage(),
+                                  ),
+                                );
+                              },
+                              child: const Icon(LucideIcons.arrowLeftRight),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.code),
-                  title: const Text('Snippets'),
+                const SizedBox(height: 8),
+                _DrawerItem(
+                  icon: LucideIcons.code,
+                  label: 'Snippets',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -130,9 +134,9 @@ class MainDrawer extends ConsumerWidget {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.key),
-                  title: const Text('Secrets'),
+                _DrawerItem(
+                  icon: LucideIcons.key,
+                  label: 'Secrets',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -143,9 +147,9 @@ class MainDrawer extends ConsumerWidget {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.description),
-                  title: const Text('Agent Instructions'),
+                _DrawerItem(
+                  icon: LucideIcons.fileText,
+                  label: 'Agent Instructions',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -156,9 +160,9 @@ class MainDrawer extends ConsumerWidget {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.settings),
-                  title: const Text('Settings'),
+                _DrawerItem(
+                  icon: LucideIcons.settings,
+                  label: 'Settings',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -169,9 +173,9 @@ class MainDrawer extends ConsumerWidget {
                     );
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.feedback),
-                  title: const Text('Feedback'),
+                _DrawerItem(
+                  icon: LucideIcons.messageSquare,
+                  label: 'Feedback',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
@@ -194,12 +198,7 @@ class MainDrawer extends ConsumerWidget {
                 children: [
                   Text(
                     'Copyright 2025 Fewshot Corp',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                    ),
+                    style: theme.textTheme.muted.copyWith(fontSize: 11),
                   ),
                   const SizedBox(height: 4),
                   Consumer(
@@ -207,16 +206,14 @@ class MainDrawer extends ConsumerWidget {
                       final packageInfo = ref.watch(packageInfoProvider);
                       return packageInfo.when(
                         data: (info) => Text(
-                          'Version ${info.version}+${info.buildNumber}',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.5),
-                          ),
+                          'Version ${info.version} (${info.buildNumber})',
+                          style: theme.textTheme.muted.copyWith(fontSize: 11),
                         ),
-                        loading: () => const SizedBox.shrink(),
-                        error: (error, stack) => const SizedBox.shrink(),
+                        loading: () => const SizedBox(
+                          height: 10,
+                          width: 50,
+                        ), // Placeholder
+                        error: (_, _) => const SizedBox.shrink(),
                       );
                     },
                   ),
@@ -225,6 +222,32 @@ class MainDrawer extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DrawerItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DrawerItem({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+      child: ShadButton.ghost(
+        width: double.infinity,
+        mainAxisAlignment: MainAxisAlignment.start,
+        leading: Icon(icon, size: 18),
+        onPressed: onTap,
+        child: Text(label),
       ),
     );
   }
