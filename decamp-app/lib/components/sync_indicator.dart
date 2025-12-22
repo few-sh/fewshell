@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../services/sync_service.dart';
 
 class SyncIndicator extends ConsumerStatefulWidget {
@@ -37,6 +38,7 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
   @override
   Widget build(BuildContext context) {
     final syncService = ref.watch(syncServiceProvider);
+    final theme = ShadTheme.of(context);
 
     return StreamBuilder<SyncConnectionState>(
       stream: syncService.connectionState,
@@ -48,9 +50,16 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
           if (!_spinController.isAnimating) {
             _spinController.repeat();
           }
-          return RotationTransition(
-            turns: _spinController,
-            child: const Icon(Icons.refresh, size: 16),
+          return ShadTooltip(
+            builder: (context) => const Text('Connecting...'),
+            child: RotationTransition(
+              turns: _spinController,
+              child: Icon(
+                LucideIcons.refreshCw,
+                size: 16,
+                color: theme.colorScheme.mutedForeground,
+              ),
+            ),
           );
         } else {
           if (_spinController.isAnimating) {
@@ -60,10 +69,13 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
         }
 
         if (connectionState == SyncConnectionState.disconnected) {
-          return Icon(
-            Icons.cloud_off,
-            size: 16,
-            color: Theme.of(context).colorScheme.error,
+          return ShadTooltip(
+            builder: (context) => const Text('Disconnected'),
+            child: Icon(
+              LucideIcons.cloudOff,
+              size: 16,
+              color: theme.colorScheme.destructive,
+            ),
           );
         }
 
@@ -81,13 +93,9 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
             } else {
               if (_pulseController.isAnimating) {
                 _pulseController.stop();
-                _pulseController.value =
-                    0.0; // Reset to fully visible (or dimmed)
+                _pulseController.value = 0.0;
               }
             }
-
-            // When syncing, pulse between 1.0 and 0.5
-            // When idle, stay at 0.5 (dimmed)
 
             return AnimatedBuilder(
               animation: _pulseController,
@@ -101,9 +109,17 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
                   opacity = 0.5;
                 }
 
-                return Opacity(
-                  opacity: opacity,
-                  child: const Icon(Icons.cloud_queue, size: 16),
+                return ShadTooltip(
+                  builder: (context) =>
+                      Text(isSyncing ? 'Syncing...' : 'Synced'),
+                  child: Opacity(
+                    opacity: opacity,
+                    child: Icon(
+                      LucideIcons.cloud,
+                      size: 16,
+                      color: theme.colorScheme.foreground,
+                    ),
+                  ),
                 );
               },
             );
