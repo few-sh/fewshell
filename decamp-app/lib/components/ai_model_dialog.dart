@@ -286,6 +286,8 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               ShadInput(
                 controller: _urlController,
                 placeholder: const Text('https://api.example.com/v1'),
+                minLines: 1,
+                maxLines: null,
               ),
               const SizedBox(height: 12),
               Text('API Key', style: theme.textTheme.small),
@@ -298,6 +300,8 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                       : 'Enter your API key',
                 ),
                 obscureText: _obscureApiKey,
+                minLines: 1,
+                maxLines: _obscureApiKey ? 1 : null,
                 trailing: ShadButton.ghost(
                   width: 24,
                   height: 24,
