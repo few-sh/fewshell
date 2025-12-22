@@ -320,6 +320,19 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 )
               : <LlmApiSettings>[]);
 
+    // Get the current default identifier
+    final String? currentDefault;
+    if (isGlobal) {
+      currentDefault = ref.watch(globalSettingsProvider).defaultLlmIdentifier;
+    } else {
+      final currentProjectId = ref.watch(currentProjectIdProvider);
+      currentDefault = currentProjectId != null
+          ? ref
+                .watch(projectSettingsProvider(currentProjectId))
+                ?.defaultLlmIdentifier
+          : null;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -379,6 +392,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               child: _buildModelCard(
                 settings: settings,
                 isGlobal: isGlobal,
+                isSelected: settings.identifier == currentDefault,
                 onEdit: () => _showEditModelDialog(
                   settings: settings,
                   isGlobal: isGlobal,
@@ -397,23 +411,11 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   Widget _buildModelCard({
     required LlmApiSettings settings,
     required bool isGlobal,
+    required bool isSelected,
     required VoidCallback onEdit,
     required VoidCallback onDelete,
   }) {
     final theme = ShadTheme.of(context);
-
-    // Get the current default identifier
-    final String? currentDefault;
-    if (isGlobal) {
-      currentDefault = ref.watch(globalSettingsProvider).defaultLlmIdentifier;
-    } else {
-      final currentProjectId = ref.watch(currentProjectIdProvider);
-      currentDefault = currentProjectId != null
-          ? ref
-                .watch(projectSettingsProvider(currentProjectId))
-                ?.defaultLlmIdentifier
-          : null;
-    }
 
     return ShadCard(
       padding: const EdgeInsets.all(16),
@@ -430,7 +432,13 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      ShadRadio(value: settings.identifier == currentDefault),
+                      Icon(
+                        isSelected ? LucideIcons.circleDot : LucideIcons.circle,
+                        size: 16,
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.mutedForeground,
+                      ),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
