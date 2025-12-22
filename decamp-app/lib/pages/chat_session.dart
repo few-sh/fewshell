@@ -22,6 +22,7 @@ import 'package:decamp/components/no_llm_configured_overlay.dart';
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:logging/logging.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 class ChatSession extends ConsumerStatefulWidget {
   const ChatSession({super.key});
@@ -299,22 +300,28 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       : null,
                 ),
                 centerTitle: false,
-                backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+                backgroundColor: ShadTheme.of(context).colorScheme.card,
                 actions: [
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    tooltip: 'Search',
+                  ShadButton.ghost(
+                    width: 40,
+                    height: 40,
+                    padding: EdgeInsets.zero,
                     onPressed: hasProject ? _activateSearch : null,
+                    child: const Icon(LucideIcons.search),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    tooltip: 'New Session',
+                  ShadButton.ghost(
+                    width: 40,
+                    height: 40,
+                    padding: EdgeInsets.zero,
                     onPressed: hasProject ? _createNewSession : null,
+                    child: const Icon(LucideIcons.plus),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.history),
-                    tooltip: 'Session History',
+                  ShadButton.ghost(
+                    width: 40,
+                    height: 40,
+                    padding: EdgeInsets.zero,
                     onPressed: _showSessionHistory,
+                    child: const Icon(LucideIcons.history),
                   ),
                 ],
               ),
@@ -345,8 +352,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                                 ? _searchNavigatorHeight + 16
                                 : 0,
                           ),
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
+                          loading: () => Center(
+                            child: CircularProgressIndicator(
+                              color: ShadTheme.of(context).colorScheme.primary,
+                            ),
+                          ),
                           error: (error, stack) => Center(
                             // TODO: Log this error to our logging service
                             child: Text('Error loading messages: $error'),
