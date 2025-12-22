@@ -9,6 +9,8 @@ import 'package:decamp/pages/snippets_page.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/providers/package_info_provider.dart';
 import 'package:decamp/pages/feedback_page.dart';
+import 'package:decamp/pages/debug_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 class MainDrawer extends ConsumerWidget {
@@ -186,6 +188,20 @@ class MainDrawer extends ConsumerWidget {
                     );
                   },
                 ),
+                if (kDebugMode)
+                  _DrawerItem(
+                    icon: LucideIcons.bug,
+                    label: 'Debug',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const DebugPage(),
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
           ),
