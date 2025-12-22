@@ -8,6 +8,7 @@ import '../providers/llm_settings_provider.dart';
 import '../providers/llm_service_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
+import '../themes/shad_layout_theme.dart';
 
 /// Agent Instructions page with User and Project settings tabs
 class AgentInstructionsPage extends ConsumerStatefulWidget {
@@ -25,6 +26,8 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
   Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
     final theme = ShadTheme.of(context);
+    final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
+    final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
     return Scaffold(
       appBar: AppBar(
@@ -34,11 +37,11 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Container(
+      body: Column(
+        children: [
+          Padding(
+            padding: pagePadding,
+            child: Container(
               decoration: BoxDecoration(
                 color: theme.colorScheme.muted,
                 borderRadius: theme.radius,
@@ -99,27 +102,26 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: IndexedStack(
-                index: _currentTab == 'user' ? 0 : 1,
-                children: [
-                  const _UserSettingsTab(),
-                  currentProject != null
-                      ? _ProjectSettingsTab(
-                          projectId: currentProject.id,
-                          key: ValueKey(currentProject.id),
-                        )
-                      : const Center(
-                          child: Text(
-                            'No project selected. Please select a project first.',
-                          ),
+          ),
+          Expanded(
+            child: IndexedStack(
+              index: _currentTab == 'user' ? 0 : 1,
+              children: [
+                const _UserSettingsTab(),
+                currentProject != null
+                    ? _ProjectSettingsTab(
+                        projectId: currentProject.id,
+                        key: ValueKey(currentProject.id),
+                      )
+                    : const Center(
+                        child: Text(
+                          'No project selected. Please select a project first.',
                         ),
-                ],
-              ),
+                      ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -243,6 +245,8 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
   Widget build(BuildContext context) {
     final settings = ref.watch(globalSettingsProvider);
     final llmSettings = ref.watch(globalLlmSettingsProvider);
+    final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
+    final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
     // Load settings when they change
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -256,7 +260,7 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
       children: [
         // Preview/Edit toggle and Save button
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: pagePadding,
           child: Row(
             children: [
               Expanded(
@@ -280,7 +284,7 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
         const ShadSeparator.horizontal(),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16.0),
+            padding: pagePadding,
             children: [
               // Template variables info
               const _TemplateVariablesInfo(),
@@ -484,6 +488,8 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   Widget build(BuildContext context) {
     final projectId = widget.projectId;
     final llmSettings = ref.watch(projectLlmSettingsProvider(projectId));
+    final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
+    final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
     // Listen for settings updates (e.g. when they finish loading)
     ref.listen<ProjectSettings?>(projectSettingsProvider(projectId), (
@@ -500,7 +506,7 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
       children: [
         // Preview/Edit toggle and Save button
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: pagePadding,
           child: Row(
             children: [
               Expanded(
@@ -524,7 +530,7 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
         const ShadSeparator.horizontal(),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16.0),
+            padding: pagePadding,
             children: [
               // Include User Instructions Checkbox
               ShadCheckbox(
@@ -792,7 +798,6 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     return ShadCard(
-      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -844,7 +849,7 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
             const SizedBox(height: 8),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: theme.inputTheme.padding ?? const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 border: Border.all(color: theme.colorScheme.border),
                 borderRadius: theme.radius,
