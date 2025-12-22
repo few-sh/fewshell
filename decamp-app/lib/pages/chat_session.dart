@@ -264,6 +264,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Detect keyboard visibility
     final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     // Track keyboard state changes
     if (keyboardVisible != _previousKeyboardVisible) {
@@ -281,54 +282,54 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         // Dismiss keyboard when tapping outside
         _inputFocusNode.unfocus();
       },
-      child: SafeArea(
-        top: !keyboardVisible,
-        child: Scaffold(
-          appBar: PreferredSize(
-            preferredSize: Size.fromHeight(
-              keyboardVisible ? 0 : kToolbarHeight,
-            ),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              height: keyboardVisible ? 0 : kToolbarHeight,
-              child: AppBar(
-                title: ProjectTitleBar(
-                  title: currentProjectName,
-                  leading: (currentProject?.serverUrl != null)
-                      ? const SyncIndicator()
-                      : null,
-                ),
-                centerTitle: false,
-                backgroundColor: ShadTheme.of(context).colorScheme.card,
-                actions: [
-                  ShadButton.ghost(
-                    width: 40,
-                    height: 40,
-                    padding: EdgeInsets.zero,
-                    onPressed: hasProject ? _activateSearch : null,
-                    child: const Icon(LucideIcons.search),
-                  ),
-                  ShadButton.ghost(
-                    width: 40,
-                    height: 40,
-                    padding: EdgeInsets.zero,
-                    onPressed: hasProject ? _createNewSession : null,
-                    child: const Icon(LucideIcons.plus),
-                  ),
-                  ShadButton.ghost(
-                    width: 40,
-                    height: 40,
-                    padding: EdgeInsets.zero,
-                    onPressed: _showSessionHistory,
-                    child: const Icon(LucideIcons.history),
-                  ),
-                ],
+      child: Scaffold(
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(
+            keyboardVisible ? 0 : kToolbarHeight + topPadding,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            height: keyboardVisible ? 0 : kToolbarHeight + topPadding,
+            child: AppBar(
+              title: ProjectTitleBar(
+                title: currentProjectName,
+                leading: (currentProject?.serverUrl != null)
+                    ? const SyncIndicator()
+                    : null,
               ),
+              centerTitle: false,
+              backgroundColor: ShadTheme.of(context).colorScheme.card,
+              actions: [
+                ShadButton.ghost(
+                  width: 40,
+                  height: 40,
+                  padding: EdgeInsets.zero,
+                  onPressed: hasProject ? _activateSearch : null,
+                  child: const Icon(LucideIcons.search),
+                ),
+                ShadButton.ghost(
+                  width: 40,
+                  height: 40,
+                  padding: EdgeInsets.zero,
+                  onPressed: hasProject ? _createNewSession : null,
+                  child: const Icon(LucideIcons.plus),
+                ),
+                ShadButton.ghost(
+                  width: 40,
+                  height: 40,
+                  padding: EdgeInsets.zero,
+                  onPressed: _showSessionHistory,
+                  child: const Icon(LucideIcons.history),
+                ),
+              ],
             ),
           ),
-          drawer: const MainDrawer(),
-          body: Stack(
+        ),
+        drawer: const MainDrawer(),
+        body: SafeArea(
+          top: !keyboardVisible,
+          child: Stack(
             children: [
               // Main chat UI
               Column(
