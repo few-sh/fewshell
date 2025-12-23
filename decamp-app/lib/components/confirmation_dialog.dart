@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 Future<bool?> showConfirmationDialog({
   required BuildContext context,
@@ -8,25 +9,26 @@ Future<bool?> showConfirmationDialog({
   String cancelLabel = 'Cancel',
   bool isDestructive = true,
 }) {
-  return showDialog<bool>(
+  return showShadDialog<bool>(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (context) => ShadDialog.alert(
       title: Text(title),
-      content: Text(content),
+      description: Text(content),
       actions: [
-        TextButton(
+        ShadButton.outline(
           onPressed: () => Navigator.pop(context, false),
           child: Text(cancelLabel),
         ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: TextButton.styleFrom(
-            foregroundColor: isDestructive
-                ? Theme.of(context).colorScheme.error
-                : null,
+        if (isDestructive)
+          ShadButton.destructive(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(confirmLabel),
+          )
+        else
+          ShadButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(confirmLabel),
           ),
-          child: Text(confirmLabel),
-        ),
       ],
     ),
   );
