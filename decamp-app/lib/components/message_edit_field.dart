@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Inline edit field for message editing
 /// Shows a text field with Save and Cancel buttons
@@ -59,17 +60,16 @@ class _MessageEditFieldState extends State<MessageEditField> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: theme.colorScheme.secondary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.3),
+          color: theme.colorScheme.primary.withValues(alpha: 0.3),
           width: 2,
         ),
       ),
@@ -77,7 +77,7 @@ class _MessageEditFieldState extends State<MessageEditField> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextField(
+          ShadInput(
             controller: _controller,
             focusNode: _focusNode,
             maxLines: null,
@@ -85,37 +85,27 @@ class _MessageEditFieldState extends State<MessageEditField> {
             textInputAction: TextInputAction.newline,
             autocorrect: false,
             enableSuggestions: false,
-            style: theme.textTheme.bodyMedium,
-            decoration: InputDecoration(
-              hintText: 'Edit your message...',
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colorScheme.outline),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colorScheme.outline),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colorScheme.primary, width: 2),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
+            placeholder: const Text('Edit your message...'),
           ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
+              ShadButton.outline(
                 onPressed: widget.onCancel,
                 child: const Text('Cancel'),
               ),
               const SizedBox(width: 8),
-              FilledButton.icon(
+              ShadButton(
                 onPressed: _handleSave,
-                icon: const Icon(Icons.check, size: 18),
-                label: const Text('Save'),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.check, size: 18),
+                    SizedBox(width: 8),
+                    Text('Save'),
+                  ],
+                ),
               ),
             ],
           ),
