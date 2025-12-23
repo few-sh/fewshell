@@ -16,6 +16,7 @@ import 'package:decamp/components/empty_placeholder.dart';
 import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/new_snippet_card.dart';
 import 'package:decamp/components/no_llm_configured_overlay.dart';
+import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/project_setup_view.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
@@ -121,6 +122,15 @@ class DebugPage extends StatelessWidget {
                 child: const Text('No LLM Configured Overlay'),
                 onPressed: () {
                   NoLlmConfiguredOverlay.show(context);
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: ShadButton.outline(
+                child: const Text('Multi Command Approval Overlay'),
+                onPressed: () {
+                  MultiCommandApprovalOverlay.showTest(context);
                 },
               ),
             ),

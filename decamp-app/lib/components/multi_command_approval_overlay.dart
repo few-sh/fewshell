@@ -22,6 +22,60 @@ class MultiCommandApprovalOverlay extends StatefulWidget {
     );
   }
 
+  /// Test method to show the overlay with placeholder data
+  static Future<void> showTest(BuildContext context) async {
+    final actions = [
+      ToolAction(
+        id: '1',
+        toolName: 'run_in_terminal',
+        params: {
+          'command': 'ls -la',
+          'explanation': 'List all files in the current directory',
+        },
+        isSelected: true,
+      ),
+      ToolAction(
+        id: '2',
+        toolName: 'fetch_webpage',
+        params: {
+          'url': 'https://example.com',
+          'method': 'GET',
+          'explanation': 'Fetch the example.com homepage',
+        },
+        isSelected: true,
+      ),
+      ToolAction(
+        id: '3',
+        toolName: 'run_in_terminal',
+        params: {
+          'command': 'sudo rm -rf /',
+          'explanation': 'Dangerous command requiring privileges',
+          'sudo_required': true,
+        },
+        isSelected: false,
+      ),
+      ToolAction(
+        id: '4',
+        toolName: 'custom_tool',
+        params: {'explanation': 'A custom tool action'},
+        isSelected: true,
+      ),
+    ];
+
+    final result = await show(context, actions);
+    if (context.mounted) {
+      if (result != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Approved ${result.length} actions')),
+        );
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cancelled')));
+      }
+    }
+  }
+
   @override
   State<MultiCommandApprovalOverlay> createState() =>
       _MultiCommandApprovalOverlayState();
