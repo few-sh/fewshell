@@ -242,7 +242,10 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
                           foregroundColor: _isGlobalSelection
                               ? theme.colorScheme.primaryForeground
                               : theme.colorScheme.secondaryForeground,
-                          child: const Text('User (Global)'),
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('User'),
+                          ),
                         ),
                       ),
                     ],
