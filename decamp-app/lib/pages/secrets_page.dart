@@ -240,15 +240,22 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                 ),
                 const SizedBox(height: 8),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        isObscured ? '••••••••••••••••' : value,
-                        style: theme.textTheme.p.copyWith(
-                          fontFamily: 'monospace',
-                          color: theme.colorScheme.mutedForeground,
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 200),
+                        alignment: Alignment.topLeft,
+                        curve: Curves.easeInOut,
+                        child: Text(
+                          isObscured ? '••••••••••••••••' : value,
+                          style: theme.textTheme.p.copyWith(
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.mutedForeground,
+                          ),
+                          maxLines: isObscured ? 1 : null,
+                          overflow: isObscured ? TextOverflow.ellipsis : null,
                         ),
-                        maxLines: isObscured ? 1 : null,
                       ),
                     ),
                     ShadButton.ghost(
