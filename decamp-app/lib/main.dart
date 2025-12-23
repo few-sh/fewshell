@@ -14,6 +14,7 @@ import 'providers/project_provider.dart';
 import 'services/sync_service.dart';
 import 'themes/neon_dark.dart';
 import 'themes/neon_light.dart';
+import 'themes/shad_layout_theme.dart';
 import 'utils/globals.dart';
 
 final _log = Logger('DecampApp');
@@ -92,6 +93,7 @@ class DecampApp extends ConsumerWidget {
       theme: ShadThemeData(
         brightness: Brightness.light,
         colorScheme: neonLightShadColorScheme,
+        contextMenuTheme: getShadContextMenuTheme(),
         inputTheme: const ShadInputTheme(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
@@ -99,6 +101,7 @@ class DecampApp extends ConsumerWidget {
       darkTheme: ShadThemeData(
         brightness: Brightness.dark,
         colorScheme: neonShadColorScheme,
+        contextMenuTheme: getShadContextMenuTheme(),
         inputTheme: const ShadInputTheme(
           padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
