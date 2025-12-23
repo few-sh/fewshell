@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Search match navigator widget
 /// Shows match count and provides previous/next navigation buttons
@@ -18,54 +19,62 @@ class SearchMatchNavigator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = ShadTheme.of(context);
     final hasMatches = totalMatches > 0;
 
-    return Card(
-      elevation: 4,
-      color: colorScheme.surface,
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              hasMatches ? '$currentMatch of $totalMatches' : 'No matches',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.background,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            hasMatches ? '$currentMatch of $totalMatches' : 'No matches',
+            style: theme.textTheme.small.copyWith(
+              color: theme.colorScheme.foreground.withValues(alpha: 0.7),
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: Icon(
-                Icons.keyboard_arrow_up,
-                size: 18,
-                color: hasMatches
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-              ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              tooltip: 'Previous match',
-              onPressed: hasMatches ? onPrevious : null,
+          ),
+          const SizedBox(width: 8),
+          ShadButton.ghost(
+            width: 24,
+            height: 24,
+            padding: EdgeInsets.zero,
+            onPressed: hasMatches ? onPrevious : null,
+            child: Icon(
+              LucideIcons.chevronUp,
+              size: 16,
+              color: hasMatches
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.foreground.withValues(alpha: 0.3),
             ),
-            const SizedBox(width: 4),
-            IconButton(
-              icon: Icon(
-                Icons.keyboard_arrow_down,
-                size: 18,
-                color: hasMatches
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-              ),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              tooltip: 'Next match',
-              onPressed: hasMatches ? onNext : null,
+          ),
+          const SizedBox(width: 4),
+          ShadButton.ghost(
+            width: 24,
+            height: 24,
+            padding: EdgeInsets.zero,
+            onPressed: hasMatches ? onNext : null,
+            child: Icon(
+              LucideIcons.chevronDown,
+              size: 16,
+              color: hasMatches
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.foreground.withValues(alpha: 0.3),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
