@@ -81,51 +81,58 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
       ],
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 16),
-            Text('Environment Variable Name', style: theme.textTheme.small),
-            const SizedBox(height: 4),
-            ShadInput(
-              controller: _keyController,
-              placeholder: const Text('e.g., API_KEY, DATABASE_URL'),
-              enabled: !_isEditMode,
-              textCapitalization: TextCapitalization.characters,
-            ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4, left: 4),
-              child: Text(
-                'Must be uppercase with underscores',
-                style: theme.textTheme.muted.copyWith(fontSize: 12),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 16),
+              Text('Environment Variable Name', style: theme.textTheme.small),
+              const SizedBox(height: 4),
+              ShadInput(
+                controller: _keyController,
+                placeholder: const Text('e.g., API_KEY, DATABASE_URL'),
+                enabled: !_isEditMode,
+                textCapitalization: TextCapitalization.characters,
               ),
-            ),
-            const SizedBox(height: 16),
-            Text('Secret Value', style: theme.textTheme.small),
-            const SizedBox(height: 4),
-            ShadInput(
-              controller: _valueController,
-              placeholder: const Text('Enter the secret value'),
-              obscureText: _obscureValue,
-              minLines: 1,
-              maxLines: _obscureValue ? 1 : 5,
-              trailing: ShadButton.ghost(
-                width: 24,
-                height: 24,
-                padding: EdgeInsets.zero,
-                child: Icon(
-                  _obscureValue ? LucideIcons.eye : LucideIcons.eyeOff,
-                  size: 16,
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  'Must be uppercase with underscores',
+                  style: theme.textTheme.muted.copyWith(fontSize: 12),
                 ),
-                onPressed: () {
-                  setState(() {
-                    _obscureValue = !_obscureValue;
-                  });
-                },
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text('Secret Value', style: theme.textTheme.small),
+              const SizedBox(height: 4),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                alignment: Alignment.topCenter,
+                curve: Curves.easeInOut,
+                child: ShadInput(
+                  controller: _valueController,
+                  placeholder: const Text('Enter the secret value'),
+                  obscureText: _obscureValue,
+                  minLines: 1,
+                  maxLines: _obscureValue ? 1 : null,
+                  trailing: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    child: Icon(
+                      _obscureValue ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 16,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureValue = !_obscureValue;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
