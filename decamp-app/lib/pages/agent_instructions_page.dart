@@ -790,9 +790,12 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
                   ),
           ),
         ] else
-          ShadTextarea(
+          ShadInput(
             controller: widget.controller,
             placeholder: const Text('Enter instruction in markdown format...'),
+            minLines: 4,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
             onChanged: (_) {
               if (_processedText != null) {
                 setState(() => _processedText = null);
@@ -936,9 +939,12 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
                     ),
             ),
           ] else
-            ShadTextarea(
+            ShadInput(
               controller: widget.controller,
               placeholder: const Text('Enter model-specific instruction...'),
+              minLines: 4,
+              maxLines: null,
+              keyboardType: TextInputType.multiline,
               onChanged: (_) {
                 // Invalidate processed text when content changes
                 if (_processedText != null) {
