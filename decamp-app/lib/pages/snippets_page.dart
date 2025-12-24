@@ -56,8 +56,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           ),
           actions: [
             ShadButton.ghost(
-              child: const Icon(LucideIcons.plus),
               onPressed: _addNewSnippet,
+              child: const Icon(LucideIcons.plus),
             ),
           ],
         ),

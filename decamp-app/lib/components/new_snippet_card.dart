@@ -150,8 +150,8 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
                 )
               else
                 ShadButton.ghost(
-                  child: const Icon(LucideIcons.x),
                   onPressed: widget.onCancel,
+                  child: const Icon(LucideIcons.x),
                 ),
             ],
           ),

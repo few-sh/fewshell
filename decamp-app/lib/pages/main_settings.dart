@@ -177,7 +177,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         ShadCard(
           padding: const EdgeInsets.all(16),
           border: ShadBorder.all(color: theme.colorScheme.destructive),
-          backgroundColor: theme.colorScheme.destructive.withOpacity(0.1),
+          backgroundColor: theme.colorScheme.destructive.withValues(alpha: 0.1),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -842,7 +842,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             ? ShadBorder.all(color: theme.colorScheme.primary, width: 2)
             : null,
         backgroundColor: isSelected
-            ? theme.colorScheme.primary.withOpacity(0.1)
+            ? theme.colorScheme.primary.withValues(alpha: 0.1)
             : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -417,10 +417,6 @@ class _SelectableListItemState<T>
       context: context,
       builder: (context) => ShadDialog(
         title: const Text('Rename'),
-        child: ShadInput(
-          controller: controller,
-          placeholder: const Text('Name'),
-        ),
         actions: [
           ShadButton.outline(
             child: const Text('Cancel'),
@@ -431,6 +427,10 @@ class _SelectableListItemState<T>
             onPressed: () => Navigator.pop(context, controller.text.trim()),
           ),
         ],
+        child: ShadInput(
+          controller: controller,
+          placeholder: const Text('Name'),
+        ),
       ),
     );
 
