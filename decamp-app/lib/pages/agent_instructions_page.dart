@@ -616,8 +616,8 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Include User Instructions Checkbox
-                      ShadCheckbox(
+                      // Include User Instructions Switch
+                      ShadSwitch(
                         value: _includeUserInstructions,
                         onChanged: (value) {
                           setState(() {
