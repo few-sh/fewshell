@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Floating search controls widget
 /// Provides auto-focused text field with clear and close buttons
@@ -45,17 +46,19 @@ class _SearchControlsState extends State<SearchControls> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = ShadTheme.of(context);
 
-    return Card(
-      elevation: 4,
-      color: colorScheme.surface,
-      margin: const EdgeInsets.all(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: ShadCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Row(
           children: [
-            Icon(Icons.search, color: colorScheme.onSurfaceVariant, size: 20),
+            Icon(
+              LucideIcons.search,
+              size: 16,
+              color: theme.colorScheme.foreground.withValues(alpha: 0.5),
+            ),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(
@@ -64,25 +67,24 @@ class _SearchControlsState extends State<SearchControls> {
                 autofocus: widget.autofocus,
                 autocorrect: false,
                 enableSuggestions: false,
+                style: theme.textTheme.small,
                 decoration: InputDecoration(
                   hintText: 'Search messages (supports regex)...',
+                  hintStyle: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.foreground.withValues(alpha: 0.5),
+                  ),
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 ),
-                style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
-            IconButton(
-              icon: Icon(
-                Icons.close,
-                size: 18,
-                color: colorScheme.onSurfaceVariant,
-              ),
+            ShadButton.ghost(
+              width: 24,
+              height: 24,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              tooltip: 'Close search',
               onPressed: widget.onClose,
+              child: const Icon(LucideIcons.x, size: 16),
             ),
           ],
         ),

@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/rich_message_content.dart';
 import 'package:decamp/utils/search_utils.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Simple chat message list widget
 /// Displays messages from database with streaming support and search highlighting
@@ -296,6 +297,7 @@ class _ChatListState extends State<ChatList> {
     return SelectionArea(
       child: CustomScrollView(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         reverse: true,
         cacheExtent: 1000, // Pre-render area to smooth out scrolling
         slivers: [
@@ -323,9 +325,13 @@ class _ChatListState extends State<ChatList> {
                         currentMatchIndex: widget.currentMatchIndex,
                       );
                     } else if (widget.isLoading) {
-                      return const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Center(child: CircularProgressIndicator()),
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: ShadTheme.of(context).colorScheme.primary,
+                          ),
+                        ),
                       );
                     }
                     return const SizedBox.shrink();
@@ -336,10 +342,14 @@ class _ChatListState extends State<ChatList> {
 
           // Loading Indicator (if loading and no stream provided)
           if (widget.isLoading && widget.streamingMessageStream == null)
-            const SliverToBoxAdapter(
+            SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(child: CircularProgressIndicator()),
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: ShadTheme.of(context).colorScheme.primary,
+                  ),
+                ),
               ),
             ),
 
@@ -393,12 +403,12 @@ class _MessageItem extends StatelessWidget {
     return Column(
       children: [
         if (showDivider)
-          Divider(
-            height: 8,
-            thickness: 0.5,
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: ShadSeparator.horizontal(
+              color: ShadTheme.of(context).colorScheme.border,
+              thickness: 0.5,
+            ),
           ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.0),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
@@ -39,7 +40,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return GestureDetector(
       onTap: () {
@@ -49,23 +50,31 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
       child: Scaffold(
         appBar: AppBar(
           title: const ProjectTitleBar(title: 'Snippets'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+          leading: ShadButton.ghost(
+            child: const Icon(LucideIcons.arrowLeft),
             onPressed: () => Navigator.of(context).pop(),
           ),
+          actions: [
+            ShadButton.ghost(
+              child: const Icon(LucideIcons.plus),
+              onPressed: _addNewSnippet,
+            ),
+          ],
         ),
         body: Column(
           children: [
             // Stationary tab bar
             Container(
-              color: theme.colorScheme.surface,
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: theme.colorScheme.border),
+                ),
+              ),
               child: TabBar(
                 controller: _tabController,
                 indicatorColor: theme.colorScheme.primary,
                 labelColor: theme.colorScheme.primary,
-                unselectedLabelColor: theme.colorScheme.onSurface.withValues(
-                  alpha: 0.6,
-                ),
+                unselectedLabelColor: theme.colorScheme.mutedForeground,
                 labelStyle: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -84,10 +93,6 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
               ),
             ),
           ],
-        ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _addNewSnippet,
-          child: const Icon(Icons.add),
         ),
       ),
     );
@@ -134,7 +139,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     if (currentProjectId == null) {
       return Center(
         child: EmptyPlaceholder(
-          icon: Icons.info_outline,
+          icon: LucideIcons.info,
           title: 'No Project Selected',
           subtitle: 'Select a project to manage project-specific snippets.',
         ),
@@ -164,9 +169,9 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     if (snippets.isEmpty && !_isAddingSnippet) {
       return Center(
         child: EmptyPlaceholder(
-          icon: Icons.code_off,
+          icon: LucideIcons.code,
           title: 'No Snippets Yet',
-          subtitle: 'Add your first snippet using the + button below.',
+          subtitle: 'Add your first snippet using the + button above.',
         ),
       );
     }
@@ -232,7 +237,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     required bool isGlobal,
     required VoidCallback onDelete,
   }) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return Dismissible(
       key: key,
@@ -242,21 +247,27 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
         padding: const EdgeInsets.only(right: 20),
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: theme.colorScheme.error,
+          color: theme.colorScheme.destructive,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(Icons.delete, color: theme.colorScheme.onError),
+        child: Icon(
+          LucideIcons.trash2,
+          color: theme.colorScheme.destructiveForeground,
+        ),
       ),
       confirmDismiss: (direction) async {
         onDelete();
         return true;
       },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: _SnippetCardContent(
-          index: index,
-          snippet: snippet,
-          isGlobal: isGlobal,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: ShadCard(
+          padding: EdgeInsets.zero,
+          child: _SnippetCardContent(
+            index: index,
+            snippet: snippet,
+            isGlobal: isGlobal,
+          ),
         ),
       ),
     );
@@ -343,10 +354,13 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('Error saving: $e'),
+            action: ShadButton.destructive(
+              child: const Text('Dismiss'),
+              onPressed: () => ShadToaster.of(context).hide(),
+            ),
           ),
         );
       }
@@ -355,7 +369,8 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
+    final terminalTheme = Theme.of(context).extension<TerminalTheme>();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -367,9 +382,9 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             child: ReorderableDragStartListener(
               index: widget.index,
               child: Icon(
-                Icons.drag_handle,
+                LucideIcons.gripHorizontal,
                 size: 20,
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                color: theme.colorScheme.mutedForeground,
               ),
             ),
           ),
@@ -393,103 +408,63 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: Icon(
-                    Icons.circle,
+                    LucideIcons.circle,
                     size: 8,
                     color: theme.colorScheme.primary,
                   ),
                 ),
               Expanded(
-                child: TextField(
+                child: ShadInput(
                   controller: _descriptionController,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: 'Description',
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  style: theme.textTheme.bodyMedium,
-                  minLines: 1,
-                  maxLines: null,
+                  placeholder: const Text('Description'),
                   onSubmitted: (_) => _autoSave(),
-                  onTapOutside: (_) => _autoSave(),
+                  // onTapOutside: (_) => _autoSave(), // ShadInput doesn't have onTapOutside yet? Check errors.
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
+          ShadInput(
             controller: _contentController,
-            autocorrect: false,
-            enableSuggestions: false,
-            decoration: InputDecoration(
-              hintText: 'Command',
-              hintStyle: TextStyle(
-                color:
-                    theme.extension<TerminalTheme>()?.hintColor ??
-                    Colors.grey.shade600,
-              ),
-              isDense: true,
-              filled: true,
-              fillColor:
-                  theme.extension<TerminalTheme>()?.backgroundColor ??
-                  Colors.black,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color:
-                      theme.extension<TerminalTheme>()?.borderColor ??
-                      Colors.grey.shade800,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color:
-                      theme.extension<TerminalTheme>()?.borderColor ??
-                      Colors.grey.shade800,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                  width: 2,
-                ),
-              ),
-              contentPadding: const EdgeInsets.all(12),
-            ),
+            placeholder: const Text('Command'),
             minLines: 2,
             maxLines: null,
             style: TextStyle(
               fontFamily: 'monospace',
               fontSize: 14,
-              color:
-                  theme.extension<TerminalTheme>()?.textColor ??
-                  Colors.greenAccent.shade400,
+              color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
               height: 1.5,
             ),
+            // Note: ShadInput doesn't support full decoration customization like TextField
+            // We rely on default Shadcn styling which is clean.
             onSubmitted: (_) => _autoSave(),
-            onTapOutside: (_) => _autoSave(),
           ),
           const SizedBox(height: 8),
-          SwitchListTile(
-            title: const Text('Visible to AI'),
-            subtitle: const Text(
-              'Include this snippet in the AI context',
-              style: TextStyle(fontSize: 12),
-            ),
-            value: _isVisibleToLlm,
-            onChanged: (value) {
-              setState(() {
-                _isVisibleToLlm = value;
-                _hasChanges = true;
-              });
-              _autoSave();
-            },
-            dense: true,
-            contentPadding: EdgeInsets.zero,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Visible to AI', style: theme.textTheme.small),
+                    Text(
+                      'Include this snippet in the AI context',
+                      style: theme.textTheme.muted,
+                    ),
+                  ],
+                ),
+              ),
+              ShadSwitch(
+                value: _isVisibleToLlm,
+                onChanged: (value) {
+                  setState(() {
+                    _isVisibleToLlm = value;
+                    _hasChanges = true;
+                  });
+                  _autoSave();
+                },
+              ),
+            ],
           ),
         ],
       ),

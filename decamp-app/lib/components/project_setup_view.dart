@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/themes/terminal_theme.dart';
@@ -47,10 +48,13 @@ class ProjectSetupView extends ConsumerWidget {
           );
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error importing project: $e'),
-                backgroundColor: Colors.red,
+            ShadToaster.of(context).show(
+              ShadToast(
+                description: Text('Error importing project: $e'),
+                action: ShadButton.destructive(
+                  child: const Text('Dismiss'),
+                  onPressed: () => ShadToaster.of(context).hide(),
+                ),
               ),
             );
           }
@@ -84,10 +88,13 @@ class ProjectSetupView extends ConsumerWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error creating project: $e'),
-            backgroundColor: Colors.red,
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('Error creating project: $e'),
+            action: ShadButton.destructive(
+              child: const Text('Dismiss'),
+              onPressed: () => ShadToaster.of(context).hide(),
+            ),
           ),
         );
       }
@@ -98,6 +105,7 @@ class ProjectSetupView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final projectsAsync = ref.watch(projectsStreamProvider);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>()!;
+    final theme = ShadTheme.of(context);
 
     return projectsAsync.when(
       data: (projects) {
@@ -110,20 +118,18 @@ class ProjectSetupView extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  Icons.folder_open,
+                  LucideIcons.folderOpen,
                   size: 64,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.3),
+                  color: theme.colorScheme.mutedForeground.withValues(
+                    alpha: 0.3,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'run this command from a host',
-                  style: TextStyle(
+                  style: theme.textTheme.h4.copyWith(
+                    color: theme.colorScheme.mutedForeground,
                     fontSize: 18,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -140,37 +146,35 @@ class ProjectSetupView extends ConsumerWidget {
                 const SizedBox(height: 16),
                 Text(
                   'then scan the QR code',
-                  style: TextStyle(
+                  style: theme.textTheme.h4.copyWith(
+                    color: theme.colorScheme.mutedForeground,
                     fontSize: 18,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.6),
                   ),
                 ),
                 const SizedBox(height: 24),
-                OutlinedButton.icon(
+                ShadButton.outline(
                   onPressed: () =>
                       _handleScanQrCode(context, ref, existingNames),
-                  icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text('Scan QR Code'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(LucideIcons.qrCode),
+                      SizedBox(width: 8),
+                      Text('Scan QR Code'),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton.icon(
+                ShadButton.outline(
                   onPressed: () =>
                       _createProjectWithRandomName(context, ref, existingNames),
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Enter Manually'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(LucideIcons.pencil),
+                      SizedBox(width: 8),
+                      Text('Enter Manually'),
+                    ],
                   ),
                 ),
               ],

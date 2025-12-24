@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:agent_core/agent_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../services/project_importer.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
@@ -12,12 +13,10 @@ import '../providers/project_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/ssh_settings_provider.dart';
 import '../providers/settings_provider.dart';
-import '../utils/project_utils.dart';
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
-import '../components/confirmation_dialog.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -45,33 +44,38 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const ProjectTitleBar(title: 'Settings'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+        leading: ShadButton.ghost(
+          width: 32,
+          height: 32,
+          padding: EdgeInsets.zero,
+          decoration: const ShadDecoration(border: ShadBorder.none),
           onPressed: () => Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const ChatSession()),
             (route) => false,
           ),
+          child: const Icon(LucideIcons.arrowLeft, size: 16),
         ),
       ),
       body: Column(
         children: [
           // Stationary tab bar
           Container(
-            color: theme.colorScheme.surface,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colorScheme.border),
+              ),
+            ),
             child: TabBar(
               controller: _tabController,
               indicatorColor: theme.colorScheme.primary,
               labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurface.withValues(
-                alpha: 0.6,
-              ),
-              labelStyle: const TextStyle(
-                fontSize: 16,
+              unselectedLabelColor: theme.colorScheme.mutedForeground,
+              labelStyle: theme.textTheme.list.copyWith(
                 fontWeight: FontWeight.bold,
               ),
               tabs: const [
@@ -154,66 +158,64 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ShadToaster.of(context).show(ShadToast(description: Text(message)));
   }
 
   Widget _buildDeleteProjectSection(ProjectEntity project) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Danger Zone',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.error,
+          style: theme.textTheme.h4.copyWith(
+            color: theme.colorScheme.destructive,
           ),
         ),
         const SizedBox(height: 16),
-        Card(
-          color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Delete Project',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
+        ShadCard(
+          padding: const EdgeInsets.all(16),
+          border: ShadBorder.all(color: theme.colorScheme.destructive),
+          backgroundColor: theme.colorScheme.destructive.withOpacity(0.1),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Delete Project',
+                style: theme.textTheme.large.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Permanently delete "${project.name}" and all associated data.',
+                style: theme.textTheme.muted,
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ShadButton.destructive(
+                  onPressed: () => _showDeleteProjectDialog(
+                    context: context,
+                    ref: ref,
+                    projectId: project.id,
+                    projectName: project.name,
+                    onDeleted: () {
+                      if (mounted) Navigator.pop(context);
+                    },
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(LucideIcons.trash2, size: 16),
+                      SizedBox(width: 8),
+                      Text('Delete Project'),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Permanently delete "${project.name}" and all associated data.',
-                  style: theme.textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => showDeleteProjectDialog(
-                      context: context,
-                      ref: ref,
-                      projectId: project.id,
-                      projectName: project.name,
-                      onDeleted: () {
-                        if (mounted) Navigator.pop(context);
-                      },
-                    ),
-                    icon: const Icon(Icons.delete_forever),
-                    label: const Text('Delete Project'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.error,
-                      foregroundColor: theme.colorScheme.onError,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],
@@ -221,7 +223,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildProjectNameSection(ProjectEntity project) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     final controller = TextEditingController(text: project.name);
     final projectsAsync = ref.watch(projectsStreamProvider);
 
@@ -272,38 +274,32 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Project Name',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text('Project Name', style: theme.textTheme.h4),
             if (!kIsWeb && (Platform.isAndroid || Platform.isIOS))
-              IconButton.filledTonal(
+              ShadButton.outline(
                 onPressed: () => _scanAndConfigureProject(project.id),
-                icon: const Icon(Icons.qr_code_scanner),
-                tooltip: 'Scan Project Config',
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.qrCode, size: 16),
+                    SizedBox(width: 8),
+                    Text('Scan Config'),
+                  ],
+                ),
               ),
           ],
         ),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: controller,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                prefixIcon: const Icon(Icons.folder),
-              ),
-              onSubmitted: saveChanges,
-              onTapOutside: (_) => saveChanges(controller.text),
+        ShadCard(
+          padding: const EdgeInsets.all(16),
+          child: ShadInput(
+            controller: controller,
+            placeholder: const Text('Name'),
+            leading: const Padding(
+              padding: EdgeInsets.only(right: 8),
+              child: Icon(LucideIcons.folder, size: 16),
             ),
+            onSubmitted: saveChanges,
           ),
         ),
       ],
@@ -311,7 +307,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildAIModelsSection({required bool isGlobal}) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     // Get the appropriate provider based on scope
     final llmSettings = isGlobal
@@ -324,22 +320,36 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 )
               : <LlmApiSettings>[]);
 
+    // Get the current default identifier
+    final String? currentDefault;
+    if (isGlobal) {
+      currentDefault = ref.watch(globalSettingsProvider).defaultLlmIdentifier;
+    } else {
+      final currentProjectId = ref.watch(currentProjectIdProvider);
+      currentDefault = currentProjectId != null
+          ? ref
+                .watch(projectSettingsProvider(currentProjectId))
+                ?.defaultLlmIdentifier
+          : null;
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'AI Models',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            FilledButton.icon(
+            Text('AI Models', style: theme.textTheme.h4),
+            ShadButton(
               onPressed: () => _showAddModelDialog(isGlobal: isGlobal),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Model'),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.plus, size: 16),
+                  SizedBox(width: 8),
+                  Text('Add Model'),
+                ],
+              ),
             ),
           ],
         ),
@@ -349,22 +359,20 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
+              border: Border.all(color: theme.colorScheme.border),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  LucideIcons.info,
+                  color: theme.colorScheme.mutedForeground,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Select a project to configure project-specific AI models.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                    style: theme.textTheme.muted,
                   ),
                 ),
               ],
@@ -372,7 +380,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           )
         else if (llmSettings.isEmpty)
           const EmptyPlaceholder(
-            icon: Icons.info_outline,
+            icon: LucideIcons.info,
             title: 'No AI Models',
             subtitle:
                 'No AI models configured yet. Click "Add Model" to get started.',
@@ -384,6 +392,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               child: _buildModelCard(
                 settings: settings,
                 isGlobal: isGlobal,
+                isSelected: settings.identifier == currentDefault,
                 onEdit: () => _showEditModelDialog(
                   settings: settings,
                   isGlobal: isGlobal,
@@ -402,157 +411,130 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   Widget _buildModelCard({
     required LlmApiSettings settings,
     required bool isGlobal,
+    required bool isSelected,
     required VoidCallback onEdit,
     required VoidCallback onDelete,
   }) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
-    // Get the current default identifier
-    final String? currentDefault;
-    if (isGlobal) {
-      currentDefault = ref.watch(globalSettingsProvider).defaultLlmIdentifier;
-    } else {
-      final currentProjectId = ref.watch(currentProjectIdProvider);
-      currentDefault = currentProjectId != null
-          ? ref
-                .watch(projectSettingsProvider(currentProjectId))
-                ?.defaultLlmIdentifier
-          : null;
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _setDefaultModel(
-                      settings.identifier,
-                      isGlobal: isGlobal,
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Radio<String>(
-                          value: settings.identifier,
-                          groupValue: currentDefault,
-                          onChanged: (value) {
-                            if (value != null) {
-                              _setDefaultModel(value, isGlobal: isGlobal);
-                            }
-                          },
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        Flexible(
-                          child: Text(
-                            settings.identifier,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+    return ShadCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () =>
+                      _setDefaultModel(settings.identifier, isGlobal: isGlobal),
+                  borderRadius: BorderRadius.circular(4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? LucideIcons.circleDot : LucideIcons.circle,
+                        size: 16,
+                        color: isSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.mutedForeground,
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          settings.identifier,
+                          style: theme.textTheme.large.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!settings.enabled)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Chip(
-                          label: const Text('Disabled'),
-                          backgroundColor: theme.colorScheme.errorContainer,
-                          labelStyle: TextStyle(
-                            color: theme.colorScheme.onErrorContainer,
-                            fontSize: 12,
-                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: onEdit,
-                      tooltip: 'Edit',
+                    ],
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!settings.enabled)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ShadBadge.destructive(
+                        child: const Text('Disabled'),
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: onDelete,
-                      tooltip: 'Delete',
+                  ShadButton.ghost(
+                    width: 32,
+                    height: 32,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: onEdit,
+                    child: const Icon(LucideIcons.pencil, size: 16),
+                  ),
+                  ShadButton.ghost(
+                    width: 32,
+                    height: 32,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: onDelete,
+                    foregroundColor: theme.colorScheme.destructive,
+                    child: const Icon(LucideIcons.trash2, size: 16),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(
+              left: 32,
+            ), // Align with text after radio
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      LucideIcons.link,
+                      size: 16,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        settings.baseUrl,
+                        style: theme.textTheme.muted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      LucideIcons.key,
+                      size: 16,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '••••••••••${settings.identifier.substring(0, settings.identifier.length > 4 ? 4 : settings.identifier.length)}',
+                      style: theme.textTheme.muted.copyWith(
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 48,
-              ), // Align with text after radio
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.link,
-                        size: 16,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          settings.baseUrl,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.8,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.key,
-                        size: 16,
-                        color: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.6,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '••••••••••${settings.identifier.substring(0, settings.identifier.length > 4 ? 4 : settings.identifier.length)}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.8,
-                          ),
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildRemoteShellSection() {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     final currentProjectId = ref.watch(currentProjectIdProvider);
 
     return Column(
@@ -560,14 +542,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Remote Shell',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+          children: [Text('Remote Shell', style: theme.textTheme.h4)],
         ),
         const SizedBox(height: 16),
         // Show message if no project selected
@@ -575,22 +550,20 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline),
+              border: Border.all(color: theme.colorScheme.border),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Icon(
-                  Icons.info_outline,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  LucideIcons.info,
+                  color: theme.colorScheme.mutedForeground,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Select a project to configure remote shell connection.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    ),
+                    style: theme.textTheme.muted,
                   ),
                 ),
               ],
@@ -603,7 +576,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildSshSettingsCard(String projectId) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
 
     if (sshSettings == null) {
@@ -611,17 +584,23 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       return Column(
         children: [
           const EmptyPlaceholder(
-            icon: Icons.terminal,
+            icon: LucideIcons.terminal,
             title: 'No Remote Shell',
             subtitle: 'No remote shell configured yet.',
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: FilledButton.icon(
+            child: ShadButton(
               onPressed: () => _showSshSettingsDialog(projectId: projectId),
-              icon: const Icon(Icons.add),
-              label: const Text('Configure Connection'),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.plus, size: 16),
+                  SizedBox(width: 8),
+                  Text('Configure Connection'),
+                ],
+              ),
             ),
           ),
         ],
@@ -629,109 +608,105 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     }
 
     // SSH configuration exists
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.terminal,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${sshSettings.username}@${sshSettings.host}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+    return ShadCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
                   children: [
-                    if (!sshSettings.enabled)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Chip(
-                          label: const Text('Disabled'),
-                          backgroundColor: theme.colorScheme.errorContainer,
-                          labelStyle: TextStyle(
-                            color: theme.colorScheme.onErrorContainer,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => _showSshSettingsDialog(
-                        projectId: projectId,
-                        existingSettings: sshSettings,
-                      ),
-                      tooltip: 'Edit',
+                    Icon(
+                      LucideIcons.terminal,
+                      color: theme.colorScheme.primary,
+                      size: 20,
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete),
-                      onPressed: () =>
-                          _showDeleteSshConfirmation(projectId: projectId),
-                      tooltip: 'Delete',
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${sshSettings.username}@${sshSettings.host}',
+                        style: theme.textTheme.large.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(
-                  Icons.dns,
-                  size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${sshSettings.host}:${sshSettings.port}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!sshSettings.enabled)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ShadBadge.destructive(
+                        child: const Text('Disabled'),
+                      ),
+                    ),
+                  ShadButton.ghost(
+                    width: 32,
+                    height: 32,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: () => _showSshSettingsDialog(
+                      projectId: projectId,
+                      existingSettings: sshSettings,
+                    ),
+                    child: const Icon(LucideIcons.pencil, size: 16),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  sshSettings.authMethod == SshAuthMethod.password
-                      ? Icons.password
-                      : Icons.key,
-                  size: 16,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  sshSettings.authMethod == SshAuthMethod.password
-                      ? 'Password Authentication'
-                      : 'Private Key Authentication',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  ShadButton.ghost(
+                    width: 32,
+                    height: 32,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: () =>
+                        _showDeleteSshConfirmation(projectId: projectId),
+                    foregroundColor: theme.colorScheme.destructive,
+                    child: const Icon(LucideIcons.trash2, size: 16),
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                LucideIcons.server,
+                size: 16,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${sshSettings.host}:${sshSettings.port}',
+                style: theme.textTheme.muted,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(
+                sshSettings.authMethod == SshAuthMethod.password
+                    ? LucideIcons.lock
+                    : LucideIcons.key,
+                size: 16,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                sshSettings.authMethod == SshAuthMethod.password
+                    ? 'Password Authentication'
+                    : 'Private Key Authentication',
+                style: theme.textTheme.muted,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -749,12 +724,24 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   void _showDeleteSshConfirmation({required String projectId}) async {
-    final confirmed = await showConfirmationDialog(
+    final confirmed = await showShadDialog<bool>(
       context: context,
-      title: 'Delete Remote Shell Configuration',
-      content:
+      builder: (context) => ShadDialog.alert(
+        title: const Text('Delete Remote Shell Configuration'),
+        description: const Text(
           'Are you sure you want to delete the remote shell configuration? This will also delete all associated credentials.',
-      confirmLabel: 'Delete',
+        ),
+        actions: [
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          ShadButton.destructive(
+            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
     );
 
     if (confirmed == true) {
@@ -764,16 +751,21 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             .deleteSshSettings();
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Remote shell configuration deleted')),
+          ShadToaster.of(context).show(
+            const ShadToast(
+              description: Text('Remote shell configuration deleted'),
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting configuration: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error,
+          ShadToaster.of(context).show(
+            ShadToast(
+              description: Text('Error deleting configuration: $e'),
+              action: ShadButton.destructive(
+                child: const Text('Dismiss'),
+                onPressed: () => ShadToaster.of(context).hide(),
+              ),
             ),
           );
         }
@@ -782,25 +774,20 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildThemeSection() {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     final currentThemeMode = ref.watch(themeProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Theme',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text('Theme', style: theme.textTheme.h4),
         const SizedBox(height: 16),
         Row(
           children: [
             Expanded(
               child: _buildThemeCard(
                 title: 'Light',
-                icon: Icons.light_mode,
+                icon: LucideIcons.sun,
                 isSelected: currentThemeMode == ThemeMode.light,
                 onTap: () {
                   ref
@@ -813,7 +800,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             Expanded(
               child: _buildThemeCard(
                 title: 'Dark',
-                icon: Icons.dark_mode,
+                icon: LucideIcons.moon,
                 isSelected: currentThemeMode == ThemeMode.dark,
                 onTap: () {
                   ref.read(themeProvider.notifier).setThemeMode(ThemeMode.dark);
@@ -824,7 +811,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             Expanded(
               child: _buildThemeCard(
                 title: 'System',
-                icon: Icons.brightness_auto,
+                icon: LucideIcons.monitor,
                 isSelected: currentThemeMode == ThemeMode.system,
                 onTap: () {
                   ref
@@ -845,25 +832,18 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
+      child: ShadCard(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.outline,
-            width: isSelected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : null,
-        ),
+        border: isSelected
+            ? ShadBorder.all(color: theme.colorScheme.primary, width: 2)
+            : null,
+        backgroundColor: isSelected
+            ? theme.colorScheme.primary.withOpacity(0.1)
+            : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -872,16 +852,16 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               size: 32,
               color: isSelected
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  : theme.colorScheme.mutedForeground,
             ),
             const SizedBox(height: 8),
             Text(
               title,
-              style: theme.textTheme.bodyMedium?.copyWith(
+              style: theme.textTheme.p.copyWith(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected
                     ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
+                    : theme.colorScheme.foreground,
               ),
             ),
           ],
@@ -909,10 +889,13 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error setting default model: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('Error setting default model: $e'),
+            action: ShadButton.destructive(
+              child: const Text('Dismiss'),
+              onPressed: () => ShadToaster.of(context).hide(),
+            ),
           ),
         );
       }
@@ -939,19 +922,20 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     required LlmApiSettings settings,
     required bool isGlobal,
   }) {
-    showDialog(
+    showShadDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
+      builder: (dialogContext) => ShadDialog.alert(
         title: const Text('Delete AI Model'),
-        content: Text(
+        description: Text(
           'Are you sure you want to delete "${settings.identifier}"?',
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
+          ShadButton.outline(
             child: const Text('Cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
           ),
-          FilledButton(
+          ShadButton.destructive(
+            child: const Text('Delete'),
             onPressed: () async {
               try {
                 if (isGlobal) {
@@ -969,30 +953,29 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
                 if (dialogContext.mounted) {
                   Navigator.of(dialogContext).pop();
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Deleted model: ${settings.identifier}'),
+                  ShadToaster.of(dialogContext).show(
+                    ShadToast(
+                      description: Text(
+                        'Deleted model: ${settings.identifier}',
+                      ),
                     ),
                   );
                 }
               } catch (e) {
                 if (dialogContext.mounted) {
                   Navigator.of(dialogContext).pop();
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting model: $e'),
-                      backgroundColor: Theme.of(
-                        dialogContext,
-                      ).colorScheme.error,
+                  ShadToaster.of(dialogContext).show(
+                    ShadToast(
+                      description: Text('Error deleting model: $e'),
+                      action: ShadButton.destructive(
+                        child: const Text('Dismiss'),
+                        onPressed: () => ShadToaster.of(dialogContext).hide(),
+                      ),
                     ),
                   );
                 }
               }
             },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
           ),
         ],
       ),
@@ -1000,7 +983,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildServerUrlSection(ProjectEntity project) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     final controller = TextEditingController(text: project.serverUrl);
 
     Future<void> saveChanges(String value) async {
@@ -1024,40 +1007,64 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Sync Server URL',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        Text('Sync Server URL', style: theme.textTheme.h4),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: controller,
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  decoration: InputDecoration(
-                    labelText: 'Server URL',
-                    hintText: 'ws://localhost:3123',
-                    helperText: 'Leave empty to disable sync',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    prefixIcon: const Icon(Icons.cloud_sync),
-                  ),
-                  onSubmitted: saveChanges,
-                  onTapOutside: (_) => saveChanges(controller.text),
+        ShadCard(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShadInput(
+                controller: controller,
+                placeholder: const Text('ws://localhost:3123'),
+                leading: const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Icon(LucideIcons.cloud, size: 16),
                 ),
-              ],
-            ),
+                onSubmitted: saveChanges,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Leave empty to disable sync',
+                style: theme.textTheme.muted.copyWith(fontSize: 12),
+              ),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _showDeleteProjectDialog({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String projectId,
+    required String projectName,
+    required VoidCallback onDeleted,
+  }) async {
+    final confirmed = await showShadDialog<bool>(
+      context: context,
+      builder: (context) => ShadDialog.alert(
+        title: const Text('Delete Project'),
+        description: Text(
+          'Are you sure you want to delete "$projectName"? This cannot be undone.',
+        ),
+        actions: [
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          ShadButton.destructive(
+            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await ref.read(projectControllerProvider).deleteProject(projectId);
+      onDeleted();
+    }
   }
 }

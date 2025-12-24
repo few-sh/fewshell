@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/user_provider.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 class UserBadge extends ConsumerWidget {
   const UserBadge({super.key});
@@ -8,88 +9,75 @@ class UserBadge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final username = ref.watch(userProvider);
+    final theme = ShadTheme.of(context);
 
-    return InkWell(
-      onTap: () => _showEditUsernameDialog(context, ref, username),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.person,
-              size: 16,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.7),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              username,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.9),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.edit,
-              size: 12,
-              color: Theme.of(
-                context,
-              ).colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
+    return ShadButton.ghost(
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      onPressed: () => _showEditUsernameDialog(context, ref, username),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(LucideIcons.user, size: 16),
+          const SizedBox(width: 8),
+          Text(
+            username,
+            style: theme.textTheme.p.copyWith(fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            LucideIcons.pencil,
+            size: 12,
+            color: theme.colorScheme.mutedForeground,
+          ),
+        ],
       ),
     );
   }
 
-  void _showEditUsernameDialog(
+  Future<void> _showEditUsernameDialog(
     BuildContext context,
     WidgetRef ref,
     String currentUsername,
-  ) {
+  ) async {
     final controller = TextEditingController(text: currentUsername);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Username'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Enter username'),
-          autofocus: true,
-          autocorrect: false,
-          enableSuggestions: false,
-          onSubmitted: (_) {
-            final newName = controller.text.trim();
-            if (newName.isNotEmpty) {
-              ref.read(userProvider.notifier).setUsername(newName);
-            }
-            Navigator.pop(context);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
+    try {
+      await showShadDialog(
+        context: context,
+        builder: (context) => ShadDialog(
+          title: const Text('Edit Username'),
+          child: ShadInput(
+            controller: controller,
+            placeholder: const Text('Enter username'),
+            autofocus: true,
+            onSubmitted: (_) {
               final newName = controller.text.trim();
               if (newName.isNotEmpty) {
                 ref.read(userProvider.notifier).setUsername(newName);
               }
               Navigator.pop(context);
             },
-            child: const Text('Save'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            ShadButton.outline(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ShadButton(
+              onPressed: () {
+                final newName = controller.text.trim();
+                if (newName.isNotEmpty) {
+                  ref.read(userProvider.notifier).setUsername(newName);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 }
