@@ -1,3 +1,6 @@
 {
-    "chat.useNestedAgentsMdFiles": true
+    "chat.useNestedAgentsMdFiles": true,
+    "chat.tools.terminal.autoApprove": {
+        "dart analyze": true,
+    },
 }
