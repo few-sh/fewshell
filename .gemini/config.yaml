@@ -1,5 +1,5 @@
 code_review:
-  comment_severity_threshold: LOW
+  comment_severity_threshold: MEDIUM
   max_review_comments: -1
   pull_request_opened:
     code_review: true
