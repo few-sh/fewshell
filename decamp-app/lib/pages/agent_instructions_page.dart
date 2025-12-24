@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/settings_provider.dart';
 import '../providers/llm_settings_provider.dart';
-import '../providers/llm_service_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
 import '../themes/shad_layout_theme.dart';
@@ -145,7 +143,6 @@ class _UserSettingsTab extends ConsumerStatefulWidget {
 class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
   late TextEditingController _defaultController;
   final Map<String, TextEditingController> _modelControllers = {};
-  bool _showPreview = false;
   bool _hasChanges = false;
 
   @override
@@ -281,13 +278,6 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                       style: ShadTheme.of(context).textTheme.muted,
                     ),
                   ),
-                  ShadIconButton.ghost(
-                    icon: Icon(
-                      _showPreview ? LucideIcons.pencil : LucideIcons.eye,
-                    ),
-                    onPressed: () =>
-                        setState(() => _showPreview = !_showPreview),
-                  ),
                   ShadButton(
                     onPressed: _hasChanges ? _saveSettings : null,
                     leading: const Icon(LucideIcons.save),
@@ -320,7 +310,6 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                         title: 'Default Instruction',
                         subtitle: 'Applies to all models unless overridden',
                         controller: _defaultController,
-                        showPreview: _showPreview,
                         onChanged: _markChanged,
                       ),
                       const SizedBox(height: 24),
@@ -351,7 +340,6 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                                     return _ModelOverrideSection(
                                       modelIdentifier: entry.key,
                                       controller: entry.value,
-                                      showPreview: _showPreview,
                                       onChanged: _markChanged,
                                       onRemove: () =>
                                           _removeModelOverride(entry.key),
@@ -397,7 +385,6 @@ class _ProjectSettingsTab extends ConsumerStatefulWidget {
 class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   late TextEditingController _defaultController;
   final Map<String, TextEditingController> _modelControllers = {};
-  bool _showPreview = false;
   bool _hasChanges = false;
   bool _includeUserInstructions = false;
   bool _settingsLoaded = false;
@@ -555,13 +542,6 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                       style: ShadTheme.of(context).textTheme.muted,
                     ),
                   ),
-                  ShadIconButton.ghost(
-                    icon: Icon(
-                      _showPreview ? LucideIcons.pencil : LucideIcons.eye,
-                    ),
-                    onPressed: () =>
-                        setState(() => _showPreview = !_showPreview),
-                  ),
                   ShadButton(
                     onPressed: _hasChanges
                         ? () => _saveSettings(projectId)
@@ -613,7 +593,6 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                         subtitle:
                             'Applies to all models in this project unless overridden',
                         controller: _defaultController,
-                        showPreview: _showPreview,
                         onChanged: _markChanged,
                       ),
                       const SizedBox(height: 24),
@@ -644,7 +623,6 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                                     return _ModelOverrideSection(
                                       modelIdentifier: entry.key,
                                       controller: entry.value,
-                                      showPreview: _showPreview,
                                       onChanged: _markChanged,
                                       onRemove: () =>
                                           _removeModelOverride(entry.key),
@@ -681,14 +659,12 @@ class _InstructionSection extends ConsumerStatefulWidget {
   final String title;
   final String subtitle;
   final TextEditingController controller;
-  final bool showPreview;
   final VoidCallback onChanged;
 
   const _InstructionSection({
     required this.title,
     required this.subtitle,
     required this.controller,
-    required this.showPreview,
     required this.onChanged,
   });
 
@@ -698,35 +674,6 @@ class _InstructionSection extends ConsumerStatefulWidget {
 }
 
 class _InstructionSectionState extends ConsumerState<_InstructionSection> {
-  bool _renderJinja = false;
-  String? _processedText;
-  bool _isLoading = false;
-
-  Future<void> _loadContext() async {
-    if (_processedText != null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final llmService = ref.read(llmServiceProvider);
-      final processed = await llmService.processTemplate(
-        widget.controller.text,
-      );
-
-      if (mounted) {
-        setState(() {
-          _processedText = processed;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading preview context: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -737,75 +684,16 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
         const SizedBox(height: 4),
         Text(widget.subtitle, style: theme.textTheme.muted),
         const SizedBox(height: 12),
-        if (widget.showPreview) ...[
-          Row(
-            children: [
-              ShadCheckbox(
-                value: _renderJinja,
-                onChanged: (value) {
-                  setState(() {
-                    _renderJinja = value;
-                    if (!_renderJinja) {
-                      _processedText = null;
-                    }
-                  });
-                  if (_renderJinja) {
-                    _loadContext();
-                  }
-                },
-                label: const Text('Render Jinja in preview'),
-              ),
-              if (_isLoading) ...[
-                const SizedBox(width: 8),
-                const SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.border),
-              borderRadius: theme.radius,
-            ),
-            constraints: const BoxConstraints(minHeight: 200),
-            child: widget.controller.text.isEmpty
-                ? Text(
-                    'No instruction provided',
-                    style: theme.textTheme.muted.copyWith(
-                      fontStyle: FontStyle.italic,
-                    ),
-                  )
-                : SelectionArea(
-                    child: GptMarkdown(
-                      _renderJinja
-                          ? (_processedText ?? widget.controller.text)
-                          : widget.controller.text,
-                    ),
-                  ),
-          ),
-        ] else
-          ShadInput(
-            controller: widget.controller,
-            placeholder: const Text('Enter instruction in markdown format...'),
-            minLines: 4,
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
-            onChanged: (_) {
-              if (_processedText != null) {
-                setState(() => _processedText = null);
-                if (_renderJinja) {
-                  _loadContext();
-                }
-              }
-              widget.onChanged();
-            },
-          ),
+        ShadInput(
+          controller: widget.controller,
+          placeholder: const Text('Enter instruction in markdown format...'),
+          minLines: 4,
+          maxLines: null,
+          keyboardType: TextInputType.multiline,
+          onChanged: (_) {
+            widget.onChanged();
+          },
+        ),
       ],
     );
   }
@@ -815,14 +703,12 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
 class _ModelOverrideSection extends ConsumerStatefulWidget {
   final String modelIdentifier;
   final TextEditingController controller;
-  final bool showPreview;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
 
   const _ModelOverrideSection({
     required this.modelIdentifier,
     required this.controller,
-    required this.showPreview,
     required this.onChanged,
     required this.onRemove,
   });
@@ -833,35 +719,6 @@ class _ModelOverrideSection extends ConsumerStatefulWidget {
 }
 
 class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
-  bool _renderJinja = false;
-  String? _processedText;
-  bool _isLoading = false;
-
-  Future<void> _loadContext() async {
-    if (_processedText != null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final llmService = ref.read(llmServiceProvider);
-      final processed = await llmService.processTemplate(
-        widget.controller.text,
-      );
-
-      if (mounted) {
-        setState(() {
-          _processedText = processed;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading preview context: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -884,78 +741,16 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
             ],
           ),
           const SizedBox(height: 8),
-          if (widget.showPreview) ...[
-            Row(
-              children: [
-                ShadCheckbox(
-                  value: _renderJinja,
-                  onChanged: (value) {
-                    setState(() {
-                      _renderJinja = value;
-                      // Reset processed text when toggling off so we re-fetch if toggled on again
-                      // or if text changed (though we don't track text changes here easily without listener)
-                      if (!_renderJinja) {
-                        _processedText = null;
-                      }
-                    });
-                    if (_renderJinja) {
-                      _loadContext();
-                    }
-                  },
-                  label: const Text('Render Jinja in preview'),
-                ),
-                if (_isLoading) ...[
-                  const SizedBox(width: 8),
-                  const SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: theme.inputTheme.padding ?? const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.colorScheme.border),
-                borderRadius: theme.radius,
-              ),
-              constraints: const BoxConstraints(minHeight: 150),
-              child: widget.controller.text.isEmpty
-                  ? Text(
-                      'No override instruction provided',
-                      style: theme.textTheme.muted.copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )
-                  : SelectionArea(
-                      child: GptMarkdown(
-                        _renderJinja
-                            ? (_processedText ?? widget.controller.text)
-                            : widget.controller.text,
-                      ),
-                    ),
-            ),
-          ] else
-            ShadInput(
-              controller: widget.controller,
-              placeholder: const Text('Enter model-specific instruction...'),
-              minLines: 4,
-              maxLines: null,
-              keyboardType: TextInputType.multiline,
-              onChanged: (_) {
-                // Invalidate processed text when content changes
-                if (_processedText != null) {
-                  setState(() => _processedText = null);
-                  if (_renderJinja) {
-                    _loadContext();
-                  }
-                }
-                widget.onChanged();
-              },
-            ),
+          ShadInput(
+            controller: widget.controller,
+            placeholder: const Text('Enter model-specific instruction...'),
+            minLines: 4,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            onChanged: (_) {
+              widget.onChanged();
+            },
+          ),
         ],
       ),
     );
