@@ -130,6 +130,7 @@ class _SshSettingsDialogFormState
   final Map<String, String?> _errors = {};
 
   bool _obscurePassword = true;
+  bool _obscurePrivateKey = true;
   bool _obscurePassphrase = true;
   bool _obscureSudoPassword = true;
   bool _isTestingConnection = false;
@@ -230,7 +231,7 @@ class _SshSettingsDialogFormState
     List<TextInputFormatter>? inputFormatters,
     Widget? trailing,
     int? minLines,
-    int? maxLines,
+    int? maxLines = 1,
     String? errorKey,
   }) {
     final theme = ShadTheme.of(context);
@@ -249,19 +250,26 @@ class _SshSettingsDialogFormState
           ),
         ],
         const SizedBox(height: 4),
-        ShadInput(
-          controller: controller,
-          placeholder: placeholder != null ? Text(placeholder) : null,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          trailing: trailing,
-          autocorrect: false,
-          enableSuggestions: false,
-          style: const TextStyle(
-            fontFamily: 'Courier New',
-            fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-            fontFeatures: [FontFeature.tabularFigures()],
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          alignment: Alignment.topCenter,
+          curve: Curves.easeInOut,
+          child: ShadInput(
+            controller: controller,
+            placeholder: placeholder != null ? Text(placeholder) : null,
+            obscureText: obscureText,
+            keyboardType: keyboardType,
+            inputFormatters: inputFormatters,
+            trailing: trailing,
+            minLines: minLines,
+            maxLines: obscureText ? 1 : maxLines,
+            autocorrect: false,
+            enableSuggestions: false,
+            style: const TextStyle(
+              fontFamily: 'Courier New',
+              fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ),
         if (error != null) ...[
@@ -393,6 +401,7 @@ class _SshSettingsDialogFormState
                     ),
                   ),
                   errorKey: 'password',
+                  maxLines: null,
                 ),
               ] else ...[
                 _buildLabeledInput(
@@ -402,6 +411,23 @@ class _SshSettingsDialogFormState
                       ? 'Leave blank to keep current key'
                       : 'Paste your private key',
                   description: 'Paste the contents of your private key file',
+                  obscureText: _obscurePrivateKey,
+                  minLines: _obscurePrivateKey ? 1 : 3,
+                  maxLines: null,
+                  trailing: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      setState(() {
+                        _obscurePrivateKey = !_obscurePrivateKey;
+                      });
+                    },
+                    child: Icon(
+                      _obscurePrivateKey ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 16,
+                    ),
+                  ),
                   errorKey: 'privateKey',
                 ),
                 const SizedBox(height: 12),
@@ -410,6 +436,7 @@ class _SshSettingsDialogFormState
                   controller: _passphraseController,
                   placeholder: 'Enter passphrase if key is encrypted',
                   obscureText: _obscurePassphrase,
+                  maxLines: null,
                   trailing: ShadButton.ghost(
                     width: 24,
                     height: 24,
@@ -438,6 +465,7 @@ class _SshSettingsDialogFormState
                 description:
                     'Required for commands needing elevated privileges',
                 obscureText: _obscureSudoPassword,
+                maxLines: null,
                 trailing: ShadButton.ghost(
                   width: 24,
                   height: 24,
