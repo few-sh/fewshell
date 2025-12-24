@@ -41,65 +41,72 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
         children: [
           Padding(
             padding: pagePadding,
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.muted,
-                borderRadius: theme.radius,
-              ),
-              padding: const EdgeInsets.all(4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _currentTab == 'user'
-                        ? ShadButton(
-                            shadows: [
-                              BoxShadow(
-                                color: theme.colorScheme.background.withValues(
-                                  alpha: 0.1,
-                                ),
-                                spreadRadius: 1,
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                            backgroundColor: theme.colorScheme.background,
-                            foregroundColor: theme.colorScheme.foreground,
-                            hoverBackgroundColor: theme.colorScheme.background,
-                            onPressed: () {},
-                            child: const Text('User Settings'),
-                          )
-                        : ShadButton.ghost(
-                            onPressed: () =>
-                                setState(() => _currentTab = 'user'),
-                            child: const Text('User Settings'),
-                          ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.muted,
+                    borderRadius: theme.radius,
                   ),
-                  Expanded(
-                    child: _currentTab == 'project'
-                        ? ShadButton(
-                            shadows: [
-                              BoxShadow(
-                                color: theme.colorScheme.background.withValues(
-                                  alpha: 0.1,
-                                ),
-                                spreadRadius: 1,
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _currentTab == 'user'
+                            ? ShadButton(
+                                shadows: [
+                                  BoxShadow(
+                                    color: theme.colorScheme.background
+                                        .withValues(alpha: 0.1),
+                                    spreadRadius: 1,
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                                backgroundColor: theme.colorScheme.background,
+                                foregroundColor: theme.colorScheme.foreground,
+                                hoverBackgroundColor:
+                                    theme.colorScheme.background,
+                                onPressed: () {},
+                                child: const Text('User Settings'),
+                              )
+                            : ShadButton.ghost(
+                                onPressed: () =>
+                                    setState(() => _currentTab = 'user'),
+                                child: const Text('User Settings'),
                               ),
-                            ],
-                            backgroundColor: theme.colorScheme.background,
-                            foregroundColor: theme.colorScheme.foreground,
-                            hoverBackgroundColor: theme.colorScheme.background,
-                            onPressed: () {},
-                            child: const Text('Project Settings'),
-                          )
-                        : ShadButton.ghost(
-                            onPressed: () =>
-                                setState(() => _currentTab = 'project'),
-                            child: const Text('Project Settings'),
-                          ),
+                      ),
+                      Expanded(
+                        child: _currentTab == 'project'
+                            ? ShadButton(
+                                shadows: [
+                                  BoxShadow(
+                                    color: theme.colorScheme.background
+                                        .withValues(alpha: 0.1),
+                                    spreadRadius: 1,
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                                backgroundColor: theme.colorScheme.background,
+                                foregroundColor: theme.colorScheme.foreground,
+                                hoverBackgroundColor:
+                                    theme.colorScheme.background,
+                                onPressed: () {},
+                                child: const Text('Project Settings'),
+                              )
+                            : ShadButton.ghost(
+                                onPressed: () =>
+                                    setState(() => _currentTab = 'project'),
+                                child: const Text('Project Settings'),
+                              ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -259,26 +266,36 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
     return Column(
       children: [
         // Preview/Edit toggle and Save button
-        Padding(
-          padding: pagePadding,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Configure default instructions for all AI models',
-                  style: ShadTheme.of(context).textTheme.muted,
-                ),
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+            ),
+            child: Padding(
+              padding: pagePadding,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Configure default instructions for all AI models',
+                      style: ShadTheme.of(context).textTheme.muted,
+                    ),
+                  ),
+                  ShadIconButton.ghost(
+                    icon: Icon(
+                      _showPreview ? LucideIcons.pencil : LucideIcons.eye,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showPreview = !_showPreview),
+                  ),
+                  ShadButton(
+                    onPressed: _hasChanges ? _saveSettings : null,
+                    leading: const Icon(LucideIcons.save),
+                    child: const Text('Save'),
+                  ),
+                ],
               ),
-              ShadIconButton.ghost(
-                icon: Icon(_showPreview ? LucideIcons.pencil : LucideIcons.eye),
-                onPressed: () => setState(() => _showPreview = !_showPreview),
-              ),
-              ShadButton(
-                onPressed: _hasChanges ? _saveSettings : null,
-                leading: const Icon(LucideIcons.save),
-                child: const Text('Save'),
-              ),
-            ],
+            ),
           ),
         ),
         const ShadSeparator.horizontal(),
@@ -286,59 +303,77 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
           child: ListView(
             padding: pagePadding,
             children: [
-              // Template variables info
-              const _TemplateVariablesInfo(),
-              const SizedBox(height: 16),
-
-              // Default Instruction Section
-              _InstructionSection(
-                title: 'Default Instruction',
-                subtitle: 'Applies to all models unless overridden',
-                controller: _defaultController,
-                showPreview: _showPreview,
-                onChanged: _markChanged,
-              ),
-              const SizedBox(height: 24),
-
-              // Model-Specific Overrides
-              ShadAccordion<String>.multiple(
-                children: [
-                  ShadAccordionItem(
-                    value: 'overrides',
-                    title: const Text('Model-Specific Overrides'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_modelControllers.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: Text(
-                              'No overrides configured',
-                              style: ShadTheme.of(context).textTheme.muted,
-                            ),
-                          )
-                        else
-                          ..._modelControllers.entries.map((entry) {
-                            return _ModelOverrideSection(
-                              modelIdentifier: entry.key,
-                              controller: entry.value,
-                              showPreview: _showPreview,
-                              onChanged: _markChanged,
-                              onRemove: () => _removeModelOverride(entry.key),
-                            );
-                          }),
-
-                        // Add new override button
-                        const SizedBox(height: 16),
-                        _AddModelOverrideButton(
-                          existingIdentifiers: _modelControllers.keys.toSet(),
-                          availableLlms: llmSettings,
-                          onAdd: _addModelOverride,
-                        ),
-                      ],
-                    ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Template variables info
+                      const _TemplateVariablesInfo(),
+                      const SizedBox(height: 16),
+
+                      // Default Instruction Section
+                      _InstructionSection(
+                        title: 'Default Instruction',
+                        subtitle: 'Applies to all models unless overridden',
+                        controller: _defaultController,
+                        showPreview: _showPreview,
+                        onChanged: _markChanged,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Model-Specific Overrides
+                      ShadAccordion<String>.multiple(
+                        children: [
+                          ShadAccordionItem(
+                            value: 'overrides',
+                            title: const Text('Model-Specific Overrides'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_modelControllers.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 16.0,
+                                    ),
+                                    child: Text(
+                                      'No overrides configured',
+                                      style: ShadTheme.of(
+                                        context,
+                                      ).textTheme.muted,
+                                    ),
+                                  )
+                                else
+                                  ..._modelControllers.entries.map((entry) {
+                                    return _ModelOverrideSection(
+                                      modelIdentifier: entry.key,
+                                      controller: entry.value,
+                                      showPreview: _showPreview,
+                                      onChanged: _markChanged,
+                                      onRemove: () =>
+                                          _removeModelOverride(entry.key),
+                                    );
+                                  }),
+
+                                // Add new override button
+                                const SizedBox(height: 16),
+                                _AddModelOverrideButton(
+                                  existingIdentifiers: _modelControllers.keys
+                                      .toSet(),
+                                  availableLlms: llmSettings,
+                                  onAdd: _addModelOverride,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
@@ -505,26 +540,38 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
     return Column(
       children: [
         // Preview/Edit toggle and Save button
-        Padding(
-          padding: pagePadding,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Configure project-specific instructions',
-                  style: ShadTheme.of(context).textTheme.muted,
-                ),
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+            ),
+            child: Padding(
+              padding: pagePadding,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Configure project-specific instructions',
+                      style: ShadTheme.of(context).textTheme.muted,
+                    ),
+                  ),
+                  ShadIconButton.ghost(
+                    icon: Icon(
+                      _showPreview ? LucideIcons.pencil : LucideIcons.eye,
+                    ),
+                    onPressed: () =>
+                        setState(() => _showPreview = !_showPreview),
+                  ),
+                  ShadButton(
+                    onPressed: _hasChanges
+                        ? () => _saveSettings(projectId)
+                        : null,
+                    leading: const Icon(LucideIcons.save),
+                    child: const Text('Save'),
+                  ),
+                ],
               ),
-              ShadIconButton.ghost(
-                icon: Icon(_showPreview ? LucideIcons.pencil : LucideIcons.eye),
-                onPressed: () => setState(() => _showPreview = !_showPreview),
-              ),
-              ShadButton(
-                onPressed: _hasChanges ? () => _saveSettings(projectId) : null,
-                leading: const Icon(LucideIcons.save),
-                child: const Text('Save'),
-              ),
-            ],
+            ),
           ),
         ),
         const ShadSeparator.horizontal(),
@@ -532,76 +579,94 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
           child: ListView(
             padding: pagePadding,
             children: [
-              // Include User Instructions Checkbox
-              ShadCheckbox(
-                value: _includeUserInstructions,
-                onChanged: (value) {
-                  setState(() {
-                    _includeUserInstructions = value;
-                    _hasChanges = true;
-                  });
-                },
-                label: const Text('Include User-Level Instructions'),
-                sublabel: const Text(
-                  'Prepend user-level instructions to project instructions',
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Template variables info
-              const _TemplateVariablesInfo(),
-              const SizedBox(height: 16),
-
-              // Default Project Instruction Section
-              _InstructionSection(
-                title: 'Default Project Instruction',
-                subtitle:
-                    'Applies to all models in this project unless overridden',
-                controller: _defaultController,
-                showPreview: _showPreview,
-                onChanged: _markChanged,
-              ),
-              const SizedBox(height: 24),
-
-              // Model-Specific Overrides
-              ShadAccordion<String>.multiple(
-                children: [
-                  ShadAccordionItem(
-                    value: 'overrides',
-                    title: const Text('Model-Specific Overrides'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_modelControllers.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: Text(
-                              'No overrides configured',
-                              style: ShadTheme.of(context).textTheme.muted,
-                            ),
-                          )
-                        else
-                          ..._modelControllers.entries.map((entry) {
-                            return _ModelOverrideSection(
-                              modelIdentifier: entry.key,
-                              controller: entry.value,
-                              showPreview: _showPreview,
-                              onChanged: _markChanged,
-                              onRemove: () => _removeModelOverride(entry.key),
-                            );
-                          }),
-
-                        // Add new override button
-                        const SizedBox(height: 16),
-                        _AddModelOverrideButton(
-                          existingIdentifiers: _modelControllers.keys.toSet(),
-                          availableLlms: llmSettings,
-                          onAdd: _addModelOverride,
-                        ),
-                      ],
-                    ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Include User Instructions Checkbox
+                      ShadCheckbox(
+                        value: _includeUserInstructions,
+                        onChanged: (value) {
+                          setState(() {
+                            _includeUserInstructions = value;
+                            _hasChanges = true;
+                          });
+                        },
+                        label: const Text('Include User-Level Instructions'),
+                        sublabel: const Text(
+                          'Prepend user-level instructions to project instructions',
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Template variables info
+                      const _TemplateVariablesInfo(),
+                      const SizedBox(height: 16),
+
+                      // Default Project Instruction Section
+                      _InstructionSection(
+                        title: 'Default Project Instruction',
+                        subtitle:
+                            'Applies to all models in this project unless overridden',
+                        controller: _defaultController,
+                        showPreview: _showPreview,
+                        onChanged: _markChanged,
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Model-Specific Overrides
+                      ShadAccordion<String>.multiple(
+                        children: [
+                          ShadAccordionItem(
+                            value: 'overrides',
+                            title: const Text('Model-Specific Overrides'),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_modelControllers.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: 16.0,
+                                    ),
+                                    child: Text(
+                                      'No overrides configured',
+                                      style: ShadTheme.of(
+                                        context,
+                                      ).textTheme.muted,
+                                    ),
+                                  )
+                                else
+                                  ..._modelControllers.entries.map((entry) {
+                                    return _ModelOverrideSection(
+                                      modelIdentifier: entry.key,
+                                      controller: entry.value,
+                                      showPreview: _showPreview,
+                                      onChanged: _markChanged,
+                                      onRemove: () =>
+                                          _removeModelOverride(entry.key),
+                                    );
+                                  }),
+
+                                // Add new override button
+                                const SizedBox(height: 16),
+                                _AddModelOverrideButton(
+                                  existingIdentifiers: _modelControllers.keys
+                                      .toSet(),
+                                  availableLlms: llmSettings,
+                                  onAdd: _addModelOverride,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),

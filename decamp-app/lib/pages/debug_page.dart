@@ -14,6 +14,7 @@ import 'package:decamp/pages/qr_scanner_page.dart';
 import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/pages/snippets_page.dart';
+import 'package:decamp/themes/shad_layout_theme.dart';
 
 // Components
 import 'package:decamp/components/empty_placeholder.dart';
@@ -34,118 +35,129 @@ class DebugPage extends ConsumerWidget {
       appBar: AppBar(title: const Text('Debug Page')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Pages',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
             ),
-            const SizedBox(height: 10),
-            _buildPageButton(
-              context,
-              'Agent Instructions',
-              const AgentInstructionsPage(),
-            ),
-            _buildPageButton(context, 'Chat Session', const ChatSession()),
-            _buildPageButton(context, 'Feedback', const FeedbackPage()),
-            _buildPageButton(
-              context,
-              'Main Settings',
-              const MainSettingsPage(),
-            ),
-            _buildPageButton(
-              context,
-              'Project Setup',
-              const ProjectSetupPage(),
-            ),
-            _buildPageButton(context, 'Projects', const ProjectsPage()),
-            _buildPageButton(context, 'QR Scanner', const QrScannerPage()),
-            _buildPageButton(context, 'Secrets', const SecretsPage()),
-            _buildPageButton(
-              context,
-              'Sessions History',
-              const SessionsHistoryPage(),
-            ),
-            _buildPageButton(context, 'Snippets', const SnippetsPage()),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Pages',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                _buildPageButton(
+                  context,
+                  'Agent Instructions',
+                  const AgentInstructionsPage(),
+                ),
+                _buildPageButton(context, 'Chat Session', const ChatSession()),
+                _buildPageButton(context, 'Feedback', const FeedbackPage()),
+                _buildPageButton(
+                  context,
+                  'Main Settings',
+                  const MainSettingsPage(),
+                ),
+                _buildPageButton(
+                  context,
+                  'Project Setup',
+                  const ProjectSetupPage(),
+                ),
+                _buildPageButton(context, 'Projects', const ProjectsPage()),
+                _buildPageButton(context, 'QR Scanner', const QrScannerPage()),
+                _buildPageButton(context, 'Secrets', const SecretsPage()),
+                _buildPageButton(
+                  context,
+                  'Sessions History',
+                  const SessionsHistoryPage(),
+                ),
+                _buildPageButton(context, 'Snippets', const SnippetsPage()),
 
-            const SizedBox(height: 20),
-            const Text(
-              'Components (Viewers)',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            // Add buttons for components here.
-            // Many components require specific props, so we might need to wrap them or provide dummy data.
-            // For now, I'll add a few that are likely to be standalone or easy to mock.
-            _buildComponentButton(
-              context,
-              'Main Drawer',
-              const Scaffold(
-                drawer: MainDrawer(),
-                body: Center(child: Text('Open Drawer')),
-              ),
-            ),
-            _buildComponentButton(
-              context,
-              'User Badge',
-              const Center(child: UserBadge()),
-            ),
-            _buildComponentButton(
-              context,
-              'Empty Placeholder',
-              const EmptyPlaceholder(
-                icon: LucideIcons.info,
-                title: 'Debug Placeholder',
-                subtitle: 'This is a debug placeholder component',
-              ),
-            ),
-            const SizedBox(height: 10),
-            ShadButton.outline(
-              child: const Text('SSH Settings Dialog (Debug)'),
-              onPressed: () => _openSshSettingsDialog(context, ref),
-            ),
-            _buildComponentButton(
-              context,
-              'Sync Indicator',
-              const Center(child: SyncIndicator()),
-            ),
-            _buildComponentButton(
-              context,
-              'Project Setup View',
-              const ProjectSetupView(),
-            ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Components (Viewers)',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                // Add buttons for components here.
+                // Many components require specific props, so we might need to wrap them or provide dummy data.
+                // For now, I'll add a few that are likely to be standalone or easy to mock.
+                _buildComponentButton(
+                  context,
+                  'Main Drawer',
+                  const Scaffold(
+                    drawer: MainDrawer(),
+                    body: Center(child: Text('Open Drawer')),
+                  ),
+                ),
+                _buildComponentButton(
+                  context,
+                  'User Badge',
+                  const Center(child: UserBadge()),
+                ),
+                _buildComponentButton(
+                  context,
+                  'Empty Placeholder',
+                  const EmptyPlaceholder(
+                    icon: LucideIcons.info,
+                    title: 'Debug Placeholder',
+                    subtitle: 'This is a debug placeholder component',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ShadButton.outline(
+                  child: const Text('SSH Settings Dialog (Debug)'),
+                  onPressed: () => _openSshSettingsDialog(context, ref),
+                ),
+                _buildComponentButton(
+                  context,
+                  'Sync Indicator',
+                  const Center(child: SyncIndicator()),
+                ),
+                _buildComponentButton(
+                  context,
+                  'Project Setup View',
+                  const ProjectSetupView(),
+                ),
 
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: ShadButton.outline(
-                child: const Text('New Snippet Dialog'),
-                onPressed: () {
-                  showNewSnippetDialog(context);
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: ShadButton.outline(
-                child: const Text('No LLM Configured Overlay'),
-                onPressed: () {
-                  NoLlmConfiguredOverlay.show(context);
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: ShadButton.outline(
-                child: const Text('Multi Command Approval Overlay'),
-                onPressed: () {
-                  MultiCommandApprovalOverlay.showTest(context);
-                },
-              ),
-            ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('New Snippet Dialog'),
+                    onPressed: () {
+                      showNewSnippetDialog(context);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('No LLM Configured Overlay'),
+                    onPressed: () {
+                      NoLlmConfiguredOverlay.show(context);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('Multi Command Approval Overlay'),
+                    onPressed: () {
+                      MultiCommandApprovalOverlay.showTest(context);
+                    },
+                  ),
+                ),
 
-            // Add more as needed/possible
-          ],
+                // Add more as needed/possible
+              ],
+            ),
+          ),
         ),
       ),
     );

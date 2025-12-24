@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../themes/shad_layout_theme.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
@@ -70,19 +71,29 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
                   bottom: BorderSide(color: theme.colorScheme.border),
                 ),
               ),
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: theme.colorScheme.primary,
-                labelColor: theme.colorScheme.primary,
-                unselectedLabelColor: theme.colorScheme.mutedForeground,
-                labelStyle: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth:
+                      Theme.of(
+                        context,
+                      ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                      800,
                 ),
-                tabs: const [
-                  Tab(text: 'User Snippets'),
-                  Tab(text: 'Project Snippets'),
-                ],
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: theme.colorScheme.primary,
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.colorScheme.mutedForeground,
+                  labelStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  tabs: const [
+                    Tab(text: 'User Snippets'),
+                    Tab(text: 'Project Snippets'),
+                  ],
+                ),
               ),
             ),
             // Scrollable content
@@ -138,10 +149,19 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 
     if (currentProjectId == null) {
       return Center(
-        child: EmptyPlaceholder(
-          icon: LucideIcons.info,
-          title: 'No Project Selected',
-          subtitle: 'Select a project to manage project-specific snippets.',
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth:
+                Theme.of(
+                  context,
+                ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                800,
+          ),
+          child: EmptyPlaceholder(
+            icon: LucideIcons.info,
+            title: 'No Project Selected',
+            subtitle: 'Select a project to manage project-specific snippets.',
+          ),
         ),
       );
     }
@@ -168,10 +188,19 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     // Show empty state only if no snippets AND not adding a new one
     if (snippets.isEmpty && !_isAddingSnippet) {
       return Center(
-        child: EmptyPlaceholder(
-          icon: LucideIcons.code,
-          title: 'No Snippets Yet',
-          subtitle: 'Add your first snippet using the + button above.',
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth:
+                Theme.of(
+                  context,
+                ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                800,
+          ),
+          child: EmptyPlaceholder(
+            icon: LucideIcons.code,
+            title: 'No Snippets Yet',
+            subtitle: 'Add your first snippet using the + button above.',
+          ),
         ),
       );
     }
@@ -179,31 +208,57 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     // Build list items with new snippet card at top if needed
     final listItems = <Widget>[
       if (_isAddingSnippet)
-        NewSnippetCard(
-          key: const ValueKey('new_snippet'),
-          isGlobal: isGlobal,
-          onSuccess: () {
-            setState(() {
-              _isAddingSnippet = false;
-            });
-          },
-          onCancel: () {
-            setState(() {
-              _isAddingSnippet = false;
-            });
-          },
+        Center(
+          key: const ValueKey('new_snippet_wrapper'),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
+            ),
+            child: NewSnippetCard(
+              key: const ValueKey('new_snippet'),
+              isGlobal: isGlobal,
+              onSuccess: () {
+                setState(() {
+                  _isAddingSnippet = false;
+                });
+              },
+              onCancel: () {
+                setState(() {
+                  _isAddingSnippet = false;
+                });
+              },
+            ),
+          ),
         ),
       ...snippets.asMap().entries.map((entry) {
         final index = entry.key + (_isAddingSnippet ? 1 : 0);
         final snippet = entry.value;
-        return _buildSnippetCard(
-          key: ValueKey(snippet.id),
-          index: index,
-          snippet: snippet,
-          isGlobal: isGlobal,
-          onDelete: () async {
-            await ref.read(snippetControllerProvider).deleteSnippet(snippet.id);
-          },
+        return Center(
+          key: ValueKey('snippet_wrapper_${snippet.id}'),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
+            ),
+            child: _buildSnippetCard(
+              key: ValueKey(snippet.id),
+              index: index,
+              snippet: snippet,
+              isGlobal: isGlobal,
+              onDelete: () async {
+                await ref
+                    .read(snippetControllerProvider)
+                    .deleteSnippet(snippet.id);
+              },
+            ),
+          ),
         );
       }),
     ];
