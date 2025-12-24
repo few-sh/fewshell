@@ -35,45 +35,49 @@ class UserBadge extends ConsumerWidget {
     );
   }
 
-  void _showEditUsernameDialog(
+  Future<void> _showEditUsernameDialog(
     BuildContext context,
     WidgetRef ref,
     String currentUsername,
-  ) {
+  ) async {
     final controller = TextEditingController(text: currentUsername);
-    showShadDialog(
-      context: context,
-      builder: (context) => ShadDialog(
-        title: const Text('Edit Username'),
-        child: ShadInput(
-          controller: controller,
-          placeholder: const Text('Enter username'),
-          autofocus: true,
-          onSubmitted: (_) {
-            final newName = controller.text.trim();
-            if (newName.isNotEmpty) {
-              ref.read(userProvider.notifier).setUsername(newName);
-            }
-            Navigator.pop(context);
-          },
-        ),
-        actions: [
-          ShadButton.outline(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ShadButton(
-            onPressed: () {
+    try {
+      await showShadDialog(
+        context: context,
+        builder: (context) => ShadDialog(
+          title: const Text('Edit Username'),
+          child: ShadInput(
+            controller: controller,
+            placeholder: const Text('Enter username'),
+            autofocus: true,
+            onSubmitted: (_) {
               final newName = controller.text.trim();
               if (newName.isNotEmpty) {
                 ref.read(userProvider.notifier).setUsername(newName);
               }
               Navigator.pop(context);
             },
-            child: const Text('Save'),
           ),
-        ],
-      ),
-    );
+          actions: [
+            ShadButton.outline(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ShadButton(
+              onPressed: () {
+                final newName = controller.text.trim();
+                if (newName.isNotEmpty) {
+                  ref.read(userProvider.notifier).setUsername(newName);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 }
