@@ -244,7 +244,7 @@ class _SshSettingsDialogFormState
           inputFormatters: inputFormatters,
           trailing: trailing,
           minLines: minLines,
-          maxLines: maxLines,
+          maxLines: obscureText ? 1 : (maxLines ?? 1),
           autocorrect: false,
           enableSuggestions: false,
           style: const TextStyle(
