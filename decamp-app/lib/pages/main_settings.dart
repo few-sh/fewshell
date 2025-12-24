@@ -203,28 +203,30 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           ),
         ),
         const SizedBox(height: 16),
-        ShadCard(
-          padding: const EdgeInsets.all(16),
-          border: ShadBorder.all(color: theme.colorScheme.destructive),
-          backgroundColor: theme.colorScheme.destructive.withValues(alpha: 0.1),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Delete Project',
-                style: theme.textTheme.large.copyWith(
-                  fontWeight: FontWeight.bold,
+        SizedBox(
+          width: double.infinity,
+          child: ShadCard(
+            padding: const EdgeInsets.all(16),
+            border: ShadBorder.all(color: theme.colorScheme.destructive),
+            backgroundColor: theme.colorScheme.destructive.withValues(
+              alpha: 0.1,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delete Project',
+                  style: theme.textTheme.large.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Permanently delete "${project.name}" and all associated data.',
-                style: theme.textTheme.muted,
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ShadButton.destructive(
+                const SizedBox(height: 8),
+                Text(
+                  'Permanently delete "${project.name}" and all associated data.',
+                  style: theme.textTheme.muted,
+                ),
+                const SizedBox(height: 16),
+                ShadButton.destructive(
                   onPressed: () => _showDeleteProjectDialog(
                     context: context,
                     ref: ref,
@@ -235,7 +237,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                     },
                   ),
                   child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(LucideIcons.trash2, size: 16),
                       SizedBox(width: 8),
@@ -243,8 +245,8 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -565,13 +567,31 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   Widget _buildRemoteShellSection() {
     final theme = ShadTheme.of(context);
     final currentProjectId = ref.watch(currentProjectIdProvider);
+    final sshSettings = currentProjectId != null
+        ? ref.watch(projectSshSettingsProvider(currentProjectId))
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [Text('Remote Shell', style: theme.textTheme.h4)],
+          children: [
+            Text('Remote Shell', style: theme.textTheme.h4),
+            if (currentProjectId != null && sshSettings == null)
+              ShadButton(
+                onPressed: () =>
+                    _showSshSettingsDialog(projectId: currentProjectId),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.plus, size: 16),
+                    SizedBox(width: 8),
+                    Text('Configure Connection'),
+                  ],
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 16),
         // Show message if no project selected
@@ -610,27 +630,12 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
     if (sshSettings == null) {
       // No SSH configuration yet
-      return Column(
+      return const Column(
         children: [
-          const EmptyPlaceholder(
+          EmptyPlaceholder(
             icon: LucideIcons.terminal,
             title: 'No Remote Shell',
             subtitle: 'No remote shell configured yet.',
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ShadButton(
-              onPressed: () => _showSshSettingsDialog(projectId: projectId),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(LucideIcons.plus, size: 16),
-                  SizedBox(width: 8),
-                  Text('Configure Connection'),
-                ],
-              ),
-            ),
           ),
         ],
       );
