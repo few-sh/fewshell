@@ -17,6 +17,7 @@ import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
+import '../themes/shad_layout_theme.dart';
 
 /// Main settings page with User and Project settings tabs
 class MainSettingsPage extends ConsumerStatefulWidget {
@@ -70,18 +71,28 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 bottom: BorderSide(color: theme.colorScheme.border),
               ),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: theme.colorScheme.primary,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.mutedForeground,
-              labelStyle: theme.textTheme.list.copyWith(
-                fontWeight: FontWeight.bold,
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth:
+                    Theme.of(
+                      context,
+                    ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                    800,
               ),
-              tabs: const [
-                Tab(text: 'User Settings'),
-                Tab(text: 'Project Settings'),
-              ],
+              child: TabBar(
+                controller: _tabController,
+                indicatorColor: theme.colorScheme.primary,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.mutedForeground,
+                labelStyle: theme.textTheme.list.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+                tabs: const [
+                  Tab(text: 'User Settings'),
+                  Tab(text: 'Project Settings'),
+                ],
+              ),
             ),
           ),
           // Scrollable content
@@ -97,36 +108,54 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   }
 
   Widget _buildUserSettings() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _buildAIModelsSection(isGlobal: true),
-        const SizedBox(height: 24),
-        _buildThemeSection(),
-      ],
-    );
+    return _buildResponsiveContent([
+      _buildAIModelsSection(isGlobal: true),
+      const SizedBox(height: 24),
+      _buildThemeSection(),
+    ]);
   }
 
   Widget _buildProjectSettings() {
     final currentProject = ref.watch(currentProjectProvider);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (currentProject != null) ...[
-          _buildProjectNameSection(currentProject),
-          const SizedBox(height: 24),
-          _buildServerUrlSection(currentProject),
-          const SizedBox(height: 24),
-        ],
-        _buildAIModelsSection(isGlobal: false),
+    return _buildResponsiveContent([
+      if (currentProject != null) ...[
+        _buildProjectNameSection(currentProject),
         const SizedBox(height: 24),
-        _buildRemoteShellSection(),
-        if (currentProject != null) ...[
-          const SizedBox(height: 24),
-          _buildDeleteProjectSection(currentProject),
-        ],
+        _buildServerUrlSection(currentProject),
+        const SizedBox(height: 24),
       ],
+      _buildAIModelsSection(isGlobal: false),
+      const SizedBox(height: 24),
+      _buildRemoteShellSection(),
+      if (currentProject != null) ...[
+        const SizedBox(height: 24),
+        _buildDeleteProjectSection(currentProject),
+      ],
+    ]);
+  }
+
+  Widget _buildResponsiveContent(List<Widget> children) {
+    final maxWidth =
+        Theme.of(
+          context,
+        ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+        800;
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      itemCount: children.length,
+      itemBuilder: (context, index) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: children[index],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1007,7 +1036,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Sync Server URL', style: theme.textTheme.h4),
+        Text('Remote Agent URL', style: theme.textTheme.h4),
         const SizedBox(height: 16),
         ShadCard(
           padding: const EdgeInsets.all(16),
@@ -1025,7 +1054,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ),
               const SizedBox(height: 4),
               Text(
-                'Leave empty to disable sync',
+                'Leave empty to run locally',
                 style: theme.textTheme.muted.copyWith(fontSize: 12),
               ),
             ],
