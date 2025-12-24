@@ -85,6 +85,28 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
     }
   }
 
+  Future<bool?> _showExitConfirmationDialog(BuildContext context) {
+    return showShadDialog<bool>(
+      context: context,
+      builder: (context) => ShadDialog(
+        title: const Text('Unsaved Changes'),
+        description: const Text(
+          'You have unsaved changes. Are you sure you want to leave?',
+        ),
+        actions: [
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          ShadButton(
+            child: const Text('Leave'),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
@@ -92,86 +114,100 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
     final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
     final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const ProjectTitleBar(title: 'Agent Instructions'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final shouldPop = await _showExitConfirmationDialog(context);
+        if (shouldPop == true) {
+          if (context.mounted) Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const ProjectTitleBar(title: 'Agent Instructions'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
         ),
-      ),
-      body: Column(
-        children: [
-          // Preview and Save buttons
-          Padding(
-            padding: pagePadding,
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _tabController.index == 0
-                            ? 'Configure default instructions for all AI models'
-                            : 'Configure project-specific instructions',
-                        style: theme.textTheme.muted,
+        body: Column(
+          children: [
+            // Preview and Save buttons
+            Padding(
+              padding: pagePadding,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _tabController.index == 0
+                              ? 'Configure default instructions for all AI models'
+                              : 'Configure project-specific instructions',
+                          style: theme.textTheme.muted,
+                        ),
                       ),
-                    ),
-                    ShadButton.outline(
-                      leading: const Icon(LucideIcons.eye),
-                      onPressed: _handlePreview,
-                      child: const Text('Preview'),
-                    ),
-                    const SizedBox(width: 8),
-                    ShadButton(
-                      onPressed: _hasChanges ? _handleSave : null,
-                      leading: const Icon(LucideIcons.save),
-                      child: const Text('Save'),
-                    ),
-                  ],
+                      ShadButton.outline(
+                        leading: const Icon(LucideIcons.eye),
+                        onPressed: _handlePreview,
+                        child: const Text('Preview'),
+                      ),
+                      const SizedBox(width: 8),
+                      ShadButton(
+                        onPressed: _hasChanges ? _handleSave : null,
+                        leading: const Icon(LucideIcons.save),
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Tab Bar
-          TabBar(
-            controller: _tabController,
-            labelColor: theme.colorScheme.foreground,
-            unselectedLabelColor: theme.colorScheme.mutedForeground,
-            indicatorColor: theme.colorScheme.primary,
-            tabs: const [
-              Tab(text: 'User Settings'),
-              Tab(text: 'Project Settings'),
-            ],
-          ),
-
-          const ShadSeparator.horizontal(),
-
-          // Tab Content
-          Expanded(
-            child: TabBarView(
+            // Tab Bar
+            TabBar(
               controller: _tabController,
-              children: [
-                UserSettingsTab(key: _userTabKey, onChanged: _handleTabChanges),
-                currentProject != null
-                    ? ProjectSettingsTab(
-                        key: _projectTabKey,
-                        projectId: currentProject.id,
-                        onChanged: _handleTabChanges,
-                      )
-                    : const Center(
-                        child: Text(
-                          'No project selected. Please select a project first.',
-                        ),
-                      ),
+              labelColor: theme.colorScheme.foreground,
+              unselectedLabelColor: theme.colorScheme.mutedForeground,
+              indicatorColor: theme.colorScheme.primary,
+              tabs: const [
+                Tab(text: 'User Settings'),
+                Tab(text: 'Project Settings'),
               ],
             ),
-          ),
-        ],
+
+            const ShadSeparator.horizontal(),
+
+            // Tab Content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  UserSettingsTab(
+                    key: _userTabKey,
+                    onChanged: _handleTabChanges,
+                  ),
+                  currentProject != null
+                      ? ProjectSettingsTab(
+                          key: _projectTabKey,
+                          projectId: currentProject.id,
+                          onChanged: _handleTabChanges,
+                        )
+                      : const Center(
+                          child: Text(
+                            'No project selected. Please select a project first.',
+                          ),
+                        ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -192,6 +228,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
   late TextEditingController _defaultController;
   final Map<String, TextEditingController> _modelControllers = {};
   bool _hasChanges = false;
+  AgentInstruction? _originalInstruction;
 
   bool get hasChanges => _hasChanges;
 
@@ -216,6 +253,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
   void _loadSettings() {
     final settings = ref.read(globalSettingsProvider);
     final instruction = settings.agentInstruction;
+    _originalInstruction = instruction;
 
     _defaultController.text = instruction?.defaultInstruction ?? '';
 
@@ -234,9 +272,28 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
     widget.onChanged(_hasChanges);
   }
 
-  void _markChanged() {
-    if (!_hasChanges) {
-      setState(() => _hasChanges = true);
+  void _checkForChanges() {
+    final defaultChanged =
+        _defaultController.text !=
+        (_originalInstruction?.defaultInstruction ?? '');
+
+    bool overridesChanged = false;
+    final originalOverrides = _originalInstruction?.modelOverrides ?? {};
+
+    if (_modelControllers.length != originalOverrides.length) {
+      overridesChanged = true;
+    } else {
+      for (var entry in _modelControllers.entries) {
+        if (entry.value.text != (originalOverrides[entry.key] ?? '')) {
+          overridesChanged = true;
+          break;
+        }
+      }
+    }
+
+    final hasChanges = defaultChanged || overridesChanged;
+    if (_hasChanges != hasChanges) {
+      setState(() => _hasChanges = hasChanges);
       widget.onChanged(_hasChanges);
     }
   }
@@ -265,6 +322,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
         settings.copyWith(agentInstruction: newInstruction, updatedAt: now),
       );
 
+      _originalInstruction = newInstruction;
       setState(() => _hasChanges = false);
       widget.onChanged(_hasChanges);
 
@@ -292,8 +350,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
     if (!_modelControllers.containsKey(modelIdentifier)) {
       setState(() {
         _modelControllers[modelIdentifier] = TextEditingController();
-        _hasChanges = true;
-        widget.onChanged(_hasChanges);
+        _checkForChanges();
       });
     }
   }
@@ -302,8 +359,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
     setState(() {
       _modelControllers[modelIdentifier]?.dispose();
       _modelControllers.remove(modelIdentifier);
-      _hasChanges = true;
-      widget.onChanged(_hasChanges);
+      _checkForChanges();
     });
   }
 
@@ -343,7 +399,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
                   title: 'Default Instruction',
                   subtitle: 'Applies to all models unless overridden',
                   controller: _defaultController,
-                  onChanged: _markChanged,
+                  onChanged: _checkForChanges,
                 ),
                 const SizedBox(height: 24),
 
@@ -369,7 +425,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
                               return _ModelOverrideSection(
                                 modelIdentifier: entry.key,
                                 controller: entry.value,
-                                onChanged: _markChanged,
+                                onChanged: _checkForChanges,
                                 onRemove: () => _removeModelOverride(entry.key),
                                 onPreview: () =>
                                     AgentInstructionPreviewModal.show(
@@ -422,6 +478,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
   bool _hasChanges = false;
   bool _includeUserInstructions = false;
   bool _settingsLoaded = false;
+  ProjectSettings? _originalSettings;
 
   bool get hasChanges => _hasChanges;
 
@@ -464,6 +521,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
   }
 
   void _loadSettings(ProjectSettings settings) {
+    _originalSettings = settings;
     final instruction = settings.agentInstruction;
 
     _defaultController.text = instruction?.defaultInstruction ?? '';
@@ -484,9 +542,35 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
     widget.onChanged(_hasChanges);
   }
 
-  void _markChanged() {
-    if (!_hasChanges) {
-      setState(() => _hasChanges = true);
+  void _checkForChanges() {
+    final originalInstruction = _originalSettings?.agentInstruction;
+
+    final defaultChanged =
+        _defaultController.text !=
+        (originalInstruction?.defaultInstruction ?? '');
+
+    final includeUserInstructionsChanged =
+        _includeUserInstructions !=
+        (_originalSettings?.includeUserInstructions ?? false);
+
+    bool overridesChanged = false;
+    final originalOverrides = originalInstruction?.modelOverrides ?? {};
+
+    if (_modelControllers.length != originalOverrides.length) {
+      overridesChanged = true;
+    } else {
+      for (var entry in _modelControllers.entries) {
+        if (entry.value.text != (originalOverrides[entry.key] ?? '')) {
+          overridesChanged = true;
+          break;
+        }
+      }
+    }
+
+    final hasChanges =
+        defaultChanged || includeUserInstructionsChanged || overridesChanged;
+    if (_hasChanges != hasChanges) {
+      setState(() => _hasChanges = hasChanges);
       widget.onChanged(_hasChanges);
     }
   }
@@ -515,14 +599,15 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
         updatedAt: now,
       );
 
-      await settingsNotifier.updateSettings(
-        settings.copyWith(
-          agentInstruction: newInstruction,
-          includeUserInstructions: _includeUserInstructions,
-          updatedAt: now,
-        ),
+      final newSettings = settings.copyWith(
+        agentInstruction: newInstruction,
+        includeUserInstructions: _includeUserInstructions,
+        updatedAt: now,
       );
 
+      await settingsNotifier.updateSettings(newSettings);
+
+      _originalSettings = newSettings;
       setState(() => _hasChanges = false);
       widget.onChanged(_hasChanges);
 
@@ -555,8 +640,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
     if (!_modelControllers.containsKey(modelIdentifier)) {
       setState(() {
         _modelControllers[modelIdentifier] = TextEditingController();
-        _hasChanges = true;
-        widget.onChanged(_hasChanges);
+        _checkForChanges();
       });
     }
   }
@@ -565,8 +649,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
     setState(() {
       _modelControllers[modelIdentifier]?.dispose();
       _modelControllers.remove(modelIdentifier);
-      _hasChanges = true;
-      widget.onChanged(_hasChanges);
+      _checkForChanges();
     });
   }
 
@@ -631,8 +714,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
                   onChanged: (value) {
                     setState(() {
                       _includeUserInstructions = value;
-                      _hasChanges = true;
-                      widget.onChanged(_hasChanges);
+                      _checkForChanges();
                     });
                   },
                   label: const Text('Include User-Level Instructions'),
@@ -652,7 +734,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
                   subtitle:
                       'Applies to all models in this project unless overridden',
                   controller: _defaultController,
-                  onChanged: _markChanged,
+                  onChanged: _checkForChanges,
                 ),
                 const SizedBox(height: 24),
 
@@ -678,7 +760,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
                               return _ModelOverrideSection(
                                 modelIdentifier: entry.key,
                                 controller: entry.value,
-                                onChanged: _markChanged,
+                                onChanged: _checkForChanges,
                                 onRemove: () => _removeModelOverride(entry.key),
                                 onPreview: () =>
                                     AgentInstructionPreviewModal.show(
