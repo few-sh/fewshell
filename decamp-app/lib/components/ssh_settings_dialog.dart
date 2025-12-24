@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'ssh_prompt_dialog.dart';
 import '../providers/ssh_settings_provider.dart';
 
@@ -50,7 +51,7 @@ class SshSettingsDialog {
 
     if (!context.mounted) return;
 
-    await showDialog(
+    await showShadDialog(
       context: context,
       builder: (context) => _SshSettingsDialogForm(
         title: isEditMode ? 'Edit Remote Shell' : 'Configure Remote Shell',
@@ -112,8 +113,9 @@ class _SshSettingsDialogFormState
   late final TextEditingController _passphraseController;
   late final TextEditingController _sudoPasswordController;
 
-  final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
+  final Map<String, String?> _errors = {};
+
   bool _obscurePassword = true;
   bool _obscurePassphrase = true;
   bool _obscureSudoPassword = true;
@@ -160,18 +162,125 @@ class _SshSettingsDialogFormState
     super.dispose();
   }
 
+  bool _validate() {
+    final errors = <String, String?>{};
+    bool isValid = true;
+
+    if (_hostController.text.isEmpty) {
+      errors['host'] = 'Please enter a host';
+      isValid = false;
+    }
+
+    if (_portController.text.isEmpty) {
+      errors['port'] = 'Please enter a port';
+      isValid = false;
+    } else {
+      final port = int.tryParse(_portController.text);
+      if (port == null || port < 1 || port > 65535) {
+        errors['port'] = 'Port must be between 1 and 65535';
+        isValid = false;
+      }
+    }
+
+    if (_usernameController.text.isEmpty) {
+      errors['username'] = 'Please enter a username';
+      isValid = false;
+    }
+
+    if (_authMethod == SshAuthMethod.password) {
+      if (!_isEditMode && _passwordController.text.isEmpty) {
+        errors['password'] = 'Please enter a password';
+        isValid = false;
+      }
+    } else {
+      if (!_isEditMode && _privateKeyController.text.isEmpty) {
+        errors['privateKey'] = 'Please enter a private key';
+        isValid = false;
+      }
+    }
+
+    setState(() {
+      _errors.clear();
+      _errors.addAll(errors);
+    });
+
+    return isValid;
+  }
+
+  Widget _buildLabeledInput({
+    required String label,
+    required TextEditingController controller,
+    String? placeholder,
+    String? description,
+    bool obscureText = false,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    Widget? trailing,
+    int? minLines,
+    int? maxLines,
+    String? errorKey,
+  }) {
+    final theme = ShadTheme.of(context);
+    final error = errorKey != null ? _errors[errorKey] : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: theme.textTheme.small),
+        if (description != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            description,
+            style: theme.textTheme.muted.copyWith(fontSize: 12),
+          ),
+        ],
+        const SizedBox(height: 4),
+        ShadInput(
+          controller: controller,
+          placeholder: placeholder != null ? Text(placeholder) : null,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          trailing: trailing,
+          minLines: minLines,
+          maxLines: maxLines,
+          autocorrect: false,
+          enableSuggestions: false,
+          style: const TextStyle(
+            fontFamily: 'Courier New',
+            fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+        if (error != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            error,
+            style: theme.textTheme.small.copyWith(
+              color: theme.colorScheme.destructive,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
-    return AlertDialog(
-      insetPadding: const EdgeInsets.all(16),
-      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+    return ShadDialog(
       title: Text(widget.title),
-      content: Form(
-        key: _formKey,
+      actions: [
+        ShadButton.outline(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ShadButton(onPressed: _save, child: const Text('Save')),
+      ],
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 600),
         child: SingleChildScrollView(
           controller: _scrollController,
           child: Column(
@@ -179,90 +288,38 @@ class _SshSettingsDialogFormState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Host field
-              TextFormField(
+              _buildLabeledInput(
+                label: 'Host',
                 controller: _hostController,
-                decoration: InputDecoration(
-                  labelText: 'Host',
-                  hintText: 'example.com or 192.168.1.100',
-                  isDense: true,
-                ),
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.none,
-                style: const TextStyle(
-                  fontFamily: 'Courier New',
-                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a host';
-                  }
-                  return null;
-                },
+                placeholder: 'example.com or 192.168.1.100',
+                errorKey: 'host',
               ),
               const SizedBox(height: 12),
 
               // Port field
-              TextFormField(
+              _buildLabeledInput(
+                label: 'Port',
                 controller: _portController,
-                decoration: const InputDecoration(
-                  labelText: 'Port',
-                  hintText: '22',
-                  isDense: true,
-                ),
+                placeholder: '22',
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.none,
-                style: const TextStyle(
-                  fontFamily: 'Courier New',
-                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a port';
-                  }
-                  final port = int.tryParse(value);
-                  if (port == null || port < 1 || port > 65535) {
-                    return 'Port must be between 1 and 65535';
-                  }
-                  return null;
-                },
+                errorKey: 'port',
               ),
               const SizedBox(height: 12),
 
               // Username field
-              TextFormField(
+              _buildLabeledInput(
+                label: 'Username',
                 controller: _usernameController,
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  hintText: 'root or admin',
-                  isDense: true,
-                ),
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.none,
-                style: const TextStyle(
-                  fontFamily: 'Courier New',
-                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a username';
-                  }
-                  return null;
-                },
+                placeholder: 'root or admin',
+                errorKey: 'username',
               ),
               const SizedBox(height: 16),
 
               // Authentication method selector
               Text(
                 'Authentication Method',
-                style: theme.textTheme.titleSmall?.copyWith(
+                style: theme.textTheme.small.copyWith(
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.primary,
                 ),
@@ -273,7 +330,7 @@ class _SshSettingsDialogFormState
                   Expanded(
                     child: _buildAuthMethodCard(
                       title: 'Password',
-                      icon: Icons.password,
+                      icon: LucideIcons.lock,
                       method: SshAuthMethod.password,
                       isSelected: _authMethod == SshAuthMethod.password,
                       onTap: () {
@@ -287,7 +344,7 @@ class _SshSettingsDialogFormState
                   Expanded(
                     child: _buildAuthMethodCard(
                       title: 'Private Key',
-                      icon: Icons.key,
+                      icon: LucideIcons.key,
                       method: SshAuthMethod.privateKey,
                       isSelected: _authMethod == SshAuthMethod.privateKey,
                       onTap: () {
@@ -303,196 +360,141 @@ class _SshSettingsDialogFormState
 
               // Conditional fields based on auth method
               if (_authMethod == SshAuthMethod.password) ...[
-                TextFormField(
+                _buildLabeledInput(
+                  label: 'Password',
                   controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    hintText: _isEditMode
-                        ? 'Leave blank to keep current password'
-                        : 'Enter your password',
-                    isDense: true,
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            size: 20,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
+                  placeholder: _isEditMode
+                      ? 'Leave blank to keep current password'
+                      : 'Enter your password',
+                  obscureText: _obscurePassword,
+                  trailing: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                    child: Icon(
+                      _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 16,
                     ),
                   ),
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  textCapitalization: TextCapitalization.none,
-                  style: const TextStyle(
-                    fontFamily: 'Courier New',
-                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                  minLines: 1,
-                  maxLines: _obscurePassword ? 1 : 3,
-                  obscureText: _obscurePassword,
-                  validator: (value) {
-                    if (!_isEditMode && (value == null || value.isEmpty)) {
-                      return 'Please enter a password';
-                    }
-                    return null;
-                  },
+                  errorKey: 'password',
                 ),
               ] else ...[
-                TextFormField(
+                _buildLabeledInput(
+                  label: 'Private Key',
                   controller: _privateKeyController,
-                  decoration: InputDecoration(
-                    labelText: 'Private Key',
-                    hintText: _isEditMode
-                        ? 'Leave blank to keep current key'
-                        : 'Paste your private key',
-                    isDense: true,
-                    helperText: 'Paste the contents of your private key file',
-                  ),
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  textCapitalization: TextCapitalization.none,
-                  style: const TextStyle(
-                    fontFamily: 'Courier New',
-                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                  maxLines: 5,
-                  validator: (value) {
-                    if (!_isEditMode && (value == null || value.isEmpty)) {
-                      return 'Please enter a private key';
-                    }
-                    return null;
-                  },
+                  placeholder: _isEditMode
+                      ? 'Leave blank to keep current key'
+                      : 'Paste your private key',
+                  description: 'Paste the contents of your private key file',
+                  minLines: 3,
+                  maxLines: 10,
+                  errorKey: 'privateKey',
                 ),
                 const SizedBox(height: 12),
-                TextFormField(
+                _buildLabeledInput(
+                  label: 'Passphrase (Optional)',
                   controller: _passphraseController,
-                  decoration: InputDecoration(
-                    labelText: 'Passphrase (Optional)',
-                    hintText: 'Enter passphrase if key is encrypted',
-                    isDense: true,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassphrase
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassphrase = !_obscurePassphrase;
-                        });
-                      },
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                  placeholder: 'Enter passphrase if key is encrypted',
+                  obscureText: _obscurePassphrase,
+                  trailing: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassphrase = !_obscurePassphrase;
+                      });
+                    },
+                    child: Icon(
+                      _obscurePassphrase ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 16,
                     ),
                   ),
-                  autocorrect: false,
-                  enableSuggestions: false,
-                  textCapitalization: TextCapitalization.none,
-                  style: const TextStyle(
-                    fontFamily: 'Courier New',
-                    fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                    fontFeatures: [FontFeature.tabularFigures()],
-                  ),
-                  minLines: 1,
-                  maxLines: _obscurePassphrase ? 1 : 3,
-                  obscureText: _obscurePassphrase,
                 ),
               ],
 
               // Sudo password field (applies to all auth methods)
               const SizedBox(height: 12),
-              TextFormField(
+              _buildLabeledInput(
+                label: 'Sudo Password (Optional)',
                 controller: _sudoPasswordController,
-                decoration: InputDecoration(
-                  labelText: 'Sudo Password (Optional)',
-                  hintText: _isEditMode
-                      ? 'Leave blank to keep current sudo password'
-                      : 'Enter password for sudo commands',
-                  helperText:
-                      'Required for commands needing elevated privileges',
-                  helperMaxLines: 2,
-                  isDense: true,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureSudoPassword
-                          ? Icons.visibility
-                          : Icons.visibility_off,
-                      size: 20,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscureSudoPassword = !_obscureSudoPassword;
-                      });
-                    },
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                placeholder: _isEditMode
+                    ? 'Leave blank to keep current sudo password'
+                    : 'Enter password for sudo commands',
+                description:
+                    'Required for commands needing elevated privileges',
+                obscureText: _obscureSudoPassword,
+                trailing: ShadButton.ghost(
+                  width: 24,
+                  height: 24,
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    setState(() {
+                      _obscureSudoPassword = !_obscureSudoPassword;
+                    });
+                  },
+                  child: Icon(
+                    _obscureSudoPassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                    size: 16,
                   ),
                 ),
-                autocorrect: false,
-                enableSuggestions: false,
-                textCapitalization: TextCapitalization.none,
-                style: const TextStyle(
-                  fontFamily: 'Courier New',
-                  fontFamilyFallback: ['Courier', 'Monaco', 'Menlo'],
-                  fontFeatures: [FontFeature.tabularFigures()],
-                ),
-                minLines: 1,
-                maxLines: _obscureSudoPassword ? 1 : 3,
-                obscureText: _obscureSudoPassword,
               ),
 
               if (_isEditMode) ...[
                 const SizedBox(height: 12),
-                SwitchListTile(
-                  title: const Text('Enabled'),
-                  subtitle: const Text(
-                    'Allow connections using this configuration',
-                  ),
-                  value: _enabled,
-                  onChanged: (value) {
-                    setState(() {
-                      _enabled = value;
-                    });
-                  },
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
+                Row(
+                  children: [
+                    ShadSwitch(
+                      value: _enabled,
+                      onChanged: (value) {
+                        setState(() {
+                          _enabled = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 12),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Enabled',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text('Allow connections using this configuration'),
+                      ],
+                    ),
+                  ],
                 ),
               ],
 
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
+                child: ShadButton.outline(
                   onPressed: _isTestingConnection ? null : _testConnection,
-                  icon: _isTestingConnection
-                      ? const SizedBox(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isTestingConnection)
+                        const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.network_check, size: 20),
-                  label: Text(
-                    _isTestingConnection
-                        ? 'Testing Connection...'
-                        : 'Test Connection',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                      else
+                        const Icon(LucideIcons.network, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        _isTestingConnection
+                            ? 'Testing Connection...'
+                            : 'Test Connection',
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -505,12 +507,12 @@ class _SshSettingsDialogFormState
                   decoration: BoxDecoration(
                     color: _testResultSuccess == true
                         ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
+                        : theme.colorScheme.destructive.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: _testResultSuccess == true
                           ? Colors.green
-                          : Colors.red,
+                          : theme.colorScheme.destructive,
                       width: 1,
                     ),
                   ),
@@ -518,11 +520,11 @@ class _SshSettingsDialogFormState
                     children: [
                       Icon(
                         _testResultSuccess == true
-                            ? Icons.check_circle
-                            : Icons.error,
+                            ? LucideIcons.check
+                            : LucideIcons.circleAlert,
                         color: _testResultSuccess == true
                             ? Colors.green
-                            : Colors.red,
+                            : theme.colorScheme.destructive,
                         size: 18,
                       ),
                       const SizedBox(width: 8),
@@ -532,7 +534,7 @@ class _SshSettingsDialogFormState
                           style: TextStyle(
                             color: _testResultSuccess == true
                                 ? Colors.green.shade700
-                                : Colors.red.shade700,
+                                : theme.colorScheme.destructive,
                             fontSize: 13,
                           ),
                         ),
@@ -545,13 +547,6 @@ class _SshSettingsDialogFormState
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _save, child: const Text('Save')),
-      ],
     );
   }
 
@@ -562,24 +557,23 @@ class _SshSettingsDialogFormState
     required bool isSelected,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           border: Border.all(
             color: isSelected
                 ? theme.colorScheme.primary
-                : theme.colorScheme.outline,
+                : theme.colorScheme.border,
             width: isSelected ? 2 : 1,
           ),
           borderRadius: BorderRadius.circular(8),
           color: isSelected
               ? theme.colorScheme.primary.withValues(alpha: 0.1)
-              : null,
+              : theme.colorScheme.background,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -589,16 +583,16 @@ class _SshSettingsDialogFormState
               size: 24,
               color: isSelected
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  : theme.colorScheme.foreground.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 6),
             Text(
               title,
-              style: theme.textTheme.bodySmall?.copyWith(
+              style: theme.textTheme.small.copyWith(
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 color: isSelected
                     ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface,
+                    : theme.colorScheme.foreground,
               ),
             ),
           ],
@@ -608,7 +602,7 @@ class _SshSettingsDialogFormState
   }
 
   Future<void> _testConnection() async {
-    if (!_formKey.currentState!.validate()) {
+    if (!_validate()) {
       return;
     }
 
@@ -693,82 +687,85 @@ class _SshSettingsDialogFormState
   }
 
   Future<void> _save() async {
-    if (_formKey.currentState!.validate()) {
-      final port = int.parse(_portController.text);
-      final host = _hostController.text;
-      final username = _usernameController.text;
-      final authMethod = _authMethod;
-      final password = authMethod == SshAuthMethod.password
-          ? _passwordController.text
-          : null;
-      final privateKey = authMethod == SshAuthMethod.privateKey
-          ? _privateKeyController.text
-          : null;
-      final passphrase =
-          authMethod == SshAuthMethod.privateKey &&
-              _passphraseController.text.isNotEmpty
-          ? _passphraseController.text
-          : null;
-      final sudoPassword = _sudoPasswordController.text.isNotEmpty
-          ? _sudoPasswordController.text
-          : null;
-      final enabled = _isEditMode ? _enabled : null;
+    if (!_validate()) {
+      return;
+    }
 
-      try {
-        final notifier = ref.read(
-          projectSshSettingsProvider(widget.projectId).notifier,
+    final port = int.parse(_portController.text);
+    final host = _hostController.text;
+    final username = _usernameController.text;
+    final authMethod = _authMethod;
+    final password = authMethod == SshAuthMethod.password
+        ? _passwordController.text
+        : null;
+    final privateKey = authMethod == SshAuthMethod.privateKey
+        ? _privateKeyController.text
+        : null;
+    final passphrase =
+        authMethod == SshAuthMethod.privateKey &&
+            _passphraseController.text.isNotEmpty
+        ? _passphraseController.text
+        : null;
+    final sudoPassword = _sudoPasswordController.text.isNotEmpty
+        ? _sudoPasswordController.text
+        : null;
+    final enabled = _isEditMode ? _enabled : null;
+
+    try {
+      final notifier = ref.read(
+        projectSshSettingsProvider(widget.projectId).notifier,
+      );
+
+      if (_isEditMode) {
+        await notifier.updateSshSettings(
+          host: host,
+          port: port,
+          username: username,
+          authMethod: authMethod,
+          password: password,
+          privateKey: privateKey,
+          passphrase: passphrase,
+          sudoPassword: sudoPassword,
+          enabled: enabled,
         );
+      } else {
+        await notifier.createSshSettings(
+          host: host,
+          port: port,
+          username: username,
+          authMethod: authMethod,
+          password: password,
+          privateKey: privateKey,
+          passphrase: passphrase,
+          sudoPassword: sudoPassword,
+        );
+      }
 
-        if (_isEditMode) {
-          await notifier.updateSshSettings(
-            host: host,
-            port: port,
-            username: username,
-            authMethod: authMethod,
-            password: password,
-            privateKey: privateKey,
-            passphrase: passphrase,
-            sudoPassword: sudoPassword,
-            enabled: enabled,
-          );
-        } else {
-          await notifier.createSshSettings(
-            host: host,
-            port: port,
-            username: username,
-            authMethod: authMethod,
-            password: password,
-            privateKey: privateKey,
-            passphrase: passphrase,
-            sudoPassword: sudoPassword,
-          );
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _isEditMode
-                    ? 'Remote shell configuration updated'
-                    : 'Remote shell configured successfully',
-              ),
+      if (mounted) {
+        ShadToaster.of(context).show(
+          ShadToast(
+            title: const Text('Success'),
+            description: Text(
+              _isEditMode
+                  ? 'Remote shell configuration updated'
+                  : 'Remote shell configured successfully',
             ),
-          );
-          Navigator.of(context).pop();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                _isEditMode
-                    ? 'Error updating configuration: $e'
-                    : 'Error configuring remote shell: $e',
-              ),
-              backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ShadToaster.of(context).show(
+          ShadToast.destructive(
+            title: const Text('Error'),
+            description: Text(
+              _isEditMode
+                  ? 'Error updating configuration: $e'
+                  : 'Error configuring remote shell: $e',
             ),
-          );
-        }
+          ),
+        );
       }
     }
   }
