@@ -163,7 +163,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
     return ShadDialog(
       title: Text(widget.title),
       actions: [
-        ShadButton.ghost(
+        ShadButton.outline(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),

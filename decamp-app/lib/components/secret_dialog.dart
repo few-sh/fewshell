@@ -73,7 +73,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
     return ShadDialog(
       title: Text(widget.title),
       actions: [
-        ShadButton.ghost(
+        ShadButton.outline(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
