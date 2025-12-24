@@ -59,11 +59,11 @@ agent-core/ is the package with the common code shared between the frontend and 
 - In general avoid hard-coding. When in doubt, ASK me.
 - Think long-term. Avoid temporary hacky solutions. Avoid technical debt.
 - Avoid duplicating state, it leads to additional complexity of having to sychronize the redundant state and may lead to bugs when things go out of sync. Always examine the code base to see if existing state can already be queried.
-- Fix linter warnings when writing new code. (Pre-existing TODO warnings are OK to ignore).
+- Fix linter warnings when writing new code. (Pre-existing TODO warnings are OK to ignore). Run `dart analyze` after finishing your task and fix all the issues that your change might have created.
 - Do not swallow exceptions. Let them fall through and handle them at API level
 if on the server (eg before the response), or at GUI level if on the client.
 
-When it comes to state management and data model, make your design decisions assuming that we will have the following future features:
+When it comes to state management and data model, our design should adhere to the following:
 - Real-time collaboration support (eg CRDT).
 - Replicated storage of state.
 - Real-time Client-server architecture where the app sends commands to the server and some of the state is on the server.
