@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:agent_core/agent_core.dart';
+import 'package:decamp/components/ssh_settings_dialog.dart';
+import 'package:decamp/providers/ssh_settings_provider.dart';
 import 'package:decamp/pages/agent_instructions_page.dart';
 import 'package:decamp/pages/chat_session.dart';
 import 'package:decamp/pages/feedback_page.dart';
@@ -21,11 +25,11 @@ import 'package:decamp/components/project_setup_view.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
 
-class DebugPage extends StatelessWidget {
+class DebugPage extends ConsumerWidget {
   const DebugPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Debug Page')),
       body: SingleChildScrollView(
@@ -95,6 +99,11 @@ class DebugPage extends StatelessWidget {
                 title: 'Debug Placeholder',
                 subtitle: 'This is a debug placeholder component',
               ),
+            ),
+            const SizedBox(height: 10),
+            ShadButton.outline(
+              child: const Text('SSH Settings Dialog (Debug)'),
+              onPressed: () => _openSshSettingsDialog(context, ref),
             ),
             _buildComponentButton(
               context,
@@ -179,5 +188,77 @@ class DebugPage extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _openSshSettingsDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    const debugProjectId = 'debug_project_id';
+    final mockNotifier = MockProjectSshSettingsNotifier();
+
+    await SshSettingsDialog.show(
+      context,
+      ref,
+      projectId: debugProjectId,
+      existingSettings: SshSettings(
+        host: 'debug.example.com',
+        port: 2222,
+        username: 'debug_user',
+        authMethod: SshAuthMethod.password,
+        passwordSecretId: 'mock_password_id',
+        enabled: true,
+      ),
+      password: 'mock_password_value',
+      overrides: [
+        projectSshSettingsProvider(
+          debugProjectId,
+        ).overrideWith((ref) => mockNotifier),
+      ],
+    );
+  }
+}
+
+class MockProjectSshSettingsNotifier extends StateNotifier<SshSettings?>
+    implements ProjectSshSettingsNotifier {
+  MockProjectSshSettingsNotifier() : super(null);
+
+  @override
+  Future<void> createSshSettings({
+    required String host,
+    required int port,
+    required String username,
+    required SshAuthMethod authMethod,
+    String? password,
+    String? privateKey,
+    String? passphrase,
+    String? sudoPassword,
+  }) async {
+    debugPrint('Mock createSshSettings: $host:$port, $username');
+  }
+
+  @override
+  Future<void> updateSshSettings({
+    String? host,
+    int? port,
+    String? username,
+    SshAuthMethod? authMethod,
+    String? password,
+    String? privateKey,
+    String? passphrase,
+    String? sudoPassword,
+    bool? enabled,
+  }) async {
+    debugPrint('Mock updateSshSettings: $host:$port');
+  }
+
+  @override
+  Future<String?> getSecret(String secretId) async {
+    return 'mock_secret_value';
+  }
+
+  @override
+  Future<void> deleteSshSettings() async {
+    debugPrint('Mock deleteSshSettings');
   }
 }

@@ -17,33 +17,43 @@ class SshSettingsDialog {
     WidgetRef ref, {
     required String projectId,
     SshSettings? existingSettings,
+    String? password,
+    String? privateKey,
+    String? passphrase,
+    String? sudoPassword,
+    List<Override>? overrides,
   }) async {
     final isEditMode = existingSettings != null;
 
-    // Fetch credentials for edit mode
-    String? password;
-    String? privateKey;
-    String? passphrase;
-    String? sudoPassword;
+    // Fetch credentials for edit mode if not provided
+    String? finalPassword = password;
+    String? finalPrivateKey = privateKey;
+    String? finalPassphrase = passphrase;
+    String? finalSudoPassword = sudoPassword;
 
     if (isEditMode) {
       final notifier = ref.read(projectSshSettingsProvider(projectId).notifier);
 
-      if (existingSettings.passwordSecretId != null) {
-        password = await notifier.getSecret(existingSettings.passwordSecretId!);
+      if (finalPassword == null && existingSettings.passwordSecretId != null) {
+        finalPassword = await notifier.getSecret(
+          existingSettings.passwordSecretId!,
+        );
       }
-      if (existingSettings.privateKeySecretId != null) {
-        privateKey = await notifier.getSecret(
+      if (finalPrivateKey == null &&
+          existingSettings.privateKeySecretId != null) {
+        finalPrivateKey = await notifier.getSecret(
           existingSettings.privateKeySecretId!,
         );
       }
-      if (existingSettings.passphraseSecretId != null) {
-        passphrase = await notifier.getSecret(
+      if (finalPassphrase == null &&
+          existingSettings.passphraseSecretId != null) {
+        finalPassphrase = await notifier.getSecret(
           existingSettings.passphraseSecretId!,
         );
       }
-      if (existingSettings.sudoPasswordSecretId != null) {
-        sudoPassword = await notifier.getSecret(
+      if (finalSudoPassword == null &&
+          existingSettings.sudoPasswordSecretId != null) {
+        finalSudoPassword = await notifier.getSecret(
           existingSettings.sudoPasswordSecretId!,
         );
       }
@@ -53,18 +63,21 @@ class SshSettingsDialog {
 
     await showShadDialog(
       context: context,
-      builder: (context) => _SshSettingsDialogForm(
-        title: isEditMode ? 'Edit Remote Shell' : 'Configure Remote Shell',
-        projectId: projectId,
-        initialHost: existingSettings?.host,
-        initialPort: existingSettings?.port,
-        initialUsername: existingSettings?.username,
-        initialAuthMethod: existingSettings?.authMethod,
-        initialPassword: password,
-        initialPrivateKey: privateKey,
-        initialPassphrase: passphrase,
-        initialSudoPassword: sudoPassword,
-        initialEnabled: existingSettings?.enabled,
+      builder: (context) => ProviderScope(
+        overrides: overrides ?? [],
+        child: _SshSettingsDialogForm(
+          title: isEditMode ? 'Edit Remote Shell' : 'Configure Remote Shell',
+          projectId: projectId,
+          initialHost: existingSettings?.host,
+          initialPort: existingSettings?.port,
+          initialUsername: existingSettings?.username,
+          initialAuthMethod: existingSettings?.authMethod,
+          initialPassword: finalPassword,
+          initialPrivateKey: finalPrivateKey,
+          initialPassphrase: finalPassphrase,
+          initialSudoPassword: finalSudoPassword,
+          initialEnabled: existingSettings?.enabled,
+        ),
       ),
     );
   }
@@ -243,8 +256,6 @@ class _SshSettingsDialogFormState
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           trailing: trailing,
-          minLines: minLines,
-          maxLines: obscureText ? 1 : (maxLines ?? 1),
           autocorrect: false,
           enableSuggestions: false,
           style: const TextStyle(
@@ -391,8 +402,6 @@ class _SshSettingsDialogFormState
                       ? 'Leave blank to keep current key'
                       : 'Paste your private key',
                   description: 'Paste the contents of your private key file',
-                  minLines: 3,
-                  maxLines: 10,
                   errorKey: 'privateKey',
                 ),
                 const SizedBox(height: 12),
