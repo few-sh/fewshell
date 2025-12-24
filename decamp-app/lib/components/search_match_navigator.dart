@@ -22,59 +22,49 @@ class SearchMatchNavigator extends StatelessWidget {
     final theme = ShadTheme.of(context);
     final hasMatches = totalMatches > 0;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.background,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            hasMatches ? '$currentMatch of $totalMatches' : 'No matches',
-            style: theme.textTheme.small.copyWith(
-              color: theme.colorScheme.foreground.withValues(alpha: 0.7),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: ShadCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              hasMatches ? '$currentMatch of $totalMatches' : 'No matches',
+              style: theme.textTheme.small.copyWith(
+                color: theme.colorScheme.foreground.withValues(alpha: 0.7),
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          ShadButton.ghost(
-            width: 24,
-            height: 24,
-            padding: EdgeInsets.zero,
-            onPressed: hasMatches ? onPrevious : null,
-            child: Icon(
-              LucideIcons.chevronUp,
-              size: 16,
-              color: hasMatches
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.foreground.withValues(alpha: 0.3),
+            const SizedBox(width: 8),
+            ShadButton.ghost(
+              width: 24,
+              height: 24,
+              padding: EdgeInsets.zero,
+              onPressed: hasMatches ? onPrevious : null,
+              child: Icon(
+                LucideIcons.chevronUp,
+                size: 16,
+                color: hasMatches
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.foreground.withValues(alpha: 0.3),
+              ),
             ),
-          ),
-          const SizedBox(width: 4),
-          ShadButton.ghost(
-            width: 24,
-            height: 24,
-            padding: EdgeInsets.zero,
-            onPressed: hasMatches ? onNext : null,
-            child: Icon(
-              LucideIcons.chevronDown,
-              size: 16,
-              color: hasMatches
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.foreground.withValues(alpha: 0.3),
+            const SizedBox(width: 4),
+            ShadButton.ghost(
+              width: 24,
+              height: 24,
+              padding: EdgeInsets.zero,
+              onPressed: hasMatches ? onNext : null,
+              child: Icon(
+                LucideIcons.chevronDown,
+                size: 16,
+                color: hasMatches
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.foreground.withValues(alpha: 0.3),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -48,56 +48,46 @@ class _SearchControlsState extends State<SearchControls> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
 
-    return Container(
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.background,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: Row(
-        children: [
-          Icon(
-            LucideIcons.search,
-            size: 16,
-            color: theme.colorScheme.foreground.withValues(alpha: 0.5),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              focusNode: _focusNode,
-              autofocus: widget.autofocus,
-              autocorrect: false,
-              enableSuggestions: false,
-              style: theme.textTheme.small,
-              decoration: InputDecoration(
-                hintText: 'Search messages (supports regex)...',
-                hintStyle: theme.textTheme.small.copyWith(
-                  color: theme.colorScheme.foreground.withValues(alpha: 0.5),
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: ShadCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.search,
+              size: 16,
+              color: theme.colorScheme.foreground.withValues(alpha: 0.5),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                focusNode: _focusNode,
+                autofocus: widget.autofocus,
+                autocorrect: false,
+                enableSuggestions: false,
+                style: theme.textTheme.small,
+                decoration: InputDecoration(
+                  hintText: 'Search messages (supports regex)...',
+                  hintStyle: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.foreground.withValues(alpha: 0.5),
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
                 ),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
             ),
-          ),
-          ShadButton.ghost(
-            width: 24,
-            height: 24,
-            padding: EdgeInsets.zero,
-            onPressed: widget.onClose,
-            child: const Icon(LucideIcons.x, size: 16),
-          ),
-        ],
+            ShadButton.ghost(
+              width: 24,
+              height: 24,
+              padding: EdgeInsets.zero,
+              onPressed: widget.onClose,
+              child: const Icon(LucideIcons.x, size: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
