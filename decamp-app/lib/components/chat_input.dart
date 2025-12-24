@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Simple chat input field widget
 class ChatInput extends StatefulWidget {
@@ -54,64 +55,38 @@ class _ChatInputState extends State<ChatInput> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
     return Container(
       padding: const EdgeInsets.all(8.0),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: theme.colorScheme.background,
+        // border: Border(top: BorderSide(color: theme.colorScheme.border)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: TextField(
+            child: ShadInput(
               controller: _controller,
               focusNode: _focusNode,
               enabled: widget.enabled,
+              minLines: 1,
+              //              maxLines: 5,
               autofocus: false,
               autocorrect: false,
               enableSuggestions: false,
-              stylusHandwritingEnabled: false,
-              maxLines: null, // Allow multiple lines
-              textInputAction: TextInputAction.send,
+              placeholder: Text(widget.hintText),
               onSubmitted: widget.enabled ? (_) => _handleSend() : null,
-              decoration: InputDecoration(
-                hintText: widget.hintText,
-                hintStyle: TextStyle(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-                filled: true,
-                fillColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24.0),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 12.0,
-                ),
-              ),
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             ),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.send),
+          ShadButton(
+            width: 40,
+            height: 40,
+            padding: EdgeInsets.zero,
             onPressed: widget.enabled ? _handleSend : null,
-            color: Theme.of(context).colorScheme.primary,
-            disabledColor: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.3),
+            child: const Icon(LucideIcons.send),
+            backgroundColor: theme.colorScheme.background,
           ),
         ],
       ),

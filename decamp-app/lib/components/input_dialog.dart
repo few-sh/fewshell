@@ -8,36 +8,40 @@ Future<String?> showInputDialog({
   String? confirmLabel,
 }) {
   final controller = TextEditingController(text: initialValue);
-  return showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-        autofocus: true,
-        autocorrect: false,
-        enableSuggestions: false,
-        textCapitalization: TextCapitalization.sentences,
-        onSubmitted: (value) {
-          Navigator.pop(context, value.trim());
-        },
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context, controller.text.trim());
+  try {
+    return await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
+          autofocus: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          textCapitalization: TextCapitalization.sentences,
+          onSubmitted: (value) {
+            Navigator.pop(context, value.trim());
           },
-          child: Text(confirmLabel ?? 'Confirm'),
         ),
-      ],
-    ),
-  );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context, controller.text.trim());
+            },
+            child: Text(confirmLabel ?? 'Confirm'),
+          ),
+        ],
+      ),
+    );
+  } finally {
+    controller.dispose();
+  }
 }

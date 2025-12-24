@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/empty_placeholder.dart';
-import 'package:decamp/components/confirmation_dialog.dart';
-import 'package:decamp/components/input_dialog.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 enum SelectableViewMode { active, archived }
 
@@ -83,10 +82,17 @@ class SelectableListView<T> extends ConsumerStatefulWidget {
 
 class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
   SelectableViewMode _viewMode = SelectableViewMode.active;
+  final _viewMenuController = ShadPopoverController();
+
+  @override
+  void dispose() {
+    _viewMenuController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     final data = _viewMode == SelectableViewMode.active
         ? widget.activeData
         : widget.archivedData;
@@ -98,41 +104,42 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
               ? widget.title
               : 'Archived ${widget.title}',
         ),
-        backgroundColor: theme.colorScheme.inversePrimary,
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'toggle_view') {
-                setState(() {
-                  _viewMode = _viewMode == SelectableViewMode.active
-                      ? SelectableViewMode.archived
-                      : SelectableViewMode.active;
-                });
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'toggle_view',
-                child: Row(
-                  children: [
-                    Icon(
-                      _viewMode == SelectableViewMode.active
-                          ? Icons.archive_outlined
-                          : Icons.list,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _viewMode == SelectableViewMode.active
-                          ? 'Show archived'
-                          : 'Show active',
-                    ),
-                  ],
+          ShadContextMenu(
+            controller: _viewMenuController,
+            items: [
+              ShadContextMenuItem(
+                leading: Icon(
+                  _viewMode == SelectableViewMode.active
+                      ? LucideIcons.archive
+                      : LucideIcons.list,
+                  size: 16,
                 ),
+                child: Text(
+                  _viewMode == SelectableViewMode.active
+                      ? 'Show archived'
+                      : 'Show active',
+                ),
+                onPressed: () {
+                  setState(() {
+                    _viewMode = _viewMode == SelectableViewMode.active
+                        ? SelectableViewMode.archived
+                        : SelectableViewMode.active;
+                  });
+                  _viewMenuController.toggle();
+                },
               ),
             ],
+            child: ShadButton.ghost(
+              width: 32,
+              height: 32,
+              padding: EdgeInsets.zero,
+              decoration: const ShadDecoration(border: ShadBorder.none),
+              onPressed: _viewMenuController.toggle,
+              child: const Icon(LucideIcons.ellipsisVertical, size: 16),
+            ),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: data.when(
@@ -140,8 +147,8 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
           if (items.isEmpty) {
             return EmptyPlaceholder(
               icon: _viewMode == SelectableViewMode.active
-                  ? Icons.inbox
-                  : Icons.archive_outlined,
+                  ? LucideIcons.inbox
+                  : LucideIcons.archive,
               title: _viewMode == SelectableViewMode.active
                   ? 'No ${widget.title.toLowerCase()}'
                   : 'No archived ${widget.title.toLowerCase()}',
@@ -154,10 +161,16 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
           final sortedItems = List<T>.from(items);
 
           return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: sortedItems.length,
             itemBuilder: (context, index) {
               final item = sortedItems[index];
-              return _buildCard(context, item);
+              return _SelectableListItem<T>(
+                key: ValueKey(widget.getId(item)),
+                item: item,
+                viewMode: _viewMode,
+                widget: widget,
+              );
             },
           );
         },
@@ -165,7 +178,7 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
         error: (error, stack) => Center(
           child: Text(
             'Error: $error',
-            style: TextStyle(color: theme.colorScheme.error),
+            style: TextStyle(color: theme.colorScheme.destructive),
           ),
         ),
       ),
@@ -174,177 +187,177 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
           : null,
     );
   }
+}
 
-  Widget _buildCard(BuildContext context, T item) {
-    final theme = Theme.of(context);
-    final id = widget.getId(item);
-    final name = widget.getName(item);
-    final isSelected = widget.isSelected?.call(item) ?? false;
+class _SelectableListItem<T> extends ConsumerStatefulWidget {
+  final T item;
+  final SelectableViewMode viewMode;
+  final SelectableListView<T> widget;
+
+  const _SelectableListItem({
+    super.key,
+    required this.item,
+    required this.viewMode,
+    required this.widget,
+  });
+
+  @override
+  ConsumerState<_SelectableListItem<T>> createState() =>
+      _SelectableListItemState<T>();
+}
+
+class _SelectableListItemState<T>
+    extends ConsumerState<_SelectableListItem<T>> {
+  final _menuController = ShadPopoverController();
+
+  @override
+  void dispose() {
+    _menuController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    final id = widget.widget.getId(widget.item);
+    final name = widget.widget.getName(widget.item);
+    final isSelected = widget.widget.isSelected?.call(widget.item) ?? false;
 
     // Date display
-    final dateDisplay = DateFormatter.format(widget.getUpdatedAt(item));
+    final dateDisplay = DateFormatter.format(
+      widget.widget.getUpdatedAt(widget.item),
+    );
     final relativeTime = DateFormatter.formatRelative(
-      widget.getUpdatedAt(item),
+      widget.widget.getUpdatedAt(widget.item),
     );
 
     return Dismissible(
       key: ValueKey(id),
       direction: DismissDirection.endToStart,
       confirmDismiss: (direction) async {
-        if (_viewMode == SelectableViewMode.active) {
-          await widget.beforeArchive?.call(item);
-          await widget.dao.archiveItem(id);
+        if (widget.viewMode == SelectableViewMode.active) {
+          await widget.widget.beforeArchive?.call(widget.item);
+          await widget.widget.dao.archiveItem(id);
         } else {
-          await widget.dao.unarchiveItem(id);
+          await widget.widget.dao.unarchiveItem(id);
         }
         return true;
       },
       background: _buildDismissBackground(context),
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        color: isSelected ? theme.colorScheme.primaryContainer : null,
-        child: ListTile(
-          leading: widget.leadingBuilder?.call(item, _viewMode),
-          title: Text(
-            name,
-            style: TextStyle(
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isSelected
-                  ? theme.colorScheme.onPrimaryContainer
-                  : theme.colorScheme.onSurface,
-            ),
-          ),
-          subtitle: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: ShadCard(
+          padding: const EdgeInsets.all(12),
+          backgroundColor: isSelected ? theme.colorScheme.muted : null,
+          child: InkWell(
+            onTap: () {
+              if (widget.viewMode == SelectableViewMode.archived) return;
+              widget.widget.onSelect?.call(widget.item);
+            },
+            child: Row(
               children: [
-                Text(
-                  dateDisplay,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isSelected
-                        ? theme.colorScheme.onPrimaryContainer.withValues(
-                            alpha: 0.7,
-                          )
-                        : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                if (widget.widget.leadingBuilder != null) ...[
+                  widget.widget.leadingBuilder!(widget.item, widget.viewMode),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: theme.textTheme.p.copyWith(
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            dateDisplay,
+                            style: theme.textTheme.muted.copyWith(fontSize: 11),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            relativeTime,
+                            style: theme.textTheme.muted.copyWith(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (isSelected) _buildActiveIndicator(context),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  relativeTime,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? theme.colorScheme.onPrimaryContainer
-                        : theme.colorScheme.primary,
+                ShadContextMenu(
+                  controller: _menuController,
+                  items: _buildMenuItems(context),
+                  child: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: _menuController.toggle,
+                    child: Icon(
+                      LucideIcons.ellipsisVertical,
+                      size: 16,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
                   ),
                 ),
-                if (isSelected) _buildActiveIndicator(context),
               ],
             ),
           ),
-          trailing: PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) => _handleMenuAction(value, item),
-            itemBuilder: (context) => _buildMenuItems(),
-          ),
-          onTap: () {
-            if (_viewMode == SelectableViewMode.archived) return;
-            widget.onSelect?.call(item);
-          },
         ),
       ),
     );
   }
 
-  // --- Inlined helpers ---
-
   Widget _buildDismissBackground(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = _viewMode == SelectableViewMode.active
+    final theme = ShadTheme.of(context);
+    final color = widget.viewMode == SelectableViewMode.active
         ? theme.colorScheme.secondary
         : theme.colorScheme.primary;
 
     return Container(
       alignment: Alignment.centerRight,
       padding: const EdgeInsets.only(right: 20),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       color: color,
       child: Icon(
-        _viewMode == SelectableViewMode.active
-            ? Icons.archive
-            : Icons.unarchive,
-        color: Colors.white,
+        widget.viewMode == SelectableViewMode.active
+            ? LucideIcons.archive
+            : LucideIcons.archiveRestore,
+        color: theme.colorScheme.secondaryForeground,
       ),
     );
   }
 
-  List<PopupMenuEntry<String>> _buildMenuItems() {
-    return [
-      const PopupMenuItem(
-        value: 'rename',
-        child: Row(
-          children: [
-            Icon(Icons.edit, size: 18),
-            SizedBox(width: 12),
-            Text('Rename'),
-          ],
-        ),
-      ),
-      if (_viewMode == SelectableViewMode.active)
-        const PopupMenuItem(
-          value: 'archive',
-          child: Row(
-            children: [
-              Icon(Icons.archive_outlined, size: 18),
-              SizedBox(width: 12),
-              Text('Archive'),
-            ],
-          ),
-        )
-      else
-        const PopupMenuItem(
-          value: 'unarchive',
-          child: Row(
-            children: [
-              Icon(Icons.unarchive_outlined, size: 18),
-              SizedBox(width: 12),
-              Text('Unarchive'),
-            ],
-          ),
-        ),
-      const PopupMenuItem(
-        value: 'delete',
-        child: Row(
-          children: [
-            Icon(Icons.delete_outline, size: 18, color: Colors.red),
-            SizedBox(width: 12),
-            Text('Delete', style: TextStyle(color: Colors.red)),
-          ],
-        ),
-      ),
-    ];
-  }
-
   Widget _buildActiveIndicator(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         children: [
           Icon(
-            Icons.check_circle,
+            LucideIcons.circleCheck,
             size: 14,
-            color: theme.colorScheme.secondary,
+            color: theme.colorScheme.primary,
           ),
           const SizedBox(width: 4),
           Text(
             'Active',
-            style: TextStyle(
+            style: theme.textTheme.muted.copyWith(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: theme.colorScheme.secondary,
+              color: theme.colorScheme.primary,
             ),
           ),
         ],
@@ -352,64 +365,146 @@ class _SelectableListViewState<T> extends ConsumerState<SelectableListView<T>> {
     );
   }
 
-  Future<void> _handleMenuAction(String action, T item) async {
-    final id = widget.getId(item);
-    final name = widget.getName(item);
+  List<Widget> _buildMenuItems(BuildContext context) {
+    final theme = ShadTheme.of(context);
+    return [
+      ShadContextMenuItem(
+        leading: const Icon(LucideIcons.pencil),
+        child: const Text('Rename'),
+        onPressed: () {
+          _menuController.toggle();
+          _handleRename();
+        },
+      ),
+      if (widget.viewMode == SelectableViewMode.active)
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.archive),
+          child: const Text('Archive'),
+          onPressed: () {
+            _menuController.toggle();
+            _handleArchive();
+          },
+        )
+      else
+        ShadContextMenuItem(
+          leading: const Icon(LucideIcons.archiveRestore),
+          child: const Text('Unarchive'),
+          onPressed: () {
+            _menuController.toggle();
+            _handleUnarchive();
+          },
+        ),
+      ShadContextMenuItem(
+        leading: Icon(LucideIcons.trash2, color: theme.colorScheme.destructive),
+        child: Text(
+          'Delete',
+          style: TextStyle(color: theme.colorScheme.destructive),
+        ),
+        onPressed: () {
+          _menuController.toggle();
+          _handleDelete();
+        },
+      ),
+    ];
+  }
 
-    switch (action) {
-      case 'rename':
-        final newName = await showInputDialog(
-          context: context,
-          title: 'Rename',
-          label: 'Name',
-          initialValue: name,
-          confirmLabel: 'Rename',
-        );
-        if (newName != null && newName.isNotEmpty && newName != name) {
-          await widget.dao.renameItem(id, newName);
-        }
-        break;
+  Future<void> _handleRename() async {
+    final id = widget.widget.getId(widget.item);
+    final name = widget.widget.getName(widget.item);
+    final controller = TextEditingController(text: name);
 
-      case 'archive':
-        await widget.beforeArchive?.call(item);
-        await widget.dao.archiveItem(id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Archived: $name'),
-            action: SnackBarAction(
-              label: 'Undo',
-              onPressed: () => widget.dao.unarchiveItem(id),
-            ),
+    final newName = await showShadDialog<String>(
+      context: context,
+      builder: (context) => ShadDialog(
+        title: const Text('Rename'),
+        child: ShadInput(
+          controller: controller,
+          placeholder: const Text('Name'),
+        ),
+        actions: [
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
           ),
-        );
-        break;
+          ShadButton(
+            child: const Text('Rename'),
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+          ),
+        ],
+      ),
+    );
 
-      case 'unarchive':
-        await widget.dao.unarchiveItem(id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Restored: $name')));
-        break;
+    controller.dispose();
 
-      case 'delete':
-        final confirmed = await showConfirmationDialog(
-          context: context,
-          title: 'Delete?',
-          content:
-              'Are you sure you want to delete "$name"? This cannot be undone.',
-        );
-        if (confirmed == true) {
-          await widget.beforeDelete?.call(item);
-          await widget.cleanupOnDelete?.call(item);
-          await widget.dao.deleteItem(id);
-          if (!mounted) return;
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Deleted: $name')));
-        }
-        break;
+    if (newName != null && newName.isNotEmpty && newName != name) {
+      await widget.widget.dao.renameItem(id, newName);
+    }
+  }
+
+  Future<void> _handleArchive() async {
+    final id = widget.widget.getId(widget.item);
+    final name = widget.widget.getName(widget.item);
+
+    await widget.widget.beforeArchive?.call(widget.item);
+    await widget.widget.dao.archiveItem(id);
+    if (!mounted) return;
+
+    ShadToaster.of(context).show(
+      ShadToast(
+        description: Text('Archived: $name'),
+        action: ShadButton.outline(
+          child: const Text('Undo'),
+          onPressed: () => widget.widget.dao.unarchiveItem(id),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleUnarchive() async {
+    final id = widget.widget.getId(widget.item);
+    final name = widget.widget.getName(widget.item);
+
+    await widget.widget.dao.unarchiveItem(id);
+    if (!mounted) return;
+
+    ShadToaster.of(
+      context,
+    ).show(ShadToast(description: Text('Restored: $name')));
+  }
+
+  Future<void> _handleDelete() async {
+    final id = widget.widget.getId(widget.item);
+    final name = widget.widget.getName(widget.item);
+
+    final confirmed = await showShadDialog<bool>(
+      context: context,
+      builder: (context) => ShadDialog.alert(
+        title: const Text('Delete?'),
+        description: Text(
+          'Are you sure you want to delete "$name"? This cannot be undone.',
+        ),
+        actions: [
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          ShadButton.destructive(
+            child: const Text('Delete'),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await widget.widget.beforeDelete?.call(widget.item);
+      await widget.widget.cleanupOnDelete?.call(widget.item);
+      await widget.widget.dao.deleteItem(id);
+      if (!mounted) return;
+
+      ShadToaster.of(
+        context,
+      ).show(ShadToast(description: Text('Deleted: $name')));
     }
   }
 }

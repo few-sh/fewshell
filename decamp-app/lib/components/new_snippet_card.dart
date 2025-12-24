@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
@@ -13,8 +14,7 @@ Future<void> showNewSnippetDialog(
 }) {
   return showDialog(
     context: context,
-    builder: (context) => Dialog(
-      insetPadding: const EdgeInsets.all(16),
+    builder: (context) => ShadDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
         child: NewSnippetCard(
@@ -109,10 +109,13 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     } catch (e) {
       if (mounted) {
         setState(() => _isSaving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error adding snippet: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('Error adding snippet: $e'),
+            action: ShadButton.destructive(
+              child: const Text('Dismiss'),
+              onPressed: () => ShadToaster.of(context).hide(),
+            ),
           ),
         );
       }
@@ -121,178 +124,152 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
+    final terminalTheme = Theme.of(context).extension<TerminalTheme>();
 
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      color: Colors.transparent,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return ShadCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(LucideIcons.circlePlus, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'New Snippet',
+                style: theme.textTheme.h4.copyWith(fontSize: 18),
+              ),
+              const Spacer(),
+              if (_isSaving)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                ShadButton.ghost(
+                  child: const Icon(LucideIcons.x),
+                  onPressed: widget.onCancel,
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ShadInput(
+            controller: _descriptionController,
+            focusNode: _descriptionFocus,
+            placeholder: const Text('Description (e.g., List all pods)'),
+            minLines: 1,
+            maxLines: null,
+          ),
+          const SizedBox(height: 12),
+          ShadInput(
+            controller: _contentController,
+            placeholder: const Text('Command (e.g., kubectl get pods)'),
+            minLines: 2,
+            maxLines: null,
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
+              height: 1.5,
+            ),
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Visible to AI', style: theme.textTheme.small),
+                    Text(
+                      'Include this snippet in the AI context',
+                      style: theme.textTheme.muted,
+                    ),
+                  ],
+                ),
+              ),
+              ShadSwitch(
+                value: _isVisibleToLlm,
+                onChanged: (value) {
+                  setState(() {
+                    _isVisibleToLlm = value;
+                  });
+                },
+              ),
+            ],
+          ),
+          if (widget.isGlobal == null) ...[
+            const SizedBox(height: 12),
             Row(
               children: [
-                Icon(
-                  Icons.add_circle_outline,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
                 Text(
-                  'New Snippet',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
+                  'Scope:',
+                  style: theme.textTheme.p.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const Spacer(),
-                if (_isSaving)
-                  const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: widget.onCancel,
-                    tooltip: 'Cancel',
-                    iconSize: 20,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ShadButton(
+                          onPressed: () {
+                            setState(() => _isGlobalSelection = false);
+                          },
+                          backgroundColor: !_isGlobalSelection
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.secondary,
+                          foregroundColor: !_isGlobalSelection
+                              ? theme.colorScheme.primaryForeground
+                              : theme.colorScheme.secondaryForeground,
+                          child: const Text('Project'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ShadButton(
+                          onPressed: () {
+                            setState(() => _isGlobalSelection = true);
+                          },
+                          backgroundColor: _isGlobalSelection
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.secondary,
+                          foregroundColor: _isGlobalSelection
+                              ? theme.colorScheme.primaryForeground
+                              : theme.colorScheme.secondaryForeground,
+                          child: const FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('User'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _descriptionController,
-              focusNode: _descriptionFocus,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                hintText: 'Description (e.g., List all pods)',
-                isDense: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-              minLines: 1,
-              maxLines: null,
-              style: theme.textTheme.bodyMedium,
-              textInputAction: TextInputAction.next,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _contentController,
-              autocorrect: false,
-              enableSuggestions: false,
-              decoration: InputDecoration(
-                hintText: 'Command (e.g., kubectl get pods)',
-                hintStyle: TextStyle(
-                  color:
-                      theme.extension<TerminalTheme>()?.hintColor ??
-                      Colors.grey.shade600,
-                ),
-                isDense: true,
-                filled: true,
-                fillColor:
-                    theme.extension<TerminalTheme>()?.backgroundColor ??
-                    Colors.black,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color:
-                        theme.extension<TerminalTheme>()?.borderColor ??
-                        Colors.grey.shade800,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color:
-                        theme.extension<TerminalTheme>()?.borderColor ??
-                        Colors.grey.shade800,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.5),
-                    width: 2,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-              minLines: 2,
-              maxLines: null,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 14,
-                color:
-                    theme.extension<TerminalTheme>()?.textColor ??
-                    Colors.greenAccent.shade400,
-                height: 1.5,
-              ),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _save(),
-            ),
-            const SizedBox(height: 12),
-            SwitchListTile(
-              title: const Text('Visible to AI'),
-              subtitle: const Text(
-                'Include this snippet in the AI context',
-                style: TextStyle(fontSize: 12),
-              ),
-              value: _isVisibleToLlm,
-              onChanged: (value) {
-                setState(() {
-                  _isVisibleToLlm = value;
-                });
-              },
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (widget.isGlobal == null) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Text(
-                    'Scope:',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ChoiceChip(
-                    label: const Text('Project'),
-                    selected: !_isGlobalSelection,
-                    onSelected: (selected) {
-                      if (selected) setState(() => _isGlobalSelection = false);
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('User (Global)'),
-                    selected: _isGlobalSelection,
-                    onSelected: (selected) {
-                      if (selected) setState(() => _isGlobalSelection = true);
-                    },
-                  ),
+          ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ShadButton(
+              onPressed: _isSaving ? null : _save,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(LucideIcons.check, size: 16),
+                  SizedBox(width: 8),
+                  Text('Save Snippet'),
                 ],
               ),
-            ],
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _isSaving ? null : _save,
-                icon: const Icon(Icons.check),
-                label: const Text('Save Snippet'),
-              ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

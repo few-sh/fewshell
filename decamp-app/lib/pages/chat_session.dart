@@ -22,6 +22,7 @@ import 'package:decamp/components/no_llm_configured_overlay.dart';
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:logging/logging.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 class ChatSession extends ConsumerStatefulWidget {
   const ChatSession({super.key});
@@ -263,6 +264,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Detect keyboard visibility
     final keyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     // Track keyboard state changes
     if (keyboardVisible != _previousKeyboardVisible) {
@@ -280,48 +282,54 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         // Dismiss keyboard when tapping outside
         _inputFocusNode.unfocus();
       },
-      child: SafeArea(
-        top: !keyboardVisible,
-        child: Scaffold(
-          appBar: PreferredSize(
-            preferredSize: Size.fromHeight(
-              keyboardVisible ? 0 : kToolbarHeight,
-            ),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeInOut,
-              height: keyboardVisible ? 0 : kToolbarHeight,
-              child: AppBar(
-                title: ProjectTitleBar(
-                  title: currentProjectName,
-                  leading: (currentProject?.serverUrl != null)
-                      ? const SyncIndicator()
-                      : null,
-                ),
-                centerTitle: false,
-                backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    tooltip: 'Search',
-                    onPressed: hasProject ? _activateSearch : null,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    tooltip: 'New Session',
-                    onPressed: hasProject ? _createNewSession : null,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.history),
-                    tooltip: 'Session History',
-                    onPressed: _showSessionHistory,
-                  ),
-                ],
+      child: Scaffold(
+        appBar: PreferredSize(
+          preferredSize: Size.fromHeight(
+            keyboardVisible ? 0 : kToolbarHeight + topPadding,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            height: keyboardVisible ? 0 : kToolbarHeight + topPadding,
+            child: AppBar(
+              title: ProjectTitleBar(
+                title: currentProjectName,
+                leading: (currentProject?.serverUrl != null)
+                    ? const SyncIndicator()
+                    : null,
               ),
+              centerTitle: false,
+              backgroundColor: ShadTheme.of(context).colorScheme.card,
+              actions: [
+                ShadButton.ghost(
+                  width: 40,
+                  height: 40,
+                  padding: EdgeInsets.zero,
+                  onPressed: hasProject ? _activateSearch : null,
+                  child: const Icon(LucideIcons.search),
+                ),
+                ShadButton.ghost(
+                  width: 40,
+                  height: 40,
+                  padding: EdgeInsets.zero,
+                  onPressed: hasProject ? _createNewSession : null,
+                  child: const Icon(LucideIcons.plus),
+                ),
+                ShadButton.ghost(
+                  width: 40,
+                  height: 40,
+                  padding: EdgeInsets.zero,
+                  onPressed: _showSessionHistory,
+                  child: const Icon(LucideIcons.history),
+                ),
+              ],
             ),
           ),
-          drawer: const MainDrawer(),
-          body: Stack(
+        ),
+        drawer: const MainDrawer(),
+        body: SafeArea(
+          top: !keyboardVisible,
+          child: Stack(
             children: [
               // Main chat UI
               Column(
@@ -345,8 +353,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                                 ? _searchNavigatorHeight + 16
                                 : 0,
                           ),
-                          loading: () =>
-                              const Center(child: CircularProgressIndicator()),
+                          loading: () => Center(
+                            child: CircularProgressIndicator(
+                              color: ShadTheme.of(context).colorScheme.primary,
+                            ),
+                          ),
                           error: (error, stack) => Center(
                             // TODO: Log this error to our logging service
                             child: Text('Error loading messages: $error'),

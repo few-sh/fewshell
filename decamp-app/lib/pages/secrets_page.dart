@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/secret_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/secret_dialog.dart';
@@ -33,13 +34,13 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const ProjectTitleBar(title: 'Secrets'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+        leading: ShadButton.ghost(
+          child: const Icon(LucideIcons.arrowLeft),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -47,14 +48,16 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
         children: [
           // Stationary tab bar
           Container(
-            color: theme.colorScheme.surface,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colorScheme.border),
+              ),
+            ),
             child: TabBar(
               controller: _tabController,
               indicatorColor: theme.colorScheme.primary,
               labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.onSurface.withValues(
-                alpha: 0.6,
-              ),
+              unselectedLabelColor: theme.colorScheme.mutedForeground,
               labelStyle: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -187,14 +190,14 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     required bool isGlobal,
     String? projectId,
   }) {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
     bool isObscured = true;
 
     return StatefulBuilder(
       builder: (context, setState) {
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ShadCard(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,59 +207,70 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                     Expanded(
                       child: Text(
                         key,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
+                        style: theme.textTheme.h4.copyWith(
+                          fontSize: 16,
                           fontFamily: 'monospace',
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
+                    ShadButton.ghost(
+                      width: 32,
+                      height: 32,
+                      padding: EdgeInsets.zero,
+                      child: const Icon(LucideIcons.pencil, size: 16),
                       onPressed: () => _showEditSecretDialog(
                         key: key,
                         value: value,
                         isGlobal: isGlobal,
                         projectId: projectId,
                       ),
-                      tooltip: 'Edit',
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 20),
+                    ShadButton.ghost(
+                      width: 32,
+                      height: 32,
+                      padding: EdgeInsets.zero,
+                      child: const Icon(LucideIcons.trash2, size: 16),
                       onPressed: () => _confirmDeleteSecret(
                         key: key,
                         isGlobal: isGlobal,
                         projectId: projectId,
                       ),
-                      tooltip: 'Delete',
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        isObscured ? '••••••••••••••••' : value,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontFamily: 'monospace',
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.7,
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 200),
+                        alignment: Alignment.topLeft,
+                        curve: Curves.easeInOut,
+                        child: Text(
+                          isObscured ? '••••••••••••••••' : value,
+                          style: theme.textTheme.p.copyWith(
+                            fontFamily: 'monospace',
+                            color: theme.colorScheme.mutedForeground,
                           ),
+                          maxLines: isObscured ? 1 : null,
+                          overflow: isObscured ? TextOverflow.ellipsis : null,
                         ),
-                        maxLines: isObscured ? 1 : null,
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        isObscured ? Icons.visibility : Icons.visibility_off,
-                        size: 20,
+                    ShadButton.ghost(
+                      width: 32,
+                      height: 32,
+                      padding: EdgeInsets.zero,
+                      child: Icon(
+                        isObscured ? LucideIcons.eye : LucideIcons.eyeOff,
+                        size: 16,
                       ),
                       onPressed: () {
                         setState(() {
                           isObscured = !isObscured;
                         });
                       },
-                      tooltip: isObscured ? 'Show' : 'Hide',
                     ),
                   ],
                 ),
@@ -270,29 +284,33 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
   Widget _buildEmptyState(String message) {
     return EmptyPlaceholder(
-      icon: Icons.key_off,
+      icon: LucideIcons.key,
       title: 'No Secrets',
       subtitle: message,
     );
   }
 
   Widget _buildSecurityInfoBanner() {
-    final theme = Theme.of(context);
+    final theme = ShadTheme.of(context);
 
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          color: theme.colorScheme.primary.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.security, size: 20, color: theme.colorScheme.primary),
+          Icon(
+            LucideIcons.shieldCheck,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -300,15 +318,15 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
               children: [
                 Text(
                   '• All secrets are stored using secure system keychain',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  style: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.mutedForeground,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '• Secrets are always redacted from the LLM',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                  style: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.mutedForeground,
                   ),
                 ),
               ],
@@ -323,10 +341,16 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      child: FilledButton.icon(
+      child: ShadButton(
         onPressed: onPressed,
-        icon: const Icon(Icons.add),
-        label: const Text('Add Secret'),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(LucideIcons.plus, size: 16),
+            SizedBox(width: 8),
+            Text('Add Secret'),
+          ],
+        ),
       ),
     );
   }
@@ -352,17 +376,20 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
           }
 
           if (mounted) {
-            ScaffoldMessenger.of(
+            ShadToaster.of(
               context,
-            ).showSnackBar(SnackBar(content: Text('Added secret: $key')));
+            ).show(ShadToast(description: Text('Added secret: $key')));
             setState(() {}); // Refresh the list
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error adding secret: $e'),
-                backgroundColor: Theme.of(context).colorScheme.error,
+            ShadToaster.of(context).show(
+              ShadToast(
+                description: Text('Error adding secret: $e'),
+                action: ShadButton.destructive(
+                  child: const Text('Dismiss'),
+                  onPressed: () => ShadToaster.of(context).hide(),
+                ),
               ),
             );
           }
@@ -396,17 +423,20 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
           }
 
           if (mounted) {
-            ScaffoldMessenger.of(
+            ShadToaster.of(
               context,
-            ).showSnackBar(SnackBar(content: Text('Updated secret: $key')));
+            ).show(ShadToast(description: Text('Updated secret: $key')));
             setState(() {}); // Refresh the list
           }
         } catch (e) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Error updating secret: $e'),
-                backgroundColor: Theme.of(context).colorScheme.error,
+            ShadToaster.of(context).show(
+              ShadToast(
+                description: Text('Error updating secret: $e'),
+                action: ShadButton.destructive(
+                  child: const Text('Dismiss'),
+                  onPressed: () => ShadToaster.of(context).hide(),
+                ),
               ),
             );
           }
@@ -440,17 +470,20 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(
+          ShadToaster.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('Deleted secret: $key')));
+          ).show(ShadToast(description: Text('Deleted secret: $key')));
           setState(() {}); // Refresh the list
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting secret: $e'),
-              backgroundColor: Theme.of(context).colorScheme.error,
+          ShadToaster.of(context).show(
+            ShadToast(
+              description: Text('Error deleting secret: $e'),
+              action: ShadButton.destructive(
+                child: const Text('Dismiss'),
+                onPressed: () => ShadToaster.of(context).hide(),
+              ),
             ),
           );
         }

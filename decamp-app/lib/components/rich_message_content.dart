@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
-import 'package:intl/intl.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/utils/message_formatter.dart';
 import 'package:decamp/themes/terminal_theme.dart';
@@ -13,6 +12,7 @@ import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/utils/highlight_injector.dart';
 import 'package:decamp/providers/chat_controller_provider.dart';
 import 'package:logging/logging.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Rich message content widget
 /// Renders message content as markdown with text selection support
@@ -131,11 +131,20 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
         ? _streamedContent
         : MessageFormatter.formatMessageContent(widget.message);
 
+    final shadTheme = ShadTheme.of(context);
+    final isUserBubble =
+        widget.isUser &&
+        (widget.message.toolResultsJson == null ||
+            widget.message.toolResultsJson!.isEmpty);
+
+    final textColor = isUserBubble
+        ? shadTheme.colorScheme.primaryForeground
+        : shadTheme.colorScheme.foreground;
+
     // Build markdown content
-    final content = _buildMarkdownContent(
-      context,
-      text,
-    ); // Build timestamp with optional edit indicator
+    final content = _buildMarkdownContent(context, text, textColor: textColor);
+
+    // Build timestamp with optional edit indicator
     final timestamp = _buildTimestamp(context);
 
     // Build controls row (timestamp + menu)
@@ -150,9 +159,7 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     );
 
     // Wrap user messages in a bubble container (content only, controls below)
-    if (widget.isUser &&
-        (widget.message.toolResultsJson == null ||
-            widget.message.toolResultsJson!.isEmpty)) {
+    if (isUserBubble) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
@@ -161,7 +168,7 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
             margin: const EdgeInsets.symmetric(vertical: 4),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
+              color: shadTheme.colorScheme.primary,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(18),
                 topRight: Radius.circular(18),
@@ -217,9 +224,7 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
 
     final baseStyle = TextStyle(
       fontSize: 10,
-      color: Theme.of(
-        context,
-      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+      color: ShadTheme.of(context).colorScheme.mutedForeground,
       fontWeight: FontWeight.w400,
     );
 
@@ -244,9 +249,13 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     );
   }
 
-  Widget _buildMarkdownContent(BuildContext context, String text) {
-    final textColor =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.white;
+  Widget _buildMarkdownContent(
+    BuildContext context,
+    String text, {
+    Color? textColor,
+  }) {
+    final effectiveTextColor =
+        textColor ?? ShadTheme.of(context).colorScheme.foreground;
 
     // Get terminal theme for code blocks
     final terminalTheme =
@@ -265,11 +274,9 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     final processedText = HighlightInjector.injectMarkers(text, highlights);
 
     // Get highlight colors from theme
-    final colorScheme = Theme.of(context).colorScheme;
-    final activeHighlightColor = colorScheme.tertiary;
-    final inactiveHighlightColor = colorScheme.tertiaryContainer.withValues(
-      alpha: 0.5,
-    );
+    final colorScheme = ShadTheme.of(context).colorScheme;
+    final activeHighlightColor = colorScheme.accent;
+    final inactiveHighlightColor = colorScheme.accent.withValues(alpha: 0.5);
 
     // Create custom component for rendering highlights
     final highlightComponent = SearchHighlightComponent(
@@ -280,7 +287,7 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
 
     Widget markdown = GptMarkdown(
       processedText,
-      style: TextStyle(color: textColor),
+      style: TextStyle(color: effectiveTextColor),
       inlineComponents: [
         highlightComponent,
         ...MarkdownComponent.inlineComponents,

@@ -72,6 +72,7 @@ dependencies:
   # SSH Client
   dartssh2: ^2.9.2
   stream_channel: ^2.1.4
+  shadcn_ui: ^0.43.0
 
 dependency_overrides:
   postgres_crdt: 3.0.0

@@ -4,6 +4,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:decamp/providers/user_provider.dart';
 import 'package:decamp/utils/globals.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 class FeedbackPage extends ConsumerStatefulWidget {
   const FeedbackPage({super.key});
@@ -81,9 +82,9 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
 
   Future<void> _submit() async {
     if (_textController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter some feedback')),
-      );
+      ShadToaster.of(
+        context,
+      ).show(const ShadToast(description: Text('Please enter some feedback')));
       return;
     }
 
@@ -105,15 +106,21 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
       await _clearTransientState();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Feedback submitted successfully')),
+        ShadToaster.of(context).show(
+          const ShadToast(description: Text('Feedback submitted successfully')),
         );
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error submitting feedback: $e')),
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('Error submitting feedback: $e'),
+            action: ShadButton.destructive(
+              child: const Text('Dismiss'),
+              onPressed: () => ShadToaster.of(context).hide(),
+            ),
+          ),
         );
       }
     } finally {
@@ -127,105 +134,148 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Feedback')),
+      appBar: AppBar(
+        title: Text('Feedback', style: theme.textTheme.h4),
+        leading: ShadButton.ghost(
+          child: const Icon(LucideIcons.arrowLeft),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
+            ShadInput(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name (optional)',
-                border: OutlineInputBorder(),
-              ),
+              placeholder: const Text('Name (optional)'),
             ),
             const SizedBox(height: 16),
-            TextField(
+            ShadInput(
               controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email (optional)',
-                border: OutlineInputBorder(),
-              ),
+              placeholder: const Text('Email (optional)'),
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
             Row(
               children: [
-                ChoiceChip(
-                  label: const Text('Bug Report'),
-                  selected: _feedbackType == 'bug',
-                  onSelected: (selected) {
-                    if (selected) {
+                Expanded(
+                  child: ShadButton(
+                    onPressed: () {
                       setState(() {
                         _feedbackType = 'bug';
                       });
                       _saveState();
-                    }
-                  },
+                    },
+                    backgroundColor: _feedbackType == 'bug'
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.secondary,
+                    foregroundColor: _feedbackType == 'bug'
+                        ? theme.colorScheme.primaryForeground
+                        : theme.colorScheme.secondaryForeground,
+                    child: const Text('Bug Report'),
+                  ),
                 ),
                 const SizedBox(width: 12),
-                ChoiceChip(
-                  label: const Text('Feature Request'),
-                  selected: _feedbackType == 'feature',
-                  onSelected: (selected) {
-                    if (selected) {
+                Expanded(
+                  child: ShadButton(
+                    onPressed: () {
                       setState(() {
                         _feedbackType = 'feature';
                       });
                       _saveState();
-                    }
-                  },
+                    },
+                    backgroundColor: _feedbackType == 'feature'
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.secondary,
+                    foregroundColor: _feedbackType == 'feature'
+                        ? theme.colorScheme.primaryForeground
+                        : theme.colorScheme.secondaryForeground,
+                    child: const Text('Feature Request'),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            TextField(
+            ShadInput(
               controller: _textController,
               minLines: 7,
               maxLines: 7,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: const InputDecoration(
-                hintText: 'Describe your feedback here...',
-                border: OutlineInputBorder(),
-              ),
+              placeholder: const Text('Describe your feedback here...'),
             ),
             const SizedBox(height: 16),
-            CheckboxListTile(
-              title: const Text(
-                'Allow the team to contact me about my feedback',
-              ),
-              value: _canContact,
-              onChanged: (value) {
-                setState(() {
-                  _canContact = value ?? false;
-                });
-                _saveState();
-              },
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
-            ),
-            CheckboxListTile(
-              title: const Text('Include debug logs'),
-              value: _feedbackType == 'bug' ? _includeLogs : false,
-              onChanged: _feedbackType == 'bug'
-                  ? (value) {
+            Row(
+              children: [
+                ShadCheckbox(
+                  value: _canContact,
+                  onChanged: (value) {
+                    setState(() {
+                      _canContact = value;
+                    });
+                    _saveState();
+                  },
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
                       setState(() {
-                        _includeLogs = value ?? false;
+                        _canContact = !_canContact;
                       });
                       _saveState();
-                    }
-                  : null,
-              controlAffinity: ListTileControlAffinity.leading,
-              contentPadding: EdgeInsets.zero,
+                    },
+                    child: const Text(
+                      'Allow the team to contact me about my feedback',
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            ElevatedButton(
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ShadCheckbox(
+                  value: _feedbackType == 'bug' ? _includeLogs : false,
+                  enabled: _feedbackType == 'bug',
+                  onChanged: (value) {
+                    setState(() {
+                      _includeLogs = value;
+                    });
+                    _saveState();
+                  },
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _feedbackType == 'bug'
+                        ? () {
+                            setState(() {
+                              _includeLogs = !_includeLogs;
+                            });
+                            _saveState();
+                          }
+                        : null,
+                    child: Text(
+                      'Include debug logs',
+                      style: TextStyle(
+                        color: _feedbackType == 'bug'
+                            ? theme.colorScheme.foreground
+                            : theme.colorScheme.mutedForeground,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            ShadButton(
               onPressed: _isSubmitting ? null : _submit,
               child: _isSubmitting
                   ? const SizedBox(

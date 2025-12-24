@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Reusable dialog for adding or editing secrets
 class SecretDialog {
@@ -14,7 +15,7 @@ class SecretDialog {
   }) async {
     final isEditMode = existingKey != null;
 
-    await showDialog(
+    await showShadDialog(
       context: context,
       builder: (context) => _SecretDialogForm(
         title: isEditMode ? 'Edit Secret' : 'Add Secret',
@@ -47,7 +48,6 @@ class _SecretDialogForm extends StatefulWidget {
 class _SecretDialogFormState extends State<_SecretDialogForm> {
   late final TextEditingController _keyController;
   late final TextEditingController _valueController;
-  final _formKey = GlobalKey<FormState>();
   bool _obscureValue = true;
 
   bool get _isEditMode => widget.initialKey != null;
@@ -68,93 +68,108 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
+    final theme = ShadTheme.of(context);
+
+    return ShadDialog(
       title: Text(widget.title),
-      content: Form(
-        key: _formKey,
+      actions: [
+        ShadButton.ghost(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ShadButton(onPressed: _save, child: const Text('Save')),
+      ],
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 500),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
+              const SizedBox(height: 16),
+              Text('Environment Variable Name', style: theme.textTheme.small),
+              const SizedBox(height: 4),
+              ShadInput(
                 controller: _keyController,
-                decoration: const InputDecoration(
-                  labelText: 'Environment Variable Name',
-                  hintText: 'e.g., API_KEY, DATABASE_URL',
-                  prefixIcon: Icon(Icons.label),
-                  helperText: 'Must be uppercase with underscores',
-                ),
+                placeholder: const Text('e.g., API_KEY, DATABASE_URL'),
                 enabled: !_isEditMode,
-                autocorrect: false,
-                enableSuggestions: false,
                 textCapitalization: TextCapitalization.characters,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a variable name';
-                  }
-                  // Validate environment variable naming: uppercase letters, numbers, underscores
-                  final envVarPattern = RegExp(r'^[A-Z_][A-Z0-9_]*$');
-                  if (!envVarPattern.hasMatch(value)) {
-                    return 'Use only uppercase letters, numbers, and underscores';
-                  }
-                  return null;
-                },
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 4, left: 4),
+                child: Text(
+                  'Must be uppercase with underscores',
+                  style: theme.textTheme.muted.copyWith(fontSize: 12),
+                ),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _valueController,
-                decoration: InputDecoration(
-                  labelText: 'Secret Value',
-                  hintText: 'Enter the secret value',
-                  prefixIcon: const Icon(Icons.key),
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          _obscureValue
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscureValue = !_obscureValue;
-                          });
-                        },
-                      ),
-                    ],
+              Text('Secret Value', style: theme.textTheme.small),
+              const SizedBox(height: 4),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                alignment: Alignment.topCenter,
+                curve: Curves.easeInOut,
+                child: ShadInput(
+                  controller: _valueController,
+                  placeholder: const Text('Enter the secret value'),
+                  obscureText: _obscureValue,
+                  minLines: 1,
+                  maxLines: _obscureValue ? 1 : null,
+                  trailing: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    child: Icon(
+                      _obscureValue ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 16,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureValue = !_obscureValue;
+                      });
+                    },
                   ),
                 ),
-                autocorrect: false,
-                enableSuggestions: false,
-                obscureText: _obscureValue,
-                maxLines: _obscureValue ? 1 : 5,
-                minLines: 1,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a secret value';
-                  }
-                  return null;
-                },
               ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _save, child: const Text('Save')),
-      ],
     );
   }
 
   void _save() {
-    if (_formKey.currentState!.validate()) {
-      widget.onSave(_keyController.text, _valueController.text);
-      Navigator.of(context).pop();
+    final key = _keyController.text;
+    final value = _valueController.text;
+
+    if (key.isEmpty) {
+      ShadToaster.of(context).show(
+        const ShadToast(description: Text('Please enter a variable name')),
+      );
+      return;
     }
+
+    // Validate environment variable naming: uppercase letters, numbers, underscores
+    final envVarPattern = RegExp(r'^[A-Z_][A-Z0-9_]*$');
+    if (!envVarPattern.hasMatch(key)) {
+      ShadToaster.of(context).show(
+        const ShadToast(
+          description: Text(
+            'Use only uppercase letters, numbers, and underscores',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (value.isEmpty) {
+      ShadToaster.of(
+        context,
+      ).show(const ShadToast(description: Text('Please enter a secret value')));
+      return;
+    }
+
+    widget.onSave(key, value);
+    Navigator.of(context).pop();
   }
 }

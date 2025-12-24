@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/settings_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/llm_service_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
+import '../themes/shad_layout_theme.dart';
 
 /// Agent Instructions page with User and Project settings tabs
 class AgentInstructionsPage extends ConsumerStatefulWidget {
@@ -17,26 +19,15 @@ class AgentInstructionsPage extends ConsumerStatefulWidget {
       _AgentInstructionsPageState();
 }
 
-class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
+  String _currentTab = 'project';
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final currentProject = ref.watch(currentProjectProvider);
+    final theme = ShadTheme.of(context);
+    final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
+    final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
     return Scaffold(
       appBar: AppBar(
@@ -48,33 +39,85 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
       ),
       body: Column(
         children: [
-          // Stationary tab bar
-          Container(
-            color: theme.colorScheme.surface,
-            child: TabBar(
-              controller: _tabController,
-              tabs: const [
-                Tab(text: 'User Settings'),
-                Tab(text: 'Project Settings'),
-              ],
+          Padding(
+            padding: pagePadding,
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.muted,
+                borderRadius: theme.radius,
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _currentTab == 'user'
+                        ? ShadButton(
+                            shadows: [
+                              BoxShadow(
+                                color: theme.colorScheme.background.withValues(
+                                  alpha: 0.1,
+                                ),
+                                spreadRadius: 1,
+                                blurRadius: 2,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                            backgroundColor: theme.colorScheme.background,
+                            foregroundColor: theme.colorScheme.foreground,
+                            hoverBackgroundColor: theme.colorScheme.background,
+                            onPressed: () {},
+                            child: const Text('User Settings'),
+                          )
+                        : ShadButton.ghost(
+                            onPressed: () =>
+                                setState(() => _currentTab = 'user'),
+                            child: const Text('User Settings'),
+                          ),
+                  ),
+                  Expanded(
+                    child: _currentTab == 'project'
+                        ? ShadButton(
+                            shadows: [
+                              BoxShadow(
+                                color: theme.colorScheme.background.withValues(
+                                  alpha: 0.1,
+                                ),
+                                spreadRadius: 1,
+                                blurRadius: 2,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                            backgroundColor: theme.colorScheme.background,
+                            foregroundColor: theme.colorScheme.foreground,
+                            hoverBackgroundColor: theme.colorScheme.background,
+                            onPressed: () {},
+                            child: const Text('Project Settings'),
+                          )
+                        : ShadButton.ghost(
+                            onPressed: () =>
+                                setState(() => _currentTab = 'project'),
+                            child: const Text('Project Settings'),
+                          ),
+                  ),
+                ],
+              ),
             ),
           ),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
+            child: IndexedStack(
+              index: _currentTab == 'user' ? 0 : 1,
               children: [
                 const _UserSettingsTab(),
-                if (currentProject != null)
-                  _ProjectSettingsTab(
-                    projectId: currentProject.id,
-                    key: ValueKey(currentProject.id),
-                  )
-                else
-                  const Center(
-                    child: Text(
-                      'No project selected. Please select a project first.',
-                    ),
-                  ),
+                currentProject != null
+                    ? _ProjectSettingsTab(
+                        projectId: currentProject.id,
+                        key: ValueKey(currentProject.id),
+                      )
+                    : const Center(
+                        child: Text(
+                          'No project selected. Please select a project first.',
+                        ),
+                      ),
               ],
             ),
           ),
@@ -166,16 +209,15 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
       setState(() => _hasChanges = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User-level instructions saved')),
+        ShadToaster.of(context).show(
+          const ShadToast(description: Text('User-level instructions saved')),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving instructions: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast.destructive(
+            description: Text('Error saving instructions: $e'),
           ),
         );
       }
@@ -203,6 +245,8 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
   Widget build(BuildContext context) {
     final settings = ref.watch(globalSettingsProvider);
     final llmSettings = ref.watch(globalLlmSettingsProvider);
+    final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
+    final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
     // Load settings when they change
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -216,32 +260,31 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
       children: [
         // Preview/Edit toggle and Save button
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: pagePadding,
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   'Configure default instructions for all AI models',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: ShadTheme.of(context).textTheme.muted,
                 ),
               ),
-              IconButton(
-                icon: Icon(_showPreview ? Icons.edit : Icons.preview),
-                tooltip: _showPreview ? 'Edit' : 'Preview',
+              ShadIconButton.ghost(
+                icon: Icon(_showPreview ? LucideIcons.pencil : LucideIcons.eye),
                 onPressed: () => setState(() => _showPreview = !_showPreview),
               ),
-              ElevatedButton.icon(
+              ShadButton(
                 onPressed: _hasChanges ? _saveSettings : null,
-                icon: const Icon(Icons.save),
-                label: const Text('Save'),
+                leading: const Icon(LucideIcons.save),
+                child: const Text('Save'),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        const ShadSeparator.horizontal(),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16.0),
+            padding: pagePadding,
             children: [
               // Template variables info
               const _TemplateVariablesInfo(),
@@ -258,21 +301,23 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
               const SizedBox(height: 24),
 
               // Model-Specific Overrides
-              Card(
-                child: ExpansionTile(
-                  title: const Text('Model-Specific Overrides'),
-                  subtitle: Text(
-                    _modelControllers.isEmpty
-                        ? 'No overrides configured'
-                        : '${_modelControllers.length} override(s) configured',
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // List existing overrides
+              ShadAccordion<String>.multiple(
+                children: [
+                  ShadAccordionItem(
+                    value: 'overrides',
+                    title: const Text('Model-Specific Overrides'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_modelControllers.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Text(
+                              'No overrides configured',
+                              style: ShadTheme.of(context).textTheme.muted,
+                            ),
+                          )
+                        else
                           ..._modelControllers.entries.map((entry) {
                             return _ModelOverrideSection(
                               modelIdentifier: entry.key,
@@ -283,18 +328,17 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                             );
                           }),
 
-                          // Add new override button
-                          const SizedBox(height: 16),
-                          _AddModelOverrideButton(
-                            existingIdentifiers: _modelControllers.keys.toSet(),
-                            availableLlms: llmSettings,
-                            onAdd: _addModelOverride,
-                          ),
-                        ],
-                      ),
+                        // Add new override button
+                        const SizedBox(height: 16),
+                        _AddModelOverrideButton(
+                          existingIdentifiers: _modelControllers.keys.toSet(),
+                          availableLlms: llmSettings,
+                          onAdd: _addModelOverride,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -406,16 +450,17 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
       setState(() => _hasChanges = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Project-level instructions saved')),
+        ShadToaster.of(context).show(
+          const ShadToast(
+            description: Text('Project-level instructions saved'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving project instructions: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        ShadToaster.of(context).show(
+          ShadToast.destructive(
+            description: Text('Error saving project instructions: $e'),
           ),
         );
       }
@@ -443,6 +488,8 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   Widget build(BuildContext context) {
     final projectId = widget.projectId;
     final llmSettings = ref.watch(projectLlmSettingsProvider(projectId));
+    final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
+    final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
     // Listen for settings updates (e.g. when they finish loading)
     ref.listen<ProjectSettings?>(projectSettingsProvider(projectId), (
@@ -459,46 +506,45 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
       children: [
         // Preview/Edit toggle and Save button
         Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: pagePadding,
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   'Configure project-specific instructions',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: ShadTheme.of(context).textTheme.muted,
                 ),
               ),
-              IconButton(
-                icon: Icon(_showPreview ? Icons.edit : Icons.preview),
-                tooltip: _showPreview ? 'Edit' : 'Preview',
+              ShadIconButton.ghost(
+                icon: Icon(_showPreview ? LucideIcons.pencil : LucideIcons.eye),
                 onPressed: () => setState(() => _showPreview = !_showPreview),
               ),
-              ElevatedButton.icon(
+              ShadButton(
                 onPressed: _hasChanges ? () => _saveSettings(projectId) : null,
-                icon: const Icon(Icons.save),
-                label: const Text('Save'),
+                leading: const Icon(LucideIcons.save),
+                child: const Text('Save'),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        const ShadSeparator.horizontal(),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.all(16.0),
+            padding: pagePadding,
             children: [
               // Include User Instructions Checkbox
-              CheckboxListTile(
-                title: const Text('Include User-Level Instructions'),
-                subtitle: const Text(
-                  'Prepend user-level instructions to project instructions',
-                ),
+              ShadCheckbox(
                 value: _includeUserInstructions,
                 onChanged: (value) {
                   setState(() {
-                    _includeUserInstructions = value ?? false;
+                    _includeUserInstructions = value;
                     _hasChanges = true;
                   });
                 },
+                label: const Text('Include User-Level Instructions'),
+                sublabel: const Text(
+                  'Prepend user-level instructions to project instructions',
+                ),
               ),
               const SizedBox(height: 16),
 
@@ -518,21 +564,23 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
               const SizedBox(height: 24),
 
               // Model-Specific Overrides
-              Card(
-                child: ExpansionTile(
-                  title: const Text('Model-Specific Overrides'),
-                  subtitle: Text(
-                    _modelControllers.isEmpty
-                        ? 'No overrides configured'
-                        : '${_modelControllers.length} override(s) configured',
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // List existing overrides
+              ShadAccordion<String>.multiple(
+                children: [
+                  ShadAccordionItem(
+                    value: 'overrides',
+                    title: const Text('Model-Specific Overrides'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_modelControllers.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16.0),
+                            child: Text(
+                              'No overrides configured',
+                              style: ShadTheme.of(context).textTheme.muted,
+                            ),
+                          )
+                        else
                           ..._modelControllers.entries.map((entry) {
                             return _ModelOverrideSection(
                               modelIdentifier: entry.key,
@@ -543,18 +591,17 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                             );
                           }),
 
-                          // Add new override button
-                          const SizedBox(height: 16),
-                          _AddModelOverrideButton(
-                            existingIdentifiers: _modelControllers.keys.toSet(),
-                            availableLlms: llmSettings,
-                            onAdd: _addModelOverride,
-                          ),
-                        ],
-                      ),
+                        // Add new override button
+                        const SizedBox(height: 16),
+                        _AddModelOverrideButton(
+                          existingIdentifiers: _modelControllers.keys.toSet(),
+                          availableLlms: llmSettings,
+                          onAdd: _addModelOverride,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -617,33 +664,22 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.title,
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
+        Text(widget.title, style: theme.textTheme.h4),
         const SizedBox(height: 4),
-        Text(
-          widget.subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(
-              context,
-            ).colorScheme.onSurface.withValues(alpha: 0.6),
-          ),
-        ),
+        Text(widget.subtitle, style: theme.textTheme.muted),
         const SizedBox(height: 12),
         if (widget.showPreview) ...[
           Row(
             children: [
-              Checkbox(
+              ShadCheckbox(
                 value: _renderJinja,
                 onChanged: (value) {
                   setState(() {
-                    _renderJinja = value ?? false;
+                    _renderJinja = value;
                     if (!_renderJinja) {
                       _processedText = null;
                     }
@@ -652,8 +688,8 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
                     _loadContext();
                   }
                 },
+                label: const Text('Render Jinja in preview'),
               ),
-              const Text('Render Jinja in preview'),
               if (_isLoading) ...[
                 const SizedBox(width: 8),
                 const SizedBox(
@@ -669,18 +705,15 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: theme.colorScheme.border),
+              borderRadius: theme.radius,
             ),
             constraints: const BoxConstraints(minHeight: 200),
             child: widget.controller.text.isEmpty
                 ? Text(
                     'No instruction provided',
-                    style: TextStyle(
+                    style: theme.textTheme.muted.copyWith(
                       fontStyle: FontStyle.italic,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   )
                 : SelectionArea(
@@ -692,17 +725,9 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
                   ),
           ),
         ] else
-          TextField(
+          ShadTextarea(
             controller: widget.controller,
-            maxLines: null,
-            minLines: 8,
-            autocorrect: false,
-            enableSuggestions: false,
-            decoration: const InputDecoration(
-              hintText: 'Enter instruction in markdown format...',
-              border: OutlineInputBorder(),
-              helperText: 'Supports markdown formatting',
-            ),
+            placeholder: const Text('Enter instruction in markdown format...'),
             onChanged: (_) {
               if (_processedText != null) {
                 setState(() => _processedText = null);
@@ -771,116 +796,96 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    final theme = ShadTheme.of(context);
+    return ShadCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.modelIdentifier,
+                  style: theme.textTheme.large,
+                ),
+              ),
+              ShadIconButton.destructive(
+                icon: const Icon(LucideIcons.trash),
+                onPressed: widget.onRemove,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (widget.showPreview) ...[
             Row(
               children: [
-                Expanded(
-                  child: Text(
-                    widget.modelIdentifier,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  tooltip: 'Remove override',
-                  onPressed: widget.onRemove,
-                  color: Theme.of(context).colorScheme.error,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (widget.showPreview) ...[
-              Row(
-                children: [
-                  Checkbox(
-                    value: _renderJinja,
-                    onChanged: (value) {
-                      setState(() {
-                        _renderJinja = value ?? false;
-                        // Reset processed text when toggling off so we re-fetch if toggled on again
-                        // or if text changed (though we don't track text changes here easily without listener)
-                        if (!_renderJinja) {
-                          _processedText = null;
-                        }
-                      });
-                      if (_renderJinja) {
-                        _loadContext();
+                ShadCheckbox(
+                  value: _renderJinja,
+                  onChanged: (value) {
+                    setState(() {
+                      _renderJinja = value;
+                      // Reset processed text when toggling off so we re-fetch if toggled on again
+                      // or if text changed (though we don't track text changes here easily without listener)
+                      if (!_renderJinja) {
+                        _processedText = null;
                       }
-                    },
-                  ),
-                  const Text('Render Jinja in preview'),
-                  if (_isLoading) ...[
-                    const SizedBox(width: 8),
-                    const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                constraints: const BoxConstraints(minHeight: 150),
-                child: widget.controller.text.isEmpty
-                    ? Text(
-                        'No override instruction provided',
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                      )
-                    : SelectionArea(
-                        child: GptMarkdown(
-                          _renderJinja
-                              ? (_processedText ?? widget.controller.text)
-                              : widget.controller.text,
-                        ),
-                      ),
-              ),
-            ] else
-              TextField(
-                controller: widget.controller,
-                maxLines: null,
-                minLines: 6,
-                autocorrect: false,
-                enableSuggestions: false,
-                decoration: const InputDecoration(
-                  hintText: 'Enter model-specific instruction...',
-                  border: OutlineInputBorder(),
-                  helperText: 'Supports markdown formatting',
-                ),
-                onChanged: (_) {
-                  // Invalidate processed text when content changes
-                  if (_processedText != null) {
-                    setState(() => _processedText = null);
+                    });
                     if (_renderJinja) {
                       _loadContext();
                     }
-                  }
-                  widget.onChanged();
-                },
+                  },
+                  label: const Text('Render Jinja in preview'),
+                ),
+                if (_isLoading) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: theme.inputTheme.padding ?? const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: theme.colorScheme.border),
+                borderRadius: theme.radius,
               ),
-          ],
-        ),
+              constraints: const BoxConstraints(minHeight: 150),
+              child: widget.controller.text.isEmpty
+                  ? Text(
+                      'No override instruction provided',
+                      style: theme.textTheme.muted.copyWith(
+                        fontStyle: FontStyle.italic,
+                      ),
+                    )
+                  : SelectionArea(
+                      child: GptMarkdown(
+                        _renderJinja
+                            ? (_processedText ?? widget.controller.text)
+                            : widget.controller.text,
+                      ),
+                    ),
+            ),
+          ] else
+            ShadTextarea(
+              controller: widget.controller,
+              placeholder: const Text('Enter model-specific instruction...'),
+              onChanged: (_) {
+                // Invalidate processed text when content changes
+                if (_processedText != null) {
+                  setState(() => _processedText = null);
+                  if (_renderJinja) {
+                    _loadContext();
+                  }
+                }
+                widget.onChanged();
+              },
+            ),
+        ],
       ),
     );
   }
@@ -900,10 +905,10 @@ class _AddModelOverrideButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
+    return ShadButton.outline(
       onPressed: () => _showAddDialog(context),
-      icon: const Icon(Icons.add),
-      label: const Text('Add Model Override'),
+      leading: const Icon(LucideIcons.plus),
+      child: const Text('Add Model Override'),
     );
   }
 
@@ -913,34 +918,46 @@ class _AddModelOverrideButton extends StatelessWidget {
         .toList();
 
     if (availableModels.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('All configured models already have overrides'),
+      ShadToaster.of(context).show(
+        const ShadToast(
+          description: Text('All configured models already have overrides'),
         ),
       );
       return;
     }
 
-    final result = await showDialog<String>(
+    final result = await showShadDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) => ShadDialog(
         title: const Text('Select Model'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: availableModels.map((llm) {
-            return ListTile(
-              title: Text(llm.identifier),
-              subtitle: Text(llm.apiType.name),
-              onTap: () => Navigator.of(context).pop(llm.identifier),
-            );
-          }).toList(),
-        ),
         actions: [
-          TextButton(
+          ShadButton.outline(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
           ),
         ],
+        child: SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: availableModels.map((llm) {
+              return ShadButton.ghost(
+                width: double.infinity,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(llm.identifier),
+                    Text(
+                      llm.apiType.name,
+                      style: ShadTheme.of(context).textTheme.muted,
+                    ),
+                  ],
+                ),
+                onPressed: () => Navigator.of(context).pop(llm.identifier),
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
 
@@ -956,57 +973,24 @@ class _TemplateVariablesInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
+    return ShadAlert(
+      icon: const Icon(LucideIcons.info),
+      title: const Text('Template Variables'),
+      description: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Template Variables',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Use {{ USER_SNIPPETS }} and {{ PROJECT_SNIPPETS }} to access snippets. Each snippet has: name, content, description, tags, position, createdAt, updatedAt.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  r'Use \{{ to escape and show literal braces.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 4),
+          const Text(
+            'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Use {{ USER_SNIPPETS }} and {{ PROJECT_SNIPPETS }} to access snippets. Each snippet has: name, content, description, tags, position, createdAt, updatedAt.',
+          ),
+          const SizedBox(height: 4),
+          Text(
+            r'Use \{{ to escape and show literal braces.',
+            style: ShadTheme.of(context).textTheme.muted,
           ),
         ],
       ),
