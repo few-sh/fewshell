@@ -6,6 +6,7 @@ import '../providers/settings_provider.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
+import '../components/agent_instruction_preview_modal.dart';
 import '../themes/shad_layout_theme.dart';
 
 /// Agent Instructions page with User and Project settings tabs
@@ -278,6 +279,15 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                       style: ShadTheme.of(context).textTheme.muted,
                     ),
                   ),
+                  ShadButton.outline(
+                    leading: const Icon(LucideIcons.eye),
+                    onPressed: () => AgentInstructionPreviewModal.show(
+                      context,
+                      _defaultController.text,
+                    ),
+                    child: const Text('Preview'),
+                  ),
+                  const SizedBox(width: 8),
                   ShadButton(
                     onPressed: _hasChanges ? _saveSettings : null,
                     leading: const Icon(LucideIcons.save),
@@ -542,6 +552,15 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                       style: ShadTheme.of(context).textTheme.muted,
                     ),
                   ),
+                  ShadButton.outline(
+                    leading: const Icon(LucideIcons.eye),
+                    onPressed: () => AgentInstructionPreviewModal.show(
+                      context,
+                      _defaultController.text,
+                    ),
+                    child: const Text('Preview'),
+                  ),
+                  const SizedBox(width: 8),
                   ShadButton(
                     onPressed: _hasChanges
                         ? () => _saveSettings(projectId)
@@ -732,6 +751,13 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
                 child: Text(
                   widget.modelIdentifier,
                   style: theme.textTheme.large,
+                ),
+              ),
+              ShadIconButton.outline(
+                icon: const Icon(LucideIcons.eye),
+                onPressed: () => AgentInstructionPreviewModal.show(
+                  context,
+                  widget.controller.text,
                 ),
               ),
               ShadIconButton.destructive(
