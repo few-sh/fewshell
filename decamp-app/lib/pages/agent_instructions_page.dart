@@ -905,23 +905,25 @@ class _TemplateVariablesInfo extends StatelessWidget {
     return ShadAlert(
       icon: const Icon(LucideIcons.info),
       title: const Text('Template Variables'),
-      description: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 4),
-          const Text(
-            'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Use {{ USER_SNIPPETS }} and {{ PROJECT_SNIPPETS }} to access snippets. Each snippet has: name, content, description, tags, position, createdAt, updatedAt.',
-          ),
-          const SizedBox(height: 4),
-          Text(
-            r'Use \{{ to escape and show literal braces.',
-            style: ShadTheme.of(context).textTheme.muted,
-          ),
-        ],
+      description: SelectionArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            const Text(
+              'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Use {{ USER_SNIPPETS }} and {{ PROJECT_SNIPPETS }} to access snippets. Each snippet has: name, content, description, tags, position, createdAt, updatedAt.',
+            ),
+            const SizedBox(height: 4),
+            Text(
+              r'Use \{{ to escape and show literal braces.',
+              style: ShadTheme.of(context).textTheme.muted,
+            ),
+          ],
+        ),
       ),
     );
   }
