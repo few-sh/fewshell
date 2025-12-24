@@ -297,6 +297,7 @@ class _ChatListState extends State<ChatList> {
     return SelectionArea(
       child: CustomScrollView(
         controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         reverse: true,
         cacheExtent: 1000, // Pre-render area to smooth out scrolling
         slivers: [
