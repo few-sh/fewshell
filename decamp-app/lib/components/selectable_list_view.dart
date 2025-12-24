@@ -434,6 +434,8 @@ class _SelectableListItemState<T>
       ),
     );
 
+    controller.dispose();
+
     if (newName != null && newName.isNotEmpty && newName != name) {
       await widget.widget.dao.renameItem(id, newName);
     }
