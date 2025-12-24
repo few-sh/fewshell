@@ -353,6 +353,11 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                                       onChanged: _markChanged,
                                       onRemove: () =>
                                           _removeModelOverride(entry.key),
+                                      onPreview: () =>
+                                          AgentInstructionPreviewModal.show(
+                                            context,
+                                            entry.value.text,
+                                          ),
                                     );
                                   }),
 
@@ -516,6 +521,31 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
     });
   }
 
+  String _getPreviewInstruction(String? modelIdentifier, String currentInput) {
+    if (!_includeUserInstructions) {
+      return currentInput;
+    }
+
+    final globalSettings = ref.read(globalSettingsProvider);
+    final userInstruction = globalSettings.agentInstruction;
+    if (userInstruction == null) return currentInput;
+
+    String? userPart;
+    if (modelIdentifier != null) {
+      userPart =
+          userInstruction.modelOverrides[modelIdentifier] ??
+          userInstruction.defaultInstruction;
+    } else {
+      userPart = userInstruction.defaultInstruction;
+    }
+
+    if (userPart.isEmpty) {
+      return currentInput;
+    }
+
+    return '$userPart\n\n$currentInput';
+  }
+
   @override
   Widget build(BuildContext context) {
     final projectId = widget.projectId;
@@ -556,7 +586,7 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                     leading: const Icon(LucideIcons.eye),
                     onPressed: () => AgentInstructionPreviewModal.show(
                       context,
-                      _defaultController.text,
+                      _getPreviewInstruction(null, _defaultController.text),
                     ),
                     child: const Text('Preview'),
                   ),
@@ -645,6 +675,14 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                                       onChanged: _markChanged,
                                       onRemove: () =>
                                           _removeModelOverride(entry.key),
+                                      onPreview: () =>
+                                          AgentInstructionPreviewModal.show(
+                                            context,
+                                            _getPreviewInstruction(
+                                              entry.key,
+                                              entry.value.text,
+                                            ),
+                                          ),
                                     );
                                   }),
 
@@ -724,12 +762,14 @@ class _ModelOverrideSection extends ConsumerStatefulWidget {
   final TextEditingController controller;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
+  final VoidCallback onPreview;
 
   const _ModelOverrideSection({
     required this.modelIdentifier,
     required this.controller,
     required this.onChanged,
     required this.onRemove,
+    required this.onPreview,
   });
 
   @override
@@ -755,10 +795,7 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
               ),
               ShadIconButton.outline(
                 icon: const Icon(LucideIcons.eye),
-                onPressed: () => AgentInstructionPreviewModal.show(
-                  context,
-                  widget.controller.text,
-                ),
+                onPressed: widget.onPreview,
               ),
               ShadIconButton.destructive(
                 icon: const Icon(LucideIcons.trash),
