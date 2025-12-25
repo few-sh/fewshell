@@ -23,7 +23,6 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   late TabController _tabController;
   final ScrollController _userSnippetsScrollController = ScrollController();
   final ScrollController _projectSnippetsScrollController = ScrollController();
-  bool _isAddingSnippet = false;
 
   @override
   void initState() {
@@ -55,12 +54,6 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
             child: const Icon(LucideIcons.arrowLeft),
             onPressed: () => Navigator.of(context).pop(),
           ),
-          actions: [
-            ShadButton.ghost(
-              onPressed: _addNewSnippet,
-              child: const Icon(LucideIcons.plus),
-            ),
-          ],
         ),
         body: Column(
           children: [
@@ -109,38 +102,43 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     );
   }
 
-  void _addNewSnippet() {
-    setState(() {
-      _isAddingSnippet = true;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final controller = _tabController.index == 0
-          ? _userSnippetsScrollController
-          : _projectSnippetsScrollController;
-
-      if (controller.hasClients) {
-        controller.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   Widget _buildUserSnippets() {
     final snippetsAsync = ref.watch(globalSnippetsProvider);
 
-    return snippetsAsync.when(
-      data: (snippets) => _buildSnippetsList(
-        snippets,
-        isGlobal: true,
-        scrollController: _userSnippetsScrollController,
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) =>
-          Center(child: Text('Error loading snippets: $error')),
+    return Column(
+      children: [
+        Expanded(
+          child: snippetsAsync.when(
+            data: (snippets) => _buildSnippetsList(
+              snippets,
+              isGlobal: true,
+              scrollController: _userSnippetsScrollController,
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) =>
+                Center(child: Text('Error loading snippets: $error')),
+          ),
+        ),
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
+            ),
+            child: _buildAddButton(
+              label: 'Add User Snippet',
+              onPressed: () => showNewSnippetDialog(
+                context,
+                isGlobal: true,
+                title: 'Add User Snippet',
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -168,15 +166,40 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
 
     final snippetsAsync = ref.watch(projectSnippetsProvider(currentProjectId));
 
-    return snippetsAsync.when(
-      data: (snippets) => _buildSnippetsList(
-        snippets,
-        isGlobal: false,
-        scrollController: _projectSnippetsScrollController,
-      ),
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) =>
-          Center(child: Text('Error loading snippets: $error')),
+    return Column(
+      children: [
+        Expanded(
+          child: snippetsAsync.when(
+            data: (snippets) => _buildSnippetsList(
+              snippets,
+              isGlobal: false,
+              scrollController: _projectSnippetsScrollController,
+            ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) =>
+                Center(child: Text('Error loading snippets: $error')),
+          ),
+        ),
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
+            ),
+            child: _buildAddButton(
+              label: 'Add Project Snippet',
+              onPressed: () => showNewSnippetDialog(
+                context,
+                isGlobal: false,
+                title: 'Add Project Snippet',
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -185,8 +208,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     required bool isGlobal,
     required ScrollController scrollController,
   }) {
-    // Show empty state only if no snippets AND not adding a new one
-    if (snippets.isEmpty && !_isAddingSnippet) {
+    // Show empty state only if no snippets
+    if (snippets.isEmpty) {
       return Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
@@ -199,43 +222,16 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
           child: EmptyPlaceholder(
             icon: LucideIcons.code,
             title: 'No Snippets Yet',
-            subtitle: 'Add your first snippet using the + button above.',
+            subtitle: 'Add your first snippet using the + button below.',
           ),
         ),
       );
     }
 
-    // Build list items with new snippet card at top if needed
+    // Build list items
     final listItems = <Widget>[
-      if (_isAddingSnippet)
-        Center(
-          key: const ValueKey('new_snippet_wrapper'),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth:
-                  Theme.of(
-                    context,
-                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
-                  800,
-            ),
-            child: NewSnippetCard(
-              key: const ValueKey('new_snippet'),
-              isGlobal: isGlobal,
-              onSuccess: () {
-                setState(() {
-                  _isAddingSnippet = false;
-                });
-              },
-              onCancel: () {
-                setState(() {
-                  _isAddingSnippet = false;
-                });
-              },
-            ),
-          ),
-        ),
       ...snippets.asMap().entries.map((entry) {
-        final index = entry.key + (_isAddingSnippet ? 1 : 0);
+        final index = entry.key;
         final snippet = entry.value;
         return Center(
           key: ValueKey('snippet_wrapper_${snippet.id}'),
@@ -267,19 +263,10 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
       scrollController: scrollController,
       padding: const EdgeInsets.all(16),
       onReorder: (oldIndex, newIndex) async {
-        // Skip reordering if trying to move the new snippet card
-        if (_isAddingSnippet && (oldIndex == 0 || newIndex == 0)) {
-          return;
-        }
-
-        // Adjust indices if new snippet card is present
-        final adjustedOldIndex = _isAddingSnippet ? oldIndex - 1 : oldIndex;
-        final adjustedNewIndex = _isAddingSnippet ? newIndex - 1 : newIndex;
-
         // Update the order in the database
         await ref
             .read(snippetControllerProvider)
-            .reorderSnippets(snippets, adjustedOldIndex, adjustedNewIndex);
+            .reorderSnippets(snippets, oldIndex, newIndex);
       },
       children: listItems,
     );
@@ -323,6 +310,28 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
             snippet: snippet,
             isGlobal: isGlobal,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddButton({
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      alignment: Alignment.centerRight,
+      child: ShadButton(
+        onPressed: onPressed,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.plus, size: 16),
+            const SizedBox(width: 8),
+            Text(label),
+          ],
         ),
       ),
     );

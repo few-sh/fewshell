@@ -11,6 +11,7 @@ Future<void> showNewSnippetDialog(
   String? initialDescription,
   String? initialContent,
   bool? isGlobal,
+  String? title,
 }) {
   return showDialog(
     context: context,
@@ -21,6 +22,7 @@ Future<void> showNewSnippetDialog(
           isGlobal: isGlobal,
           initialDescription: initialDescription,
           initialContent: initialContent,
+          title: title,
           onCancel: () => Navigator.of(context).pop(),
           onSuccess: () => Navigator.of(context).pop(),
         ),
@@ -34,6 +36,7 @@ class NewSnippetCard extends ConsumerStatefulWidget {
   final bool? isGlobal;
   final String? initialDescription;
   final String? initialContent;
+  final String? title;
   final VoidCallback onCancel;
   final VoidCallback onSuccess;
 
@@ -42,6 +45,7 @@ class NewSnippetCard extends ConsumerStatefulWidget {
     this.isGlobal,
     this.initialDescription,
     this.initialContent,
+    this.title,
     required this.onCancel,
     required this.onSuccess,
   });
@@ -138,7 +142,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
               Icon(LucideIcons.circlePlus, color: theme.colorScheme.primary),
               const SizedBox(width: 8),
               Text(
-                'New Snippet',
+                widget.title ?? 'New Snippet',
                 style: theme.textTheme.h4.copyWith(fontSize: 18),
               ),
               const Spacer(),
