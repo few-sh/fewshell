@@ -173,43 +173,40 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
           maxLines: null,
         ),
         const SizedBox(height: 12),
-        ShadInput(
-          controller: _contentController,
-          placeholder: const Text('Command (e.g., kubectl get pods)'),
-          minLines: 2,
-          maxLines: null,
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontSize: 14,
-            color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
-            height: 1.5,
+        Container(
+          decoration: BoxDecoration(
+            color: terminalTheme?.backgroundColor ?? Colors.black,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: terminalTheme?.borderColor ?? Colors.grey,
+              width: 1,
+            ),
           ),
-          onSubmitted: (_) => _save(),
+          child: ShadInput(
+            controller: _contentController,
+            placeholder: const Text('Command (e.g., kubectl get pods)'),
+            minLines: 2,
+            maxLines: null,
+            decoration: const ShadDecoration(border: ShadBorder.none),
+            style: TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 14,
+              color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
+              height: 1.5,
+            ),
+            onSubmitted: (_) => _save(),
+          ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Visible to AI', style: theme.textTheme.small),
-                  Text(
-                    'Include this snippet in the AI context',
-                    style: theme.textTheme.muted,
-                  ),
-                ],
-              ),
-            ),
-            ShadSwitch(
-              value: _isVisibleToLlm,
-              onChanged: (value) {
-                setState(() {
-                  _isVisibleToLlm = value;
-                });
-              },
-            ),
-          ],
+        ShadSwitch(
+          value: _isVisibleToLlm,
+          onChanged: (value) {
+            setState(() {
+              _isVisibleToLlm = value;
+            });
+          },
+          label: const Text('Visible to AI'),
+          sublabel: const Text('Include this snippet in the AI context'),
         ),
         if (widget.isGlobal == null) ...[
           const SizedBox(height: 12),
