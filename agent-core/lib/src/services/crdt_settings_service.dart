@@ -92,26 +92,64 @@ class CrdtSettingsService {
     return crdt;
   }
 
-  static String _projectKey(String projectId) => 'project_$projectId';
-
   Future<ProjectSettings?> getProjectSettings(String projectId) async {
     final crdt = await getProjectCrdt(projectId);
-    final json = crdt.get('settings', _projectKey(projectId));
-    if (json != null) {
-      try {
-        return ProjectSettings.fromJson(Map<String, dynamic>.from(json));
-      } catch (e) {
-        _log.warning('Error parsing project settings for $projectId: $e');
-      }
+    final flatMap = crdt.getAll();
+
+    if (flatMap.isEmpty) return null;
+
+    final nestedMap = SettingsFlattener.unflatten(flatMap);
+
+    // Convert llmSettings map to list
+    if (nestedMap['llmSettings'] is Map) {
+      nestedMap['llmSettings'] =
+          (nestedMap['llmSettings'] as Map).values.toList();
     }
-    return null;
+
+    try {
+      return ProjectSettings.fromJson(nestedMap);
+    } catch (e) {
+      _log.warning('Error parsing project settings for $projectId: $e');
+      return null;
+    }
   }
 
   Future<void> saveProjectSettings(ProjectSettings settings) async {
     final crdt = await getProjectCrdt(settings.projectId);
+
     // Ensure deep serialization by encoding/decoding
     final json = jsonDecode(jsonEncode(settings.toJson()));
-    await crdt.put('settings', _projectKey(settings.projectId), json);
+
+    // Convert Lists to Maps for CRDT friendly storage
+    if (json['llmSettings'] is List) {
+      final list = json['llmSettings'] as List;
+      final map = <String, dynamic>{};
+      for (final item in list) {
+        if (item is Map && item.containsKey('identifier')) {
+          map[item['identifier']] = item;
+        }
+      }
+      json['llmSettings'] = map;
+    }
+
+    final flatMap = SettingsFlattener.flatten(json);
+    final currentMap = crdt.getAll();
+
+    // Update changed/new keys
+    for (final entry in flatMap.entries) {
+      final key = entry.key;
+      final value = entry.value;
+      if (!currentMap.containsKey(key) || currentMap[key] != value) {
+        await crdt.put('settings', key, value);
+      }
+    }
+
+    // Delete removed keys
+    for (final key in currentMap.keys) {
+      if (!flatMap.containsKey(key)) {
+        await crdt.put('settings', key, null, true);
+      }
+    }
   }
 
   Future<void> close() async {

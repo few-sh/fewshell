@@ -118,11 +118,15 @@ class SyncController {
       List<LlmApiSettings> llmSettings = [];
 
       // We can read directly from the CRDT since we have it
-      final json = settingsCrdt.get('settings', 'project_$projectId');
-      if (json != null) {
+      final flatMap = settingsCrdt.getAll();
+      if (flatMap.isNotEmpty) {
         try {
-          final settings =
-              ProjectSettings.fromJson(Map<String, dynamic>.from(json));
+          final nestedMap = SettingsFlattener.unflatten(flatMap);
+          if (nestedMap['llmSettings'] is Map) {
+            nestedMap['llmSettings'] =
+                (nestedMap['llmSettings'] as Map).values.toList();
+          }
+          final settings = ProjectSettings.fromJson(nestedMap);
           llmSettings = settings.llmSettings;
         } catch (e) {
           _log.warning('Error parsing project settings for $projectId: $e');

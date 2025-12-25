@@ -18,6 +18,7 @@ export 'src/models/ssh_settings.dart';
 
 // Utils
 export 'src/utils/constants.dart';
+export 'src/utils/settings_flattener.dart';
 export 'src/utils/date_formatter.dart';
 export 'src/utils/id_generator.dart';
 export 'src/utils/template_processor.dart';

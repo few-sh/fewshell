@@ -11,8 +11,6 @@ import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 import 'package:agent_core/agent_core.dart';
 
-import 'package:agent_core/agent_core.dart';
-
 final _log = Logger('FewshellAgent');
 
 void main(List<String> args) async {

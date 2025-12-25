@@ -39,6 +39,15 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     super.dispose();
   }
 
+  void _addNewSnippet() {
+    final isGlobal = _tabController.index == 0;
+    showNewSnippetDialog(
+      context,
+      isGlobal: isGlobal,
+      title: isGlobal ? 'Add User Snippet' : 'Add Project Snippet',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -52,13 +61,13 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
         appBar: AppBar(
           title: const ProjectTitleBar(title: 'Snippets'),
           leading: ShadButton.ghost(
-            child: const Icon(LucideIcons.arrowLeft),
             onPressed: () => Navigator.of(context).pop(),
+            child: const Icon(LucideIcons.arrowLeft),
           ),
           actions: [
             ShadButton.ghost(
-              child: const Icon(LucideIcons.plus),
               onPressed: _addNewSnippet,
+              child: const Icon(LucideIcons.plus),
             ),
           ],
         ),
