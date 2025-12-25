@@ -490,7 +490,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
           ),
           const SizedBox(height: 8),
           // Description
-          Text(
+          SelectableText(
             widget.snippet.description ?? '',
             style: theme.textTheme.p.copyWith(fontWeight: FontWeight.bold),
           ),
@@ -500,10 +500,14 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: theme.colorScheme.muted,
+              color: terminalTheme?.backgroundColor ?? Colors.black,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: terminalTheme?.borderColor ?? Colors.grey,
+                width: 1,
+              ),
             ),
-            child: Text(
+            child: SelectableText(
               widget.snippet.content,
               style: TextStyle(
                 fontFamily: 'monospace',
