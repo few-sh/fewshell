@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:agent_core/src/database/tables/messages_table.dart';
 import 'package:decamp/providers/chat_controller_provider.dart';
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
@@ -161,8 +160,8 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
         ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.pencil),
-          child: const Text('Edit'),
           onPressed: widget.onEdit,
+          child: const Text('Edit'),
         ),
         if (isShellCommand)
           ShadContextMenuItem(
@@ -181,24 +180,24 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
         if (isUser)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.send),
-            child: const Text('Re-send'),
             onPressed: _handleResend,
+            child: const Text('Re-send'),
           ),
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.gitBranch),
-          child: const Text('Branch Session'),
           onPressed: _handleBranch,
+          child: const Text('Branch Session'),
         ),
         ShadContextMenuItem(
           leading: Icon(
             LucideIcons.trash2,
             color: theme.colorScheme.destructive,
           ),
+          onPressed: _handleDelete,
           child: Text(
             'Delete',
             style: TextStyle(color: theme.colorScheme.destructive),
           ),
-          onPressed: _handleDelete,
         ),
       ],
       child: ShadButton.ghost(

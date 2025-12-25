@@ -12,13 +12,14 @@ class SecretDialog {
     required Function(String key, String value) onSave,
     String? existingKey,
     String? existingValue,
+    String? title,
   }) async {
     final isEditMode = existingKey != null;
 
     await showShadDialog(
       context: context,
       builder: (context) => _SecretDialogForm(
-        title: isEditMode ? 'Edit Secret' : 'Add Secret',
+        title: title ?? (isEditMode ? 'Edit Secret' : 'Add Secret'),
         initialKey: existingKey,
         initialValue: existingValue ?? '',
         onSave: onSave,
@@ -73,7 +74,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
     return ShadDialog(
       title: Text(widget.title),
       actions: [
-        ShadButton.ghost(
+        ShadButton.outline(
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),

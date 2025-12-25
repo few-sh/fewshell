@@ -63,7 +63,7 @@ class NoLlmConfiguredOverlay extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            ShadButton.ghost(
+            ShadButton.outline(
               onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),

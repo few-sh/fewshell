@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../themes/shad_layout_theme.dart';
 import '../providers/secret_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/secret_dialog.dart';
@@ -53,19 +54,29 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                 bottom: BorderSide(color: theme.colorScheme.border),
               ),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: theme.colorScheme.primary,
-              labelColor: theme.colorScheme.primary,
-              unselectedLabelColor: theme.colorScheme.mutedForeground,
-              labelStyle: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth:
+                    Theme.of(
+                      context,
+                    ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                    800,
               ),
-              tabs: const [
-                Tab(text: 'User Secrets'),
-                Tab(text: 'Project Secrets'),
-              ],
+              child: TabBar(
+                controller: _tabController,
+                indicatorColor: theme.colorScheme.primary,
+                labelColor: theme.colorScheme.primary,
+                unselectedLabelColor: theme.colorScheme.mutedForeground,
+                labelStyle: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                tabs: const [
+                  Tab(text: 'User Secrets'),
+                  Tab(text: 'Project Secrets'),
+                ],
+              ),
             ),
           ),
           // Scrollable content
@@ -98,14 +109,48 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
         return Column(
           children: [
-            _buildSecurityInfoBanner(),
+            Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth:
+                      Theme.of(
+                        context,
+                      ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                      800,
+                ),
+                child: _buildSecurityInfoBanner(),
+              ),
+            ),
             Expanded(
               child: secrets.isEmpty
-                  ? _buildEmptyState('No user secrets yet')
+                  ? Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth:
+                              Theme.of(context)
+                                  .extension<ShadLayoutTheme>()
+                                  ?.centeredContentMaxWidth ??
+                              800,
+                        ),
+                        child: _buildEmptyState('No user secrets yet'),
+                      ),
+                    )
                   : _buildSecretsList(secrets, isGlobal: true),
             ),
-            _buildAddButton(
-              onPressed: () => _showAddSecretDialog(isGlobal: true),
+            Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth:
+                      Theme.of(
+                        context,
+                      ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                      800,
+                ),
+                child: _buildAddButton(
+                  label: 'Add User Secret',
+                  onPressed: () => _showAddSecretDialog(isGlobal: true),
+                ),
+              ),
             ),
           ],
         );
@@ -118,10 +163,32 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
     return Column(
       children: [
-        _buildSecurityInfoBanner(),
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
+            ),
+            child: _buildSecurityInfoBanner(),
+          ),
+        ),
         Expanded(
           child: currentProjectId == null
-              ? _buildEmptyState('Please select a project')
+              ? Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth:
+                          Theme.of(context)
+                              .extension<ShadLayoutTheme>()
+                              ?.centeredContentMaxWidth ??
+                          800,
+                    ),
+                    child: _buildEmptyState('Please select a project'),
+                  ),
+                )
               : FutureBuilder<Map<String, String>>(
                   future: ref
                       .watch(keychainServiceProvider)
@@ -140,7 +207,18 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                     final secrets = snapshot.data ?? {};
 
                     return secrets.isEmpty
-                        ? _buildEmptyState('No project secrets yet')
+                        ? Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    Theme.of(context)
+                                        .extension<ShadLayoutTheme>()
+                                        ?.centeredContentMaxWidth ??
+                                    800,
+                              ),
+                              child: _buildEmptyState('No project secrets yet'),
+                            ),
+                          )
                         : _buildSecretsList(
                             secrets,
                             isGlobal: false,
@@ -150,10 +228,22 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                 ),
         ),
         if (currentProjectId != null)
-          _buildAddButton(
-            onPressed: () => _showAddSecretDialog(
-              isGlobal: false,
-              projectId: currentProjectId,
+          Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth:
+                    Theme.of(
+                      context,
+                    ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                    800,
+              ),
+              child: _buildAddButton(
+                label: 'Add Project Secret',
+                onPressed: () => _showAddSecretDialog(
+                  isGlobal: false,
+                  projectId: currentProjectId,
+                ),
+              ),
             ),
           ),
       ],
@@ -174,11 +264,22 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
         final key = sortedKeys[index];
         final value = secrets[key]!;
 
-        return _buildSecretCard(
-          key: key,
-          value: value,
-          isGlobal: isGlobal,
-          projectId: projectId,
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth:
+                  Theme.of(
+                    context,
+                  ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                  800,
+            ),
+            child: _buildSecretCard(
+              key: key,
+              value: value,
+              isGlobal: isGlobal,
+              projectId: projectId,
+            ),
+          ),
         );
       },
     );
@@ -337,18 +438,22 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     );
   }
 
-  Widget _buildAddButton({required VoidCallback onPressed}) {
+  Widget _buildAddButton({
+    required String label,
+    required VoidCallback onPressed,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
+      alignment: Alignment.centerRight,
       child: ShadButton(
         onPressed: onPressed,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(LucideIcons.plus, size: 16),
-            SizedBox(width: 8),
-            Text('Add Secret'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.plus, size: 16),
+            const SizedBox(width: 8),
+            Text(label),
           ],
         ),
       ),
@@ -361,6 +466,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   }) async {
     await SecretDialog.show(
       context,
+      title: isGlobal ? 'Add User Secret' : 'Add Project Secret',
       onSave: (key, value) async {
         try {
           if (isGlobal) {

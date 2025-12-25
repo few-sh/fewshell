@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -6,12 +7,23 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 @immutable
 class ShadLayoutTheme extends ThemeExtension<ShadLayoutTheme> {
   final EdgeInsets pagePadding;
+  final double centeredContentMaxWidth;
 
-  const ShadLayoutTheme({required this.pagePadding});
+  const ShadLayoutTheme({
+    required this.pagePadding,
+    this.centeredContentMaxWidth = 800,
+  });
 
   @override
-  ShadLayoutTheme copyWith({EdgeInsets? pagePadding}) {
-    return ShadLayoutTheme(pagePadding: pagePadding ?? this.pagePadding);
+  ShadLayoutTheme copyWith({
+    EdgeInsets? pagePadding,
+    double? centeredContentMaxWidth,
+  }) {
+    return ShadLayoutTheme(
+      pagePadding: pagePadding ?? this.pagePadding,
+      centeredContentMaxWidth:
+          centeredContentMaxWidth ?? this.centeredContentMaxWidth,
+    );
   }
 
   @override
@@ -21,6 +33,11 @@ class ShadLayoutTheme extends ThemeExtension<ShadLayoutTheme> {
     }
     return ShadLayoutTheme(
       pagePadding: EdgeInsets.lerp(pagePadding, other.pagePadding, t)!,
+      centeredContentMaxWidth: lerpDouble(
+        centeredContentMaxWidth,
+        other.centeredContentMaxWidth,
+        t,
+      )!,
     );
   }
 }

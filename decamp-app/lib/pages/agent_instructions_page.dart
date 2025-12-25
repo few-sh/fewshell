@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/settings_provider.dart';
 import '../providers/llm_settings_provider.dart';
-import '../providers/llm_service_provider.dart';
 import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
+import '../components/agent_instruction_preview_modal.dart';
 import '../themes/shad_layout_theme.dart';
 
 /// Agent Instructions page with User and Project settings tabs
@@ -19,8 +18,94 @@ class AgentInstructionsPage extends ConsumerStatefulWidget {
       _AgentInstructionsPageState();
 }
 
-class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
-  String _currentTab = 'project';
+class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final GlobalKey<UserSettingsTabState> _userTabKey = GlobalKey();
+  final GlobalKey<ProjectSettingsTabState> _projectTabKey = GlobalKey();
+  bool _hasChanges = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_handleTabSelection);
+  }
+
+  @override
+  void dispose() {
+    _tabController.removeListener(_handleTabSelection);
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _handleTabSelection() {
+    // Update hasChanges based on the new tab
+    // We need to schedule this because we might be in the middle of a build or animation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateHasChanges();
+      }
+    });
+  }
+
+  void _updateHasChanges() {
+    setState(() {
+      if (_tabController.index == 0) {
+        _hasChanges = _userTabKey.currentState?.hasChanges ?? false;
+      } else {
+        _hasChanges = _projectTabKey.currentState?.hasChanges ?? false;
+      }
+    });
+  }
+
+  void _handleTabChanges(bool hasChanges) {
+    // This is called by the child tab when its state changes.
+    // We need to schedule this because it might be called during the child's build/initState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateHasChanges();
+      }
+    });
+  }
+
+  void _handleSave() {
+    if (_tabController.index == 0) {
+      _userTabKey.currentState?.saveSettings();
+    } else {
+      _projectTabKey.currentState?.saveSettings();
+    }
+  }
+
+  void _handlePreview() {
+    if (_tabController.index == 0) {
+      _userTabKey.currentState?.previewSettings();
+    } else {
+      _projectTabKey.currentState?.previewSettings();
+    }
+  }
+
+  Future<bool?> _showExitConfirmationDialog(BuildContext context) {
+    return showShadDialog<bool>(
+      context: context,
+      builder: (context) => ShadDialog(
+        title: const Text('Unsaved Changes'),
+        description: const Text(
+          'You have unsaved changes. Are you sure you want to leave?',
+        ),
+        actions: [
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
+          ShadButton(
+            child: const Text('Leave'),
+            onPressed: () => Navigator.of(context).pop(true),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,117 +114,128 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage> {
     final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
     final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const ProjectTitleBar(title: 'Agent Instructions'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
+    return PopScope(
+      canPop: !_hasChanges,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+
+        final shouldPop = await _showExitConfirmationDialog(context);
+        if (shouldPop == true) {
+          if (context.mounted) Navigator.of(context).pop();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const ProjectTitleBar(title: 'Agent Instructions'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
         ),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: pagePadding,
-            child: Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.muted,
-                borderRadius: theme.radius,
+        body: Column(
+          children: [
+            // Preview and Save buttons
+            Padding(
+              padding: pagePadding,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _tabController.index == 0
+                              ? 'Configure default instructions for all AI models'
+                              : 'Configure project-specific instructions',
+                          style: theme.textTheme.muted,
+                        ),
+                      ),
+                      ShadButton.outline(
+                        leading: const Icon(LucideIcons.eye),
+                        onPressed: _handlePreview,
+                        child: const Text('Preview'),
+                      ),
+                      const SizedBox(width: 8),
+                      ShadButton(
+                        enabled: _hasChanges,
+                        onPressed: _handleSave,
+                        leading: const Icon(LucideIcons.save),
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.all(4),
-              child: Row(
+            ),
+
+            // Tab Bar
+            TabBar(
+              controller: _tabController,
+              labelColor: theme.colorScheme.foreground,
+              unselectedLabelColor: theme.colorScheme.mutedForeground,
+              indicatorColor: theme.colorScheme.primary,
+              tabs: const [
+                Tab(text: 'User Settings'),
+                Tab(text: 'Project Settings'),
+              ],
+            ),
+
+            const ShadSeparator.horizontal(),
+
+            // Tab Content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
                 children: [
-                  Expanded(
-                    child: _currentTab == 'user'
-                        ? ShadButton(
-                            shadows: [
-                              BoxShadow(
-                                color: theme.colorScheme.background.withValues(
-                                  alpha: 0.1,
-                                ),
-                                spreadRadius: 1,
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                            backgroundColor: theme.colorScheme.background,
-                            foregroundColor: theme.colorScheme.foreground,
-                            hoverBackgroundColor: theme.colorScheme.background,
-                            onPressed: () {},
-                            child: const Text('User Settings'),
-                          )
-                        : ShadButton.ghost(
-                            onPressed: () =>
-                                setState(() => _currentTab = 'user'),
-                            child: const Text('User Settings'),
-                          ),
+                  UserSettingsTab(
+                    key: _userTabKey,
+                    onChanged: _handleTabChanges,
                   ),
-                  Expanded(
-                    child: _currentTab == 'project'
-                        ? ShadButton(
-                            shadows: [
-                              BoxShadow(
-                                color: theme.colorScheme.background.withValues(
-                                  alpha: 0.1,
-                                ),
-                                spreadRadius: 1,
-                                blurRadius: 2,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                            backgroundColor: theme.colorScheme.background,
-                            foregroundColor: theme.colorScheme.foreground,
-                            hoverBackgroundColor: theme.colorScheme.background,
-                            onPressed: () {},
-                            child: const Text('Project Settings'),
-                          )
-                        : ShadButton.ghost(
-                            onPressed: () =>
-                                setState(() => _currentTab = 'project'),
-                            child: const Text('Project Settings'),
+                  currentProject != null
+                      ? ProjectSettingsTab(
+                          key: _projectTabKey,
+                          projectId: currentProject.id,
+                          onChanged: _handleTabChanges,
+                        )
+                      : const Center(
+                          child: Text(
+                            'No project selected. Please select a project first.',
                           ),
-                  ),
+                        ),
                 ],
               ),
             ),
-          ),
-          Expanded(
-            child: IndexedStack(
-              index: _currentTab == 'user' ? 0 : 1,
-              children: [
-                const _UserSettingsTab(),
-                currentProject != null
-                    ? _ProjectSettingsTab(
-                        projectId: currentProject.id,
-                        key: ValueKey(currentProject.id),
-                      )
-                    : const Center(
-                        child: Text(
-                          'No project selected. Please select a project first.',
-                        ),
-                      ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 /// User Settings Tab - Global/User-level agent instructions
-class _UserSettingsTab extends ConsumerStatefulWidget {
-  const _UserSettingsTab();
+class UserSettingsTab extends ConsumerStatefulWidget {
+  final ValueChanged<bool> onChanged;
+
+  const UserSettingsTab({required this.onChanged, super.key});
 
   @override
-  ConsumerState<_UserSettingsTab> createState() => _UserSettingsTabState();
+  ConsumerState<UserSettingsTab> createState() => UserSettingsTabState();
 }
 
-class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
+class UserSettingsTabState extends ConsumerState<UserSettingsTab>
+    with AutomaticKeepAliveClientMixin {
   late TextEditingController _defaultController;
   final Map<String, TextEditingController> _modelControllers = {};
-  bool _showPreview = false;
   bool _hasChanges = false;
+  AgentInstruction? _originalInstruction;
+  bool _settingsLoaded = false;
+
+  bool get hasChanges => _hasChanges;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -159,6 +255,7 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
   void _loadSettings() {
     final settings = ref.read(globalSettingsProvider);
     final instruction = settings.agentInstruction;
+    _originalInstruction = instruction;
 
     _defaultController.text = instruction?.defaultInstruction ?? '';
 
@@ -174,15 +271,36 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
       }
     }
     _hasChanges = false;
+    widget.onChanged(_hasChanges);
   }
 
-  void _markChanged() {
-    if (!_hasChanges) {
-      setState(() => _hasChanges = true);
+  void _checkForChanges() {
+    final defaultChanged =
+        _defaultController.text !=
+        (_originalInstruction?.defaultInstruction ?? '');
+
+    bool overridesChanged = false;
+    final originalOverrides = _originalInstruction?.modelOverrides ?? {};
+
+    if (_modelControllers.length != originalOverrides.length) {
+      overridesChanged = true;
+    } else {
+      for (var entry in _modelControllers.entries) {
+        if (entry.value.text != (originalOverrides[entry.key] ?? '')) {
+          overridesChanged = true;
+          break;
+        }
+      }
+    }
+
+    final hasChanges = defaultChanged || overridesChanged;
+    if (_hasChanges != hasChanges) {
+      setState(() => _hasChanges = hasChanges);
+      widget.onChanged(_hasChanges);
     }
   }
 
-  Future<void> _saveSettings() async {
+  Future<void> saveSettings() async {
     try {
       final settings = ref.read(globalSettingsProvider);
       final settingsNotifier = ref.read(globalSettingsProvider.notifier);
@@ -206,7 +324,9 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
         settings.copyWith(agentInstruction: newInstruction, updatedAt: now),
       );
 
+      _originalInstruction = newInstruction;
       setState(() => _hasChanges = false);
+      widget.onChanged(_hasChanges);
 
       if (mounted) {
         ShadToaster.of(context).show(
@@ -224,11 +344,15 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
     }
   }
 
+  void previewSettings() {
+    AgentInstructionPreviewModal.show(context, _defaultController.text);
+  }
+
   void _addModelOverride(String modelIdentifier) {
     if (!_modelControllers.containsKey(modelIdentifier)) {
       setState(() {
         _modelControllers[modelIdentifier] = TextEditingController();
-        _hasChanges = true;
+        _checkForChanges();
       });
     }
   }
@@ -237,12 +361,13 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
     setState(() {
       _modelControllers[modelIdentifier]?.dispose();
       _modelControllers.remove(modelIdentifier);
-      _hasChanges = true;
+      _checkForChanges();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final settings = ref.watch(globalSettingsProvider);
     final llmSettings = ref.watch(globalLlmSettingsProvider);
     final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
@@ -250,83 +375,67 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
 
     // Load settings when they change
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_defaultController.text.isEmpty &&
-          settings.agentInstruction != null) {
+      if (!_settingsLoaded && settings.agentInstruction != null) {
         _loadSettings();
+        setState(() => _settingsLoaded = true);
       }
     });
 
-    return Column(
+    return ListView(
+      padding: pagePadding,
       children: [
-        // Preview/Edit toggle and Save button
-        Padding(
-          padding: pagePadding,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Configure default instructions for all AI models',
-                  style: ShadTheme.of(context).textTheme.muted,
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Template variables info
+                const _TemplateVariablesInfo(),
+                const SizedBox(height: 16),
+
+                // Default Instruction Section
+                _InstructionSection(
+                  title: 'Default Instruction',
+                  subtitle: 'Applies to all models unless overridden',
+                  controller: _defaultController,
+                  onChanged: _checkForChanges,
                 ),
-              ),
-              ShadIconButton.ghost(
-                icon: Icon(_showPreview ? LucideIcons.pencil : LucideIcons.eye),
-                onPressed: () => setState(() => _showPreview = !_showPreview),
-              ),
-              ShadButton(
-                onPressed: _hasChanges ? _saveSettings : null,
-                leading: const Icon(LucideIcons.save),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        ),
-        const ShadSeparator.horizontal(),
-        Expanded(
-          child: ListView(
-            padding: pagePadding,
-            children: [
-              // Template variables info
-              const _TemplateVariablesInfo(),
-              const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-              // Default Instruction Section
-              _InstructionSection(
-                title: 'Default Instruction',
-                subtitle: 'Applies to all models unless overridden',
-                controller: _defaultController,
-                showPreview: _showPreview,
-                onChanged: _markChanged,
-              ),
-              const SizedBox(height: 24),
-
-              // Model-Specific Overrides
-              ShadAccordion<String>.multiple(
-                children: [
-                  ShadAccordionItem(
-                    value: 'overrides',
-                    title: const Text('Model-Specific Overrides'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_modelControllers.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: Text(
-                              'No overrides configured',
-                              style: ShadTheme.of(context).textTheme.muted,
-                            ),
-                          )
-                        else
-                          ..._modelControllers.entries.map((entry) {
-                            return _ModelOverrideSection(
-                              modelIdentifier: entry.key,
-                              controller: entry.value,
-                              showPreview: _showPreview,
-                              onChanged: _markChanged,
-                              onRemove: () => _removeModelOverride(entry.key),
-                            );
-                          }),
+                // Model-Specific Overrides
+                ShadAccordion<String>.multiple(
+                  children: [
+                    ShadAccordionItem(
+                      value: 'overrides',
+                      title: const Text('Model-Specific Overrides'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_modelControllers.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: Text(
+                                'No overrides configured',
+                                style: ShadTheme.of(context).textTheme.muted,
+                              ),
+                            )
+                          else
+                            ..._modelControllers.entries.map((entry) {
+                              return _ModelOverrideSection(
+                                modelIdentifier: entry.key,
+                                controller: entry.value,
+                                onChanged: _checkForChanges,
+                                onRemove: () => _removeModelOverride(entry.key),
+                                onPreview: () =>
+                                    AgentInstructionPreviewModal.show(
+                                      context,
+                                      entry.value.text,
+                                    ),
+                              );
+                            }),
 
                         // Add new override button
                         const SizedBox(height: 16),
@@ -337,10 +446,10 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -349,23 +458,33 @@ class _UserSettingsTabState extends ConsumerState<_UserSettingsTab> {
 }
 
 /// Project Settings Tab - Project-level agent instructions
-class _ProjectSettingsTab extends ConsumerStatefulWidget {
+class ProjectSettingsTab extends ConsumerStatefulWidget {
   final String projectId;
+  final ValueChanged<bool> onChanged;
 
-  const _ProjectSettingsTab({required this.projectId, super.key});
+  const ProjectSettingsTab({
+    required this.projectId,
+    required this.onChanged,
+    super.key,
+  });
 
   @override
-  ConsumerState<_ProjectSettingsTab> createState() =>
-      _ProjectSettingsTabState();
+  ConsumerState<ProjectSettingsTab> createState() => ProjectSettingsTabState();
 }
 
-class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
+class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
+    with AutomaticKeepAliveClientMixin {
   late TextEditingController _defaultController;
   final Map<String, TextEditingController> _modelControllers = {};
-  bool _showPreview = false;
   bool _hasChanges = false;
   bool _includeUserInstructions = false;
   bool _settingsLoaded = false;
+  ProjectSettings? _originalSettings;
+
+  bool get hasChanges => _hasChanges;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -381,6 +500,19 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   }
 
   @override
+  void didUpdateWidget(ProjectSettingsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId) {
+      _settingsLoaded = false;
+      final settings = ref.read(projectSettingsProvider(widget.projectId));
+      if (settings != null) {
+        _loadSettings(settings);
+        _settingsLoaded = true;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _defaultController.dispose();
     for (var controller in _modelControllers.values) {
@@ -390,6 +522,7 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
   }
 
   void _loadSettings(ProjectSettings settings) {
+    _originalSettings = settings;
     final instruction = settings.agentInstruction;
 
     _defaultController.text = instruction?.defaultInstruction ?? '';
@@ -407,19 +540,47 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
       }
     }
     _hasChanges = false;
+    widget.onChanged(_hasChanges);
   }
 
-  void _markChanged() {
-    if (!_hasChanges) {
-      setState(() => _hasChanges = true);
+  void _checkForChanges() {
+    final originalInstruction = _originalSettings?.agentInstruction;
+
+    final defaultChanged =
+        _defaultController.text !=
+        (originalInstruction?.defaultInstruction ?? '');
+
+    final includeUserInstructionsChanged =
+        _includeUserInstructions !=
+        (_originalSettings?.includeUserInstructions ?? false);
+
+    bool overridesChanged = false;
+    final originalOverrides = originalInstruction?.modelOverrides ?? {};
+
+    if (_modelControllers.length != originalOverrides.length) {
+      overridesChanged = true;
+    } else {
+      for (var entry in _modelControllers.entries) {
+        if (entry.value.text != (originalOverrides[entry.key] ?? '')) {
+          overridesChanged = true;
+          break;
+        }
+      }
+    }
+
+    final hasChanges =
+        defaultChanged || includeUserInstructionsChanged || overridesChanged;
+    if (_hasChanges != hasChanges) {
+      setState(() => _hasChanges = hasChanges);
+      widget.onChanged(_hasChanges);
     }
   }
 
-  Future<void> _saveSettings(String projectId) async {
+  Future<void> saveSettings() async {
     try {
-      final settings = ref.read(projectSettingsProvider(projectId));
+      final settings = ref.read(projectSettingsProvider(widget.projectId));
       final settingsNotifier = ref.read(
-        projectSettingsProvider(projectId).notifier,
+        projectSettingsProvider(widget.projectId).notifier,
       );
 
       if (settings == null) return;
@@ -439,15 +600,17 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
         updatedAt: now,
       );
 
-      await settingsNotifier.updateSettings(
-        settings.copyWith(
-          agentInstruction: newInstruction,
-          includeUserInstructions: _includeUserInstructions,
-          updatedAt: now,
-        ),
+      final newSettings = settings.copyWith(
+        agentInstruction: newInstruction,
+        includeUserInstructions: _includeUserInstructions,
+        updatedAt: now,
       );
 
+      await settingsNotifier.updateSettings(newSettings);
+
+      _originalSettings = newSettings;
       setState(() => _hasChanges = false);
+      widget.onChanged(_hasChanges);
 
       if (mounted) {
         ShadToaster.of(context).show(
@@ -467,11 +630,18 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
     }
   }
 
+  void previewSettings() {
+    AgentInstructionPreviewModal.show(
+      context,
+      _getPreviewInstruction(null, _defaultController.text),
+    );
+  }
+
   void _addModelOverride(String modelIdentifier) {
     if (!_modelControllers.containsKey(modelIdentifier)) {
       setState(() {
         _modelControllers[modelIdentifier] = TextEditingController();
-        _hasChanges = true;
+        _checkForChanges();
       });
     }
   }
@@ -480,12 +650,38 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
     setState(() {
       _modelControllers[modelIdentifier]?.dispose();
       _modelControllers.remove(modelIdentifier);
-      _hasChanges = true;
+      _checkForChanges();
     });
+  }
+
+  String _getPreviewInstruction(String? modelIdentifier, String currentInput) {
+    if (!_includeUserInstructions) {
+      return currentInput;
+    }
+
+    final globalSettings = ref.read(globalSettingsProvider);
+    final userInstruction = globalSettings.agentInstruction;
+    if (userInstruction == null) return currentInput;
+
+    String? userPart;
+    if (modelIdentifier != null) {
+      userPart =
+          userInstruction.modelOverrides[modelIdentifier] ??
+          userInstruction.defaultInstruction;
+    } else {
+      userPart = userInstruction.defaultInstruction;
+    }
+
+    if (userPart.isEmpty) {
+      return currentInput;
+    }
+
+    return '$userPart\n\n$currentInput';
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final projectId = widget.projectId;
     final llmSettings = ref.watch(projectLlmSettingsProvider(projectId));
     final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
@@ -502,94 +698,81 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
       }
     });
 
-    return Column(
+    return ListView(
+      padding: pagePadding,
       children: [
-        // Preview/Edit toggle and Save button
-        Padding(
-          padding: pagePadding,
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Configure project-specific instructions',
-                  style: ShadTheme.of(context).textTheme.muted,
+        Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Include User Instructions Switch
+                ShadSwitch(
+                  value: _includeUserInstructions,
+                  onChanged: (value) {
+                    setState(() {
+                      _includeUserInstructions = value;
+                      _checkForChanges();
+                    });
+                  },
+                  label: const Text('Include User-Level Instructions'),
+                  sublabel: const Text(
+                    'Prepend user-level instructions to project instructions',
+                  ),
                 ),
-              ),
-              ShadIconButton.ghost(
-                icon: Icon(_showPreview ? LucideIcons.pencil : LucideIcons.eye),
-                onPressed: () => setState(() => _showPreview = !_showPreview),
-              ),
-              ShadButton(
-                onPressed: _hasChanges ? () => _saveSettings(projectId) : null,
-                leading: const Icon(LucideIcons.save),
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        ),
-        const ShadSeparator.horizontal(),
-        Expanded(
-          child: ListView(
-            padding: pagePadding,
-            children: [
-              // Include User Instructions Checkbox
-              ShadCheckbox(
-                value: _includeUserInstructions,
-                onChanged: (value) {
-                  setState(() {
-                    _includeUserInstructions = value;
-                    _hasChanges = true;
-                  });
-                },
-                label: const Text('Include User-Level Instructions'),
-                sublabel: const Text(
-                  'Prepend user-level instructions to project instructions',
+                const SizedBox(height: 16),
+
+                // Template variables info
+                const _TemplateVariablesInfo(),
+                const SizedBox(height: 16),
+
+                // Default Project Instruction Section
+                _InstructionSection(
+                  title: 'Default Project Instruction',
+                  subtitle:
+                      'Applies to all models in this project unless overridden',
+                  controller: _defaultController,
+                  onChanged: _checkForChanges,
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-              // Template variables info
-              const _TemplateVariablesInfo(),
-              const SizedBox(height: 16),
-
-              // Default Project Instruction Section
-              _InstructionSection(
-                title: 'Default Project Instruction',
-                subtitle:
-                    'Applies to all models in this project unless overridden',
-                controller: _defaultController,
-                showPreview: _showPreview,
-                onChanged: _markChanged,
-              ),
-              const SizedBox(height: 24),
-
-              // Model-Specific Overrides
-              ShadAccordion<String>.multiple(
-                children: [
-                  ShadAccordionItem(
-                    value: 'overrides',
-                    title: const Text('Model-Specific Overrides'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_modelControllers.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: Text(
-                              'No overrides configured',
-                              style: ShadTheme.of(context).textTheme.muted,
-                            ),
-                          )
-                        else
-                          ..._modelControllers.entries.map((entry) {
-                            return _ModelOverrideSection(
-                              modelIdentifier: entry.key,
-                              controller: entry.value,
-                              showPreview: _showPreview,
-                              onChanged: _markChanged,
-                              onRemove: () => _removeModelOverride(entry.key),
-                            );
-                          }),
+                // Model-Specific Overrides
+                ShadAccordion<String>.multiple(
+                  children: [
+                    ShadAccordionItem(
+                      value: 'overrides',
+                      title: const Text('Model-Specific Overrides'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_modelControllers.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: Text(
+                                'No overrides configured',
+                                style: ShadTheme.of(context).textTheme.muted,
+                              ),
+                            )
+                          else
+                            ..._modelControllers.entries.map((entry) {
+                              return _ModelOverrideSection(
+                                modelIdentifier: entry.key,
+                                controller: entry.value,
+                                onChanged: _checkForChanges,
+                                onRemove: () => _removeModelOverride(entry.key),
+                                onPreview: () =>
+                                    AgentInstructionPreviewModal.show(
+                                      context,
+                                      _getPreviewInstruction(
+                                        entry.key,
+                                        entry.value.text,
+                                      ),
+                                    ),
+                              );
+                            }),
 
                         // Add new override button
                         const SizedBox(height: 16),
@@ -600,10 +783,10 @@ class _ProjectSettingsTabState extends ConsumerState<_ProjectSettingsTab> {
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -616,14 +799,12 @@ class _InstructionSection extends ConsumerStatefulWidget {
   final String title;
   final String subtitle;
   final TextEditingController controller;
-  final bool showPreview;
   final VoidCallback onChanged;
 
   const _InstructionSection({
     required this.title,
     required this.subtitle,
     required this.controller,
-    required this.showPreview,
     required this.onChanged,
   });
 
@@ -633,35 +814,6 @@ class _InstructionSection extends ConsumerStatefulWidget {
 }
 
 class _InstructionSectionState extends ConsumerState<_InstructionSection> {
-  bool _renderJinja = false;
-  String? _processedText;
-  bool _isLoading = false;
-
-  Future<void> _loadContext() async {
-    if (_processedText != null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final llmService = ref.read(llmServiceProvider);
-      final processed = await llmService.processTemplate(
-        widget.controller.text,
-      );
-
-      if (mounted) {
-        setState(() {
-          _processedText = processed;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading preview context: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -672,72 +824,16 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
         const SizedBox(height: 4),
         Text(widget.subtitle, style: theme.textTheme.muted),
         const SizedBox(height: 12),
-        if (widget.showPreview) ...[
-          Row(
-            children: [
-              ShadCheckbox(
-                value: _renderJinja,
-                onChanged: (value) {
-                  setState(() {
-                    _renderJinja = value;
-                    if (!_renderJinja) {
-                      _processedText = null;
-                    }
-                  });
-                  if (_renderJinja) {
-                    _loadContext();
-                  }
-                },
-                label: const Text('Render Jinja in preview'),
-              ),
-              if (_isLoading) ...[
-                const SizedBox(width: 8),
-                const SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.border),
-              borderRadius: theme.radius,
-            ),
-            constraints: const BoxConstraints(minHeight: 200),
-            child: widget.controller.text.isEmpty
-                ? Text(
-                    'No instruction provided',
-                    style: theme.textTheme.muted.copyWith(
-                      fontStyle: FontStyle.italic,
-                    ),
-                  )
-                : SelectionArea(
-                    child: GptMarkdown(
-                      _renderJinja
-                          ? (_processedText ?? widget.controller.text)
-                          : widget.controller.text,
-                    ),
-                  ),
-          ),
-        ] else
-          ShadTextarea(
-            controller: widget.controller,
-            placeholder: const Text('Enter instruction in markdown format...'),
-            onChanged: (_) {
-              if (_processedText != null) {
-                setState(() => _processedText = null);
-                if (_renderJinja) {
-                  _loadContext();
-                }
-              }
-              widget.onChanged();
-            },
-          ),
+        ShadInput(
+          controller: widget.controller,
+          placeholder: const Text('Enter instruction in markdown format...'),
+          minLines: 4,
+          maxLines: null,
+          keyboardType: TextInputType.multiline,
+          onChanged: (_) {
+            widget.onChanged();
+          },
+        ),
       ],
     );
   }
@@ -747,16 +843,16 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
 class _ModelOverrideSection extends ConsumerStatefulWidget {
   final String modelIdentifier;
   final TextEditingController controller;
-  final bool showPreview;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
+  final VoidCallback onPreview;
 
   const _ModelOverrideSection({
     required this.modelIdentifier,
     required this.controller,
-    required this.showPreview,
     required this.onChanged,
     required this.onRemove,
+    required this.onPreview,
   });
 
   @override
@@ -765,35 +861,6 @@ class _ModelOverrideSection extends ConsumerStatefulWidget {
 }
 
 class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
-  bool _renderJinja = false;
-  String? _processedText;
-  bool _isLoading = false;
-
-  Future<void> _loadContext() async {
-    if (_processedText != null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final llmService = ref.read(llmServiceProvider);
-      final processed = await llmService.processTemplate(
-        widget.controller.text,
-      );
-
-      if (mounted) {
-        setState(() {
-          _processedText = processed;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error loading preview context: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -809,6 +876,10 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
                   style: theme.textTheme.large,
                 ),
               ),
+              ShadIconButton.outline(
+                icon: const Icon(LucideIcons.eye),
+                onPressed: widget.onPreview,
+              ),
               ShadIconButton.destructive(
                 icon: const Icon(LucideIcons.trash),
                 onPressed: widget.onRemove,
@@ -816,75 +887,16 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
             ],
           ),
           const SizedBox(height: 8),
-          if (widget.showPreview) ...[
-            Row(
-              children: [
-                ShadCheckbox(
-                  value: _renderJinja,
-                  onChanged: (value) {
-                    setState(() {
-                      _renderJinja = value;
-                      // Reset processed text when toggling off so we re-fetch if toggled on again
-                      // or if text changed (though we don't track text changes here easily without listener)
-                      if (!_renderJinja) {
-                        _processedText = null;
-                      }
-                    });
-                    if (_renderJinja) {
-                      _loadContext();
-                    }
-                  },
-                  label: const Text('Render Jinja in preview'),
-                ),
-                if (_isLoading) ...[
-                  const SizedBox(width: 8),
-                  const SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: theme.inputTheme.padding ?? const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: theme.colorScheme.border),
-                borderRadius: theme.radius,
-              ),
-              constraints: const BoxConstraints(minHeight: 150),
-              child: widget.controller.text.isEmpty
-                  ? Text(
-                      'No override instruction provided',
-                      style: theme.textTheme.muted.copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
-                    )
-                  : SelectionArea(
-                      child: GptMarkdown(
-                        _renderJinja
-                            ? (_processedText ?? widget.controller.text)
-                            : widget.controller.text,
-                      ),
-                    ),
-            ),
-          ] else
-            ShadTextarea(
-              controller: widget.controller,
-              placeholder: const Text('Enter model-specific instruction...'),
-              onChanged: (_) {
-                // Invalidate processed text when content changes
-                if (_processedText != null) {
-                  setState(() => _processedText = null);
-                  if (_renderJinja) {
-                    _loadContext();
-                  }
-                }
-                widget.onChanged();
-              },
-            ),
+          ShadInput(
+            controller: widget.controller,
+            placeholder: const Text('Enter model-specific instruction...'),
+            minLines: 4,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+            onChanged: (_) {
+              widget.onChanged();
+            },
+          ),
         ],
       ),
     );
@@ -976,23 +988,25 @@ class _TemplateVariablesInfo extends StatelessWidget {
     return ShadAlert(
       icon: const Icon(LucideIcons.info),
       title: const Text('Template Variables'),
-      description: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 4),
-          const Text(
-            'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'Use {{ USER_SNIPPETS }} and {{ PROJECT_SNIPPETS }} to access snippets. Each snippet has: name, content, description, tags, position, createdAt, updatedAt.',
-          ),
-          const SizedBox(height: 4),
-          Text(
-            r'Use \{{ to escape and show literal braces.',
-            style: ShadTheme.of(context).textTheme.muted,
-          ),
-        ],
+      description: SelectionArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            const Text(
+              'Use {{ SECRETS|join(", ") }} to automatically insert a comma-separated list of all secret names.',
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Use {{ USER_SNIPPETS }} and {{ PROJECT_SNIPPETS }} to access snippets. Each snippet has: name, content, description, tags, position, createdAt, updatedAt.',
+            ),
+            const SizedBox(height: 4),
+            Text(
+              r'Use \{{ to escape and show literal braces.',
+              style: ShadTheme.of(context).textTheme.muted,
+            ),
+          ],
+        ),
       ),
     );
   }

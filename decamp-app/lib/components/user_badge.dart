@@ -46,18 +46,6 @@ class UserBadge extends ConsumerWidget {
         context: context,
         builder: (context) => ShadDialog(
           title: const Text('Edit Username'),
-          child: ShadInput(
-            controller: controller,
-            placeholder: const Text('Enter username'),
-            autofocus: true,
-            onSubmitted: (_) {
-              final newName = controller.text.trim();
-              if (newName.isNotEmpty) {
-                ref.read(userProvider.notifier).setUsername(newName);
-              }
-              Navigator.pop(context);
-            },
-          ),
           actions: [
             ShadButton.outline(
               onPressed: () => Navigator.pop(context),
@@ -74,6 +62,18 @@ class UserBadge extends ConsumerWidget {
               child: const Text('Save'),
             ),
           ],
+          child: ShadInput(
+            controller: controller,
+            placeholder: const Text('Enter username'),
+            autofocus: true,
+            onSubmitted: (_) {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty) {
+                ref.read(userProvider.notifier).setUsername(newName);
+              }
+              Navigator.pop(context);
+            },
+          ),
         ),
       );
     } finally {
