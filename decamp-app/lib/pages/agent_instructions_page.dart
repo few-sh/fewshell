@@ -159,7 +159,8 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
                       ),
                       const SizedBox(width: 8),
                       ShadButton(
-                        onPressed: _hasChanges ? _handleSave : null,
+                        enabled: _hasChanges,
+                        onPressed: _handleSave,
                         leading: const Icon(LucideIcons.save),
                         child: const Text('Save'),
                       ),
@@ -229,6 +230,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
   final Map<String, TextEditingController> _modelControllers = {};
   bool _hasChanges = false;
   AgentInstruction? _originalInstruction;
+  bool _settingsLoaded = false;
 
   bool get hasChanges => _hasChanges;
 
@@ -373,9 +375,9 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
 
     // Load settings when they change
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_defaultController.text.isEmpty &&
-          settings.agentInstruction != null) {
+      if (!_settingsLoaded && settings.agentInstruction != null) {
         _loadSettings();
+        setState(() => _settingsLoaded = true);
       }
     });
 
