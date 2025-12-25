@@ -9,6 +9,7 @@ import '../themes/terminal_theme.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
 import '../components/new_snippet_card.dart';
+import '../components/confirmation_dialog.dart';
 
 /// Snippets page with User and Project snippets tabs
 class SnippetsPage extends ConsumerStatefulWidget {
@@ -339,8 +340,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   }
 }
 
-/// Widget for displaying a snippet with visibility toggle
-class _SnippetCardContent extends ConsumerWidget {
+/// Widget for displaying a snippet with visibility toggle and context menu
+class _SnippetCardContent extends ConsumerStatefulWidget {
   final int index;
   final SnippetEntity snippet;
   final bool isGlobal;
@@ -351,23 +352,33 @@ class _SnippetCardContent extends ConsumerWidget {
     required this.isGlobal,
   });
 
-  Future<void> _toggleVisibility(
-    WidgetRef ref,
-    BuildContext context,
-    bool value,
-  ) async {
+  @override
+  ConsumerState<_SnippetCardContent> createState() =>
+      _SnippetCardContentState();
+}
+
+class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
+  final _menuController = ShadPopoverController();
+
+  @override
+  void dispose() {
+    _menuController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleVisibility(bool value) async {
     try {
       await ref
           .read(snippetControllerProvider)
           .updateSnippet(
-            id: snippet.id,
-            name: snippet.name,
-            content: snippet.content,
-            description: snippet.description ?? '',
+            id: widget.snippet.id,
+            name: widget.snippet.name,
+            content: widget.snippet.content,
+            description: widget.snippet.description ?? '',
             isVisibleToLlm: value,
           );
     } catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ShadToaster.of(context).show(
           ShadToast(
             description: Text('Error updating visibility: $e'),
@@ -381,8 +392,23 @@ class _SnippetCardContent extends ConsumerWidget {
     }
   }
 
+  Future<void> _deleteSnippet() async {
+    final confirmed = await showConfirmationDialog(
+      context: context,
+      title: 'Delete Snippet',
+      content: 'Are you sure you want to delete this snippet?',
+      confirmLabel: 'Delete',
+    );
+
+    if (confirmed == true) {
+      await ref
+          .read(snippetControllerProvider)
+          .deleteSnippet(widget.snippet.id);
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
 
@@ -391,21 +417,81 @@ class _SnippetCardContent extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle at top center
-          Center(
-            child: ReorderableDragStartListener(
-              index: index,
-              child: Icon(
-                LucideIcons.gripHorizontal,
-                size: 20,
-                color: theme.colorScheme.mutedForeground,
+          // Header with Drag Handle and Context Menu
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              ReorderableDragStartListener(
+                index: widget.index,
+                child: Container(
+                  width: double.infinity,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  color: Colors.transparent, // Hit test
+                  child: Icon(
+                    LucideIcons.gripHorizontal,
+                    size: 20,
+                    color: theme.colorScheme.mutedForeground,
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                right: 0,
+                top: -4,
+                child: ShadContextMenu(
+                  controller: _menuController,
+                  items: [
+                    ShadContextMenuItem(
+                      leading: const Icon(LucideIcons.pencil),
+                      child: const Text('Edit'),
+                      onPressed: () {
+                        _menuController.hide();
+                        showNewSnippetDialog(
+                          context,
+                          title: 'Edit Snippet',
+                          initialDescription: widget.snippet.description,
+                          initialContent: widget.snippet.content,
+                          isGlobal: widget.isGlobal,
+                          snippetId: widget.snippet.id,
+                          initialIsVisibleToLlm: widget.snippet.isVisibleToLlm,
+                        );
+                      },
+                    ),
+                    ShadContextMenuItem(
+                      leading: Icon(
+                        LucideIcons.trash2,
+                        color: theme.colorScheme.destructive,
+                      ),
+                      child: Text(
+                        'Delete',
+                        style: TextStyle(color: theme.colorScheme.destructive),
+                      ),
+                      onPressed: () {
+                        _menuController.hide();
+                        _deleteSnippet();
+                      },
+                    ),
+                  ],
+                  child: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: _menuController.toggle,
+                    child: Icon(
+                      LucideIcons.ellipsisVertical,
+                      size: 16,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           // Description
           Text(
-            snippet.description ?? '',
+            widget.snippet.description ?? '',
             style: theme.textTheme.p.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
@@ -418,7 +504,7 @@ class _SnippetCardContent extends ConsumerWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              snippet.content,
+              widget.snippet.content,
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontSize: 14,
@@ -429,8 +515,8 @@ class _SnippetCardContent extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           ShadSwitch(
-            value: snippet.isVisibleToLlm,
-            onChanged: (value) => _toggleVisibility(ref, context, value),
+            value: widget.snippet.isVisibleToLlm,
+            onChanged: _toggleVisibility,
             label: const Text('Visible to AI'),
             sublabel: const Text('Include this snippet in the AI context'),
           ),

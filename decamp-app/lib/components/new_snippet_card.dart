@@ -5,13 +5,15 @@ import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
 
-/// Shows a modal dialog to create a new snippet
+/// Shows a modal dialog to create or edit a snippet
 Future<void> showNewSnippetDialog(
   BuildContext context, {
   String? initialDescription,
   String? initialContent,
   bool? isGlobal,
   String? title,
+  String? snippetId,
+  bool? initialIsVisibleToLlm,
 }) {
   return showDialog(
     context: context,
@@ -23,6 +25,8 @@ Future<void> showNewSnippetDialog(
           initialDescription: initialDescription,
           initialContent: initialContent,
           title: title,
+          snippetId: snippetId,
+          initialIsVisibleToLlm: initialIsVisibleToLlm,
           onCancel: () => Navigator.of(context).pop(),
           onSuccess: () => Navigator.of(context).pop(),
         ),
@@ -31,12 +35,14 @@ Future<void> showNewSnippetDialog(
   );
 }
 
-/// Widget for creating a new snippet inline
+/// Widget for creating or editing a snippet inline
 class NewSnippetCard extends ConsumerStatefulWidget {
   final bool? isGlobal;
   final String? initialDescription;
   final String? initialContent;
   final String? title;
+  final String? snippetId;
+  final bool? initialIsVisibleToLlm;
   final VoidCallback onCancel;
   final VoidCallback onSuccess;
 
@@ -46,6 +52,8 @@ class NewSnippetCard extends ConsumerStatefulWidget {
     this.initialDescription,
     this.initialContent,
     this.title,
+    this.snippetId,
+    this.initialIsVisibleToLlm,
     required this.onCancel,
     required this.onSuccess,
   });
@@ -70,6 +78,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     );
     _contentController = TextEditingController(text: widget.initialContent);
     _isGlobalSelection = widget.isGlobal ?? false;
+    _isVisibleToLlm = widget.initialIsVisibleToLlm ?? true;
 
     // Auto-focus on description field
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -97,15 +106,27 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
       final currentProjectId = ref.read(currentProjectIdProvider);
       final isGlobal = widget.isGlobal ?? _isGlobalSelection;
 
-      await ref
-          .read(snippetControllerProvider)
-          .addSnippet(
-            name: _descriptionController.text.trim(),
-            content: _contentController.text.trim(),
-            description: _descriptionController.text.trim(),
-            projectId: isGlobal ? null : currentProjectId,
-            isVisibleToLlm: _isVisibleToLlm,
-          );
+      if (widget.snippetId != null) {
+        await ref
+            .read(snippetControllerProvider)
+            .updateSnippet(
+              id: widget.snippetId!,
+              name: _descriptionController.text.trim(),
+              content: _contentController.text.trim(),
+              description: _descriptionController.text.trim(),
+              isVisibleToLlm: _isVisibleToLlm,
+            );
+      } else {
+        await ref
+            .read(snippetControllerProvider)
+            .addSnippet(
+              name: _descriptionController.text.trim(),
+              content: _contentController.text.trim(),
+              description: _descriptionController.text.trim(),
+              projectId: isGlobal ? null : currentProjectId,
+              isVisibleToLlm: _isVisibleToLlm,
+            );
+      }
 
       if (mounted) {
         widget.onSuccess();
@@ -115,7 +136,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
         setState(() => _isSaving = false);
         ShadToaster.of(context).show(
           ShadToast(
-            description: Text('Error adding snippet: $e'),
+            description: Text('Error saving snippet: $e'),
             action: ShadButton.destructive(
               child: const Text('Dismiss'),
               onPressed: () => ShadToaster.of(context).hide(),
