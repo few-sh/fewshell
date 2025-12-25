@@ -339,8 +339,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
   }
 }
 
-/// Widget for displaying and editing a snippet inline
-class _SnippetCardContent extends ConsumerStatefulWidget {
+/// Widget for displaying a snippet with visibility toggle
+class _SnippetCardContent extends ConsumerWidget {
   final int index;
   final SnippetEntity snippet;
   final bool isGlobal;
@@ -351,77 +351,26 @@ class _SnippetCardContent extends ConsumerStatefulWidget {
     required this.isGlobal,
   });
 
-  @override
-  ConsumerState<_SnippetCardContent> createState() =>
-      _SnippetCardContentState();
-}
-
-class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
-  late TextEditingController _contentController;
-  late TextEditingController _descriptionController;
-  late bool _isVisibleToLlm;
-  bool _hasChanges = false;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _contentController = TextEditingController(text: widget.snippet.content);
-    _descriptionController = TextEditingController(
-      text: widget.snippet.description ?? '',
-    );
-    _isVisibleToLlm = widget.snippet.isVisibleToLlm;
-
-    // Listen for changes
-    _contentController.addListener(_markChanged);
-    _descriptionController.addListener(_markChanged);
-  }
-
-  void _markChanged() {
-    if (!_hasChanges) {
-      setState(() => _hasChanges = true);
-    }
-  }
-
-  @override
-  void dispose() {
-    _contentController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _autoSave() async {
-    if (!_hasChanges) return;
-    if (_descriptionController.text.trim().isEmpty ||
-        _contentController.text.trim().isEmpty) {
-      return;
-    }
-
-    setState(() => _isSaving = true);
-
+  Future<void> _toggleVisibility(
+    WidgetRef ref,
+    BuildContext context,
+    bool value,
+  ) async {
     try {
       await ref
           .read(snippetControllerProvider)
           .updateSnippet(
-            id: widget.snippet.id,
-            name: _descriptionController.text.trim(),
-            content: _contentController.text.trim(),
-            description: _descriptionController.text.trim(),
-            isVisibleToLlm: _isVisibleToLlm,
+            id: snippet.id,
+            name: snippet.name,
+            content: snippet.content,
+            description: snippet.description ?? '',
+            isVisibleToLlm: value,
           );
-
-      if (mounted) {
-        setState(() {
-          _hasChanges = false;
-          _isSaving = false;
-        });
-      }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isSaving = false);
+      if (context.mounted) {
         ShadToaster.of(context).show(
           ShadToast(
-            description: Text('Error saving: $e'),
+            description: Text('Error updating visibility: $e'),
             action: ShadButton.destructive(
               child: const Text('Dismiss'),
               onPressed: () => ShadToaster.of(context).hide(),
@@ -433,7 +382,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
 
@@ -445,7 +394,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
           // Drag handle at top center
           Center(
             child: ReorderableDragStartListener(
-              index: widget.index,
+              index: index,
               child: Icon(
                 LucideIcons.gripHorizontal,
                 size: 20,
@@ -454,66 +403,34 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             ),
           ),
           const SizedBox(height: 8),
-          // Description with status indicator
-          Row(
-            children: [
-              if (_isSaving)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                )
-              else if (_hasChanges)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    LucideIcons.circle,
-                    size: 8,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              Expanded(
-                child: ShadInput(
-                  controller: _descriptionController,
-                  placeholder: const Text('Description'),
-                  onSubmitted: (_) => _autoSave(),
-                  // onTapOutside: (_) => _autoSave(), // ShadInput doesn't have onTapOutside yet? Check errors.
-                ),
-              ),
-            ],
+          // Description
+          Text(
+            snippet.description ?? '',
+            style: theme.textTheme.p.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          ShadInput(
-            controller: _contentController,
-            placeholder: const Text('Command'),
-            minLines: 2,
-            maxLines: null,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 14,
-              color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
-              height: 1.5,
+          // Content
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.muted,
+              borderRadius: BorderRadius.circular(8),
             ),
-            // Note: ShadInput doesn't support full decoration customization like TextField
-            // We rely on default Shadcn styling which is clean.
-            onSubmitted: (_) => _autoSave(),
+            child: Text(
+              snippet.content,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 14,
+                color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
+                height: 1.5,
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           ShadSwitch(
-            value: _isVisibleToLlm,
-            onChanged: (value) {
-              setState(() {
-                _isVisibleToLlm = value;
-                _hasChanges = true;
-              });
-              _autoSave();
-            },
+            value: snippet.isVisibleToLlm,
+            onChanged: (value) => _toggleVisibility(ref, context, value),
             label: const Text('Visible to AI'),
             sublabel: const Text('Include this snippet in the AI context'),
           ),
