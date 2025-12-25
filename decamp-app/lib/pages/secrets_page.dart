@@ -147,6 +147,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                       800,
                 ),
                 child: _buildAddButton(
+                  label: 'Add User Secret',
                   onPressed: () => _showAddSecretDialog(isGlobal: true),
                 ),
               ),
@@ -237,6 +238,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                     800,
               ),
               child: _buildAddButton(
+                label: 'Add Project Secret',
                 onPressed: () => _showAddSecretDialog(
                   isGlobal: false,
                   projectId: currentProjectId,
@@ -436,18 +438,22 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     );
   }
 
-  Widget _buildAddButton({required VoidCallback onPressed}) {
+  Widget _buildAddButton({
+    required String label,
+    required VoidCallback onPressed,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
+      alignment: Alignment.centerRight,
       child: ShadButton(
         onPressed: onPressed,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(LucideIcons.plus, size: 16),
-            SizedBox(width: 8),
-            Text('Add Secret'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.plus, size: 16),
+            const SizedBox(width: 8),
+            Text(label),
           ],
         ),
       ),
@@ -460,6 +466,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   }) async {
     await SecretDialog.show(
       context,
+      title: isGlobal ? 'Add User Secret' : 'Add Project Secret',
       onSave: (key, value) async {
         try {
           if (isGlobal) {

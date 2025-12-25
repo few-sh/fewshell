@@ -12,13 +12,14 @@ class SecretDialog {
     required Function(String key, String value) onSave,
     String? existingKey,
     String? existingValue,
+    String? title,
   }) async {
     final isEditMode = existingKey != null;
 
     await showShadDialog(
       context: context,
       builder: (context) => _SecretDialogForm(
-        title: isEditMode ? 'Edit Secret' : 'Add Secret',
+        title: title ?? (isEditMode ? 'Edit Secret' : 'Add Secret'),
         initialKey: existingKey,
         initialValue: existingValue ?? '',
         onSave: onSave,
