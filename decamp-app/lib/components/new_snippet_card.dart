@@ -131,150 +131,131 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
 
-    return ShadCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(LucideIcons.circlePlus, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                widget.title ?? 'New Snippet',
-                style: theme.textTheme.h4.copyWith(fontSize: 18),
-              ),
-              const Spacer(),
-              if (_isSaving)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                ShadButton.ghost(
-                  onPressed: widget.onCancel,
-                  child: const Icon(LucideIcons.x),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ShadInput(
-            controller: _descriptionController,
-            focusNode: _descriptionFocus,
-            placeholder: const Text('Description (e.g., List all pods)'),
-            minLines: 1,
-            maxLines: null,
-          ),
-          const SizedBox(height: 12),
-          ShadInput(
-            controller: _contentController,
-            placeholder: const Text('Command (e.g., kubectl get pods)'),
-            minLines: 2,
-            maxLines: null,
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 14,
-              color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
-              height: 1.5,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              widget.title ?? 'New Snippet',
+              style: theme.textTheme.h4.copyWith(fontSize: 18),
             ),
-            onSubmitted: (_) => _save(),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ShadInput(
+          controller: _descriptionController,
+          focusNode: _descriptionFocus,
+          placeholder: const Text('Description (e.g., List all pods)'),
+          minLines: 1,
+          maxLines: null,
+        ),
+        const SizedBox(height: 12),
+        ShadInput(
+          controller: _contentController,
+          placeholder: const Text('Command (e.g., kubectl get pods)'),
+          minLines: 2,
+          maxLines: null,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 14,
+            color: terminalTheme?.textColor ?? Colors.greenAccent.shade400,
+            height: 1.5,
           ),
+          onSubmitted: (_) => _save(),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Visible to AI', style: theme.textTheme.small),
+                  Text(
+                    'Include this snippet in the AI context',
+                    style: theme.textTheme.muted,
+                  ),
+                ],
+              ),
+            ),
+            ShadSwitch(
+              value: _isVisibleToLlm,
+              onChanged: (value) {
+                setState(() {
+                  _isVisibleToLlm = value;
+                });
+              },
+            ),
+          ],
+        ),
+        if (widget.isGlobal == null) ...[
           const SizedBox(height: 12),
           Row(
             children: [
+              Text(
+                'Scope:',
+                style: theme.textTheme.p.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text('Visible to AI', style: theme.textTheme.small),
-                    Text(
-                      'Include this snippet in the AI context',
-                      style: theme.textTheme.muted,
+                    Expanded(
+                      child: ShadButton(
+                        onPressed: () {
+                          setState(() => _isGlobalSelection = false);
+                        },
+                        backgroundColor: !_isGlobalSelection
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.secondary,
+                        foregroundColor: !_isGlobalSelection
+                            ? theme.colorScheme.primaryForeground
+                            : theme.colorScheme.secondaryForeground,
+                        child: const Text('Project'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ShadButton(
+                        onPressed: () {
+                          setState(() => _isGlobalSelection = true);
+                        },
+                        backgroundColor: _isGlobalSelection
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.secondary,
+                        foregroundColor: _isGlobalSelection
+                            ? theme.colorScheme.primaryForeground
+                            : theme.colorScheme.secondaryForeground,
+                        child: const FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('User'),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              ShadSwitch(
-                value: _isVisibleToLlm,
-                onChanged: (value) {
-                  setState(() {
-                    _isVisibleToLlm = value;
-                  });
-                },
-              ),
             ],
           ),
-          if (widget.isGlobal == null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  'Scope:',
-                  style: theme.textTheme.p.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ShadButton(
-                          onPressed: () {
-                            setState(() => _isGlobalSelection = false);
-                          },
-                          backgroundColor: !_isGlobalSelection
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.secondary,
-                          foregroundColor: !_isGlobalSelection
-                              ? theme.colorScheme.primaryForeground
-                              : theme.colorScheme.secondaryForeground,
-                          child: const Text('Project'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ShadButton(
-                          onPressed: () {
-                            setState(() => _isGlobalSelection = true);
-                          },
-                          backgroundColor: _isGlobalSelection
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.secondary,
-                          foregroundColor: _isGlobalSelection
-                              ? theme.colorScheme.primaryForeground
-                              : theme.colorScheme.secondaryForeground,
-                          child: const FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text('User'),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        ],
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ShadButton(
+            onPressed: _isSaving ? null : _save,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(LucideIcons.check, size: 16),
+                SizedBox(width: 8),
+                Text('Save Snippet'),
               ],
             ),
-          ],
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ShadButton(
-              onPressed: _isSaving ? null : _save,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(LucideIcons.check, size: 16),
-                  SizedBox(width: 8),
-                  Text('Save Snippet'),
-                ],
-              ),
-            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
