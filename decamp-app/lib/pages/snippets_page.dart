@@ -260,6 +260,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage>
     ];
 
     return ReorderableListView(
+      buildDefaultDragHandles: false,
       scrollController: scrollController,
       padding: const EdgeInsets.all(16),
       onReorder: (oldIndex, newIndex) async {
