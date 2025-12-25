@@ -505,31 +505,17 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
             onSubmitted: (_) => _autoSave(),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Visible to AI', style: theme.textTheme.small),
-                    Text(
-                      'Include this snippet in the AI context',
-                      style: theme.textTheme.muted,
-                    ),
-                  ],
-                ),
-              ),
-              ShadSwitch(
-                value: _isVisibleToLlm,
-                onChanged: (value) {
-                  setState(() {
-                    _isVisibleToLlm = value;
-                    _hasChanges = true;
-                  });
-                  _autoSave();
-                },
-              ),
-            ],
+          ShadSwitch(
+            value: _isVisibleToLlm,
+            onChanged: (value) {
+              setState(() {
+                _isVisibleToLlm = value;
+                _hasChanges = true;
+              });
+              _autoSave();
+            },
+            label: const Text('Visible to AI'),
+            sublabel: const Text('Include this snippet in the AI context'),
           ),
         ],
       ),
