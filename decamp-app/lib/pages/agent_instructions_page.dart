@@ -437,14 +437,15 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
                               );
                             }),
 
-                        // Add new override button
-                        const SizedBox(height: 16),
-                        _AddModelOverrideButton(
-                          existingIdentifiers: _modelControllers.keys.toSet(),
-                          availableLlms: llmSettings,
-                          onAdd: _addModelOverride,
-                        ),
-                      ],
+                          // Add new override button
+                          const SizedBox(height: 16),
+                          _AddModelOverrideButton(
+                            existingIdentifiers: _modelControllers.keys.toSet(),
+                            availableLlms: llmSettings,
+                            onAdd: _addModelOverride,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -774,14 +775,15 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
                               );
                             }),
 
-                        // Add new override button
-                        const SizedBox(height: 16),
-                        _AddModelOverrideButton(
-                          existingIdentifiers: _modelControllers.keys.toSet(),
-                          availableLlms: llmSettings,
-                          onAdd: _addModelOverride,
-                        ),
-                      ],
+                          // Add new override button
+                          const SizedBox(height: 16),
+                          _AddModelOverrideButton(
+                            existingIdentifiers: _modelControllers.keys.toSet(),
+                            availableLlms: llmSettings,
+                            onAdd: _addModelOverride,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
