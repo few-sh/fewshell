@@ -29,9 +29,9 @@ class ProjectsPage extends ConsumerWidget {
             await ref.read(currentProjectIdProvider.notifier).select(p.id);
             if (context.mounted) {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Switched to: ${p.name}')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('Switched to: ${p.name}')));
             }
           },
         );
@@ -86,7 +86,9 @@ class _ProjectListItemState extends ConsumerState<_ProjectListItem> {
     final isSelected = widget.isSelected;
 
     final dateDisplay = DateFormatter.format(widget.project.lastSessionDate);
-    final relativeTime = DateFormatter.formatRelative(widget.project.lastSessionDate);
+    final relativeTime = DateFormatter.formatRelative(
+      widget.project.lastSessionDate,
+    );
 
     return Dismissible(
       key: ValueKey(id),
@@ -124,6 +126,25 @@ class _ProjectListItemState extends ConsumerState<_ProjectListItem> {
                               : FontWeight.w500,
                         ),
                       ),
+                      if (widget.project.serverUrl != null) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(
+                              LucideIcons.cloud,
+                              size: 12,
+                              color: theme.colorScheme.mutedForeground,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              widget.project.serverUrl!,
+                              style: theme.textTheme.muted.copyWith(
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Row(
                         children: [
