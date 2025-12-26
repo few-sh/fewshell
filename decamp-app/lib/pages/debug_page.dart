@@ -26,6 +26,7 @@ import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/project_setup_view.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
+import 'package:decamp/components/connect_to_agent_server.dart';
 
 class DebugPage extends ConsumerWidget {
   const DebugPage({super.key});
@@ -158,7 +159,7 @@ class DebugPage extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: ShadButton.outline(
                     child: const Text('Connect Global Dialog'),
-                    onPressed: () => _showConnectGlobalDialog(context, ref),
+                    onPressed: () => ConnectToAgentServerDialog.show(context),
                   ),
                 ),
 
@@ -207,46 +208,6 @@ class DebugPage extends ConsumerWidget {
           );
         },
       ),
-    );
-  }
-
-  void _showConnectGlobalDialog(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController();
-    showShadDialog(
-      context: context,
-      builder: (context) {
-        return ShadDialog(
-          title: const Text('Connect Global'),
-          actions: [
-            ShadButton.outline(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            ShadButton(
-              child: const Text('Connect'),
-              onPressed: () {
-                final url = controller.text.trim();
-                if (url.isNotEmpty) {
-                  ref.read(syncServiceProvider).connectGlobal(url);
-                }
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Enter the remote URL for global sync:'),
-              const SizedBox(height: 10),
-              ShadInput(
-                controller: controller,
-                placeholder: const Text('wss://...'),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
