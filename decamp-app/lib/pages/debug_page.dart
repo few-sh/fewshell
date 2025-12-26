@@ -15,6 +15,7 @@ import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/pages/snippets_page.dart';
 import 'package:decamp/themes/shad_layout_theme.dart';
+import 'package:decamp/services/sync_service.dart';
 
 // Components
 import 'package:decamp/components/empty_placeholder.dart';
@@ -153,6 +154,13 @@ class DebugPage extends ConsumerWidget {
                     },
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('Connect Global Dialog'),
+                    onPressed: () => _showConnectGlobalDialog(context, ref),
+                  ),
+                ),
 
                 // Add more as needed/possible
               ],
@@ -199,6 +207,46 @@ class DebugPage extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+
+  void _showConnectGlobalDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showShadDialog(
+      context: context,
+      builder: (context) {
+        return ShadDialog(
+          title: const Text('Connect Global'),
+          actions: [
+            ShadButton.outline(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            ShadButton(
+              child: const Text('Connect'),
+              onPressed: () {
+                final url = controller.text.trim();
+                if (url.isNotEmpty) {
+                  ref.read(syncServiceProvider).connectGlobal(url);
+                }
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Enter the remote URL for global sync:'),
+              const SizedBox(height: 10),
+              ShadInput(
+                controller: controller,
+                placeholder: const Text('wss://...'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

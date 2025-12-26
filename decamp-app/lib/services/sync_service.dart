@@ -110,6 +110,11 @@ class SyncService {
     }
   }
 
+  Future<void> connectGlobal(String url) async {
+    final db = ref.read(globalDatabaseProvider);
+    await _connectGlobal(db, url);
+  }
+
   Future<void> _connectGlobal(GlobalDatabase db, String? serverUrl) async {
     if (serverUrl == _currentGlobalUrl && _globalSync != null) return;
 
