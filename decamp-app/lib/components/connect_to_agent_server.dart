@@ -69,10 +69,15 @@ class _ConnectToAgentServerDialogState
                   }
                 },
           child: _isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(
+                      ShadTheme.of(context).colorScheme.primaryForeground,
+                    ),
+                  ),
                 )
               : const Text('Connect'),
         ),
@@ -86,6 +91,7 @@ class _ConnectToAgentServerDialogState
           ShadInput(
             controller: _controller,
             placeholder: const Text('wss://...'),
+            enabled: !_isLoading,
           ),
           if (_errorMessage != null) ...[
             const SizedBox(height: 10),
