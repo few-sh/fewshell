@@ -22,6 +22,8 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 });
 
 class SyncService {
+  static const defaultConnectionTimeout = Duration(seconds: 5);
+
   final Ref ref;
   CrdtSync? _globalSync;
   MultiplexedWebSocketChannel? _globalChannel;
@@ -143,7 +145,8 @@ class SyncService {
       final uri = Uri.parse('$cleanUrl/sync/global');
 
       _log.info('Connecting to global sync at $uri');
-      final channel = _connectWebSocket(uri);
+      // Use a shorter timeout for manual connections (when rethrowErrors is true)
+      final channel = _connectWebSocket(uri, timeout: defaultConnectionTimeout);
       await channel.ready;
 
       _globalChannel = MultiplexedWebSocketChannel(
@@ -377,8 +380,8 @@ class SyncService {
     }
   }
 
-  WebSocketChannel _connectWebSocket(Uri uri) {
-    _log.info('_connectWebSocket called for $uri');
+  WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {
+    _log.info('_connectWebSocket called for $uri with timeout: $timeout');
 
     try {
       _log.info('Configuring mTLS with embedded certificates');
@@ -472,7 +475,11 @@ class SyncService {
       };
 
       _log.info('Connecting with mTLS to $uri');
-      return IOWebSocketChannel.connect(uri, customClient: client);
+      return IOWebSocketChannel.connect(
+        uri,
+        customClient: client,
+        connectTimeout: timeout,
+      );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
       rethrow;
