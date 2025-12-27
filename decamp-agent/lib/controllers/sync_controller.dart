@@ -16,10 +16,10 @@ class SyncController {
 
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
-  final Future<KeychainService> Function(String projectId) keychainFactory;
+  final SecretsService secretsService;
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager, this.settingsService, this.keychainFactory);
+  SyncController(this.dbManager, this.settingsService, this.secretsService);
 
   Handler get handler {
     return (Request request) {
@@ -62,7 +62,15 @@ class SyncController {
               verbose: true,
             );
 
-            await _setupSecretSync(multiplexed, projectId, settingsCrdt);
+            // Secrets Sync
+            final secretsChannel = multiplexed.fork('\u001D');
+            final secretsCrdt =
+                await secretsService.getProjectSecretsCrdt(projectId);
+            final secretsSync = CrdtSync.server(
+              secretsCrdt,
+              secretsChannel,
+              verbose: true,
+            );
 
             _log.info(
               'Starting CrdtSync for project $projectId',
@@ -81,6 +89,7 @@ class SyncController {
                 );
                 sync.close();
                 settingsSync.close();
+                secretsSync.close();
               }),
             );
           })(request);
@@ -89,80 +98,6 @@ class SyncController {
 
       return Response.notFound('Not found');
     };
-  }
-
-  Future<void> _setupSecretSync(
-    MultiplexedWebSocketChannel channel,
-    String projectId,
-    SettingsCrdt settingsCrdt,
-  ) async {
-    final keychainService = await keychainFactory(projectId);
-
-    // Handle incoming secrets
-    channel.onCustomMessage.listen((msg) async {
-      if (msg['type'] == 'provide_secrets') {
-        final secrets = msg['secrets'] as Map<String, dynamic>;
-        for (final entry in secrets.entries) {
-          // Only save secrets that belong to this project
-          if (entry.key.contains(':project:$projectId:')) {
-            await keychainService.saveSecret(entry.key, entry.value.toString());
-          }
-        }
-        _log.info('Saved ${secrets.length} secrets from client');
-      }
-    });
-
-    // Check for missing secrets
-    Future<void> checkSecrets() async {
-      final missingKeys = <String>[];
-      List<LlmApiSettings> llmSettings = [];
-
-      // We can read directly from the CRDT since we have it
-      final flatMap = settingsCrdt.getAll();
-      if (flatMap.isNotEmpty) {
-        try {
-          final nestedMap = SettingsFlattener.unflatten(flatMap);
-          if (nestedMap['llmSettings'] is Map) {
-            nestedMap['llmSettings'] =
-                (nestedMap['llmSettings'] as Map).values.toList();
-          }
-          final settings = ProjectSettings.fromJson(nestedMap);
-          llmSettings = settings.llmSettings;
-        } catch (e) {
-          _log.warning('Error parsing project settings for $projectId: $e');
-        }
-      }
-
-      for (final setting in llmSettings) {
-        final key =
-            LlmApiKeychainKeys.buildProjectKey(projectId, setting.identifier);
-
-        if (!await keychainService.hasSecret(key)) {
-          missingKeys.add(key);
-        }
-      }
-
-      if (missingKeys.isNotEmpty) {
-        channel.sendCustomMessage({
-          'type': 'missing_secrets',
-          'keys': missingKeys,
-        });
-      }
-    }
-
-    // Initial check
-    await checkSecrets();
-
-    // Listen for changes
-    final subscription =
-        settingsCrdt.onChange.listen((_) => unawaited(checkSecrets()));
-
-    // Cleanup
-    unawaited(
-      channel.sink.done.then((_) {
-        subscription.cancel();
-      }),
-    );
   }
 
   void _setupCustomMessageHandling(

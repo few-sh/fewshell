@@ -29,6 +29,7 @@ class SyncService {
   final Ref ref;
   CrdtSync? _globalSync;
   CrdtSync? _settingsSync;
+  CrdtSync? _secretsSync;
   MultiplexedWebSocketChannel? _globalChannel;
   StreamSubscription? _globalSubscription;
 
@@ -296,12 +297,21 @@ class SyncService {
         verbose: true,
       );
 
+      // Secrets Sync
+      final secretsCrdt = ref.read(secretsCrdtProvider);
+      await secretsCrdt.ready;
+      final secretsChannel = _projectChannel!.fork('\u001D');
+      _secretsSync = CrdtSync.client(
+        secretsCrdt,
+        secretsChannel,
+        verbose: true,
+      );
+
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
         _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
           _log.fine('PONG received: ${msg['payload']}');
         }
-        _handleSecretRequest(msg, _projectChannel!);
       });
       _projectSync = CrdtSync.client(adapter, _projectChannel!, verbose: true);
     } catch (e) {
@@ -317,32 +327,6 @@ class SyncService {
     _globalChannel = null;
     _globalSubscription?.cancel();
     _globalSubscription = null;
-  }
-
-  Future<void> _handleSecretRequest(
-    Map<String, dynamic> msg,
-    MultiplexedWebSocketChannel channel,
-  ) async {
-    if (msg['type'] == 'missing_secrets') {
-      final keys = (msg['keys'] as List).cast<String>();
-      final secrets = <String, String>{};
-      final keychain = ref.read(keychainServiceProvider);
-
-      for (final key in keys) {
-        final value = await keychain.getSecret(key);
-        if (value != null) {
-          secrets[key] = value;
-        }
-      }
-
-      if (secrets.isNotEmpty) {
-        channel.sendCustomMessage({
-          'type': 'provide_secrets',
-          'secrets': secrets,
-        });
-        _log.info('Sent ${secrets.length} secrets to server');
-      }
-    }
   }
 
   void _scheduleReconnect() {
@@ -387,6 +371,8 @@ class SyncService {
   void _closeProjectConnection() {
     _settingsSync?.close();
     _settingsSync = null;
+    _secretsSync?.close();
+    _secretsSync = null;
     _projectSync?.close();
     _projectSync = null;
     _projectChannel = null;
