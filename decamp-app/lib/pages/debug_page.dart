@@ -15,7 +15,6 @@ import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/pages/snippets_page.dart';
 import 'package:decamp/themes/shad_layout_theme.dart';
-import 'package:decamp/services/sync_service.dart';
 
 // Components
 import 'package:decamp/components/empty_placeholder.dart';

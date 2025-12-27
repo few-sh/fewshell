@@ -21,6 +21,8 @@ class ConnectToAgentServerDialog extends ConsumerStatefulWidget {
 class _ConnectToAgentServerDialogState
     extends ConsumerState<ConnectToAgentServerDialog> {
   final _controller = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -34,18 +36,45 @@ class _ConnectToAgentServerDialogState
       title: const Text('Connect to Agent Server'),
       actions: [
         ShadButton.outline(
+          enabled: !_isLoading,
           child: const Text('Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         ShadButton(
-          child: const Text('Connect'),
-          onPressed: () {
-            final url = _controller.text.trim();
-            if (url.isNotEmpty) {
-              ref.read(syncServiceProvider).connectGlobal(url);
-            }
-            Navigator.of(context).pop();
-          },
+          enabled: !_isLoading,
+          onPressed: _isLoading
+              ? null
+              : () async {
+                  final url = _controller.text.trim();
+                  if (url.isEmpty) return;
+
+                  setState(() {
+                    _isLoading = true;
+                    _errorMessage = null;
+                  });
+
+                  try {
+                    await ref.read(syncServiceProvider).connectGlobal(url);
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    setState(() {
+                      _errorMessage = 'Connection Failed: $e';
+                    });
+                  } finally {
+                    if (mounted) {
+                      setState(() => _isLoading = false);
+                    }
+                  }
+                },
+          child: _isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Connect'),
         ),
       ],
       child: Column(
@@ -58,6 +87,16 @@ class _ConnectToAgentServerDialogState
             controller: _controller,
             placeholder: const Text('wss://...'),
           ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              _errorMessage!,
+              style: TextStyle(
+                color: ShadTheme.of(context).colorScheme.destructive,
+                fontSize: 14,
+              ),
+            ),
+          ],
         ],
       ),
     );

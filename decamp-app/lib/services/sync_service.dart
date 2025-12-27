@@ -112,10 +112,14 @@ class SyncService {
 
   Future<void> connectGlobal(String url) async {
     final db = ref.read(globalDatabaseProvider);
-    await _connectGlobal(db, url);
+    await _connectGlobal(db, url, rethrowErrors: true);
   }
 
-  Future<void> _connectGlobal(GlobalDatabase db, String? serverUrl) async {
+  Future<void> _connectGlobal(
+    GlobalDatabase db,
+    String? serverUrl, {
+    bool rethrowErrors = false,
+  }) async {
     if (serverUrl == _currentGlobalUrl && _globalSync != null) return;
 
     _disconnectGlobal();
@@ -139,8 +143,11 @@ class SyncService {
       final uri = Uri.parse('$cleanUrl/sync/global');
 
       _log.info('Connecting to global sync at $uri');
+      final channel = _connectWebSocket(uri);
+      await channel.ready;
+
       _globalChannel = MultiplexedWebSocketChannel(
-        _connectWebSocket(uri),
+        channel,
         awaitSync: () => adapter.onIdle,
       );
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
@@ -191,6 +198,7 @@ class SyncService {
       );
     } catch (e) {
       _log.warning('Global DB not ready or error: $e');
+      if (rethrowErrors) rethrow;
     }
   }
 
