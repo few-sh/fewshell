@@ -11,6 +11,7 @@ import 'package:decamp/utils/project_utils.dart';
 import 'package:decamp/pages/main_settings.dart';
 import 'package:decamp/pages/qr_scanner_page.dart';
 import 'package:decamp/services/project_importer.dart';
+import 'package:decamp/components/connect_to_agent_server.dart';
 
 class ProjectSetupView extends ConsumerWidget {
   const ProjectSetupView({super.key});
@@ -174,6 +175,18 @@ class ProjectSetupView extends ConsumerWidget {
                       Icon(LucideIcons.pencil),
                       SizedBox(width: 8),
                       Text('Enter Manually'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ShadButton.outline(
+                  onPressed: () => ConnectToAgentServerDialog.show(context),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(LucideIcons.globe),
+                      SizedBox(width: 8),
+                      Text('Connect to Agent Server'),
                     ],
                   ),
                 ),

@@ -25,6 +25,7 @@ import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/project_setup_view.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
+import 'package:decamp/components/connect_to_agent_server.dart';
 
 class DebugPage extends ConsumerWidget {
   const DebugPage({super.key});
@@ -151,6 +152,13 @@ class DebugPage extends ConsumerWidget {
                     onPressed: () {
                       MultiCommandApprovalOverlay.showTest(context);
                     },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('Connect Global Dialog'),
+                    onPressed: () => ConnectToAgentServerDialog.show(context),
                   ),
                 ),
 
