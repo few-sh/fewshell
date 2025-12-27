@@ -24,6 +24,8 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 });
 
 class SyncService {
+  static const defaultConnectionTimeout = Duration(seconds: 5);
+
   final Ref ref;
   CrdtSync? _globalSync;
   CrdtSync? _settingsSync;
@@ -113,7 +115,16 @@ class SyncService {
     }
   }
 
-  Future<void> _connectGlobal(GlobalDatabase db, String? serverUrl) async {
+  Future<void> connectGlobal(String url) async {
+    final db = ref.read(globalDatabaseProvider);
+    await _connectGlobal(db, url, rethrowErrors: true);
+  }
+
+  Future<void> _connectGlobal(
+    GlobalDatabase db,
+    String? serverUrl, {
+    bool rethrowErrors = false,
+  }) async {
     if (serverUrl == _currentGlobalUrl && _globalSync != null) return;
 
     _disconnectGlobal();
@@ -137,8 +148,12 @@ class SyncService {
       final uri = Uri.parse('$cleanUrl/sync/global');
 
       _log.info('Connecting to global sync at $uri');
+      // Use a shorter timeout for manual connections (when rethrowErrors is true)
+      final channel = _connectWebSocket(uri, timeout: defaultConnectionTimeout);
+      await channel.ready;
+
       _globalChannel = MultiplexedWebSocketChannel(
-        _connectWebSocket(uri),
+        channel,
         awaitSync: () => adapter.onIdle,
       );
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
@@ -190,6 +205,7 @@ class SyncService {
       );
     } catch (e) {
       _log.warning('Global DB not ready or error: $e');
+      if (rethrowErrors) rethrow;
     }
   }
 
@@ -408,8 +424,8 @@ class SyncService {
     }
   }
 
-  WebSocketChannel _connectWebSocket(Uri uri) {
-    _log.info('_connectWebSocket called for $uri');
+  WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {
+    _log.info('_connectWebSocket called for $uri with timeout: $timeout');
 
     try {
       _log.info('Configuring mTLS with embedded certificates');
@@ -503,7 +519,11 @@ class SyncService {
       };
 
       _log.info('Connecting with mTLS to $uri');
-      return IOWebSocketChannel.connect(uri, customClient: client);
+      return IOWebSocketChannel.connect(
+        uri,
+        customClient: client,
+        connectTimeout: timeout,
+      );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
       rethrow;
