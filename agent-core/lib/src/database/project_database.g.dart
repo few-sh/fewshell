@@ -1717,9 +1717,23 @@ class $ProjectSavedPromptsTable extends ProjectSavedPrompts
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _lastUsedAtMeta =
+      const VerificationMeta('lastUsedAt');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, projectId, content, description, tags, createdAt, updatedAt];
+  late final GeneratedColumn<DateTime> lastUsedAt = GeneratedColumn<DateTime>(
+      'last_used_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        projectId,
+        content,
+        description,
+        tags,
+        createdAt,
+        updatedAt,
+        lastUsedAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1767,6 +1781,12 @@ class $ProjectSavedPromptsTable extends ProjectSavedPrompts
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('last_used_at')) {
+      context.handle(
+          _lastUsedAtMeta,
+          lastUsedAt.isAcceptableOrUnknown(
+              data['last_used_at']!, _lastUsedAtMeta));
+    }
     return context;
   }
 
@@ -1790,6 +1810,8 @@ class $ProjectSavedPromptsTable extends ProjectSavedPrompts
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      lastUsedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_used_at']),
     );
   }
 
@@ -1821,6 +1843,9 @@ class ProjectSavedPrompt extends DataClass
 
   /// Timestamp when the saved prompt was last updated
   final DateTime updatedAt;
+
+  /// Timestamp when the saved prompt was last used
+  final DateTime? lastUsedAt;
   const ProjectSavedPrompt(
       {required this.id,
       this.projectId,
@@ -1828,7 +1853,8 @@ class ProjectSavedPrompt extends DataClass
       this.description,
       required this.tags,
       required this.createdAt,
-      required this.updatedAt});
+      required this.updatedAt,
+      this.lastUsedAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -1843,6 +1869,9 @@ class ProjectSavedPrompt extends DataClass
     map['tags'] = Variable<String>(tags);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
+    if (!nullToAbsent || lastUsedAt != null) {
+      map['last_used_at'] = Variable<DateTime>(lastUsedAt);
+    }
     return map;
   }
 
@@ -1859,6 +1888,9 @@ class ProjectSavedPrompt extends DataClass
       tags: Value(tags),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
+      lastUsedAt: lastUsedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastUsedAt),
     );
   }
 
@@ -1873,6 +1905,7 @@ class ProjectSavedPrompt extends DataClass
       tags: serializer.fromJson<String>(json['tags']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      lastUsedAt: serializer.fromJson<DateTime?>(json['lastUsedAt']),
     );
   }
   @override
@@ -1886,6 +1919,7 @@ class ProjectSavedPrompt extends DataClass
       'tags': serializer.toJson<String>(tags),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'lastUsedAt': serializer.toJson<DateTime?>(lastUsedAt),
     };
   }
 
@@ -1896,7 +1930,8 @@ class ProjectSavedPrompt extends DataClass
           Value<String?> description = const Value.absent(),
           String? tags,
           DateTime? createdAt,
-          DateTime? updatedAt}) =>
+          DateTime? updatedAt,
+          Value<DateTime?> lastUsedAt = const Value.absent()}) =>
       ProjectSavedPrompt(
         id: id ?? this.id,
         projectId: projectId.present ? projectId.value : this.projectId,
@@ -1905,6 +1940,7 @@ class ProjectSavedPrompt extends DataClass
         tags: tags ?? this.tags,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
+        lastUsedAt: lastUsedAt.present ? lastUsedAt.value : this.lastUsedAt,
       );
   ProjectSavedPrompt copyWithCompanion(ProjectSavedPromptCompanion data) {
     return ProjectSavedPrompt(
@@ -1916,6 +1952,8 @@ class ProjectSavedPrompt extends DataClass
       tags: data.tags.present ? data.tags.value : this.tags,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      lastUsedAt:
+          data.lastUsedAt.present ? data.lastUsedAt.value : this.lastUsedAt,
     );
   }
 
@@ -1928,14 +1966,15 @@ class ProjectSavedPrompt extends DataClass
           ..write('description: $description, ')
           ..write('tags: $tags, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('lastUsedAt: $lastUsedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id, projectId, content, description, tags, createdAt, updatedAt);
+  int get hashCode => Object.hash(id, projectId, content, description, tags,
+      createdAt, updatedAt, lastUsedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1946,7 +1985,8 @@ class ProjectSavedPrompt extends DataClass
           other.description == this.description &&
           other.tags == this.tags &&
           other.createdAt == this.createdAt &&
-          other.updatedAt == this.updatedAt);
+          other.updatedAt == this.updatedAt &&
+          other.lastUsedAt == this.lastUsedAt);
 }
 
 class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
@@ -1957,6 +1997,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
   final Value<String> tags;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<DateTime?> lastUsedAt;
   final Value<int> rowid;
   const ProjectSavedPromptCompanion({
     this.id = const Value.absent(),
@@ -1966,6 +2007,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
     this.tags = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.lastUsedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProjectSavedPromptCompanion.insert({
@@ -1976,6 +2018,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
     this.tags = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.lastUsedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         content = Value(content),
@@ -1989,6 +2032,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
     Expression<String>? tags,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? lastUsedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1999,6 +2043,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
       if (tags != null) 'tags': tags,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (lastUsedAt != null) 'last_used_at': lastUsedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2011,6 +2056,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
       Value<String>? tags,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
+      Value<DateTime?>? lastUsedAt,
       Value<int>? rowid}) {
     return ProjectSavedPromptCompanion(
       id: id ?? this.id,
@@ -2020,6 +2066,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastUsedAt: lastUsedAt ?? this.lastUsedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2048,6 +2095,9 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (lastUsedAt.present) {
+      map['last_used_at'] = Variable<DateTime>(lastUsedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2064,6 +2114,7 @@ class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
           ..write('tags: $tags, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('lastUsedAt: $lastUsedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3072,6 +3123,7 @@ typedef $$ProjectSavedPromptsTableCreateCompanionBuilder
   Value<String> tags,
   required DateTime createdAt,
   required DateTime updatedAt,
+  Value<DateTime?> lastUsedAt,
   Value<int> rowid,
 });
 typedef $$ProjectSavedPromptsTableUpdateCompanionBuilder
@@ -3083,6 +3135,7 @@ typedef $$ProjectSavedPromptsTableUpdateCompanionBuilder
   Value<String> tags,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<DateTime?> lastUsedAt,
   Value<int> rowid,
 });
 
@@ -3115,6 +3168,9 @@ class $$ProjectSavedPromptsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastUsedAt => $composableBuilder(
+      column: $table.lastUsedAt, builder: (column) => ColumnFilters(column));
 }
 
 class $$ProjectSavedPromptsTableOrderingComposer
@@ -3146,6 +3202,9 @@ class $$ProjectSavedPromptsTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastUsedAt => $composableBuilder(
+      column: $table.lastUsedAt, builder: (column) => ColumnOrderings(column));
 }
 
 class $$ProjectSavedPromptsTableAnnotationComposer
@@ -3177,6 +3236,9 @@ class $$ProjectSavedPromptsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastUsedAt => $composableBuilder(
+      column: $table.lastUsedAt, builder: (column) => column);
 }
 
 class $$ProjectSavedPromptsTableTableManager extends RootTableManager<
@@ -3216,6 +3278,7 @@ class $$ProjectSavedPromptsTableTableManager extends RootTableManager<
             Value<String> tags = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> lastUsedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ProjectSavedPromptCompanion(
@@ -3226,6 +3289,7 @@ class $$ProjectSavedPromptsTableTableManager extends RootTableManager<
             tags: tags,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            lastUsedAt: lastUsedAt,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -3236,6 +3300,7 @@ class $$ProjectSavedPromptsTableTableManager extends RootTableManager<
             Value<String> tags = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
+            Value<DateTime?> lastUsedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               ProjectSavedPromptCompanion.insert(
@@ -3246,6 +3311,7 @@ class $$ProjectSavedPromptsTableTableManager extends RootTableManager<
             tags: tags,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            lastUsedAt: lastUsedAt,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0

@@ -26,6 +26,9 @@ class SavedPrompts extends Table {
   /// Timestamp when the saved prompt was last updated
   DateTimeColumn get updatedAt => dateTime()();
 
+  /// Timestamp when the saved prompt was last used
+  DateTimeColumn get lastUsedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

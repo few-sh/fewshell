@@ -8,6 +8,7 @@ class SavedPromptEntity implements Insertable<SavedPromptEntity> {
   final String tags;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? lastUsedAt;
 
   SavedPromptEntity({
     required this.id,
@@ -17,6 +18,7 @@ class SavedPromptEntity implements Insertable<SavedPromptEntity> {
     required this.tags,
     required this.createdAt,
     required this.updatedAt,
+    this.lastUsedAt,
   });
 
   @override
@@ -29,6 +31,7 @@ class SavedPromptEntity implements Insertable<SavedPromptEntity> {
       'tags': Variable<String>(tags),
       'created_at': Variable<DateTime>(createdAt),
       'updated_at': Variable<DateTime>(updatedAt),
+      'last_used_at': Variable<DateTime>(lastUsedAt),
     };
   }
 
@@ -40,6 +43,7 @@ class SavedPromptEntity implements Insertable<SavedPromptEntity> {
     String? tags,
     DateTime? createdAt,
     DateTime? updatedAt,
+    DateTime? lastUsedAt,
   }) {
     return SavedPromptEntity(
       id: id ?? this.id,
@@ -49,6 +53,7 @@ class SavedPromptEntity implements Insertable<SavedPromptEntity> {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastUsedAt: lastUsedAt ?? this.lastUsedAt,
     );
   }
 }

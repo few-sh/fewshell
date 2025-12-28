@@ -21,6 +21,7 @@ class ProjectSavedPromptDao extends DatabaseAccessor<ProjectDatabase>
       tags: s.tags,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
+      lastUsedAt: s.lastUsedAt,
     );
   }
 
@@ -33,6 +34,7 @@ class ProjectSavedPromptDao extends DatabaseAccessor<ProjectDatabase>
       tags: c.tags,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
+      lastUsedAt: c.lastUsedAt,
     );
   }
 

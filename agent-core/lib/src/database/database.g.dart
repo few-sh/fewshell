@@ -854,9 +854,23 @@ class $SavedPromptsTable extends SavedPrompts
   late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
       'updated_at', aliasedName, false,
       type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _lastUsedAtMeta =
+      const VerificationMeta('lastUsedAt');
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, projectId, content, description, tags, createdAt, updatedAt];
+  late final GeneratedColumn<DateTime> lastUsedAt = GeneratedColumn<DateTime>(
+      'last_used_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        projectId,
+        content,
+        description,
+        tags,
+        createdAt,
+        updatedAt,
+        lastUsedAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -904,6 +918,12 @@ class $SavedPromptsTable extends SavedPrompts
     } else if (isInserting) {
       context.missing(_updatedAtMeta);
     }
+    if (data.containsKey('last_used_at')) {
+      context.handle(
+          _lastUsedAtMeta,
+          lastUsedAt.isAcceptableOrUnknown(
+              data['last_used_at']!, _lastUsedAtMeta));
+    }
     return context;
   }
 
@@ -927,6 +947,8 @@ class $SavedPromptsTable extends SavedPrompts
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+      lastUsedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}last_used_at']),
     );
   }
 
@@ -944,6 +966,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
   final Value<String> tags;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
+  final Value<DateTime?> lastUsedAt;
   final Value<int> rowid;
   const SavedPromptEntityCompanion({
     this.id = const Value.absent(),
@@ -953,6 +976,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
     this.tags = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.lastUsedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SavedPromptEntityCompanion.insert({
@@ -963,6 +987,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
     this.tags = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
+    this.lastUsedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         content = Value(content),
@@ -976,6 +1001,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
     Expression<String>? tags,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<DateTime>? lastUsedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -986,6 +1012,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
       if (tags != null) 'tags': tags,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (lastUsedAt != null) 'last_used_at': lastUsedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -998,6 +1025,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
       Value<String>? tags,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
+      Value<DateTime?>? lastUsedAt,
       Value<int>? rowid}) {
     return SavedPromptEntityCompanion(
       id: id ?? this.id,
@@ -1007,6 +1035,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastUsedAt: lastUsedAt ?? this.lastUsedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1035,6 +1064,9 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (lastUsedAt.present) {
+      map['last_used_at'] = Variable<DateTime>(lastUsedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1051,6 +1083,7 @@ class SavedPromptEntityCompanion extends UpdateCompanion<SavedPromptEntity> {
           ..write('tags: $tags, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
+          ..write('lastUsedAt: $lastUsedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1550,6 +1583,7 @@ typedef $$SavedPromptsTableCreateCompanionBuilder = SavedPromptEntityCompanion
   Value<String> tags,
   required DateTime createdAt,
   required DateTime updatedAt,
+  Value<DateTime?> lastUsedAt,
   Value<int> rowid,
 });
 typedef $$SavedPromptsTableUpdateCompanionBuilder = SavedPromptEntityCompanion
@@ -1561,6 +1595,7 @@ typedef $$SavedPromptsTableUpdateCompanionBuilder = SavedPromptEntityCompanion
   Value<String> tags,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
+  Value<DateTime?> lastUsedAt,
   Value<int> rowid,
 });
 
@@ -1593,6 +1628,9 @@ class $$SavedPromptsTableFilterComposer
 
   ColumnFilters<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get lastUsedAt => $composableBuilder(
+      column: $table.lastUsedAt, builder: (column) => ColumnFilters(column));
 }
 
 class $$SavedPromptsTableOrderingComposer
@@ -1624,6 +1662,9 @@ class $$SavedPromptsTableOrderingComposer
 
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
       column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get lastUsedAt => $composableBuilder(
+      column: $table.lastUsedAt, builder: (column) => ColumnOrderings(column));
 }
 
 class $$SavedPromptsTableAnnotationComposer
@@ -1655,6 +1696,9 @@ class $$SavedPromptsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastUsedAt => $composableBuilder(
+      column: $table.lastUsedAt, builder: (column) => column);
 }
 
 class $$SavedPromptsTableTableManager extends RootTableManager<
@@ -1690,6 +1734,7 @@ class $$SavedPromptsTableTableManager extends RootTableManager<
             Value<String> tags = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
+            Value<DateTime?> lastUsedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SavedPromptEntityCompanion(
@@ -1700,6 +1745,7 @@ class $$SavedPromptsTableTableManager extends RootTableManager<
             tags: tags,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            lastUsedAt: lastUsedAt,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -1710,6 +1756,7 @@ class $$SavedPromptsTableTableManager extends RootTableManager<
             Value<String> tags = const Value.absent(),
             required DateTime createdAt,
             required DateTime updatedAt,
+            Value<DateTime?> lastUsedAt = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               SavedPromptEntityCompanion.insert(
@@ -1720,6 +1767,7 @@ class $$SavedPromptsTableTableManager extends RootTableManager<
             tags: tags,
             createdAt: createdAt,
             updatedAt: updatedAt,
+            lastUsedAt: lastUsedAt,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
