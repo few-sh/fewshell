@@ -12,7 +12,7 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
   final SharedPreferences _prefs;
   static const String _key = 'themeMode';
 
-  ThemeNotifier(this._prefs) : super(ThemeMode.system) {
+  ThemeNotifier(this._prefs) : super(ThemeMode.dark) {
     _loadThemePreference();
   }
 
@@ -22,7 +22,7 @@ class ThemeNotifier extends StateNotifier<ThemeMode> {
     if (themeModeString != null) {
       state = ThemeMode.values.firstWhere(
         (mode) => mode.toString() == themeModeString,
-        orElse: () => ThemeMode.system,
+        orElse: () => ThemeMode.dark,
       );
     }
   }
