@@ -76,13 +76,15 @@ class GlobalDatabase extends _$GlobalDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await customStatement(
+            'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)');
       },
       onUpgrade: (Migrator m, int from, int to) async {
         // No-op: Schema upgrades are handled in beforeOpen
@@ -101,6 +103,10 @@ class GlobalDatabase extends _$GlobalDatabase {
           // Seed initial data for development/testing
           await _seedInitialData();
         }
+
+        // Ensure index exists
+        await customStatement(
+            'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)');
       },
     );
   }
@@ -184,6 +190,9 @@ class GlobalDatabase extends _$GlobalDatabase {
     );
     await executor.runCustom(
       'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)',
     );
   }
 

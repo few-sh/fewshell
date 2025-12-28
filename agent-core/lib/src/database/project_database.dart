@@ -89,7 +89,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -198,6 +198,9 @@ class ProjectDatabase extends _$ProjectDatabase {
     );
     await executor.runCustom(
       'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)',
     );
   }
 }
