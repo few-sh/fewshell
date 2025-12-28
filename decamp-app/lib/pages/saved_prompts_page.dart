@@ -4,7 +4,6 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/saved_prompt_provider.dart';
 import '../providers/project_provider.dart';
-import '../themes/terminal_theme.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
 import '../components/saved_prompt_dialog.dart';
@@ -339,7 +338,6 @@ class _PromptCardContentState extends ConsumerState<_PromptCardContent> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
-    final terminalTheme = Theme.of(context).extension<TerminalTheme>();
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -352,9 +350,9 @@ class _PromptCardContentState extends ConsumerState<_PromptCardContent> {
             children: [
               Expanded(
                 child: Text(
-                  widget.prompt.description ?? 'Untitled Prompt',
+                  widget.prompt.description ?? '',
                   style: theme.textTheme.p.copyWith(
-                    fontWeight: FontWeight.bold,
+                    fontStyle: FontStyle.italic,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -397,23 +395,32 @@ class _PromptCardContentState extends ConsumerState<_PromptCardContent> {
           ),
           const SizedBox(height: 8),
           // Content
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.muted,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: theme.colorScheme.border),
-            ),
-            child: SelectableText(
-              widget.prompt.content,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 13,
-                color: terminalTheme?.textColor,
-              ),
-            ),
+          ShadInput(
+            initialValue: widget.prompt.content,
+            readOnly: true,
+            maxLines: null,
+            minLines: 1,
           ),
+          if (widget.prompt.lastUsedAt != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Last Used: ${DateFormatter.format(widget.prompt.lastUsedAt!)}',
+                  style: theme.textTheme.muted.copyWith(fontSize: 11),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  DateFormatter.formatRelative(widget.prompt.lastUsedAt!),
+                  style: theme.textTheme.muted.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

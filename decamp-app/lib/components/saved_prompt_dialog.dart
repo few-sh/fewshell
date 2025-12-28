@@ -291,6 +291,7 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
           controller: _contentController,
           focusNode: _contentFocus,
           placeholder: const Text('Prompt Content'),
+          autocorrect: false,
           maxLines: 5,
           minLines: 3,
           style: TextStyle(
@@ -313,6 +314,7 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
         ShadInput(
           controller: _descriptionController,
           placeholder: const Text('Description (Optional)'),
+          autocorrect: false,
         ),
         const SizedBox(height: 24),
 
