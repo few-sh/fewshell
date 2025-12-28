@@ -100,17 +100,18 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
       return;
     }
 
-    // Check both global and project prompts
+    // Check prompts based on selection
     final globalPrompts = await ref.read(globalSavedPromptsProvider.future);
     final currentProjectId = ref.read(currentProjectIdProvider);
     final projectPrompts = currentProjectId != null
         ? await ref.read(projectSavedPromptsProvider(currentProjectId).future)
         : <SavedPromptEntity>[];
 
-    final allPrompts = [...globalPrompts, ...projectPrompts];
+    // Only check against the selected scope
+    final promptsToCheck = _isGlobalSelection ? globalPrompts : projectPrompts;
 
     // Exclude current prompt if editing
-    final duplicatePrompt = allPrompts
+    final duplicatePrompt = promptsToCheck
         .where((p) => p.content == content && p.id != widget.savedPromptId)
         .firstOrNull;
 
@@ -236,10 +237,33 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
             children: [
               Text('Save to:', style: theme.textTheme.small),
               const SizedBox(width: 16),
-              ShadSwitch(
-                value: _isGlobalSelection,
-                onChanged: (v) => setState(() => _isGlobalSelection = v),
-                label: const Text('User (Global)'),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.muted,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSegmentButton(
+                      label: 'Project',
+                      isSelected: !_isGlobalSelection,
+                      onTap: () {
+                        setState(() => _isGlobalSelection = false);
+                        _checkForDuplicates();
+                      },
+                    ),
+                    _buildSegmentButton(
+                      label: 'User',
+                      isSelected: _isGlobalSelection,
+                      onTap: () {
+                        setState(() => _isGlobalSelection = true);
+                        _checkForDuplicates();
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -260,23 +284,11 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
         ),
         if (_duplicateWarning != null) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _duplicateWarning!,
-                  style: theme.textTheme.small.copyWith(
-                    color: theme.colorScheme.destructive,
-                  ),
-                ),
-              ),
-              if (_duplicateId != null)
-                ShadButton.destructive(
-                  size: ShadButtonSize.sm,
-                  onPressed: _overwrite,
-                  child: const Text('Overwrite Existing'),
-                ),
-            ],
+          Text(
+            _duplicateWarning!,
+            style: theme.textTheme.small.copyWith(
+              color: theme.colorScheme.destructive,
+            ),
           ),
         ],
         const SizedBox(height: 16),
@@ -298,7 +310,9 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
             ),
             const SizedBox(width: 8),
             ShadButton(
-              onPressed: _isSaving ? null : _save,
+              onPressed: _isSaving
+                  ? null
+                  : (_duplicateId != null ? _overwrite : _save),
               child: _isSaving
                   ? const SizedBox(
                       width: 16,
@@ -306,14 +320,52 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(
-                      widget.savedPromptId != null
-                          ? 'Save Changes'
-                          : 'Create Prompt',
+                      _duplicateId != null
+                          ? 'Update Existing'
+                          : (widget.savedPromptId != null
+                                ? 'Save Changes'
+                                : 'Create Prompt'),
                     ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildSegmentButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = ShadTheme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? theme.colorScheme.background : null,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.small.copyWith(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected
+                ? theme.colorScheme.foreground
+                : theme.colorScheme.mutedForeground,
+          ),
+        ),
+      ),
     );
   }
 }
