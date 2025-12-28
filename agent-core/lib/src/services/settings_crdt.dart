@@ -11,7 +11,6 @@ import 'package:agent_core/src/utils/settings_flattener.dart';
 class SettingsCrdt extends MapCrdt {
   static final _log = Logger('SettingsCrdt');
   final File _file;
-  Timer? _saveTimer;
   final StreamController<void> _changeController = StreamController.broadcast();
 
   SettingsCrdt(this._file) : super(['settings']);
@@ -59,7 +58,9 @@ class SettingsCrdt extends MapCrdt {
             records.add({
               'key': key,
               'value': value,
-              'hlc': metadata?['hlc'] ?? Hlc.zero(nodeId).toString(),
+              'hlc': metadata?['hlc'] != null
+                  ? Hlc.parse(metadata!['hlc'] as String)
+                  : Hlc.zero(nodeId),
               'is_deleted': false,
               'modified':
                   metadata?['modified'] ?? DateTime.now().toIso8601String(),
@@ -75,7 +76,7 @@ class SettingsCrdt extends MapCrdt {
                 records.add({
                   'key': key,
                   'value': null,
-                  'hlc': metadata['hlc'],
+                  'hlc': Hlc.parse(metadata['hlc'] as String),
                   'is_deleted': true,
                   'modified': metadata['modified'],
                 });
@@ -95,20 +96,15 @@ class SettingsCrdt extends MapCrdt {
   Future<void> put(String table, String key, dynamic value,
       [bool isDeleted = false]) async {
     await super.put(table, key, value, isDeleted);
-    _scheduleSave();
+    await _save();
     _changeController.add(null);
   }
 
   @override
   Future<void> merge(Map<String, List<Map<String, Object?>>> changeset) async {
     await super.merge(changeset);
-    _scheduleSave();
+    await _save();
     _changeController.add(null);
-  }
-
-  void _scheduleSave() {
-    _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 500), _save);
   }
 
   Future<void> _save() async {
@@ -148,7 +144,6 @@ class SettingsCrdt extends MapCrdt {
   }
 
   Future<void> close() async {
-    _saveTimer?.cancel();
     await _save();
   }
 }
