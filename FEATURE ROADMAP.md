@@ -14,17 +14,18 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] A stop button (ability to cancel a chat stream or any command)
 
-[ ] Project settings replication for LLM settings and secrets
+[X] Project settings replication for LLM settings and secrets
 
-[ ] Feedback button
+[X] Feedback button
 
 [X] Shared activity indicator (when a command is in progress or streaming is in progress, all clients should see the activity indicator)
 
-[ ] Support for thoughts streaming and display (expandable)
+[ ] Support for thoughts streaming and display (expandable)*
+*Can't test
 
 [ ] "App needs an update"  Check app version and schema when connecting
 
-[ ] Ability to connect to a remote server without creating a project. (To allow getting all of the project information from the remote server)
+[X] Ability to connect to a remote server without creating a project. (To allow getting all of the project information from the remote server)
 
 [ ] Always SUMMARIZE log and HTML outputs that are larger than X (tool outputs in general). (IDEA: Add summarize as part of the request tool)
 
