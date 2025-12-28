@@ -52,8 +52,12 @@ class SyncController {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
-            // Settings Sync
+
+            // Fork channels immediately to avoid race conditions
             final settingsChannel = multiplexed.fork('\u001E');
+            final secretsChannel = multiplexed.fork('\u001D');
+
+            // Settings Sync
             final settingsCrdt =
                 await settingsService.getProjectCrdt(projectId);
             final settingsSync = CrdtSync.server(
@@ -63,7 +67,6 @@ class SyncController {
             );
 
             // Secrets Sync
-            final secretsChannel = multiplexed.fork('\u001D');
             final secretsCrdt =
                 await secretsService.getProjectSecretsCrdt(projectId);
             final secretsSync = CrdtSync.server(

@@ -38,8 +38,22 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
                 _forkedControllers[prefix]!.add(payload);
                 handled = true;
                 break;
+              } else {
+                if (data.isNotEmpty &&
+                    prefix.isNotEmpty &&
+                    data.codeUnitAt(0) == prefix.codeUnitAt(0)) {
+                  _log.warning(
+                      'Prefix match failed but first char matches? Data len: ${data.length}, Prefix len: ${prefix.length}');
+                }
               }
             }
+
+            if (!handled && data.isNotEmpty && data.codeUnitAt(0) == 29) {
+              _log.warning(
+                  'Received GS (29) but did not match any prefix. Registered prefixes: ${_forkedControllers.keys.map((k) => k.codeUnits).toList()}');
+            }
+          } else {
+            _log.warning('Received non-string data: ${data.runtimeType}');
           }
 
           if (handled) return;
