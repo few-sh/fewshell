@@ -93,10 +93,15 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
     try {
       final record = getRecord('secrets', key);
       if (record != null) {
-        final value = record.value;
+        var value = record.value;
         final hlc = record.hlc;
         final isDeleted = record.isDeleted;
         final modified = record.modified;
+
+        if (isDeleted) {
+          // Extra safety: set secret value to null if deleted
+          value = null;
+        }
 
         final json = jsonEncode({
           'value': value,
