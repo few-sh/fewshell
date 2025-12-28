@@ -303,6 +303,7 @@ class _ProjectListItemState extends ConsumerState<_ProjectListItem> {
         child: ShadInput(
           controller: controller,
           placeholder: const Text('Name'),
+          autocorrect: false,
         ),
       ),
     );

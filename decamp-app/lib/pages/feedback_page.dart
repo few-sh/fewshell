@@ -156,11 +156,13 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
             ShadInput(
               controller: _nameController,
               placeholder: const Text('Name (optional)'),
+              autocorrect: false,
             ),
             const SizedBox(height: 16),
             ShadInput(
               controller: _emailController,
               placeholder: const Text('Email (optional)'),
+              autocorrect: false,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
@@ -209,6 +211,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
               minLines: 7,
               maxLines: 7,
               placeholder: const Text('Describe your feedback here...'),
+              autocorrect: false,
             ),
             const SizedBox(height: 16),
             Row(

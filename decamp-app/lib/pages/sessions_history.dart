@@ -323,6 +323,7 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
         child: ShadInput(
           controller: controller,
           placeholder: const Text('Name'),
+          autocorrect: false,
         ),
       ),
     );

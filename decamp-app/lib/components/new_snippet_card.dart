@@ -169,6 +169,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
           controller: _descriptionController,
           focusNode: _descriptionFocus,
           placeholder: const Text('Description (e.g., List all pods)'),
+          autocorrect: false,
           minLines: 1,
           maxLines: null,
         ),

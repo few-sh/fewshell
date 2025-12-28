@@ -326,6 +326,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           child: ShadInput(
             controller: controller,
             placeholder: const Text('Name'),
+            autocorrect: false,
             leading: const Padding(
               padding: EdgeInsets.only(right: 8),
               child: Icon(LucideIcons.folder, size: 16),

@@ -113,6 +113,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                 child: ShadInput(
                   controller: _valueController,
                   placeholder: const Text('Enter the secret value'),
+                  autocorrect: false,
                   obscureText: _obscureValue,
                   minLines: 1,
                   maxLines: _obscureValue ? 1 : null,

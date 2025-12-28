@@ -65,6 +65,7 @@ class UserBadge extends ConsumerWidget {
           child: ShadInput(
             controller: controller,
             placeholder: const Text('Enter username'),
+            autocorrect: false,
             autofocus: true,
             onSubmitted: (_) {
               final newName = controller.text.trim();

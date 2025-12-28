@@ -91,6 +91,7 @@ class _ConnectToAgentServerDialogState
           ShadInput(
             controller: _controller,
             placeholder: const Text('wss://...'),
+            autocorrect: false,
             enabled: !_isLoading,
           ),
           if (_errorMessage != null) ...[

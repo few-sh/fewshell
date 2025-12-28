@@ -829,6 +829,7 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
         ShadInput(
           controller: widget.controller,
           placeholder: const Text('Enter instruction in markdown format...'),
+          autocorrect: false,
           minLines: 4,
           maxLines: null,
           keyboardType: TextInputType.multiline,
@@ -892,6 +893,7 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
           ShadInput(
             controller: widget.controller,
             placeholder: const Text('Enter model-specific instruction...'),
+            autocorrect: false,
             minLines: 4,
             maxLines: null,
             keyboardType: TextInputType.multiline,

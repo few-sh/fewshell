@@ -285,6 +285,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               ShadInput(
                 controller: _urlController,
                 placeholder: const Text('https://api.example.com/v1'),
+                autocorrect: false,
                 minLines: 1,
                 maxLines: null,
               ),
@@ -298,6 +299,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                       ? 'Leave blank to keep current key'
                       : 'Enter your API key',
                 ),
+                autocorrect: false,
                 obscureText: _obscureApiKey,
                 minLines: 1,
                 maxLines: _obscureApiKey ? 1 : null,
@@ -328,6 +330,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                         ShadInput(
                           controller: _maxTokensController,
                           placeholder: const Text('Optional'),
+                          autocorrect: false,
                           keyboardType: TextInputType.number,
                         ),
                       ],
@@ -343,6 +346,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                         ShadInput(
                           controller: _temperatureController,
                           placeholder: const Text('0.0 - 2.0'),
+                          autocorrect: false,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
