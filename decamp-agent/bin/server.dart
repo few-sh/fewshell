@@ -54,8 +54,25 @@ void main(List<String> args) async {
     final dbManager = DatabaseManager('${Directory.current.path}/data');
     await dbManager.init();
 
+    // Initialize CrdtSettingsService
+    final settingsService = CrdtSettingsService(
+      () async => Directory('${Directory.current.path}/data'),
+      (projectId) async =>
+          Directory('${Directory.current.path}/data/projects/$projectId'),
+    );
+    await settingsService.init();
+
+    // Initialize SecretsService
+    final secretsService = SecretsService(
+      (projectId) async => MemoryStorageImpl(),
+    );
+
     // Initialize SyncController
-    final syncController = SyncController(dbManager);
+    final syncController = SyncController(
+      dbManager,
+      settingsService,
+      secretsService,
+    );
 
     // Configure SecurityContext for mTLS
     _log.info('Initializing mTLS with embedded certificates');

@@ -2,10 +2,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import '../services/storage/flutter_secure_storage_impl.dart';
 
+/// Provider for SecretsCrdt
+final secretsCrdtProvider = Provider<SecretsCrdt>((ref) {
+  final storage = FlutterSecureStorageImpl();
+  final crdt = SecretsCrdt(storage);
+  ref.onDispose(() => crdt.close());
+  return crdt;
+});
+
 /// Provider for KeychainService singleton
 /// Access directly: ref.watch(keychainServiceProvider).saveProjectSecret(...)
 final keychainServiceProvider = Provider<KeychainService>((ref) {
-  return KeychainService(FlutterSecureStorageImpl());
+  final crdt = ref.watch(secretsCrdtProvider);
+  return KeychainService(crdt);
 });
 
 /// Provider to get all secrets (global and project merged)

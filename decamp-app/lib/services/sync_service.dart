@@ -12,6 +12,8 @@ import 'package:agent_core/agent_core.dart';
 import 'package:decamp/certs.dart';
 import '../providers/database_provider.dart';
 import '../providers/project_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/secret_provider.dart';
 
 final _log = Logger('SyncService');
 
@@ -26,6 +28,8 @@ class SyncService {
 
   final Ref ref;
   CrdtSync? _globalSync;
+  CrdtSync? _settingsSync;
+  CrdtSync? _secretsSync;
   MultiplexedWebSocketChannel? _globalChannel;
   StreamSubscription? _globalSubscription;
 
@@ -156,6 +160,7 @@ class SyncService {
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         _log.fine('Global sync received custom message: $msg');
       });
+
       _globalSync = CrdtSync.client(
         adapter,
         _globalChannel!,
@@ -281,6 +286,27 @@ class SyncService {
         monitoredChannel,
         awaitSync: () => adapter.onIdle,
       );
+
+      // Settings Sync
+      final settingsService = ref.read(crdtSettingsServiceProvider);
+      final settingsCrdt = await settingsService.getProjectCrdt(projectId);
+      final settingsChannel = _projectChannel!.fork('\u001E');
+      _settingsSync = CrdtSync.client(
+        settingsCrdt,
+        settingsChannel,
+        verbose: true,
+      );
+
+      // Secrets Sync
+      final secretsCrdt = ref.read(secretsCrdtProvider);
+      await secretsCrdt.ready;
+      final secretsChannel = _projectChannel!.fork('\u001D');
+      _secretsSync = CrdtSync.client(
+        secretsCrdt,
+        secretsChannel,
+        verbose: true,
+      );
+
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
         _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
@@ -343,6 +369,10 @@ class SyncService {
   }
 
   void _closeProjectConnection() {
+    _settingsSync?.close();
+    _settingsSync = null;
+    _secretsSync?.close();
+    _secretsSync = null;
     _projectSync?.close();
     _projectSync = null;
     _projectChannel = null;

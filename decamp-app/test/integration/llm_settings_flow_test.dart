@@ -70,8 +70,14 @@ void main() {
 
           globalDatabaseProvider.overrideWithValue(globalDb),
           projectDatabaseProvider.overrideWithValue(projectDb),
-          tomlSettingsServiceProvider.overrideWith((ref) {
-            return TomlSettingsService(() async => tempDir);
+          crdtSettingsServiceProvider.overrideWith((ref) {
+            final service = CrdtSettingsService(
+              () async => tempDir,
+              (projectId) async =>
+                  Directory('${tempDir.path}/projects/$projectId'),
+            );
+            ref.onDispose(() => service.close());
+            return service;
           }),
 
           // Set the current project to our test project initially

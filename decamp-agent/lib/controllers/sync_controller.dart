@@ -15,9 +15,11 @@ class SyncController {
   static final _log = Logger('SyncController');
 
   final DatabaseManager dbManager;
+  final CrdtSettingsService settingsService;
+  final SecretsService secretsService;
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager);
+  SyncController(this.dbManager, this.settingsService, this.secretsService);
 
   Handler get handler {
     return (Request request) {
@@ -25,18 +27,15 @@ class SyncController {
 
       if (path == 'global') {
         return webSocketHandler((WebSocketChannel channel, String? protocol) {
-          final multiplexed = MultiplexedWebSocketChannel(channel);
-          _setupCustomMessageHandling(multiplexed, 'Global');
-
           _log.info('Starting CrdtSync for global');
           final sync = CrdtSync.server(
             dbManager.globalDatabase.crdt,
-            multiplexed,
+            channel,
             verbose: true,
           );
 
           unawaited(
-            multiplexed.sink.done.then((_) {
+            channel.sink.done.then((_) {
               _log.info(
                 'Channel closed for global',
               );
@@ -54,6 +53,28 @@ class SyncController {
             final multiplexed = MultiplexedWebSocketChannel(channel);
             _setupCustomMessageHandling(multiplexed, 'Project', db);
 
+            // Fork channels immediately to avoid race conditions
+            final settingsChannel = multiplexed.fork('\u001E');
+            final secretsChannel = multiplexed.fork('\u001D');
+
+            // Settings Sync
+            final settingsCrdt =
+                await settingsService.getProjectCrdt(projectId);
+            final settingsSync = CrdtSync.server(
+              settingsCrdt,
+              settingsChannel,
+              verbose: true,
+            );
+
+            // Secrets Sync
+            final secretsCrdt =
+                await secretsService.getProjectSecretsCrdt(projectId);
+            final secretsSync = CrdtSync.server(
+              secretsCrdt,
+              secretsChannel,
+              verbose: true,
+            );
+
             _log.info(
               'Starting CrdtSync for project $projectId',
             );
@@ -70,6 +91,8 @@ class SyncController {
                   'Channel closed for project $projectId',
                 );
                 sync.close();
+                settingsSync.close();
+                secretsSync.close();
               }),
             );
           })(request);

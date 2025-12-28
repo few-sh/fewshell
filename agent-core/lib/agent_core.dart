@@ -18,6 +18,7 @@ export 'src/models/ssh_settings.dart';
 
 // Utils
 export 'src/utils/constants.dart';
+export 'src/utils/settings_flattener.dart';
 export 'src/utils/date_formatter.dart';
 export 'src/utils/id_generator.dart';
 export 'src/utils/template_processor.dart';
@@ -27,7 +28,7 @@ export 'src/utils/crdt_flow_adapter.dart';
 
 // Secrets Storage
 export 'src/secrets_storage/secure_storage.dart';
-export 'src/secrets_storage/file_secure_storage_impl.dart';
+export 'src/secrets_storage/memory_storage_impl.dart';
 
 // Services
 export 'src/services/keychain_service.dart';
@@ -36,6 +37,10 @@ export 'src/services/shell_tools_provider.dart';
 export 'src/services/llm_service.dart';
 export 'src/services/remote_agent_service.dart';
 export 'src/services/toml_settings_service.dart';
+export 'src/services/crdt_settings_service.dart';
+export 'src/services/settings_crdt.dart';
+export 'src/services/secrets_crdt.dart';
+export 'src/services/secrets_service.dart';
 
 // Database
 export 'src/database/database.dart';

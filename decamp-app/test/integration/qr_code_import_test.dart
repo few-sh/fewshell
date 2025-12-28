@@ -26,6 +26,7 @@ void main() {
     late GlobalDatabase globalDb;
     late ProjectDatabase projectDb;
     late Directory tempDir;
+    CrdtSettingsService? settingsService;
     const testProjectId = 'test-project-qr-123';
 
     setUp(() async {
@@ -68,8 +69,13 @@ void main() {
           sharedPreferencesProvider.overrideWithValue(prefs),
           globalDatabaseProvider.overrideWithValue(globalDb),
           projectDatabaseProvider.overrideWithValue(projectDb),
-          tomlSettingsServiceProvider.overrideWith((ref) {
-            return TomlSettingsService(() async => tempDir);
+          crdtSettingsServiceProvider.overrideWith((ref) {
+            settingsService = CrdtSettingsService(
+              () async => tempDir,
+              (projectId) async =>
+                  Directory('${tempDir.path}/projects/$projectId'),
+            );
+            return settingsService!;
           }),
           currentProjectIdProvider.overrideWith((ref) {
             final prefs = ref.watch(sharedPreferencesProvider);
@@ -102,6 +108,7 @@ void main() {
     });
 
     tearDown(() async {
+      await settingsService?.close();
       await globalDb.close();
       await projectDb.close();
       container.dispose();

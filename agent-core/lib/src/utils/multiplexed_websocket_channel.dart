@@ -12,6 +12,8 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   final StreamController _inboundController = StreamController(sync: true);
   final StreamController<Map<String, dynamic>> _customMessageController =
       StreamController.broadcast();
+  final Map<String, StreamController> _forkedControllers = {};
+
   // Use Unit Separator (ASCII 31) as a prefix to avoid collisions with JSON
   static const String _customPrefix = '\u001F';
 
@@ -27,6 +29,35 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
       // We use catchError to ensure the chain continues even if a previous task failed.
       _pending = _pending.catchError((_) {}).then((_) async {
         try {
+          // Check forked channels first
+          bool handled = false;
+          if (data is String) {
+            for (final prefix in _forkedControllers.keys) {
+              if (data.startsWith(prefix)) {
+                final payload = data.substring(prefix.length);
+                _forkedControllers[prefix]!.add(payload);
+                handled = true;
+                break;
+              } else {
+                if (data.isNotEmpty &&
+                    prefix.isNotEmpty &&
+                    data.codeUnitAt(0) == prefix.codeUnitAt(0)) {
+                  _log.warning(
+                      'Prefix match failed but first char matches? Data len: ${data.length}, Prefix len: ${prefix.length}');
+                }
+              }
+            }
+
+            if (!handled && data.isNotEmpty && data.codeUnitAt(0) == 29) {
+              _log.warning(
+                  'Received GS (29) but did not match any prefix. Registered prefixes: ${_forkedControllers.keys.map((k) => k.codeUnits).toList()}');
+            }
+          } else {
+            _log.warning('Received non-string data: ${data.runtimeType}');
+          }
+
+          if (handled) return;
+
           if (data is String && data.startsWith(_customPrefix)) {
             // If it's a custom message, wait for any pending sync operations
             if (awaitSync != null) {
@@ -76,10 +107,33 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
     }, onError: (error, stackTrace) {
       _inboundController.addError(error, stackTrace);
       _customMessageController.addError(error, stackTrace);
+      for (final controller in _forkedControllers.values) {
+        controller.addError(error, stackTrace);
+      }
     }, onDone: () {
       _inboundController.close();
       _customMessageController.close();
+      for (final controller in _forkedControllers.values) {
+        controller.close();
+      }
     });
+  }
+
+  /// Forks the channel with a specific prefix.
+  /// Messages sent to the returned channel will be prefixed.
+  /// Incoming messages starting with the prefix will be routed to the returned channel (with prefix stripped).
+  WebSocketChannel fork(String prefix) {
+    if (_forkedControllers.containsKey(prefix)) {
+      throw ArgumentError('Prefix $prefix is already in use');
+    }
+    final controller = StreamController(sync: true);
+    _forkedControllers[prefix] = controller;
+
+    return _ForkedWebSocketChannel(
+      _inner,
+      prefix,
+      controller.stream,
+    );
   }
 
   @override
@@ -136,6 +190,73 @@ class _MultiplexedSink implements WebSocketSink {
   @override
   Future close([int? closeCode, String? closeReason]) =>
       _inner.close(closeCode, closeReason);
+
+  @override
+  Future get done => _inner.done;
+}
+
+class _ForkedWebSocketChannel extends StreamChannelMixin
+    implements WebSocketChannel {
+  final WebSocketChannel _inner;
+  final String _prefix;
+  final Stream _stream;
+  late final WebSocketSink _sink;
+
+  _ForkedWebSocketChannel(this._inner, this._prefix, this._stream) {
+    _sink = _ForkedSink(_inner.sink, _prefix);
+  }
+
+  @override
+  Stream get stream => _stream;
+
+  @override
+  WebSocketSink get sink => _sink;
+
+  @override
+  String? get protocol => _inner.protocol;
+
+  @override
+  int? get closeCode => _inner.closeCode;
+
+  @override
+  String? get closeReason => _inner.closeReason;
+
+  @override
+  Future<void> get ready => _inner.ready;
+}
+
+class _ForkedSink implements WebSocketSink {
+  final WebSocketSink _inner;
+  final String _prefix;
+
+  _ForkedSink(this._inner, this._prefix);
+
+  @override
+  void add(event) {
+    if (event is String) {
+      _inner.add('$_prefix$event');
+    } else {
+      throw UnsupportedError(
+          'Only string messages are supported for forked channels');
+    }
+  }
+
+  @override
+  void addError(Object error, [StackTrace? stackTrace]) =>
+      _inner.addError(error, stackTrace);
+
+  @override
+  Future addStream(Stream stream) async {
+    await for (final event in stream) {
+      add(event);
+    }
+  }
+
+  @override
+  Future close([int? closeCode, String? closeReason]) {
+    // We don't close the inner sink as it might be shared
+    return Future.value();
+  }
 
   @override
   Future get done => _inner.done;

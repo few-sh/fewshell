@@ -19,7 +19,6 @@ class AppSettings with _$AppSettings {
 
     /// User-level agent instructions
     AgentInstruction? agentInstruction,
-
     DateTime? createdAt,
     DateTime? updatedAt,
   }) = _AppSettings;
@@ -51,7 +50,6 @@ class ProjectSettings with _$ProjectSettings {
 
     /// SSH/Remote shell configuration for this project
     SshSettings? sshSettings,
-
     DateTime? createdAt,
     DateTime? updatedAt,
   }) = _ProjectSettings;

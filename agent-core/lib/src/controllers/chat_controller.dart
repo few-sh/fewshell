@@ -444,6 +444,7 @@ class ChatController extends StateNotifier<ChatState> {
 
       if (mounted) state = state.copyWith(isLoading: false);
     } catch (e) {
+      // TODO: Should not try to get ai usernme and use 'System' instead
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);
       final aiUserName = await _getAiUserName();
@@ -636,7 +637,12 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Get the AI username based on the active model identifier
   Future<String> _getAiUserName() async {
-    final modelId = await _llmService.getActiveModelIdentifier();
-    return modelId ?? _kAiUserName;
+    try {
+      final modelId = await _llmService.getActiveModelIdentifier();
+      return modelId ?? _kAiUserName;
+    } catch (e) {
+      _log.warning('Failed to get AI username: $e');
+      return _kAiUserName;
+    }
   }
 }
