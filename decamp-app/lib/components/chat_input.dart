@@ -79,12 +79,11 @@ class _ChatInputState extends State<ChatInput> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          ShadButton(
+          ShadButton.link(
             width: 40,
             height: 40,
             padding: EdgeInsets.zero,
             onPressed: widget.enabled ? _showSavedPrompts : null,
-            backgroundColor: theme.colorScheme.background,
             child: const Icon(LucideIcons.messageSquare),
           ),
           const SizedBox(width: 8),
