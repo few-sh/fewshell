@@ -46,6 +46,8 @@ class ProjectSavedPromptDao extends DatabaseAccessor<ProjectDatabase>
               const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
+            (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc),
           ]))
         .watch()
@@ -60,6 +62,8 @@ class ProjectSavedPromptDao extends DatabaseAccessor<ProjectDatabase>
               s.projectId.equals(projectId) &
               const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
             (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc),
           ]))
@@ -122,6 +126,8 @@ class ProjectSavedPromptDao extends DatabaseAccessor<ProjectDatabase>
 
     final rows = await (searchQuery
           ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
             (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc)
           ]))

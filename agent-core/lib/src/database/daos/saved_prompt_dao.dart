@@ -19,6 +19,8 @@ class SavedPromptDao extends DatabaseAccessor<GlobalDatabase>
               const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
+            (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc),
           ]))
         .watch();
@@ -31,6 +33,8 @@ class SavedPromptDao extends DatabaseAccessor<GlobalDatabase>
               s.projectId.equals(projectId) &
               const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
             (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc),
           ]))
@@ -45,6 +49,8 @@ class SavedPromptDao extends DatabaseAccessor<GlobalDatabase>
               const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
             (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
+            (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc),
           ]))
         .get();
@@ -57,6 +63,8 @@ class SavedPromptDao extends DatabaseAccessor<GlobalDatabase>
               s.projectId.equals(projectId) &
               const CustomExpression<bool>('is_deleted').equals(false))
           ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
             (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc),
           ]))
@@ -118,6 +126,8 @@ class SavedPromptDao extends DatabaseAccessor<GlobalDatabase>
 
     return (searchQuery
           ..orderBy([
+            (s) =>
+                OrderingTerm(expression: s.lastUsedAt, mode: OrderingMode.desc),
             (s) =>
                 OrderingTerm(expression: s.createdAt, mode: OrderingMode.desc)
           ]))
