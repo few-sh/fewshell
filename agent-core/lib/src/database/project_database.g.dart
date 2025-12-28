@@ -1669,6 +1669,407 @@ class ProjectSnippetCompanion extends UpdateCompanion<ProjectSnippet> {
   }
 }
 
+class $ProjectSavedPromptsTable extends ProjectSavedPrompts
+    with TableInfo<$ProjectSavedPromptsTable, ProjectSavedPrompt> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProjectSavedPromptsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _projectIdMeta =
+      const VerificationMeta('projectId');
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+      'project_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _contentMeta =
+      const VerificationMeta('content');
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+      'content', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _descriptionMeta =
+      const VerificationMeta('description');
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+      'description', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+      'tags', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, projectId, content, description, tags, createdAt, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'saved_prompts';
+  @override
+  VerificationContext validateIntegrity(Insertable<ProjectSavedPrompt> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(_projectIdMeta,
+          projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta));
+    }
+    if (data.containsKey('content')) {
+      context.handle(_contentMeta,
+          content.isAcceptableOrUnknown(data['content']!, _contentMeta));
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+          _descriptionMeta,
+          description.isAcceptableOrUnknown(
+              data['description']!, _descriptionMeta));
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+          _tagsMeta, tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProjectSavedPrompt map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProjectSavedPrompt(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      projectId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}project_id']),
+      content: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}content'])!,
+      description: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}description']),
+      tags: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}tags'])!,
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $ProjectSavedPromptsTable createAlias(String alias) {
+    return $ProjectSavedPromptsTable(attachedDatabase, alias);
+  }
+}
+
+class ProjectSavedPrompt extends DataClass
+    implements Insertable<ProjectSavedPrompt> {
+  /// Unique identifier for the saved prompt
+  final String id;
+
+  /// Optional foreign key to project (null for global saved prompts)
+  final String? projectId;
+
+  /// Prompt content
+  final String content;
+
+  /// Optional description
+  final String? description;
+
+  /// Tags as comma-separated string
+  final String tags;
+
+  /// Timestamp when the saved prompt was created
+  final DateTime createdAt;
+
+  /// Timestamp when the saved prompt was last updated
+  final DateTime updatedAt;
+  const ProjectSavedPrompt(
+      {required this.id,
+      this.projectId,
+      required this.content,
+      this.description,
+      required this.tags,
+      required this.createdAt,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || projectId != null) {
+      map['project_id'] = Variable<String>(projectId);
+    }
+    map['content'] = Variable<String>(content);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['tags'] = Variable<String>(tags);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ProjectSavedPromptCompanion toCompanion(bool nullToAbsent) {
+    return ProjectSavedPromptCompanion(
+      id: Value(id),
+      projectId: projectId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(projectId),
+      content: Value(content),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      tags: Value(tags),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ProjectSavedPrompt.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProjectSavedPrompt(
+      id: serializer.fromJson<String>(json['id']),
+      projectId: serializer.fromJson<String?>(json['projectId']),
+      content: serializer.fromJson<String>(json['content']),
+      description: serializer.fromJson<String?>(json['description']),
+      tags: serializer.fromJson<String>(json['tags']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'projectId': serializer.toJson<String?>(projectId),
+      'content': serializer.toJson<String>(content),
+      'description': serializer.toJson<String?>(description),
+      'tags': serializer.toJson<String>(tags),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ProjectSavedPrompt copyWith(
+          {String? id,
+          Value<String?> projectId = const Value.absent(),
+          String? content,
+          Value<String?> description = const Value.absent(),
+          String? tags,
+          DateTime? createdAt,
+          DateTime? updatedAt}) =>
+      ProjectSavedPrompt(
+        id: id ?? this.id,
+        projectId: projectId.present ? projectId.value : this.projectId,
+        content: content ?? this.content,
+        description: description.present ? description.value : this.description,
+        tags: tags ?? this.tags,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  ProjectSavedPrompt copyWithCompanion(ProjectSavedPromptCompanion data) {
+    return ProjectSavedPrompt(
+      id: data.id.present ? data.id.value : this.id,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      content: data.content.present ? data.content.value : this.content,
+      description:
+          data.description.present ? data.description.value : this.description,
+      tags: data.tags.present ? data.tags.value : this.tags,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProjectSavedPrompt(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('content: $content, ')
+          ..write('description: $description, ')
+          ..write('tags: $tags, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id, projectId, content, description, tags, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProjectSavedPrompt &&
+          other.id == this.id &&
+          other.projectId == this.projectId &&
+          other.content == this.content &&
+          other.description == this.description &&
+          other.tags == this.tags &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ProjectSavedPromptCompanion extends UpdateCompanion<ProjectSavedPrompt> {
+  final Value<String> id;
+  final Value<String?> projectId;
+  final Value<String> content;
+  final Value<String?> description;
+  final Value<String> tags;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ProjectSavedPromptCompanion({
+    this.id = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.content = const Value.absent(),
+    this.description = const Value.absent(),
+    this.tags = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProjectSavedPromptCompanion.insert({
+    required String id,
+    this.projectId = const Value.absent(),
+    required String content,
+    this.description = const Value.absent(),
+    this.tags = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        content = Value(content),
+        createdAt = Value(createdAt),
+        updatedAt = Value(updatedAt);
+  static Insertable<ProjectSavedPrompt> custom({
+    Expression<String>? id,
+    Expression<String>? projectId,
+    Expression<String>? content,
+    Expression<String>? description,
+    Expression<String>? tags,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (projectId != null) 'project_id': projectId,
+      if (content != null) 'content': content,
+      if (description != null) 'description': description,
+      if (tags != null) 'tags': tags,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProjectSavedPromptCompanion copyWith(
+      {Value<String>? id,
+      Value<String?>? projectId,
+      Value<String>? content,
+      Value<String?>? description,
+      Value<String>? tags,
+      Value<DateTime>? createdAt,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return ProjectSavedPromptCompanion(
+      id: id ?? this.id,
+      projectId: projectId ?? this.projectId,
+      content: content ?? this.content,
+      description: description ?? this.description,
+      tags: tags ?? this.tags,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProjectSavedPromptCompanion(')
+          ..write('id: $id, ')
+          ..write('projectId: $projectId, ')
+          ..write('content: $content, ')
+          ..write('description: $description, ')
+          ..write('tags: $tags, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SessionMutexesTable extends SessionMutexes
     with TableInfo<$SessionMutexesTable, SessionMutexEntity> {
   @override
@@ -1871,13 +2272,20 @@ abstract class _$ProjectDatabase extends GeneratedDatabase {
   late final $MessagesTable messages = $MessagesTable(this);
   late final $ProjectSnippetsTable projectSnippets =
       $ProjectSnippetsTable(this);
+  late final $ProjectSavedPromptsTable projectSavedPrompts =
+      $ProjectSavedPromptsTable(this);
   late final $SessionMutexesTable sessionMutexes = $SessionMutexesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities =>
-      [sessions, messages, projectSnippets, sessionMutexes];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+        sessions,
+        messages,
+        projectSnippets,
+        projectSavedPrompts,
+        sessionMutexes
+      ];
 }
 
 typedef $$SessionsTableCreateCompanionBuilder = SessionEntityCompanion
@@ -2655,6 +3063,214 @@ typedef $$ProjectSnippetsTableProcessedTableManager = ProcessedTableManager<
     ),
     ProjectSnippet,
     PrefetchHooks Function()>;
+typedef $$ProjectSavedPromptsTableCreateCompanionBuilder
+    = ProjectSavedPromptCompanion Function({
+  required String id,
+  Value<String?> projectId,
+  required String content,
+  Value<String?> description,
+  Value<String> tags,
+  required DateTime createdAt,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$ProjectSavedPromptsTableUpdateCompanionBuilder
+    = ProjectSavedPromptCompanion Function({
+  Value<String> id,
+  Value<String?> projectId,
+  Value<String> content,
+  Value<String?> description,
+  Value<String> tags,
+  Value<DateTime> createdAt,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$ProjectSavedPromptsTableFilterComposer
+    extends Composer<_$ProjectDatabase, $ProjectSavedPromptsTable> {
+  $$ProjectSavedPromptsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+      column: $table.projectId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get tags => $composableBuilder(
+      column: $table.tags, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$ProjectSavedPromptsTableOrderingComposer
+    extends Composer<_$ProjectDatabase, $ProjectSavedPromptsTable> {
+  $$ProjectSavedPromptsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+      column: $table.projectId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get content => $composableBuilder(
+      column: $table.content, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+      column: $table.tags, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ProjectSavedPromptsTableAnnotationComposer
+    extends Composer<_$ProjectDatabase, $ProjectSavedPromptsTable> {
+  $$ProjectSavedPromptsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+      column: $table.description, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ProjectSavedPromptsTableTableManager extends RootTableManager<
+    _$ProjectDatabase,
+    $ProjectSavedPromptsTable,
+    ProjectSavedPrompt,
+    $$ProjectSavedPromptsTableFilterComposer,
+    $$ProjectSavedPromptsTableOrderingComposer,
+    $$ProjectSavedPromptsTableAnnotationComposer,
+    $$ProjectSavedPromptsTableCreateCompanionBuilder,
+    $$ProjectSavedPromptsTableUpdateCompanionBuilder,
+    (
+      ProjectSavedPrompt,
+      BaseReferences<_$ProjectDatabase, $ProjectSavedPromptsTable,
+          ProjectSavedPrompt>
+    ),
+    ProjectSavedPrompt,
+    PrefetchHooks Function()> {
+  $$ProjectSavedPromptsTableTableManager(
+      _$ProjectDatabase db, $ProjectSavedPromptsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProjectSavedPromptsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProjectSavedPromptsTableOrderingComposer(
+                  $db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProjectSavedPromptsTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String?> projectId = const Value.absent(),
+            Value<String> content = const Value.absent(),
+            Value<String?> description = const Value.absent(),
+            Value<String> tags = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProjectSavedPromptCompanion(
+            id: id,
+            projectId: projectId,
+            content: content,
+            description: description,
+            tags: tags,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            Value<String?> projectId = const Value.absent(),
+            required String content,
+            Value<String?> description = const Value.absent(),
+            Value<String> tags = const Value.absent(),
+            required DateTime createdAt,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ProjectSavedPromptCompanion.insert(
+            id: id,
+            projectId: projectId,
+            content: content,
+            description: description,
+            tags: tags,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ProjectSavedPromptsTableProcessedTableManager = ProcessedTableManager<
+    _$ProjectDatabase,
+    $ProjectSavedPromptsTable,
+    ProjectSavedPrompt,
+    $$ProjectSavedPromptsTableFilterComposer,
+    $$ProjectSavedPromptsTableOrderingComposer,
+    $$ProjectSavedPromptsTableAnnotationComposer,
+    $$ProjectSavedPromptsTableCreateCompanionBuilder,
+    $$ProjectSavedPromptsTableUpdateCompanionBuilder,
+    (
+      ProjectSavedPrompt,
+      BaseReferences<_$ProjectDatabase, $ProjectSavedPromptsTable,
+          ProjectSavedPrompt>
+    ),
+    ProjectSavedPrompt,
+    PrefetchHooks Function()>;
 typedef $$SessionMutexesTableCreateCompanionBuilder
     = SessionMutexEntityCompanion Function({
   required String id,
@@ -2796,6 +3412,8 @@ class $ProjectDatabaseManager {
       $$MessagesTableTableManager(_db, _db.messages);
   $$ProjectSnippetsTableTableManager get projectSnippets =>
       $$ProjectSnippetsTableTableManager(_db, _db.projectSnippets);
+  $$ProjectSavedPromptsTableTableManager get projectSavedPrompts =>
+      $$ProjectSavedPromptsTableTableManager(_db, _db.projectSavedPrompts);
   $$SessionMutexesTableTableManager get sessionMutexes =>
       $$SessionMutexesTableTableManager(_db, _db.sessionMutexes);
 }

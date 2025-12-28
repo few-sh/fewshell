@@ -4,8 +4,11 @@ import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/snippet_dao.dart';
 import 'daos/project_snippet_dao.dart';
+import 'daos/saved_prompt_dao.dart';
+import 'daos/project_saved_prompt_dao.dart';
 import 'daos/session_mutex_dao.dart';
 import 'entities/snippet_entity.dart';
+import 'entities/saved_prompt_entity.dart';
 
 /// Facade to unify access to GlobalDatabase and ProjectDatabase.
 /// Maintains API compatibility with the old AppDatabase where possible.
@@ -42,6 +45,11 @@ class DatabaseFacade {
   late final SnippetDaoFacade snippetDao = SnippetDaoFacade(
     globalDatabase.snippetDao,
     projectDatabase?.projectSnippetDao,
+  );
+
+  late final SavedPromptDaoFacade savedPromptDao = SavedPromptDaoFacade(
+    globalDatabase.savedPromptDao,
+    projectDatabase?.projectSavedPromptDao,
   );
 
   Future<void> close() async {
@@ -161,5 +169,107 @@ class SnippetDaoFacade {
     } else {
       return globalDao.getMaxPosition();
     }
+  }
+}
+
+/// Facade for SavedPromptDao to handle routing between Global and Project databases.
+class SavedPromptDaoFacade {
+  final SavedPromptDao globalDao;
+  final ProjectSavedPromptDao? projectDao;
+
+  SavedPromptDaoFacade(this.globalDao, this.projectDao);
+
+  Stream<List<SavedPromptEntity>> watchGlobalSavedPrompts() =>
+      globalDao.watchGlobalSavedPrompts();
+
+  Stream<List<SavedPromptEntity>> watchProjectSavedPrompts(String projectId) {
+    if (projectDao != null) {
+      return projectDao!.watchProjectSavedPrompts(projectId);
+    }
+    return Stream.value([]);
+  }
+
+  Future<List<SavedPromptEntity>> getGlobalSavedPrompts() =>
+      globalDao.getGlobalSavedPrompts();
+
+  Future<List<SavedPromptEntity>> getProjectSavedPrompts(String projectId) {
+    if (projectDao != null) {
+      return projectDao!.getProjectSavedPrompts(projectId);
+    }
+    return Future.value([]);
+  }
+
+  Future<SavedPromptEntity?> getSavedPrompt(String id) async {
+    final global = await globalDao.getSavedPrompt(id);
+    if (global != null) return global;
+
+    if (projectDao != null) {
+      return await projectDao!.getSavedPrompt(id);
+    }
+    return null;
+  }
+
+  Stream<SavedPromptEntity?> watchSavedPrompt(String id) {
+    return globalDao.watchSavedPrompt(id).asyncMap((global) async {
+      if (global != null) return global;
+      if (projectDao != null) {
+        return await projectDao!.getSavedPrompt(id);
+      }
+      return null;
+    });
+  }
+
+  Future<List<SavedPromptEntity>> searchSavedPrompts(
+    String query, {
+    String? projectId,
+  }) async {
+    if (projectId != null) {
+      if (projectDao != null) {
+        return projectDao!.searchSavedPrompts(query, projectId: projectId);
+      }
+      return [];
+    } else {
+      return globalDao.searchSavedPrompts(query);
+    }
+  }
+
+  Future<int> insertSavedPrompt(SavedPromptEntityCompanion savedPrompt) {
+    if (savedPrompt.projectId.present && savedPrompt.projectId.value != null) {
+      if (projectDao == null) throw Exception('No project selected');
+      return projectDao!.insertSavedPrompt(savedPrompt);
+    } else {
+      return globalDao.insertSavedPrompt(savedPrompt);
+    }
+  }
+
+  Future<bool> updateSavedPrompt(SavedPromptEntityCompanion savedPrompt) async {
+    // If projectId is explicitly set
+    if (savedPrompt.projectId.present) {
+      if (savedPrompt.projectId.value != null) {
+        if (projectDao == null) throw Exception('No project selected');
+        return (await projectDao!.updateSavedPrompt(savedPrompt)) > 0;
+      } else {
+        return (await globalDao.updateSavedPrompt(savedPrompt)) > 0;
+      }
+    }
+
+    // If projectId is not set, try global first
+    int updated = await globalDao.updateSavedPrompt(savedPrompt);
+    if (updated > 0) return true;
+
+    if (projectDao != null) {
+      return (await projectDao!.updateSavedPrompt(savedPrompt)) > 0;
+    }
+    return false;
+  }
+
+  Future<int> deleteSavedPrompt(String id) async {
+    int count = await globalDao.deleteSavedPrompt(id);
+    if (count > 0) return count;
+
+    if (projectDao != null) {
+      return await projectDao!.deleteSavedPrompt(id);
+    }
+    return 0;
   }
 }

@@ -4,9 +4,12 @@ import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 import 'tables/projects_table.dart';
 import 'tables/snippets_table.dart';
+import 'tables/saved_prompts_table.dart';
 import 'daos/project_dao.dart';
 import 'daos/snippet_dao.dart';
+import 'daos/saved_prompt_dao.dart';
 import 'entities/snippet_entity.dart';
+import 'entities/saved_prompt_entity.dart';
 
 export 'project_database.dart';
 export 'crdt_executor_factory.dart';
@@ -15,7 +18,7 @@ part 'database.g.dart';
 
 /// Global database class for the Decamp app.
 /// Stores Projects and Global Snippets.
-@DriftDatabase(tables: [Projects, Snippets])
+@DriftDatabase(tables: [Projects, Snippets, SavedPrompts])
 class GlobalDatabase extends _$GlobalDatabase {
   final Crdt? _crdt;
   final Crdt Function()? _crdtProvider;
@@ -63,6 +66,7 @@ class GlobalDatabase extends _$GlobalDatabase {
   // DAOs - lazy initialized
   late final ProjectDao projectDao = ProjectDao(this);
   late final SnippetDao snippetDao = SnippetDao(this);
+  late final SavedPromptDao savedPromptDao = SavedPromptDao(this);
 
   /// Exposes the underlying CRDT store for sync.
   Crdt get crdt {
