@@ -8,9 +8,7 @@ import 'package:agent_core/src/secrets_storage/secure_storage.dart';
 class SecretsCrdt extends MapCrdt implements SecureStorage {
   static final _log = Logger('SecretsCrdt');
   final SecureStorage _storage;
-  Timer? _saveTimer;
   final StreamController<void> _changeController = StreamController.broadcast();
-  final Set<String> _dirtyKeys = {};
   late final Future<void> ready;
 
   SecretsCrdt(this._storage) : super(['secrets']) {
@@ -76,7 +74,7 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
       [bool isDeleted = false]) async {
     _log.info('Putting secret: $key (deleted: $isDeleted)');
     await super.put(table, key, value, isDeleted);
-    _scheduleSave(key);
+    await _saveKey(key);
     _changeController.add(null);
   }
 
@@ -86,43 +84,31 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
     final records = changeset['secrets'] ?? [];
     _log.info('Merging ${records.length} secrets');
     for (final record in records) {
-      _scheduleSave(record['key'] as String);
+      await _saveKey(record['key'] as String);
     }
     _changeController.add(null);
   }
 
-  void _scheduleSave(String key) {
-    _dirtyKeys.add(key);
-    _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 500), _save);
-  }
-
-  Future<void> _save() async {
-    final keysToSave = Set<String>.from(_dirtyKeys);
-    _dirtyKeys.clear();
-    _log.info('Saving ${keysToSave.length} secrets to storage');
-
+  Future<void> _saveKey(String key) async {
     try {
-      for (final key in keysToSave) {
-        final record = getRecord('secrets', key);
-        if (record != null) {
-          final value = record.value;
-          final hlc = record.hlc;
-          final isDeleted = record.isDeleted;
-          final modified = record.modified;
+      final record = getRecord('secrets', key);
+      if (record != null) {
+        final value = record.value;
+        final hlc = record.hlc;
+        final isDeleted = record.isDeleted;
+        final modified = record.modified;
 
-          final json = jsonEncode({
-            'value': value,
-            'hlc': hlc.toString(),
-            'is_deleted': isDeleted,
-            'modified': modified,
-          });
+        final json = jsonEncode({
+          'value': value,
+          'hlc': hlc.toString(),
+          'is_deleted': isDeleted,
+          'modified': modified,
+        });
 
-          await _storage.write(key: key, value: json);
-          _log.info('Saved secret: $key');
-        } else {
-          _log.warning('Record not found for key: $key');
-        }
+        await _storage.write(key: key, value: json);
+        _log.info('Saved secret: $key');
+      } else {
+        _log.warning('Record not found for key: $key');
       }
     } catch (e) {
       _log.severe('Error saving secrets CRDT: $e');
@@ -175,7 +161,6 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
   }
 
   Future<void> close() async {
-    _saveTimer?.cancel();
-    await _save();
+    // No-op as we save immediately
   }
 }
