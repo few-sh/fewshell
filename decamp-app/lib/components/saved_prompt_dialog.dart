@@ -67,6 +67,8 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
   late bool _isGlobalSelection;
   String? _duplicateWarning;
   String? _duplicateId;
+  bool _hasUserEditedDescription = false;
+  bool _isProgrammaticUpdate = false;
 
   @override
   void initState() {
@@ -83,6 +85,13 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
     });
 
     _contentController.addListener(_checkForDuplicates);
+    _descriptionController.addListener(_onDescriptionChanged);
+  }
+
+  void _onDescriptionChanged() {
+    if (!_isProgrammaticUpdate) {
+      _hasUserEditedDescription = true;
+    }
   }
 
   @override
@@ -119,6 +128,13 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
       setState(() {
         _duplicateWarning = 'A saved prompt with this content already exists.';
         _duplicateId = duplicatePrompt.id;
+        if (duplicatePrompt.description != null &&
+            (_descriptionController.text.isEmpty ||
+                !_hasUserEditedDescription)) {
+          _isProgrammaticUpdate = true;
+          _descriptionController.text = duplicatePrompt.description!;
+          _isProgrammaticUpdate = false;
+        }
       });
     } else if (mounted) {
       setState(() {
