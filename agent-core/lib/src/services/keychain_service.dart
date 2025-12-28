@@ -4,8 +4,10 @@ import 'package:agent_core/agent_core.dart';
 /// Uses iOS Keychain on iOS and Android Keystore on Android.
 class KeychainService {
   final SecureStorage _storage;
+  final Stream<void>? _changeStream;
 
-  KeychainService(this._storage);
+  KeychainService(this._storage, {Stream<void>? changeStream})
+      : _changeStream = changeStream;
 
   /// Save a secret value with the given key.
   /// Overwrites existing value if key already exists.
@@ -82,6 +84,19 @@ class KeychainService {
     }
 
     return projectSecrets;
+  }
+
+  /// Watch secrets for a specific project.
+  /// Yields the list of secrets whenever a change occurs.
+  Stream<Map<String, String>> watchProjectSecrets(String projectId) async* {
+    // Yield initial value
+    yield await listProjectSecrets(projectId);
+
+    if (_changeStream != null) {
+      await for (final _ in _changeStream) {
+        yield await listProjectSecrets(projectId);
+      }
+    }
   }
 
   /// Delete all secrets for a specific project.

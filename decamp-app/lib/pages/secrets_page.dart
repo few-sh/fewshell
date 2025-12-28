@@ -189,43 +189,36 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                     child: _buildEmptyState('Please select a project'),
                   ),
                 )
-              : FutureBuilder<Map<String, String>>(
-                  future: ref
-                      .watch(keychainServiceProvider)
-                      .listProjectSecrets(currentProjectId),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text('Error loading secrets: ${snapshot.error}'),
-                      );
-                    }
-
-                    final secrets = snapshot.data ?? {};
-
-                    return secrets.isEmpty
-                        ? Center(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxWidth:
-                                    Theme.of(context)
-                                        .extension<ShadLayoutTheme>()
-                                        ?.centeredContentMaxWidth ??
-                                    800,
-                              ),
-                              child: _buildEmptyState('No project secrets yet'),
-                            ),
-                          )
-                        : _buildSecretsList(
-                            secrets,
-                            isGlobal: false,
-                            projectId: currentProjectId,
-                          );
-                  },
-                ),
+              : ref
+                    .watch(projectSecretsProvider(currentProjectId))
+                    .when(
+                      data: (secrets) {
+                        return secrets.isEmpty
+                            ? Center(
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    maxWidth:
+                                        Theme.of(context)
+                                            .extension<ShadLayoutTheme>()
+                                            ?.centeredContentMaxWidth ??
+                                        800,
+                                  ),
+                                  child: _buildEmptyState(
+                                    'No project secrets yet',
+                                  ),
+                                ),
+                              )
+                            : _buildSecretsList(
+                                secrets,
+                                isGlobal: false,
+                                projectId: currentProjectId,
+                              );
+                      },
+                      error: (error, stack) =>
+                          Center(child: Text('Error loading secrets: $error')),
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                    ),
         ),
         if (currentProjectId != null)
           Center(

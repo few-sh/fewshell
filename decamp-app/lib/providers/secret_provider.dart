@@ -14,8 +14,15 @@ final secretsCrdtProvider = Provider<SecretsCrdt>((ref) {
 /// Access directly: ref.watch(keychainServiceProvider).saveProjectSecret(...)
 final keychainServiceProvider = Provider<KeychainService>((ref) {
   final crdt = ref.watch(secretsCrdtProvider);
-  return KeychainService(crdt);
+  return KeychainService(crdt, changeStream: crdt.onChange);
 });
+
+/// Provider to watch project secrets
+final projectSecretsProvider =
+    StreamProvider.family<Map<String, String>, String>((ref, projectId) {
+      final keychain = ref.watch(keychainServiceProvider);
+      return keychain.watchProjectSecrets(projectId);
+    });
 
 /// Provider to get all secrets (global and project merged)
 final allSecretsProvider = FutureProvider.family<Map<String, String>, String?>((
