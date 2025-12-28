@@ -45,6 +45,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Move agent instructions to an SQLite table and make them versioned
 
+[ ] Auto-Truncate SQLite log periodically to make sure it does not grow too big
 
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
