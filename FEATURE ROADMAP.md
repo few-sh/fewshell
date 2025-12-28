@@ -35,7 +35,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Add prompts list
 
-[ ] Be able to save certain prompts
+[X] Be able to save certain prompts
 
 [ ] A button for quick lookup of prompts and shell commands
 
@@ -46,6 +46,10 @@ MVP (Version 0 - private alpha) - Typical use-case
 [ ] Move agent instructions to an SQLite table and make them versioned
 
 [ ] Auto-Truncate SQLite log periodically to make sure it does not grow too big
+
+[ ] Do not use natural keys for secrets
+
+[ ] Add "Visible to AI" switch for secrets editing dialog.
 
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
@@ -88,6 +92,8 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 [X] If a remote project disconnects (eg server down), it falls back to using local mode. | Expected: Should block the user from typing messages, should have a clearer connection indication.
 
 [X] Concatenation of user-level agent instruction with project-level agent instruction does not work. When we enable the checkbox, it does not remember the setting.
+
+[ ] API Key secrets and others that have non-alphanumeric characters can't be edited - do not pop up the edit dialog, instead show a message with a deep link to the proper settings page.
 
 [ ] Gemini 3 in llm_dart: tool calling does not work because is requires migration to support thoughtSignatures.
 https://medium.com/google-cloud/migrating-to-gemini-3-implementing-stateful-reasoning-with-thought-signatures-4f11b625a8c9
