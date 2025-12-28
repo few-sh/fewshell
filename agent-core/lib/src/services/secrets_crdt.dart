@@ -21,7 +21,9 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
 
   Future<void> _load() async {
     try {
+      _log.info('Loading secrets from storage...');
       final allSecrets = await _storage.readAll();
+      _log.info('Found ${allSecrets.length} secrets in storage');
       final records = <Map<String, Object?>>[];
 
       for (final entry in allSecrets.entries) {
@@ -32,26 +34,28 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
             records.add({
               'key': entry.key,
               'value': json['value'],
-              'hlc': json['hlc'],
+              'hlc': Hlc.parse(json['hlc']),
               'is_deleted': json['is_deleted'] ?? false,
               'modified': json['modified'] ?? DateTime.now().toIso8601String(),
             });
           } else {
             // Legacy format (just value)
+            _log.info('Loading legacy secret: ${entry.key}');
             records.add({
               'key': entry.key,
               'value': entry.value, // The whole string is the value
-              'hlc': Hlc.zero(nodeId).toString(),
+              'hlc': Hlc.zero(nodeId),
               'is_deleted': false,
               'modified': DateTime.now().toIso8601String(),
             });
           }
         } catch (e) {
           // Not JSON, assume legacy string value
+          _log.info('Loading legacy secret (parse error): ${entry.key}');
           records.add({
             'key': entry.key,
             'value': entry.value,
-            'hlc': Hlc.zero(nodeId).toString(),
+            'hlc': Hlc.zero(nodeId),
             'is_deleted': false,
             'modified': DateTime.now().toIso8601String(),
           });
@@ -59,16 +63,18 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
       }
 
       if (records.isNotEmpty) {
-        await super.merge({'secrets': records});
+        await merge({'secrets': records});
+        _log.info('Merged ${records.length} secrets into CRDT');
       }
     } catch (e) {
-      _log.warning('Error loading secrets CRDT: ');
+      _log.warning('Error loading secrets CRDT: $e');
     }
   }
 
   @override
   Future<void> put(String table, String key, dynamic value,
       [bool isDeleted = false]) async {
+    _log.info('Putting secret: $key (deleted: $isDeleted)');
     await super.put(table, key, value, isDeleted);
     _scheduleSave(key);
     _changeController.add(null);
@@ -78,6 +84,7 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
   Future<void> merge(Map<String, List<Map<String, Object?>>> changeset) async {
     await super.merge(changeset);
     final records = changeset['secrets'] ?? [];
+    _log.info('Merging ${records.length} secrets');
     for (final record in records) {
       _scheduleSave(record['key'] as String);
     }
@@ -93,6 +100,7 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
   Future<void> _save() async {
     final keysToSave = Set<String>.from(_dirtyKeys);
     _dirtyKeys.clear();
+    _log.info('Saving ${keysToSave.length} secrets to storage');
 
     try {
       for (final key in keysToSave) {
@@ -111,10 +119,13 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
           });
 
           await _storage.write(key: key, value: json);
+          _log.info('Saved secret: $key');
+        } else {
+          _log.warning('Record not found for key: $key');
         }
       }
     } catch (e) {
-      _log.severe('Error saving secrets CRDT: ');
+      _log.severe('Error saving secrets CRDT: $e');
     }
   }
 
@@ -130,6 +141,7 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
   Future<String?> read({required String key}) async {
     await ready;
     final value = super.get('secrets', key);
+    _log.info('Read secret $key: ${value != null ? 'found' : 'not found'}');
     return value as String?;
   }
 
