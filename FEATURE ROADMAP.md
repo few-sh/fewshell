@@ -33,11 +33,18 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] For the header, leave a small button to show it
 
+[ ] Add prompts list
+
 [ ] Be able to save certain prompts
+
+[ ] A button for quick lookup of prompts and shell commands
 
 [ ] Support adding multiple snippets from multi-tool command calls
 
 [ ] Make snippets searchable
+
+[ ] Move agent instructions to an SQLite table and make them versioned
+
 
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
