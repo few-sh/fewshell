@@ -48,6 +48,8 @@ export 'src/database/crdt_executor_factory.dart';
 export 'src/database/crdt_executor.dart';
 export 'src/database/daos/project_dao.dart';
 export 'src/database/daos/snippet_dao.dart';
+export 'src/database/daos/saved_prompt_dao.dart';
+export 'src/database/entities/saved_prompt_entity.dart';
 export 'src/database/daos/session_dao.dart';
 export 'src/database/daos/message_dao.dart';
 export 'src/database/daos/project_snippet_dao.dart';
