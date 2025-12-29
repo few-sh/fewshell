@@ -12,6 +12,13 @@ class SqliteLogger {
   final String tableName;
   final String appVersion;
   final String processId;
+
+  /// Threshold in bytes at which to trigger truncation (default: 15 MB)
+  final int truncationThreshold;
+
+  /// Target size in bytes after truncation (default: 10 MB)
+  final int targetSize;
+
   late final Database _db;
   bool _initialized = false;
 
@@ -20,6 +27,8 @@ class SqliteLogger {
     required this.tableName,
     required this.appVersion,
     required this.processId,
+    this.truncationThreshold = 4 * 1024 * 1024, // 4 MB
+    this.targetSize = 2 * 1024 * 1024, // 2 MB
   }) {
     _init();
   }
@@ -35,6 +44,9 @@ class SqliteLogger {
       _db = sqlite3.open(dbPath);
       _createTable();
       _initialized = true;
+
+      // Check and truncate logs if needed during initialization
+      _truncateIfNeeded();
 
       // Subscribe to the root logger
       Logger.root.onRecord.listen(log);
@@ -127,6 +139,119 @@ class SqliteLogger {
     await File(dbPath).copy(tempPath);
 
     return File(tempPath);
+  }
+
+  /// Calculates the approximate size of log records in bytes.
+  /// Estimates size by summing the lengths of string columns.
+  int _calculateRecordsSize() {
+    try {
+      final result = _db.select('''
+        SELECT COALESCE(SUM(
+          LENGTH(COALESCE(message, '')) +
+          LENGTH(COALESCE(logger_name, '')) +
+          LENGTH(COALESCE(error, '')) +
+          LENGTH(COALESCE(stack_trace, '')) +
+          LENGTH(COALESCE(object, ''))
+        ), 0) as total_size
+        FROM $tableName
+      ''');
+
+      if (result.isNotEmpty) {
+        return result.first['total_size'] as int;
+      }
+      return 0;
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to calculate log records size: $e');
+      return 0;
+    }
+  }
+
+  /// Truncates old log records to keep the database under the target size.
+  /// Returns the number of records deleted and the size reclaimed (in bytes).
+  /// Logs a message after truncation completes.
+  Future<({int recordsDeleted, int bytesReclaimed})> truncateLogs() async {
+    if (!_initialized) {
+      throw StateError('Logger not initialized');
+    }
+
+    try {
+      final currentSize = _calculateRecordsSize();
+
+      // If we're under the target, no need to truncate
+      if (currentSize <= targetSize) {
+        return (recordsDeleted: 0, bytesReclaimed: 0);
+      }
+
+      int sizeToRemove = currentSize - targetSize;
+      int bytesReclaimed = 0;
+      int maxIdToDelete = 0;
+
+      // Find the oldest records to delete in a single query
+      final recordsToDelete = _db.select('''
+        SELECT id,
+          LENGTH(COALESCE(message, '')) +
+          LENGTH(COALESCE(logger_name, '')) +
+          LENGTH(COALESCE(error, '')) +
+          LENGTH(COALESCE(stack_trace, '')) +
+          LENGTH(COALESCE(object, '')) as record_size
+        FROM $tableName
+        ORDER BY id ASC
+      ''');
+
+      for (final record in recordsToDelete) {
+        if (bytesReclaimed >= sizeToRemove) break;
+
+        final recordId = record['id'] as int;
+        final recordSize = record['record_size'] as int;
+
+        maxIdToDelete = recordId;
+        bytesReclaimed += recordSize;
+      }
+
+      // Delete all records up to maxIdToDelete in a single operation
+      int recordsDeleted = 0;
+      if (maxIdToDelete > 0) {
+        _db.execute('DELETE FROM $tableName WHERE id <= ?', [maxIdToDelete]);
+
+        // Count actual deleted records
+        final minIdResult =
+            _db.select('SELECT MIN(id) as min_id FROM $tableName');
+        final minId = minIdResult.isNotEmpty
+            ? (minIdResult.first['min_id'] as int?)
+            : null;
+
+        if (minId != null) {
+          recordsDeleted = maxIdToDelete - minId + 1;
+        }
+      }
+
+      // Log the truncation event
+      Logger.root.info(
+        'SqliteLogger: Truncated database. '
+        'Deleted $recordsDeleted records, reclaimed ${(bytesReclaimed / 1024 / 1024).toStringAsFixed(2)} MB. '
+        'New size: ${((currentSize - bytesReclaimed) / 1024 / 1024).toStringAsFixed(2)} MB',
+      );
+
+      return (recordsDeleted: recordsDeleted, bytesReclaimed: bytesReclaimed);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Failed to truncate logs: $e');
+      rethrow;
+    }
+  }
+
+  /// Checks if truncation is needed and performs it if necessary.
+  void _truncateIfNeeded() {
+    try {
+      final currentSize = _calculateRecordsSize();
+      if (currentSize > truncationThreshold) {
+        truncateLogs();
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error during automatic log truncation: $e');
+    }
   }
 
   /// Closes the database connection.
