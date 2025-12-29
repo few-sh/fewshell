@@ -16,4 +16,7 @@ class IdGenerator {
 
   /// Generate a unique snippet ID
   static String snippetId() => 'snip_${_uuid.v4().replaceAll('-', '')}';
+
+  /// Generate a unique saved prompt ID
+  static String savedPromptId() => 'prmt_${_uuid.v4().replaceAll('-', '')}';
 }

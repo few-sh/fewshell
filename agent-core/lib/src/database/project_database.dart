@@ -7,10 +7,12 @@ import 'package:logging/logging.dart';
 import 'tables/sessions_table.dart';
 import 'tables/messages_table.dart';
 import 'tables/project_snippets_table.dart';
+import 'tables/project_saved_prompts_table.dart';
 import 'tables/session_mutex_table.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
 import 'daos/project_snippet_dao.dart';
+import 'daos/project_saved_prompt_dao.dart';
 import 'daos/session_mutex_dao.dart';
 import 'converters/tool_call_converter.dart';
 
@@ -18,7 +20,13 @@ part 'project_database.g.dart';
 
 /// Project-specific database class.
 /// Stores Sessions, Messages, and Project Snippets.
-@DriftDatabase(tables: [Sessions, Messages, ProjectSnippets, SessionMutexes])
+@DriftDatabase(tables: [
+  Sessions,
+  Messages,
+  ProjectSnippets,
+  ProjectSavedPrompts,
+  SessionMutexes
+])
 class ProjectDatabase extends _$ProjectDatabase {
   final _log = Logger('ProjectDatabase');
   final Crdt? _crdt;
@@ -70,6 +78,8 @@ class ProjectDatabase extends _$ProjectDatabase {
   late final MessageDao messageDao = MessageDao(this);
   late final ProjectSnippetDao projectSnippetDao = ProjectSnippetDao(this);
   late final SessionMutexDao sessionMutexDao = SessionMutexDao(this);
+  late final ProjectSavedPromptDao projectSavedPromptDao =
+      ProjectSavedPromptDao(this);
 
   /// Exposes the underlying CRDT store for sync.
   Crdt get crdt {
@@ -79,7 +89,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration {
@@ -188,6 +198,9 @@ class ProjectDatabase extends _$ProjectDatabase {
     );
     await executor.runCustom(
       'CREATE INDEX IF NOT EXISTS idx_project_snippets_position ON snippets(project_id, position ASC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)',
     );
   }
 }

@@ -4,9 +4,12 @@ import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 import 'tables/projects_table.dart';
 import 'tables/snippets_table.dart';
+import 'tables/saved_prompts_table.dart';
 import 'daos/project_dao.dart';
 import 'daos/snippet_dao.dart';
+import 'daos/saved_prompt_dao.dart';
 import 'entities/snippet_entity.dart';
+import 'entities/saved_prompt_entity.dart';
 
 export 'project_database.dart';
 export 'crdt_executor_factory.dart';
@@ -15,7 +18,7 @@ part 'database.g.dart';
 
 /// Global database class for the Decamp app.
 /// Stores Projects and Global Snippets.
-@DriftDatabase(tables: [Projects, Snippets])
+@DriftDatabase(tables: [Projects, Snippets, SavedPrompts])
 class GlobalDatabase extends _$GlobalDatabase {
   final Crdt? _crdt;
   final Crdt Function()? _crdtProvider;
@@ -63,6 +66,7 @@ class GlobalDatabase extends _$GlobalDatabase {
   // DAOs - lazy initialized
   late final ProjectDao projectDao = ProjectDao(this);
   late final SnippetDao snippetDao = SnippetDao(this);
+  late final SavedPromptDao savedPromptDao = SavedPromptDao(this);
 
   /// Exposes the underlying CRDT store for sync.
   Crdt get crdt {
@@ -72,13 +76,15 @@ class GlobalDatabase extends _$GlobalDatabase {
   }
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await customStatement(
+            'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)');
       },
       onUpgrade: (Migrator m, int from, int to) async {
         // No-op: Schema upgrades are handled in beforeOpen
@@ -97,6 +103,10 @@ class GlobalDatabase extends _$GlobalDatabase {
           // Seed initial data for development/testing
           await _seedInitialData();
         }
+
+        // Ensure index exists
+        await customStatement(
+            'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)');
       },
     );
   }
@@ -180,6 +190,9 @@ class GlobalDatabase extends _$GlobalDatabase {
     );
     await executor.runCustom(
       'CREATE INDEX IF NOT EXISTS idx_snippets_position ON snippets(project_id, position ASC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)',
     );
   }
 

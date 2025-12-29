@@ -6,6 +6,7 @@ import 'package:decamp/pages/main_settings.dart';
 import 'package:decamp/pages/agent_instructions_page.dart';
 import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/snippets_page.dart';
+import 'package:decamp/pages/saved_prompts_page.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/providers/package_info_provider.dart';
 import 'package:decamp/pages/feedback_page.dart';
@@ -123,6 +124,19 @@ class MainDrawer extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
+                _DrawerItem(
+                  icon: LucideIcons.messageSquare,
+                  label: 'Saved Prompts',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SavedPromptsPage(),
+                      ),
+                    );
+                  },
+                ),
                 _DrawerItem(
                   icon: LucideIcons.code,
                   label: 'Snippets',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'saved_prompts_bottom_sheet.dart';
 
 /// Simple chat input field widget
 class ChatInput extends StatefulWidget {
@@ -53,6 +54,19 @@ class _ChatInputState extends State<ChatInput> {
     _controller.clear();
   }
 
+  void _showSavedPrompts() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SavedPromptsBottomSheet(
+        onSend: (content) {
+          widget.onSend(content);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
@@ -65,6 +79,14 @@ class _ChatInputState extends State<ChatInput> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          ShadButton.link(
+            width: 40,
+            height: 40,
+            padding: EdgeInsets.zero,
+            onPressed: widget.enabled ? _showSavedPrompts : null,
+            child: const Icon(LucideIcons.messageSquare),
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: ShadInput(
               controller: _controller,
