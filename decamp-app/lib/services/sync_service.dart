@@ -38,6 +38,10 @@ class SyncService {
   StreamSubscription? _projectSubscription;
   String? _currentGlobalUrl;
 
+  // Adapters for waiting on sync idle
+  CrdtFlowAdapter? _globalAdapter;
+  CrdtFlowAdapter? _projectAdapter;
+
   final StreamController<SyncConnectionState> _connectionStateController =
       StreamController<SyncConnectionState>.broadcast();
   final StreamController<bool> _isSyncingController =
@@ -141,7 +145,7 @@ class SyncService {
       await db.customSelect('SELECT 1;').get();
 
       final crdt = db.crdt;
-      final adapter = CrdtFlowAdapter(crdt);
+      _globalAdapter = CrdtFlowAdapter(crdt);
       // Remove trailing slash if present
       final cleanUrl = serverUrl.endsWith('/')
           ? serverUrl.substring(0, serverUrl.length - 1)
@@ -155,14 +159,14 @@ class SyncService {
 
       _globalChannel = MultiplexedWebSocketChannel(
         channel,
-        awaitSync: () => adapter.onIdle,
+        awaitSync: () => _globalAdapter!.onIdle,
       );
       _globalSubscription = _globalChannel!.onCustomMessage.listen((msg) {
         _log.fine('Global sync received custom message: $msg');
       });
 
       _globalSync = CrdtSync.client(
-        adapter,
+        _globalAdapter!,
         _globalChannel!,
         verbose: true,
         validateRecord: (table, record) {
@@ -180,7 +184,7 @@ class SyncService {
               onlyNodeId,
               onlyTables,
             }) async {
-              final changeset = await adapter.getChangeset(
+              final changeset = await _globalAdapter!.getChangeset(
                 onlyTables: onlyTables,
                 onlyNodeId: onlyNodeId,
                 exceptNodeId: exceptNodeId,
@@ -246,7 +250,7 @@ class SyncService {
       }
 
       final crdt = db.crdt;
-      final adapter = CrdtFlowAdapter(crdt);
+      _projectAdapter = CrdtFlowAdapter(crdt);
       final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
       _log.info('Connecting to project sync at $uri');
@@ -284,7 +288,7 @@ class SyncService {
 
       _projectChannel = MultiplexedWebSocketChannel(
         monitoredChannel,
-        awaitSync: () => adapter.onIdle,
+        awaitSync: () => _projectAdapter!.onIdle,
       );
 
       // Settings Sync
@@ -313,7 +317,11 @@ class SyncService {
           _log.fine('PONG received: ${msg['payload']}');
         }
       });
-      _projectSync = CrdtSync.client(adapter, _projectChannel!, verbose: true);
+      _projectSync = CrdtSync.client(
+        _projectAdapter!,
+        _projectChannel!,
+        verbose: true,
+      );
     } catch (e) {
       if (token.isCancelled) return;
       _log.warning('Project DB not ready or error: $e');
@@ -397,6 +405,18 @@ class SyncService {
     _syncDebounceTimer = Timer(const Duration(milliseconds: 500), () {
       _isSyncingController.add(false);
     });
+  }
+
+  Future<void> waitForGlobalSync() async {
+    if (_globalAdapter != null) {
+      await _globalAdapter!.onIdle;
+    }
+  }
+
+  Future<void> waitForProjectSync() async {
+    if (_projectAdapter != null) {
+      await _projectAdapter!.onIdle;
+    }
   }
 
   MultiplexedWebSocketChannel? get projectChannel => _projectChannel;
