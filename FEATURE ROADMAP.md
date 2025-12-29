@@ -33,7 +33,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] For the header, leave a small button to show it
 
-[ ] Add prompts list
+[X] Add prompts list
 
 [X] Be able to save certain prompts
 
