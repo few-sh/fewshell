@@ -54,6 +54,11 @@ typedef TextDeltaCallback = void Function(String delta);
 typedef MessageCallback = Future<void> Function(ChatMessage message,
     {String? messageId});
 
+typedef ToolResultMessageCallback = Future<void> Function(
+    ChatMessage toolResultMessage,
+    {String? messageId,
+    ChatMessage? toolCallMessage});
+
 /// Optional callback to get fresh conversation (e.g., from database)
 /// If provided, called at the start of each iteration instead of using in-memory list
 typedef ConversationProvider = Future<List<ChatMessage>> Function();

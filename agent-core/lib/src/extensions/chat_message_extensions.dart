@@ -12,6 +12,7 @@ extension ChatMessageToDB on ChatMessage {
     required String sessionId,
     String? id,
     String? userName,
+    ChatMessage? toolCallMessage,
   }) {
     final now = DateTime.now();
     final messageId = id ?? IdGenerator.messageId();
@@ -44,7 +45,10 @@ extension ChatMessageToDB on ChatMessage {
       case ToolResultMessage(:final results):
         kind = MessageKind.toolResult;
         imageUrlValue = null;
-        toolCallsValue = null;
+        toolCallsValue = switch (toolCallMessage?.messageType) {
+          ToolUseMessage(:final toolCalls) => toolCalls,
+          _ => null,
+        };
         toolResultsValue = results;
 
       default:

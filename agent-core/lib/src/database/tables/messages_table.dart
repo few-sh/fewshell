@@ -66,7 +66,7 @@ class Messages extends Table {
             '(message_kind = 0 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // text
             '(message_kind = 1 AND image_url IS NOT NULL AND tool_calls_json IS NULL AND tool_results_json IS NULL) OR ' // imageUrl
             '(message_kind = 2 AND image_url IS NULL AND tool_calls_json IS NOT NULL AND tool_results_json IS NULL) OR ' // toolUse
-            '(message_kind = 3 AND image_url IS NULL AND tool_calls_json IS NULL AND tool_results_json IS NOT NULL)' // toolResult
+            '(message_kind = 3 AND image_url IS NULL AND tool_results_json IS NOT NULL)' // toolResult
             ')',
       ];
 }

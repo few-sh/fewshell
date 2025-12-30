@@ -48,7 +48,7 @@ Future<AgentLoopResult> runAgentLoop({
   required ToolExecutionFunction executeToolCall,
   TextDeltaCallback? onTextDelta,
   MessageCallback? onAssistantMessage,
-  MessageCallback? onToolResultMessage,
+  ToolResultMessageCallback? onToolResultMessage,
 }) async {
   // Work with a mutable copy if using in-memory conversation
   var messages = conversation != null
@@ -162,7 +162,8 @@ Future<AgentLoopResult> runAgentLoop({
     // Add to in-memory conversation (will be overwritten if using getConversation)
     messages.add(toolResultMessage);
     if (onToolResultMessage != null) {
-      await onToolResultMessage(toolResultMessage);
+      await onToolResultMessage(toolResultMessage,
+          toolCallMessage: assistantMessage);
     }
 
     // Loop continues with updated conversation

@@ -312,12 +312,16 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       Future<void> handleToolResultMessage(ChatMessage message,
-          {String? messageId}) async {
+          {String? messageId, ChatMessage? toolCallMessage}) async {
         // Use the ID provided by server, or generate one if local
         final idToUse = messageId ?? _messageDao.generateMessageId();
 
         await _messageDao.insertMessage(
-          message.toMessageCompanion(sessionId: sessionId, id: idToUse),
+          message.toMessageCompanion(
+            sessionId: sessionId,
+            id: idToUse,
+            toolCallMessage: toolCallMessage,
+          ),
         );
 
         await _sessionDao.touchSession(sessionId);
