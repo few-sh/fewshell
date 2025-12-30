@@ -45,7 +45,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Move agent instructions to an SQLite table and make them versioned
 
-[ ] Auto-Truncate SQLite log periodically to make sure it does not grow too big
+[X] Auto-Truncate SQLite log periodically to make sure it does not grow too big
 
 [ ] Do not use natural keys for secrets
 
