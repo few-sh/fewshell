@@ -235,44 +235,59 @@ class ProjectDatabase extends _$ProjectDatabase {
     // 1. Rename existing table
     await executor.runCustom('ALTER TABLE $tableName RENAME TO $tempName');
 
-    // 2. Create new table
-    await m.createTable(table);
+    try {
+      // 2. Create new table
+      await m.createTable(table);
 
-    // 3. Restore extra columns (CRDT columns etc)
-    final oldColumnsInfo = await _getExistingColumnsInfo(tempName);
-    final newColumns = table.$columns.map((c) => c.name).toSet();
-    final currentNewColumns = await _getExistingColumns(tableName);
+      // 3. Restore extra columns (CRDT columns etc)
+      final oldColumnsInfo = await _getExistingColumnsInfo(tempName);
+      final newColumns = table.$columns.map((c) => c.name).toSet();
+      final currentNewColumns = await _getExistingColumns(tableName);
 
-    final extraColumns = oldColumnsInfo.where((c) =>
-        !newColumns.contains(c.name) &&
-        c.name != 'is_starred' && // Explicitly drop is_starred
-        !currentNewColumns.contains(c.name));
+      final extraColumns = oldColumnsInfo.where((c) =>
+          !newColumns.contains(c.name) &&
+          c.name != 'is_starred' && // Explicitly drop is_starred
+          !currentNewColumns.contains(c.name));
 
-    for (final col in extraColumns) {
-      _log.info('Restoring extra column ${col.name} to $tableName');
-      var sql = 'ALTER TABLE $tableName ADD COLUMN ${col.name} ${col.type}';
-      if (col.notNull == 1 && col.dfltValue != null) {
-        sql += ' DEFAULT ${col.dfltValue}';
-      } else if (col.notNull == 1) {
-        sql += ' NOT NULL';
+      for (final col in extraColumns) {
+        _log.info('Restoring extra column ${col.name} to $tableName');
+        var sql = 'ALTER TABLE $tableName ADD COLUMN ${col.name} ${col.type}';
+        if (col.notNull == 1 && col.dfltValue != null) {
+          sql += ' DEFAULT ${col.dfltValue}';
+        } else if (col.notNull == 1) {
+          sql += ' NOT NULL';
+        }
+        await executor.runCustom(sql);
       }
-      await executor.runCustom(sql);
+
+      // 4. Copy data
+      final currentColumns =
+          await _getExistingColumns(tableName); // Should be new + extra
+      final oldColumnNames = oldColumnsInfo.map((c) => c.name).toSet();
+      final commonColumns = currentColumns.intersection(oldColumnNames);
+
+      if (commonColumns.isNotEmpty) {
+        final cols = commonColumns.join(', ');
+        await executor.runCustom(
+            'INSERT INTO $tableName ($cols) SELECT $cols FROM $tempName');
+      }
+
+      // 5. Drop old table
+      await executor.runCustom('DROP TABLE $tempName');
+    } catch (e, s) {
+      _log.severe(
+          'Failed to recreate table $tableName, attempting rollback', e, s);
+      try {
+        // Drop the new table if it exists
+        await executor.runCustom('DROP TABLE IF EXISTS $tableName');
+        // Restore the old table
+        await executor.runCustom('ALTER TABLE $tempName RENAME TO $tableName');
+        _log.info('Rollback successful for $tableName');
+      } catch (e2, s2) {
+        _log.severe('Rollback failed for $tableName', e2, s2);
+      }
+      rethrow;
     }
-
-    // 4. Copy data
-    final currentColumns =
-        await _getExistingColumns(tableName); // Should be new + extra
-    final oldColumnNames = oldColumnsInfo.map((c) => c.name).toSet();
-    final commonColumns = currentColumns.intersection(oldColumnNames);
-
-    if (commonColumns.isNotEmpty) {
-      final cols = commonColumns.join(', ');
-      await executor.runCustom(
-          'INSERT INTO $tableName ($cols) SELECT $cols FROM $tempName');
-    }
-
-    // 5. Drop old table
-    await executor.runCustom('DROP TABLE $tempName');
 
     // 6. Canonicalize CRDT to restore triggers
     try {
