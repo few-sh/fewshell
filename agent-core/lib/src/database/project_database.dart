@@ -220,12 +220,133 @@ class ProjectDatabase extends _$ProjectDatabase {
     if (row == null) return false;
     final currentSql = row.read<String>('sql');
 
+    // 1. Check if all code constraints are present in SQL (Added/Modified)
     for (final constraint in table.customConstraints) {
       if (!currentSql.contains(constraint)) {
         return true;
       }
     }
+
+    // 2. Check if there are any extra constraints in SQL (Removed)
+    final definitions = _parseTableDefinitions(currentSql);
+    final dbConstraints = definitions.where(_isConstraint).toList();
+
+    for (final dbConstraint in dbConstraints) {
+      bool matched = false;
+      for (final codeConstraint in table.customConstraints) {
+        if (dbConstraint.contains(codeConstraint)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched &&
+          dbConstraint.trim().toUpperCase().startsWith('PRIMARY KEY')) {
+        if (_matchesPrimaryKey(dbConstraint, table)) {
+          matched = true;
+        }
+      }
+
+      if (!matched) {
+        return true;
+      }
+    }
+
     return false;
+  }
+
+  bool _matchesPrimaryKey(String dbConstraint, TableInfo table) {
+    if (table.primaryKey.isEmpty) return false;
+
+    final start = dbConstraint.indexOf('(');
+    final end = dbConstraint.lastIndexOf(')');
+    if (start == -1 || end == -1) return false;
+
+    final content = dbConstraint.substring(start + 1, end);
+    final dbCols = content.split(',').map((c) {
+      return c
+          .trim()
+          .replaceAll('"', '')
+          .replaceAll("'", '')
+          .replaceAll('`', '');
+    }).toList();
+
+    final tableCols = table.primaryKey.map((c) => c.name).toList();
+
+    if (dbCols.length != tableCols.length) return false;
+
+    for (int i = 0; i < dbCols.length; i++) {
+      if (dbCols[i] != tableCols[i]) return false;
+    }
+
+    return true;
+  }
+
+  List<String> _parseTableDefinitions(String sql) {
+    final startIndex = sql.indexOf('(');
+    if (startIndex == -1) return [];
+
+    int balance = 0;
+    int endIndex = -1;
+    for (int i = startIndex; i < sql.length; i++) {
+      if (sql[i] == '(') {
+        balance++;
+      } else if (sql[i] == ')') {
+        balance--;
+        if (balance == 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (endIndex == -1) return [];
+
+    final content = sql.substring(startIndex + 1, endIndex);
+    final definitions = <String>[];
+    int currentStart = 0;
+    int parenBalance = 0;
+    bool inQuote = false;
+    String? quoteChar;
+
+    for (int i = 0; i < content.length; i++) {
+      final char = content[i];
+
+      if (inQuote) {
+        if (char == quoteChar) {
+          if (i + 1 < content.length && content[i + 1] == quoteChar) {
+            i++;
+          } else {
+            inQuote = false;
+            quoteChar = null;
+          }
+        }
+      } else {
+        if (char == '"' || char == "'" || char == '`') {
+          inQuote = true;
+          quoteChar = char;
+        } else if (char == '(') {
+          parenBalance++;
+        } else if (char == ')') {
+          parenBalance--;
+        } else if (char == ',' && parenBalance == 0) {
+          definitions.add(content.substring(currentStart, i).trim());
+          currentStart = i + 1;
+        }
+      }
+    }
+    definitions.add(content.substring(currentStart).trim());
+
+    return definitions.where((s) => s.isNotEmpty).toList();
+  }
+
+  bool _isConstraint(String def) {
+    final upper = def.toUpperCase();
+    return upper.startsWith('CONSTRAINT') ||
+        upper.startsWith('PRIMARY KEY') ||
+        upper.startsWith('FOREIGN KEY') ||
+        upper.startsWith('CHECK') ||
+        upper.startsWith('UNIQUE');
   }
 
   Future<void> _recreateTable(Migrator m, TableInfo table) async {
