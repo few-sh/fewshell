@@ -121,7 +121,14 @@ class ProjectDatabase extends _$ProjectDatabase {
       if (!existingTables.contains(table.actualTableName)) {
         await m.createTable(table);
       } else {
-        await _reconcileTable(m, table);
+        final constraintsChanged = await _checkConstraintsChanged(table);
+        if (constraintsChanged) {
+          _log.info(
+              'Recreating table ${table.actualTableName} due to constraint changes');
+          await _recreateTable(m, table);
+        } else {
+          await _reconcileTable(m, table);
+        }
       }
     }
 
@@ -203,4 +210,112 @@ class ProjectDatabase extends _$ProjectDatabase {
       'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)',
     );
   }
+
+  Future<bool> _checkConstraintsChanged(TableInfo table) async {
+    final row = await customSelect(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='${table.actualTableName}'",
+      readsFrom: {},
+    ).getSingleOrNull();
+
+    if (row == null) return false;
+    final currentSql = row.read<String>('sql');
+
+    for (final constraint in table.customConstraints) {
+      if (!currentSql.contains(constraint)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _recreateTable(Migrator m, TableInfo table) async {
+    final tableName = table.actualTableName;
+    final tempName = '${tableName}_backup';
+
+    // 1. Rename existing table
+    await executor.runCustom('ALTER TABLE $tableName RENAME TO $tempName');
+
+    // 2. Create new table
+    await m.createTable(table);
+
+    // 3. Restore extra columns (CRDT columns etc)
+    final oldColumnsInfo = await _getExistingColumnsInfo(tempName);
+    final newColumns = table.$columns.map((c) => c.name).toSet();
+    final currentNewColumns = await _getExistingColumns(tableName);
+
+    final extraColumns = oldColumnsInfo.where((c) =>
+        !newColumns.contains(c.name) &&
+        c.name != 'is_starred' && // Explicitly drop is_starred
+        !currentNewColumns.contains(c.name));
+
+    for (final col in extraColumns) {
+      _log.info('Restoring extra column ${col.name} to $tableName');
+      var sql = 'ALTER TABLE $tableName ADD COLUMN ${col.name} ${col.type}';
+      if (col.notNull == 1 && col.dfltValue != null) {
+        sql += ' DEFAULT ${col.dfltValue}';
+      } else if (col.notNull == 1) {
+        sql += ' NOT NULL';
+      }
+      await executor.runCustom(sql);
+    }
+
+    // 4. Copy data
+    final currentColumns =
+        await _getExistingColumns(tableName); // Should be new + extra
+    final oldColumnNames = oldColumnsInfo.map((c) => c.name).toSet();
+    final commonColumns = currentColumns.intersection(oldColumnNames);
+
+    if (commonColumns.isNotEmpty) {
+      final cols = commonColumns.join(', ');
+      await executor.runCustom(
+          'INSERT INTO $tableName ($cols) SELECT $cols FROM $tempName');
+    }
+
+    // 5. Drop old table
+    await executor.runCustom('DROP TABLE $tempName');
+
+    // 6. Canonicalize CRDT to restore triggers
+    try {
+      final c = _crdt ?? (_crdtProvider != null ? _crdtProvider() : null);
+      if (c is SqliteCrdt) {
+        // Try to call canonicalize dynamically to restore triggers
+        await (c as dynamic).canonicalize();
+      }
+    } catch (e) {
+      _log.warning('Failed to canonicalize CRDT after table recreation', e);
+    }
+  }
+
+  Future<List<PragmaTableInfo>> _getExistingColumnsInfo(
+      String tableName) async {
+    final rows = await customSelect(
+      "SELECT * FROM pragma_table_info('$tableName')",
+      readsFrom: {},
+    ).get();
+    return rows
+        .map((row) => PragmaTableInfo(
+              name: row.read<String>('name'),
+              type: row.read<String>('type'),
+              notNull: row.read<int>('notnull'),
+              dfltValue: row.read<String?>('dflt_value'),
+              pk: row.read<int>('pk'),
+            ))
+        .toList();
+  }
+}
+
+class PragmaTableInfo {
+  final String name;
+  final String type;
+  final int notNull;
+  final String? dfltValue;
+  final int pk;
+
+  PragmaTableInfo({
+    required this.name,
+    required this.type,
+    required this.notNull,
+    this.dfltValue,
+    required this.pk,
+  });
 }
