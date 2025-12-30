@@ -209,21 +209,21 @@ class SqliteLogger {
         bytesReclaimed += recordSize;
       }
 
-      // Delete all records up to maxIdToDelete in a single operation
+      // Count records to be deleted before deleting them
       int recordsDeleted = 0;
       if (maxIdToDelete > 0) {
+        final countResult = _db.select(
+            'SELECT COUNT(*) as count FROM $tableName WHERE id <= ?',
+            [maxIdToDelete]);
+        if (countResult.isNotEmpty) {
+          recordsDeleted = countResult.first['count'] as int;
+        }
+
+        // Delete all records up to maxIdToDelete in a single operation
         _db.execute('DELETE FROM $tableName WHERE id <= ?', [maxIdToDelete]);
 
-        // Count actual deleted records
-        final minIdResult =
-            _db.select('SELECT MIN(id) as min_id FROM $tableName');
-        final minId = minIdResult.isNotEmpty
-            ? (minIdResult.first['min_id'] as int?)
-            : null;
-
-        if (minId != null) {
-          recordsDeleted = maxIdToDelete - minId + 1;
-        }
+        // Optimize the database to reclaim unused space
+        _db.execute('PRAGMA optimize;');
       }
 
       // Log the truncation event
