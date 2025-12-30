@@ -35,7 +35,12 @@ class MessageFormatter {
 
         // Format using the tool result formatter
         buffer.write(
-          ToolResultFormatter.format(toolName: toolName, result: resultContent),
+          ToolResultFormatter.format(
+            toolName: toolName,
+            result: resultContent,
+            originalToolCalls: message.toolCallsJson,
+            toolCallId: toolResult.id,
+          ),
         );
       }
 
