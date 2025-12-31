@@ -44,7 +44,7 @@ abstract class ShellSession {
 class ShellService {
   static final _log = Logger('ShellService');
 
-  final ShellBackend _backend;
+  ShellBackend _backend;
   final SshSettings? _sshSettings;
   final KeychainService? _keychain;
   final String? _projectId;
@@ -81,6 +81,11 @@ class ShellService {
     String? inlinePrivateKey,
     String? inlinePassphrase,
   }) async {
+    // If we are connecting with specific settings, we must use an SshShellBackend configured with them.
+    // This overrides the current backend for this connection.
+    _backend = SshShellBackend(sshSettings, _keychain, _projectId);
+    _backend.onUserPrompt = _onUserPrompt;
+
     await _backend.connect(
       inlinePassword: inlinePassword,
       inlinePrivateKey: inlinePrivateKey,
