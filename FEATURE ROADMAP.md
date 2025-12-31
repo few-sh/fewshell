@@ -66,7 +66,7 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 ### General papercuts:
 [ ] Add a context menu button to re-run command
 
-[ ] Tool result should carry information about the original tool that we invoked
+[X] Tool result should carry information about the original tool that we invoked
 
 [ ] "Test SSH" button needs an ability to cancel the operation, or shorten the timeout.
 
@@ -99,7 +99,7 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 https://medium.com/google-cloud/migrating-to-gemini-3-implementing-stateful-reasoning-with-thought-signatures-4f11b625a8c9
 
 
-[ ] Loading state tends to get stuck for a whole session after a message gets interrupted (eg server goes down)
+[X] Loading state tends to get stuck for a whole session after a message gets interrupted (eg server goes down)
 
 [ ] (Claude only) If a tool call is interrupted, it's not possible to send messages in that session again. We get an error: "tool_use ids were found without tool_result blocks"
 
