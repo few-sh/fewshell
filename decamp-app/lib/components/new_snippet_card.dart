@@ -251,7 +251,6 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
             .read(snippetControllerProvider)
             .updateSnippet(
               id: idToUpdate,
-              name: _descriptionController.text.trim(),
               content: _contentController.text.trim(),
               description: _descriptionController.text.trim(),
               isVisibleToLlm: _isVisibleToLlm,
@@ -260,7 +259,6 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
         await ref
             .read(snippetControllerProvider)
             .addSnippet(
-              name: _descriptionController.text.trim(),
               content: _contentController.text.trim(),
               description: _descriptionController.text.trim(),
               projectId: isGlobal ? null : currentProjectId,

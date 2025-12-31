@@ -387,7 +387,6 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
           .read(snippetControllerProvider)
           .updateSnippet(
             id: widget.snippet.id,
-            name: widget.snippet.name,
             content: widget.snippet.content,
             description: widget.snippet.description ?? '',
             isVisibleToLlm: value,
