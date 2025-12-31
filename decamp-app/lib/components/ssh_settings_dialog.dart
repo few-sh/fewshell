@@ -134,6 +134,7 @@ class _SshSettingsDialogFormState
   bool _obscurePassphrase = true;
   bool _obscureSudoPassword = true;
   bool _isTestingConnection = false;
+  ShellService? _testShellService;
   String? _testResultMessage;
   bool? _testResultSuccess;
   late bool _enabled;
@@ -513,7 +514,9 @@ class _SshSettingsDialogFormState
               SizedBox(
                 width: double.infinity,
                 child: ShadButton.outline(
-                  onPressed: _isTestingConnection ? null : _testConnection,
+                  onPressed: _isTestingConnection
+                      ? _abortConnection
+                      : _testConnection,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -526,11 +529,7 @@ class _SshSettingsDialogFormState
                       else
                         const Icon(LucideIcons.network, size: 16),
                       const SizedBox(width: 8),
-                      Text(
-                        _isTestingConnection
-                            ? 'Testing Connection...'
-                            : 'Test Connection',
-                      ),
+                      Text(_isTestingConnection ? 'Abort' : 'Test Connection'),
                     ],
                   ),
                 ),
@@ -638,6 +637,17 @@ class _SshSettingsDialogFormState
     );
   }
 
+  void _abortConnection() {
+    _testShellService?.disconnect();
+    if (mounted) {
+      setState(() {
+        _isTestingConnection = false;
+        _testResultMessage = 'Connection aborted by user';
+        _testResultSuccess = false;
+      });
+    }
+  }
+
   Future<void> _testConnection() async {
     if (!_validate()) {
       return;
@@ -667,12 +677,12 @@ class _SshSettingsDialogFormState
       );
 
       // Create ShellService instance with inline credentials
-      final shellService = ShellService(null, null, null);
-      shellService.onUserPrompt = (prompt, echo) =>
+      _testShellService = ShellService(null, null, null);
+      _testShellService!.onUserPrompt = (prompt, echo) =>
           showSshPrompt(context, prompt, echo);
 
       // Connect with inline credentials
-      await shellService.connect(
+      await _testShellService!.connect(
         testSettings,
         inlinePassword: _authMethod == SshAuthMethod.password
             ? _passwordController.text
@@ -688,7 +698,8 @@ class _SshSettingsDialogFormState
       );
 
       // Disconnect immediately - authentication success is sufficient
-      shellService.disconnect();
+      _testShellService?.disconnect();
+      _testShellService = null;
 
       if (mounted) {
         setState(() {
@@ -699,6 +710,9 @@ class _SshSettingsDialogFormState
         _scrollToBottom();
       }
     } catch (e) {
+      // If aborted, don't show error
+      if (_testResultMessage == 'Connection aborted by user') return;
+
       if (mounted) {
         setState(() {
           _isTestingConnection = false;
@@ -707,6 +721,8 @@ class _SshSettingsDialogFormState
         });
         _scrollToBottom();
       }
+    } finally {
+      _testShellService = null;
     }
   }
 

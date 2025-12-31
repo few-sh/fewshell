@@ -411,6 +411,7 @@ class SshShellBackend implements ShellBackend {
   final SshSettings _settings;
   final KeychainService? _keychain;
   final String? _projectId;
+  bool _isConnectionCancelled = false;
 
   @override
   UserPromptCallback? onUserPrompt;
@@ -426,6 +427,7 @@ class SshShellBackend implements ShellBackend {
     String? inlinePrivateKey,
     String? inlinePassphrase,
   }) async {
+    _isConnectionCancelled = false;
     try {
       _log.info(
         'Connecting to SSH: ${_settings.username}@${_settings.host}:${_settings.port}',
@@ -438,11 +440,18 @@ class SshShellBackend implements ShellBackend {
       final passphrase =
           await _getCredential(inlinePassphrase, _settings.passphraseSecretId);
 
+      if (_isConnectionCancelled) return;
+
       final socket = await SSHSocket.connect(
         _settings.host,
         _settings.port,
         timeout: const Duration(seconds: 30),
       );
+
+      if (_isConnectionCancelled) {
+        socket.destroy();
+        return;
+      }
 
       if (_settings.authMethod == SshAuthMethod.password) {
         if (password == null || password.isEmpty) {
@@ -481,6 +490,7 @@ class SshShellBackend implements ShellBackend {
 
   @override
   void disconnect() {
+    _isConnectionCancelled = true;
     if (_client != null) {
       _log.info('Disconnecting from SSH');
       _client!.close();
