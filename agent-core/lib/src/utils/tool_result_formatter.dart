@@ -143,7 +143,12 @@ class ToolResultFormatter {
   }
 
   /// Format a tool result based on the tool name
-  static String format({required String toolName, required String result}) {
+  static String format({
+    required String toolName,
+    required String result,
+    List<ToolCall>? originalToolCalls,
+    String? toolCallId,
+  }) {
     // Parse the result JSON
     Map<String, dynamic>? data;
     try {
@@ -155,7 +160,8 @@ class ToolResultFormatter {
 
     // Route to specific formatter based on tool name
     return switch (toolName) {
-      kExecuteShellCommand => _formatShellCommand(data),
+      kExecuteShellCommand =>
+        _formatShellCommand(data, originalToolCalls, toolCallId),
       kFetch => _formatFetchResult(data),
       _ => _formatUnknownTool(toolName, result),
     };
@@ -169,7 +175,11 @@ class ToolResultFormatter {
   /// - Exit code (if non-zero or failed)
   /// - Standard output (if available)
   /// - Standard error (if available, labeled as warnings or errors based on success)
-  static String _formatShellCommand(Map<String, dynamic> data) {
+  static String _formatShellCommand(
+    Map<String, dynamic> data,
+    List<ToolCall>? originalToolCalls,
+    String? toolCallId,
+  ) {
     final buffer = StringBuffer();
 
     final exitCode = data['exitCode'] as int? ?? -1;
@@ -182,6 +192,26 @@ class ToolResultFormatter {
       buffer.writeln('✅ Command Executed Successfully:\n');
     } else {
       buffer.writeln('❌ **Command Failed**\n');
+    }
+
+    // Try to find original command
+    if (originalToolCalls != null && toolCallId != null) {
+      try {
+        final originalCall = originalToolCalls.firstWhere(
+          (tc) => tc.id == toolCallId,
+          orElse: () => throw Exception('Not found'),
+        );
+        final args =
+            jsonDecode(originalCall.function.arguments) as Map<String, dynamic>;
+        final command = args['command'] as String?;
+        if (command != null) {
+          buffer.writeln('```bash');
+          buffer.writeln(command);
+          buffer.writeln('```\n');
+        }
+      } catch (_) {
+        // Ignore if not found or parsing fails
+      }
     }
 
     // Exit code (show if not 0 or if command failed)

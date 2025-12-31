@@ -416,12 +416,20 @@ class _AgentSession {
             }
             await db!.sessionDao.touchSession(currentSessionId);
           },
-          onToolResultMessage: (message, {String? messageId}) async {
+          onToolResultMessage: (
+            message, {
+            String? messageId,
+            ChatMessage? toolCallMessage,
+          }) async {
             String? id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             id = db!.messageDao.generateMessageId();
             await db!.messageDao.insertMessage(
-              message.toMessageCompanion(sessionId: currentSessionId, id: id),
+              message.toMessageCompanion(
+                sessionId: currentSessionId,
+                id: id,
+                toolCallMessage: toolCallMessage,
+              ),
             );
             await db!.sessionDao.touchSession(currentSessionId);
           },

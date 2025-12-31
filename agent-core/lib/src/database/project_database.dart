@@ -121,7 +121,14 @@ class ProjectDatabase extends _$ProjectDatabase {
       if (!existingTables.contains(table.actualTableName)) {
         await m.createTable(table);
       } else {
-        await _reconcileTable(m, table);
+        final constraintsChanged = await _checkConstraintsChanged(table);
+        if (constraintsChanged) {
+          _log.info(
+              'Recreating table ${table.actualTableName} due to constraint changes');
+          await _recreateTable(m, table);
+        } else {
+          await _reconcileTable(m, table);
+        }
       }
     }
 
@@ -203,4 +210,248 @@ class ProjectDatabase extends _$ProjectDatabase {
       'CREATE INDEX IF NOT EXISTS saved_prompts_project_last_used_idx ON saved_prompts (project_id, last_used_at DESC, created_at DESC)',
     );
   }
+
+  Future<bool> _checkConstraintsChanged(TableInfo table) async {
+    final row = await customSelect(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='${table.actualTableName}'",
+      readsFrom: {},
+    ).getSingleOrNull();
+
+    if (row == null) return false;
+    final currentSql = row.read<String>('sql');
+
+    // 1. Check if all code constraints are present in SQL (Added/Modified)
+    for (final constraint in table.customConstraints) {
+      if (!currentSql.contains(constraint)) {
+        return true;
+      }
+    }
+
+    // 2. Check if there are any extra constraints in SQL (Removed)
+    final definitions = _parseTableDefinitions(currentSql);
+    final dbConstraints = definitions.where(_isConstraint).toList();
+
+    for (final dbConstraint in dbConstraints) {
+      bool matched = false;
+      for (final codeConstraint in table.customConstraints) {
+        if (dbConstraint.contains(codeConstraint)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched &&
+          dbConstraint.trim().toUpperCase().startsWith('PRIMARY KEY')) {
+        if (_matchesPrimaryKey(dbConstraint, table)) {
+          matched = true;
+        }
+      }
+
+      if (!matched) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _matchesPrimaryKey(String dbConstraint, TableInfo table) {
+    if (table.primaryKey.isEmpty) return false;
+
+    final start = dbConstraint.indexOf('(');
+    final end = dbConstraint.lastIndexOf(')');
+    if (start == -1 || end == -1) return false;
+
+    final content = dbConstraint.substring(start + 1, end);
+    final dbCols = content.split(',').map((c) {
+      return c
+          .trim()
+          .replaceAll('"', '')
+          .replaceAll("'", '')
+          .replaceAll('`', '');
+    }).toList();
+
+    final tableCols = table.primaryKey.map((c) => c.name).toList();
+
+    if (dbCols.length != tableCols.length) return false;
+
+    for (int i = 0; i < dbCols.length; i++) {
+      if (dbCols[i] != tableCols[i]) return false;
+    }
+
+    return true;
+  }
+
+  List<String> _parseTableDefinitions(String sql) {
+    final startIndex = sql.indexOf('(');
+    if (startIndex == -1) return [];
+
+    int balance = 0;
+    int endIndex = -1;
+    for (int i = startIndex; i < sql.length; i++) {
+      if (sql[i] == '(') {
+        balance++;
+      } else if (sql[i] == ')') {
+        balance--;
+        if (balance == 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+
+    if (endIndex == -1) return [];
+
+    final content = sql.substring(startIndex + 1, endIndex);
+    final definitions = <String>[];
+    int currentStart = 0;
+    int parenBalance = 0;
+    bool inQuote = false;
+    String? quoteChar;
+
+    for (int i = 0; i < content.length; i++) {
+      final char = content[i];
+
+      if (inQuote) {
+        if (char == quoteChar) {
+          if (i + 1 < content.length && content[i + 1] == quoteChar) {
+            i++;
+          } else {
+            inQuote = false;
+            quoteChar = null;
+          }
+        }
+      } else {
+        if (char == '"' || char == "'" || char == '`') {
+          inQuote = true;
+          quoteChar = char;
+        } else if (char == '(') {
+          parenBalance++;
+        } else if (char == ')') {
+          parenBalance--;
+        } else if (char == ',' && parenBalance == 0) {
+          definitions.add(content.substring(currentStart, i).trim());
+          currentStart = i + 1;
+        }
+      }
+    }
+    definitions.add(content.substring(currentStart).trim());
+
+    return definitions.where((s) => s.isNotEmpty).toList();
+  }
+
+  bool _isConstraint(String def) {
+    final upper = def.toUpperCase();
+    return upper.startsWith('CONSTRAINT') ||
+        upper.startsWith('PRIMARY KEY') ||
+        upper.startsWith('FOREIGN KEY') ||
+        upper.startsWith('CHECK') ||
+        upper.startsWith('UNIQUE');
+  }
+
+  Future<void> _recreateTable(Migrator m, TableInfo table) async {
+    final tableName = table.actualTableName;
+    final tempName = '${tableName}_backup';
+
+    // 1. Rename existing table
+    await executor.runCustom('ALTER TABLE $tableName RENAME TO $tempName');
+
+    try {
+      // 2. Create new table
+      await m.createTable(table);
+
+      // 3. Restore extra columns (CRDT columns etc)
+      final oldColumnsInfo = await _getExistingColumnsInfo(tempName);
+      final newColumns = table.$columns.map((c) => c.name).toSet();
+      final currentNewColumns = await _getExistingColumns(tableName);
+
+      final extraColumns = oldColumnsInfo.where((c) =>
+          !newColumns.contains(c.name) &&
+          c.name != 'is_starred' && // Explicitly drop is_starred
+          !currentNewColumns.contains(c.name));
+
+      for (final col in extraColumns) {
+        _log.info('Restoring extra column ${col.name} to $tableName');
+        var sql = 'ALTER TABLE $tableName ADD COLUMN ${col.name} ${col.type}';
+        if (col.notNull == 1 && col.dfltValue != null) {
+          sql += ' DEFAULT ${col.dfltValue}';
+        } else if (col.notNull == 1) {
+          sql += ' NOT NULL';
+        }
+        await executor.runCustom(sql);
+      }
+
+      // 4. Copy data
+      final currentColumns =
+          await _getExistingColumns(tableName); // Should be new + extra
+      final oldColumnNames = oldColumnsInfo.map((c) => c.name).toSet();
+      final commonColumns = currentColumns.intersection(oldColumnNames);
+
+      if (commonColumns.isNotEmpty) {
+        final cols = commonColumns.join(', ');
+        await executor.runCustom(
+            'INSERT INTO $tableName ($cols) SELECT $cols FROM $tempName');
+      }
+
+      // 5. Drop old table
+      await executor.runCustom('DROP TABLE $tempName');
+    } catch (e, s) {
+      _log.severe(
+          'Failed to recreate table $tableName, attempting rollback', e, s);
+      try {
+        // Drop the new table if it exists
+        await executor.runCustom('DROP TABLE IF EXISTS $tableName');
+        // Restore the old table
+        await executor.runCustom('ALTER TABLE $tempName RENAME TO $tableName');
+        _log.info('Rollback successful for $tableName');
+      } catch (e2, s2) {
+        _log.severe('Rollback failed for $tableName', e2, s2);
+      }
+      rethrow;
+    }
+
+    // 6. Canonicalize CRDT to restore triggers
+    try {
+      final c = _crdt ?? (_crdtProvider != null ? _crdtProvider() : null);
+      if (c is SqliteCrdt) {
+        // Try to call canonicalize dynamically to restore triggers
+        await (c as dynamic).canonicalize();
+      }
+    } catch (e) {
+      _log.warning('Failed to canonicalize CRDT after table recreation', e);
+    }
+  }
+
+  Future<List<PragmaTableInfo>> _getExistingColumnsInfo(
+      String tableName) async {
+    final rows = await customSelect(
+      "SELECT * FROM pragma_table_info('$tableName')",
+      readsFrom: {},
+    ).get();
+    return rows
+        .map((row) => PragmaTableInfo(
+              name: row.read<String>('name'),
+              type: row.read<String>('type'),
+              notNull: row.read<int>('notnull'),
+              dfltValue: row.read<String?>('dflt_value'),
+              pk: row.read<int>('pk'),
+            ))
+        .toList();
+  }
+}
+
+class PragmaTableInfo {
+  final String name;
+  final String type;
+  final int notNull;
+  final String? dfltValue;
+  final int pk;
+
+  PragmaTableInfo({
+    required this.name,
+    required this.type,
+    required this.notNull,
+    this.dfltValue,
+    required this.pk,
+  });
 }
