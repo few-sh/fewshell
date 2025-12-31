@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:agent_core/agent_core.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
@@ -9,10 +10,7 @@ class SnippetDraft {
   final String content;
   final String description;
 
-  const SnippetDraft({
-    required this.content,
-    required this.description,
-  });
+  const SnippetDraft({required this.content, required this.description});
 }
 
 /// Shows a modal dialog to create or edit a snippet
@@ -111,8 +109,8 @@ class _SnippetCarouselState extends State<SnippetCarousel> {
           initialContent: draft.content,
           isGlobal: widget.isGlobal,
           initialIsVisibleToLlm: widget.initialIsVisibleToLlm,
-          title: widget.title ??
-              (widget.drafts.length > 1 ? 'Add Snippet' : null),
+          title:
+              widget.title ?? (widget.drafts.length > 1 ? 'Add Snippet' : null),
           onCancel: () => Navigator.of(context).pop(),
           onSuccess: () {
             ShadToaster.of(context).show(
@@ -162,6 +160,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
   bool _isSaving = false;
   bool _isVisibleToLlm = true;
   late bool _isGlobalSelection;
+  SnippetEntity? _existingSnippet;
 
   @override
   void initState() {
@@ -173,9 +172,12 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     _isGlobalSelection = widget.isGlobal ?? false;
     _isVisibleToLlm = widget.initialIsVisibleToLlm ?? true;
 
+    _contentController.addListener(_checkForDuplicate);
+
     // Auto-focus on description field
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _descriptionFocus.requestFocus();
+      _checkForDuplicate();
     });
   }
 
@@ -185,6 +187,45 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     _contentController.dispose();
     _descriptionFocus.dispose();
     super.dispose();
+  }
+
+  void _checkForDuplicate() {
+    if (widget.snippetId != null) return;
+
+    final content = _contentController.text.trim();
+    if (content.isEmpty) {
+      if (_existingSnippet != null) {
+        setState(() => _existingSnippet = null);
+      }
+      return;
+    }
+
+    final globalSnippets = ref.read(globalSnippetsProvider).valueOrNull ?? [];
+    final projectId = ref.read(currentProjectIdProvider);
+    final projectSnippets = projectId != null
+        ? (ref.read(projectSnippetsProvider(projectId)).valueOrNull ?? [])
+        : <SnippetEntity>[];
+
+    SnippetEntity? match;
+    try {
+      match = [
+        ...projectSnippets,
+        ...globalSnippets,
+      ].firstWhere((s) => s.content.trim() == content);
+    } catch (_) {
+      match = null;
+    }
+
+    if (match != _existingSnippet) {
+      setState(() {
+        _existingSnippet = match;
+        if (match != null) {
+          _descriptionController.text = match.name;
+          _isVisibleToLlm = match.isVisibleToLlm;
+          _isGlobalSelection = match.projectId == null;
+        }
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -198,12 +239,13 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
     try {
       final currentProjectId = ref.read(currentProjectIdProvider);
       final isGlobal = widget.isGlobal ?? _isGlobalSelection;
+      final idToUpdate = widget.snippetId ?? _existingSnippet?.id;
 
-      if (widget.snippetId != null) {
+      if (idToUpdate != null) {
         await ref
             .read(snippetControllerProvider)
             .updateSnippet(
-              id: widget.snippetId!,
+              id: idToUpdate,
               name: _descriptionController.text.trim(),
               content: _contentController.text.trim(),
               description: _descriptionController.text.trim(),
@@ -244,6 +286,13 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
+
+    // Watch providers to ensure we have data for duplicate checking
+    ref.watch(globalSnippetsProvider);
+    final projectId = ref.watch(currentProjectIdProvider);
+    if (projectId != null) {
+      ref.watch(projectSnippetsProvider(projectId));
+    }
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -291,6 +340,15 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
             onSubmitted: (_) => _save(),
           ),
         ),
+        if (_existingSnippet != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Snippet already exists. Saving will overwrite it.',
+            style: theme.textTheme.small.copyWith(
+              color: theme.colorScheme.destructive,
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         ShadSwitch(
           value: _isVisibleToLlm,
@@ -359,10 +417,14 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
             onPressed: _isSaving ? null : _save,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(LucideIcons.check, size: 16),
-                SizedBox(width: 8),
-                Text('Save Snippet'),
+              children: [
+                const Icon(LucideIcons.check, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  _existingSnippet != null || widget.snippetId != null
+                      ? 'Update Snippet'
+                      : 'Save Snippet',
+                ),
               ],
             ),
           ),
