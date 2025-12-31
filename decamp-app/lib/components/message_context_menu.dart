@@ -129,11 +129,15 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           try {
             final args =
                 jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
-            if (args.containsKey('command')) {
-              shellCommands.add(SnippetDraft(
-                content: args['command'] as String,
-                description: args['explanation'] as String? ?? 'Shell Command',
-              ));
+            final command = args['command'];
+            if (command is String) {
+              shellCommands.add(
+                SnippetDraft(
+                  content: command,
+                  description:
+                      args['explanation'] as String? ?? 'Shell Command',
+                ),
+              );
             }
           } catch (e) {
             // Ignore parsing errors
@@ -175,9 +179,11 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
         if (shellCommands.isNotEmpty)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.code),
-            child: Text(shellCommands.length > 1
-                ? 'Add ${shellCommands.length} Snippets'
-                : 'Add to Snippets'),
+            child: Text(
+              shellCommands.length > 1
+                  ? 'Add ${shellCommands.length} Snippets'
+                  : 'Add to Snippets',
+            ),
             onPressed: () async {
               await showNewSnippetDialog(
                 context,
