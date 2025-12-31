@@ -37,9 +37,9 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [X] Be able to save certain prompts
 
-[ ] A button for quick lookup of prompts and shell commands
+[X] A button for quick lookup of prompts and shell commands
 
-[ ] Support adding multiple snippets from multi-tool command calls
+[X] Support adding multiple snippets from multi-tool command calls
 
 [ ] Make snippets searchable
 
