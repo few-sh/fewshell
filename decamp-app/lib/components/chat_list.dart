@@ -295,6 +295,16 @@ class _ChatListState extends State<ChatList> {
   Widget build(BuildContext context) {
     // TODO: When we copy the content, it should be a nicely formatted Markdown (if possible)
     return SelectionArea(
+      contextMenuBuilder: (context, selectableRegionState) {
+        try {
+          return AdaptiveTextSelectionToolbar.selectableRegion(
+            selectableRegionState: selectableRegionState,
+          );
+        } catch (e) {
+          // Workaround for crash when scrolling and selecting
+          return const SizedBox.shrink();
+        }
+      },
       child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),

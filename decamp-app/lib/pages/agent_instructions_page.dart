@@ -993,6 +993,15 @@ class _TemplateVariablesInfo extends StatelessWidget {
       icon: const Icon(LucideIcons.info),
       title: const Text('Template Variables'),
       description: SelectionArea(
+        contextMenuBuilder: (context, selectableRegionState) {
+          try {
+            return AdaptiveTextSelectionToolbar.selectableRegion(
+              selectableRegionState: selectableRegionState,
+            );
+          } catch (e) {
+            return const SizedBox.shrink();
+          }
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

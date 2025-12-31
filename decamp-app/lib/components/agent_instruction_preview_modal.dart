@@ -107,6 +107,15 @@ class _AgentInstructionPreviewModalState
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: SelectionArea(
+                contextMenuBuilder: (context, selectableRegionState) {
+                  try {
+                    return AdaptiveTextSelectionToolbar.selectableRegion(
+                      selectableRegionState: selectableRegionState,
+                    );
+                  } catch (e) {
+                    return const SizedBox.shrink();
+                  }
+                },
                 child: _previewMarkdown
                     ? GptMarkdown(_processedText ?? widget.instruction)
                     : SelectableText(_processedText ?? widget.instruction),
