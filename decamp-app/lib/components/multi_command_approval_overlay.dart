@@ -191,7 +191,10 @@ class _MultiCommandApprovalOverlayState
             const SizedBox(height: 16),
 
             // Scrollable list of commands
-            Flexible(
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.6,
+              ),
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: widget.actions.length,
