@@ -5,11 +5,22 @@ import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
 
+class SnippetDraft {
+  final String content;
+  final String description;
+
+  const SnippetDraft({
+    required this.content,
+    required this.description,
+  });
+}
+
 /// Shows a modal dialog to create or edit a snippet
 Future<void> showNewSnippetDialog(
   BuildContext context, {
   String? initialDescription,
   String? initialContent,
+  List<SnippetDraft>? drafts,
   bool? isGlobal,
   String? title,
   String? snippetId,
@@ -20,19 +31,101 @@ Future<void> showNewSnippetDialog(
     builder: (context) => ShadDialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
-        child: NewSnippetCard(
-          isGlobal: isGlobal,
-          initialDescription: initialDescription,
-          initialContent: initialContent,
-          title: title,
-          snippetId: snippetId,
-          initialIsVisibleToLlm: initialIsVisibleToLlm,
-          onCancel: () => Navigator.of(context).pop(),
-          onSuccess: () => Navigator.of(context).pop(),
-        ),
+        child: drafts != null && drafts.isNotEmpty
+            ? SnippetCarousel(
+                drafts: drafts,
+                isGlobal: isGlobal,
+                initialIsVisibleToLlm: initialIsVisibleToLlm,
+                title: title,
+              )
+            : NewSnippetCard(
+                isGlobal: isGlobal,
+                initialDescription: initialDescription,
+                initialContent: initialContent,
+                title: title,
+                snippetId: snippetId,
+                initialIsVisibleToLlm: initialIsVisibleToLlm,
+                onCancel: () => Navigator.of(context).pop(),
+                onSuccess: () => Navigator.of(context).pop(),
+              ),
       ),
     ),
   );
+}
+
+class SnippetCarousel extends StatefulWidget {
+  final List<SnippetDraft> drafts;
+  final bool? isGlobal;
+  final bool? initialIsVisibleToLlm;
+  final String? title;
+
+  const SnippetCarousel({
+    super.key,
+    required this.drafts,
+    this.isGlobal,
+    this.initialIsVisibleToLlm,
+    this.title,
+  });
+
+  @override
+  State<SnippetCarousel> createState() => _SnippetCarouselState();
+}
+
+class _SnippetCarouselState extends State<SnippetCarousel> {
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final draft = widget.drafts[_currentIndex];
+    final theme = ShadTheme.of(context);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.drafts.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                ShadButton.ghost(
+                  enabled: _currentIndex > 0,
+                  onPressed: () => setState(() => _currentIndex--),
+                  child: const Icon(LucideIcons.chevronLeft),
+                ),
+                Text(
+                  'Snippet ${_currentIndex + 1} of ${widget.drafts.length}',
+                  style: theme.textTheme.small,
+                ),
+                ShadButton.ghost(
+                  enabled: _currentIndex < widget.drafts.length - 1,
+                  onPressed: () => setState(() => _currentIndex++),
+                  child: const Icon(LucideIcons.chevronRight),
+                ),
+              ],
+            ),
+          ),
+        NewSnippetCard(
+          key: ValueKey(_currentIndex),
+          initialDescription: draft.description,
+          initialContent: draft.content,
+          isGlobal: widget.isGlobal,
+          initialIsVisibleToLlm: widget.initialIsVisibleToLlm,
+          title: widget.title ??
+              (widget.drafts.length > 1 ? 'Add Snippet' : null),
+          onCancel: () => Navigator.of(context).pop(),
+          onSuccess: () {
+            ShadToaster.of(context).show(
+              const ShadToast(
+                description: Text('Snippet saved successfully'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
 }
 
 /// Widget for creating or editing a snippet inline
