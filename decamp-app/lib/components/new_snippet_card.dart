@@ -119,6 +119,11 @@ class _SnippetCarouselState extends State<SnippetCarousel> {
                 duration: Duration(seconds: 2),
               ),
             );
+            if (_currentIndex < widget.drafts.length - 1) {
+              setState(() => _currentIndex++);
+            } else {
+              Navigator.of(context).pop();
+            }
           },
         ),
       ],
