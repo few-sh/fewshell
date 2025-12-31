@@ -23,8 +23,8 @@ class SnippetController {
   SnippetController(this._ref);
 
   Future<void> addSnippet({
-    required String name,
     required String content,
+    String? name,
     String? description,
     List<String> tags = const [],
     String? projectId,
@@ -42,7 +42,7 @@ class SnippetController {
     final snippet = SnippetEntityCompanion(
       id: Value(_generateSnippetId()),
       projectId: Value(projectId),
-      name: Value(name),
+      name: Value(name ?? ''),
       content: Value(content),
       description: Value(description),
       tags: Value(tags.join(',')),

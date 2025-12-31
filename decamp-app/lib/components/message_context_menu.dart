@@ -121,27 +121,27 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
 
     final isUser = widget.message.userId == 'user';
     final isToolCall = widget.message.messageKind == MessageKind.toolUse;
-    bool isShellCommand = false;
-    String? shellCommandContent;
-    String? shellCommandExplanation;
+    final List<SnippetDraft> shellCommands = [];
 
     if (isToolCall && widget.message.toolCallsJson != null) {
       for (final toolCall in widget.message.toolCallsJson!) {
         if (toolCall.function.name == 'execute_shell_command') {
-          isShellCommand = true;
           try {
             final args =
                 jsonDecode(toolCall.function.arguments) as Map<String, dynamic>;
-            if (args.containsKey('command')) {
-              shellCommandContent = args['command'] as String?;
-            }
-            if (args.containsKey('explanation')) {
-              shellCommandExplanation = args['explanation'] as String?;
+            final command = args['command'];
+            if (command is String) {
+              shellCommands.add(
+                SnippetDraft(
+                  content: command,
+                  description:
+                      args['explanation'] as String? ?? 'Shell Command',
+                ),
+              );
             }
           } catch (e) {
             // Ignore parsing errors
           }
-          break;
         }
       }
     }
@@ -176,16 +176,18 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           onPressed: widget.onEdit,
           child: const Text('Edit'),
         ),
-        if (isShellCommand)
+        if (shellCommands.isNotEmpty)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.code),
-            child: const Text('Add to Snippets'),
+            child: Text(
+              shellCommands.length > 1
+                  ? 'Add ${shellCommands.length} Snippets'
+                  : 'Add to Snippets',
+            ),
             onPressed: () async {
               await showNewSnippetDialog(
                 context,
-                initialDescription:
-                    shellCommandExplanation ?? 'Test Description',
-                initialContent: shellCommandContent ?? 'Test Content',
+                drafts: shellCommands,
                 isGlobal: null,
               );
             },
