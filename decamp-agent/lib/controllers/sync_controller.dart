@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:logging/logging.dart';
-import 'dart:io';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -133,6 +132,7 @@ class _AgentSession {
   final MultiplexedWebSocketChannel channel;
   final ProjectDatabase? db;
   final Set<String> _activeSessions;
+  final ShellService _shellService = ShellService.local(null, null);
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
 
@@ -337,7 +337,11 @@ class _AgentSession {
 
             if (toolCall.function.name == kExecuteShellCommand) {
               final command = params['command'] as String;
-              final result = await _executeLocalCommand(command);
+              final secrets = params['secrets'] != null
+                  ? Map<String, String>.from(params['secrets'])
+                  : null;
+              final result =
+                  await _shellService.executeCommand(command, secrets: secrets);
               await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
@@ -471,23 +475,6 @@ class _AgentSession {
       if (sessionId != null) {
         await _unlockSession(sessionId);
       }
-    }
-  }
-
-  Future<Map<String, dynamic>> _executeLocalCommand(String command) async {
-    try {
-      final result = await Process.run('bash', ['-c', command]);
-      return {
-        'stdout': result.stdout,
-        'stderr': result.stderr,
-        'exitCode': result.exitCode,
-      };
-    } catch (e) {
-      return {
-        'stdout': '',
-        'stderr': e.toString(),
-        'exitCode': -1,
-      };
     }
   }
 }
