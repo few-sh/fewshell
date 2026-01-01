@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/shell_service_provider.dart';
 import 'package:decamp/components/ssh_prompt_dialog.dart';
 import 'package:decamp/components/main_drawer.dart';
@@ -116,7 +117,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final chatController = ref.read(
       chatControllerProvider(currentSessionId).notifier,
     );
-    chatController.abortCommand();
+
+    final currentProject = ref.read(currentProjectProvider);
+    MultiplexedWebSocketChannel? syncChannel;
+    if (currentProject != null) {
+      syncChannel = ref.read(syncServiceProvider).getChannel(currentProject.id);
+    }
+
+    chatController.abortCommand(syncChannel);
   }
 
   /// Create a new chat session

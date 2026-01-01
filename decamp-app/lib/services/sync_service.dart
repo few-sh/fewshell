@@ -65,6 +65,13 @@ class SyncService {
     _init();
   }
 
+  MultiplexedWebSocketChannel? getChannel(String projectId) {
+    if (_currentProjectId == projectId) {
+      return _projectChannel;
+    }
+    return null;
+  }
+
   void _updateConnectionState(SyncConnectionState state) {
     _currentConnectionState = state;
     _connectionStateController.add(state);

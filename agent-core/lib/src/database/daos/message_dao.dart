@@ -105,6 +105,22 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     );
   }
 
+  // Update message streaming status
+  Future<int> updateMessageStreamingStatus(
+    String messageId,
+    bool isStreaming,
+  ) async {
+    final companion = MessageEntityCompanion(
+      isStreaming: Value(isStreaming),
+    );
+    final numWritten = await (update(messages)
+          ..where(
+            (m) => m.id.equals(messageId),
+          ))
+        .write(companion);
+    return numWritten;
+  }
+
   /// Get messages for a session
   Future<List<MessageEntity>> getMessagesBySession(String sessionId) {
     return (select(messages)

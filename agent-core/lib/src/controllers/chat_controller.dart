@@ -80,11 +80,16 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Abort the currently running command
-  void abortCommand() {
+  void abortCommand(MultiplexedWebSocketChannel? syncChannel) {
     _log.info('Aborting command...');
     _isAborted = true;
     _currentAbortController?.add(ProcessSignal.sigint);
     _currentLlmCancelToken?.cancel('Aborted by user');
+
+    if (syncChannel != null) {
+      _log.info('Sending abort_chat to server');
+      syncChannel.sendCustomMessage({'type': 'abort_chat'});
+    }
   }
 
   /// Build conversation history from database messages
