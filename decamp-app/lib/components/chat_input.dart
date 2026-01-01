@@ -5,6 +5,8 @@ import 'saved_prompts_bottom_sheet.dart';
 /// Simple chat input field widget
 class ChatInput extends StatefulWidget {
   final Function(String) onSend;
+  final VoidCallback? onAbort;
+  final bool isLoading;
   final bool enabled;
   final String hintText;
   final FocusNode? focusNode;
@@ -12,6 +14,8 @@ class ChatInput extends StatefulWidget {
   const ChatInput({
     super.key,
     required this.onSend,
+    this.onAbort,
+    this.isLoading = false,
     this.enabled = true,
     this.hintText = 'Type your message...',
     this.focusNode,
@@ -48,7 +52,7 @@ class _ChatInputState extends State<ChatInput> {
 
   void _handleSend() {
     final text = _controller.text.trim();
-    if (text.isEmpty || !widget.enabled) return;
+    if (text.isEmpty || !widget.enabled || widget.isLoading) return;
 
     widget.onSend(text);
     _controller.clear();
@@ -70,6 +74,8 @@ class _ChatInputState extends State<ChatInput> {
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
+    final isInputEnabled = widget.enabled && !widget.isLoading;
+
     return Container(
       padding: const EdgeInsets.all(8.0),
       decoration: BoxDecoration(
@@ -83,7 +89,7 @@ class _ChatInputState extends State<ChatInput> {
             width: 40,
             height: 40,
             padding: EdgeInsets.zero,
-            onPressed: widget.enabled ? _showSavedPrompts : null,
+            onPressed: isInputEnabled ? _showSavedPrompts : null,
             child: const Icon(LucideIcons.messageSquare),
           ),
           const SizedBox(width: 8),
@@ -91,25 +97,38 @@ class _ChatInputState extends State<ChatInput> {
             child: ShadInput(
               controller: _controller,
               focusNode: _focusNode,
-              enabled: widget.enabled,
+              enabled: isInputEnabled,
               minLines: 1,
               //              maxLines: 5,
               autofocus: false,
               autocorrect: false,
               enableSuggestions: false,
               placeholder: Text(widget.hintText),
-              onSubmitted: widget.enabled ? (_) => _handleSend() : null,
+              onSubmitted: isInputEnabled ? (_) => _handleSend() : null,
             ),
           ),
           const SizedBox(width: 8),
-          ShadButton(
-            width: 40,
-            height: 40,
-            padding: EdgeInsets.zero,
-            onPressed: widget.enabled ? _handleSend : null,
-            backgroundColor: theme.colorScheme.background,
-            child: const Icon(LucideIcons.send),
-          ),
+          if (widget.isLoading && widget.onAbort != null)
+            ShadButton(
+              width: 40,
+              height: 40,
+              padding: EdgeInsets.zero,
+              onPressed: widget.onAbort,
+              backgroundColor: theme.colorScheme.background,
+              child: Icon(
+                LucideIcons.square,
+                color: theme.colorScheme.destructive,
+              ),
+            )
+          else
+            ShadButton(
+              width: 40,
+              height: 40,
+              padding: EdgeInsets.zero,
+              onPressed: isInputEnabled ? _handleSend : null,
+              backgroundColor: theme.colorScheme.background,
+              child: const Icon(LucideIcons.send),
+            ),
         ],
       ),
     );

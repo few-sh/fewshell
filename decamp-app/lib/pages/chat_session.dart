@@ -111,6 +111,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     });
   }
 
+  void _handleAbort() {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    final chatController = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+    chatController.abortCommand();
+  }
+
   /// Create a new chat session
   Future<void> _createNewSession() async {
     final currentProject = ref.read(currentProjectProvider);
@@ -395,7 +403,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                   else
                     ChatInput(
                       onSend: _handleSendMessage,
-                      enabled: !isLoading && hasProject,
+                      onAbort: chatState.isLoading ? _handleAbort : null,
+                      isLoading: isLoading,
+                      enabled: hasProject,
                       focusNode: _inputFocusNode,
                     ),
                 ],

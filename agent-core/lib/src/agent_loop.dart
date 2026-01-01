@@ -133,6 +133,8 @@ Future<AgentLoopResult> runAgentLoop({
       String resultString;
       try {
         resultString = await executeToolCall(toolCall);
+      } on AgentAbortException {
+        return const AgentLoopCancelled();
       } catch (e) {
         // Return error as result so LLM can reason about it
         resultString = jsonEncode({
