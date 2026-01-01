@@ -407,12 +407,6 @@ class _AgentSession {
             String? id =
                 _streamingMessageId ?? db!.messageDao.generateMessageId();
 
-            // Reset streaming state
-            _streamingMessageId = null;
-            _streamingContent.clear();
-            _streamingCreatedAt = null;
-            _lastDbWrite = Future.value(); // Reset chain
-
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             // Determine if this is a tool use message or a text message
             final messageType = message.messageType;
@@ -493,18 +487,41 @@ class _AgentSession {
         }
       } finally {
         _currentCancelToken = null;
+
+        // Ensure any pending DB writes are finished before unlocking
+        try {
+          await _lastDbWrite;
+        } catch (e) {
+          _log.warning('Error waiting for last DB write: $e');
+        }
+
         if (_streamingMessageId != null && db != null) {
           // Clean up any streaming message placeholder
-          _lastDbWrite = _lastDbWrite.then((_) async {
-            await db!.messageDao
-                .updateMessageStreamingStatus(_streamingMessageId!, false);
-          }).catchError((e) {
-            _log.warning(
-              'Error writing streaming message: $e',
+          try {
+            final config = data['config'] as Map<String, dynamic>?;
+            final model = config?['model'] as String? ?? 'Ops Agent';
+
+            await db!.messageDao.insertMessageWithId(
+              id: _streamingMessageId!,
+              sessionId: sessionId!,
+              userId: 'ai',
+              userName: model,
+              content: _streamingContent.toString(),
+              isStreaming: false,
+              isVisibleToLlm: true,
             );
-            // Return void to satisfy the Future<void> chain
-          });
+          } catch (e) {
+            _log.warning(
+              'Error cleaning up streaming message placeholder: $e',
+            );
+          }
         }
+        // Reset streaming state
+        _streamingMessageId = null;
+        _streamingContent.clear();
+        _streamingCreatedAt = null;
+        _lastDbWrite = Future.value(); // Reset chain
+
         if (sessionId != null) {
           await _unlockSession(sessionId);
         }
