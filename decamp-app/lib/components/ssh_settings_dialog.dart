@@ -127,6 +127,7 @@ class _SshSettingsDialogFormState
   late final TextEditingController _sudoPasswordController;
 
   final _scrollController = ScrollController();
+  final _testResultKey = GlobalKey();
   final Map<String, String?> _errors = {};
 
   bool _obscurePassword = true;
@@ -539,6 +540,7 @@ class _SshSettingsDialogFormState
               if (_testResultMessage != null) ...[
                 const SizedBox(height: 8),
                 Container(
+                  key: _testResultKey,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _testResultSuccess == true
@@ -645,6 +647,7 @@ class _SshSettingsDialogFormState
         _testResultMessage = 'Connection aborted by user';
         _testResultSuccess = false;
       });
+      _scrollToBottom();
     }
   }
 
@@ -729,11 +732,13 @@ class _SshSettingsDialogFormState
   void _scrollToBottom() {
     // Wait for the widget tree to rebuild with the new message
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+      final context = _testResultKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
+          alignment: 1.0, // Align to bottom
         );
       }
     });

@@ -91,6 +91,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
   late final TextEditingController _maxTokensController;
   late final TextEditingController _temperatureController;
   final _scrollController = ScrollController();
+  final _testResultKey = GlobalKey();
   bool _obscureApiKey = true;
   bool _isTestingConnection = false;
   String? _testResultMessage;
@@ -409,6 +410,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               if (_testResultMessage != null) ...[
                 const SizedBox(height: 8),
                 Container(
+                  key: _testResultKey,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _testResultSuccess == true
@@ -521,11 +523,13 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
   void _scrollToBottom() {
     // Wait for the widget tree to rebuild with the new message
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+      final context = _testResultKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
+          alignment: 1.0, // Align to bottom
         );
       }
     });
