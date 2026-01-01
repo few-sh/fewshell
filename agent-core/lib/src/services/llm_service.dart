@@ -301,6 +301,7 @@ class LlmService {
   Stream<ChatStreamEvent> streamChat(
     List<ChatMessage> conversation, {
     List<Tool>? tools,
+    CancelToken? cancelToken,
   }) async* {
     final activeConfig = await _getActiveConfig();
 
@@ -323,7 +324,11 @@ class LlmService {
         systemInstruction: agentInstruction,
       );
 
-      final stream = provider.chatStream(conversation, tools: tools);
+      final stream = provider.chatStream(
+        conversation,
+        tools: tools,
+        cancelToken: cancelToken,
+      );
       yield* stream;
     } catch (e) {
       yield ErrorEvent(ProviderError(e.toString()));

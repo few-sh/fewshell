@@ -32,6 +32,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   final _activeMessageController = StreamController<MessageEntity>.broadcast();
   StreamController<ProcessSignal>? _currentAbortController;
+  CancelToken? _currentLlmCancelToken;
   bool _isAborted = false;
 
   Stream<MessageEntity> get activeMessageStream =>
@@ -83,6 +84,7 @@ class ChatController extends StateNotifier<ChatState> {
     _log.info('Aborting command...');
     _isAborted = true;
     _currentAbortController?.add(ProcessSignal.sigint);
+    _currentLlmCancelToken?.cancel('Aborted by user');
   }
 
   /// Build conversation history from database messages
@@ -384,46 +386,57 @@ class ChatController extends StateNotifier<ChatState> {
         final dbMessages = await _messageDao.getMessagesBySession(sessionId);
         final conversation = _buildConversationHistory(dbMessages);
 
-        result = await runAgentLoop(
-          llmStream: (conv, tools) =>
-              _llmService.streamChat(conv, tools: tools),
-          tools: shellTools,
-          conversation: conversation,
-          getConversation: () async {
-            // Rebuild conversation from database each iteration (single source of truth)
-            final dbMessages =
-                await _messageDao.getMessagesBySession(sessionId);
-            return _buildConversationHistory(dbMessages);
-          },
-          requestApproval: handleRequestApproval,
-          executeToolCall: (toolCall) async {
-            if (currentToolMessageId != null) {
-              // Refresh current entity just in case
-              currentEntity =
-                  await _messageDao.getMessage(currentToolMessageId!);
-            }
+        _currentLlmCancelToken = CancelToken();
 
-            final toolOutputBuffer = StringBuffer();
-            void onOutput(String data) {
-              toolOutputBuffer.write(data);
-              if (currentEntity != null) {
-                // Construct display content: original content + code block with output
-                final displayContent =
-                    '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
-                _activeMessageController.add(
-                  currentEntity!.copyWith(content: displayContent),
-                );
+        try {
+          result = await runAgentLoop(
+            llmStream: (conv, tools, {cancelToken}) => _llmService.streamChat(
+              conv,
+              tools: tools,
+              cancelToken: cancelToken,
+            ),
+            tools: shellTools,
+            conversation: conversation,
+            cancelToken: _currentLlmCancelToken,
+            getConversation: () async {
+              // Rebuild conversation from database each iteration (single source of truth)
+              final dbMessages =
+                  await _messageDao.getMessagesBySession(sessionId);
+              return _buildConversationHistory(dbMessages);
+            },
+            requestApproval: handleRequestApproval,
+            executeToolCall: (toolCall) async {
+              if (currentToolMessageId != null) {
+                // Refresh current entity just in case
+                currentEntity =
+                    await _messageDao.getMessage(currentToolMessageId!);
               }
-            }
 
-            // Execute and return result as JSON string
-            final result = await _executeToolCall(toolCall, onOutput: onOutput);
-            await _sessionDao.touchSession(sessionId);
-            return jsonEncode(result);
-          },
-          onAssistantMessage: handleAssistantMessage,
-          onToolResultMessage: handleToolResultMessage,
-        );
+              final toolOutputBuffer = StringBuffer();
+              void onOutput(String data) {
+                toolOutputBuffer.write(data);
+                if (currentEntity != null) {
+                  // Construct display content: original content + code block with output
+                  final displayContent =
+                      '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
+                  _activeMessageController.add(
+                    currentEntity!.copyWith(content: displayContent),
+                  );
+                }
+              }
+
+              // Execute and return result as JSON string
+              final result =
+                  await _executeToolCall(toolCall, onOutput: onOutput);
+              await _sessionDao.touchSession(sessionId);
+              return jsonEncode(result);
+            },
+            onAssistantMessage: handleAssistantMessage,
+            onToolResultMessage: handleToolResultMessage,
+          );
+        } finally {
+          _currentLlmCancelToken = null;
+        }
       }
 
       // Handle result
@@ -458,6 +471,14 @@ class ChatController extends StateNotifier<ChatState> {
 
       if (mounted) state = state.copyWith(isLoading: false);
     } catch (e) {
+      if (e is CancelledError) {
+        _log.info('Operation cancelled by user');
+        if (mounted) {
+          state = state.copyWith(isLoading: false);
+        }
+        return;
+      }
+
       // TODO: Should not try to get ai usernme and use 'System' instead
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);

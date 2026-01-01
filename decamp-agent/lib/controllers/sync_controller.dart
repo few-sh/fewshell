@@ -307,8 +307,12 @@ class _AgentSession {
         );
 
         await runAgentLoop(
-          llmStream: (conv, tools) {
-            return provider.chatStream(conv, tools: tools);
+          llmStream: (conv, tools, {cancelToken}) {
+            return provider.chatStream(
+              conv,
+              tools: tools,
+              cancelToken: cancelToken,
+            );
           },
           tools: shellTools,
           conversation: conversation,

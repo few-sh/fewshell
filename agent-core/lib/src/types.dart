@@ -48,8 +48,9 @@ class AgentAbortException implements Exception {
 /// Callback types for the agent loop
 typedef LlmStreamFunction = Stream<ChatStreamEvent> Function(
   List<ChatMessage> conversation,
-  List<Tool> tools,
-);
+  List<Tool> tools, {
+  CancelToken? cancelToken,
+});
 
 typedef ApprovalFunction = Future<List<PendingToolCall>?> Function(
   List<PendingToolCall> toolCalls,
