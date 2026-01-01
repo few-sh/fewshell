@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:async/async.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/llm_service_provider.dart';
@@ -91,6 +92,8 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
   late final TextEditingController _maxTokensController;
   late final TextEditingController _temperatureController;
   final _scrollController = ScrollController();
+  final _testResultKey = GlobalKey();
+  CancelableOperation<String?>? _testOperation;
   bool _obscureApiKey = true;
   bool _isTestingConnection = false;
   String? _testResultMessage;
@@ -146,6 +149,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
 
   @override
   void dispose() {
+    _testOperation?.cancel();
     _identifierController.dispose();
     _urlController.dispose();
     _apiKeyController.dispose();
@@ -385,7 +389,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               ],
               const SizedBox(height: 16),
               ShadButton.outline(
-                onPressed: _isTestingConnection ? null : _testConnection,
+                onPressed: _isTestingConnection ? _abortTest : _testConnection,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -398,9 +402,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                     else
                       const Icon(LucideIcons.network, size: 16),
                     const SizedBox(width: 8),
-                    Text(
-                      _isTestingConnection ? 'Testing...' : 'Test Connection',
-                    ),
+                    Text(_isTestingConnection ? 'Abort' : 'Test Connection'),
                   ],
                 ),
               ),
@@ -409,6 +411,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               if (_testResultMessage != null) ...[
                 const SizedBox(height: 8),
                 Container(
+                  key: _testResultKey,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _testResultSuccess == true
@@ -456,6 +459,18 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
     );
   }
 
+  Future<void> _abortTest() async {
+    await _testOperation?.cancel();
+    if (mounted) {
+      setState(() {
+        _isTestingConnection = false;
+        _testResultSuccess = false;
+        _testResultMessage = 'Connection test aborted';
+      });
+      _scrollToBottom();
+    }
+  }
+
   Future<void> _testConnection() async {
     if (!_validate()) {
       return;
@@ -493,12 +508,14 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
 
       // Get LLM service and test connection
       final llmService = ref.read(llmServiceProvider);
-      final errorMessage = await llmService.testConnection(
+      _testOperation = llmService.testConnection(
         config: testSettings,
         apiKey: apiKey,
       );
 
-      if (mounted) {
+      final errorMessage = await _testOperation?.value;
+
+      if (mounted && _isTestingConnection) {
         setState(() {
           _isTestingConnection = false;
           _testResultSuccess = errorMessage == null;
@@ -507,7 +524,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
         _scrollToBottom();
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _isTestingConnection) {
         setState(() {
           _isTestingConnection = false;
           _testResultSuccess = false;
@@ -515,17 +532,21 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
         });
         _scrollToBottom();
       }
+    } finally {
+      _testOperation = null;
     }
   }
 
   void _scrollToBottom() {
     // Wait for the widget tree to rebuild with the new message
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+      final context = _testResultKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
+          alignment: 1.0, // Align to bottom
         );
       }
     });

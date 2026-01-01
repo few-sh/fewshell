@@ -51,6 +51,18 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Add "Visible to AI" switch for secrets editing dialog.
 
+[ ] Ensure "Visible to AI" is disabled by default for when creating user secrets, or API/SSH secrets.
+
+[ ] Make sure secrets are properly passed to shell commands
+
+[ ] Allow the user to select/deselect which secrets to provide to each command.
+
+[ ] Allow the user to edit command before approving
+
+[ ] Allow LLM to pass the list of secrets by name to each shell command tool
+
+[ ] Allow the same for FETCH commands
+
 ### Smoother onboarding:
 [X] When no project exists, automatically pop up the new project dialog
 

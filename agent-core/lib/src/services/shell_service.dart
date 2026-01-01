@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:logging/logging.dart';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
@@ -13,126 +14,104 @@ import 'keychain_service.dart';
 /// Callback for interactive user prompts (e.g. 2FA, password)
 typedef UserPromptCallback = Future<String> Function(String prompt, bool echo);
 
-/// Service for executing shell commands via SSH
+/// Abstract interface for shell execution backend
+abstract class ShellBackend {
+  Future<void> connect({
+    String? inlinePassword,
+    String? inlinePrivateKey,
+    String? inlinePassphrase,
+  });
+  void disconnect();
+  bool get isConnected;
+  Future<ShellSession> execute(String command);
+  Future<ShellSession> createSession();
+
+  /// Set callback for interactive prompts
+  set onUserPrompt(UserPromptCallback? callback);
+}
+
+/// Abstract interface for a shell session
+abstract class ShellSession {
+  Stream<Uint8List> get stdout;
+  Stream<Uint8List> get stderr;
+  Future<int> get exitCode;
+  Future<void> get done;
+  void write(Uint8List data);
+  void close();
+}
+
+/// Service for executing shell commands via SSH or Local
 class ShellService {
   static final _log = Logger('ShellService');
 
-  SSHClient? _client;
+  ShellBackend _backend;
   final SshSettings? _sshSettings;
   final KeychainService? _keychain;
   final String? _projectId;
 
-  /// Callback for handling interactive prompts from the SSH server
-  UserPromptCallback? onUserPrompt;
+  /// Callback for handling interactive prompts
+  UserPromptCallback? _onUserPrompt;
 
-  ShellService(this._sshSettings, this._keychain, this._projectId);
+  UserPromptCallback? get onUserPrompt => _onUserPrompt;
+  set onUserPrompt(UserPromptCallback? callback) {
+    _onUserPrompt = callback;
+    _backend.onUserPrompt = callback;
+  }
 
-  /// Connect to SSH server using the provided settings
-  /// Throws an exception if connection fails
-  ///
-  /// Optional inline credentials can be provided for testing purposes.
-  /// If provided, they override credentials from the keychain.
+  ShellService(
+    this._sshSettings,
+    this._keychain,
+    this._projectId, {
+    ShellBackend? backend,
+  }) : _backend = backend ??
+            (_sshSettings != null
+                ? SshShellBackend(_sshSettings, _keychain, _projectId)
+                : UnconfiguredShellBackend());
+
+  /// Factory for local execution
+  factory ShellService.local(KeychainService? keychain, String? projectId) {
+    return ShellService(null, keychain, projectId,
+        backend: LocalShellBackend());
+  }
+
+  /// Connect to shell backend
   Future<void> connect(
     SshSettings sshSettings, {
     String? inlinePassword,
     String? inlinePrivateKey,
     String? inlinePassphrase,
   }) async {
-    try {
-      _log.info(
-        'Connecting to SSH: ${sshSettings.username}@${sshSettings.host}:${sshSettings.port}',
-      );
+    // If we are connecting with specific settings, we must use an SshShellBackend configured with them.
+    // This overrides the current backend for this connection.
+    _backend = SshShellBackend(sshSettings, _keychain, _projectId);
+    _backend.onUserPrompt = _onUserPrompt;
 
-      // Get credentials from inline or keychain
-      final password =
-          await _getCredential(inlinePassword, sshSettings.passwordSecretId);
-      final privateKey = await _getCredential(
-          inlinePrivateKey, sshSettings.privateKeySecretId);
-      final passphrase = await _getCredential(
-          inlinePassphrase, sshSettings.passphraseSecretId);
-
-      // Create SSH socket
-      final socket = await SSHSocket.connect(
-        sshSettings.host,
-        sshSettings.port,
-        timeout: const Duration(seconds: 30),
-      );
-
-      // Create SSH client with authentication
-      if (sshSettings.authMethod == SshAuthMethod.password) {
-        if (password == null || password.isEmpty) {
-          throw Exception('Password not found in secrets');
-        }
-
-        _client = SSHClient(
-          socket,
-          username: sshSettings.username,
-          onPasswordRequest: () => password,
-          onUserInfoRequest: (request) =>
-              _handleUserInfoRequest(request, passwordFallback: password),
-        );
-      } else {
-        // Private key authentication
-        if (privateKey == null || privateKey.isEmpty) {
-          throw Exception('Private key not found in secrets');
-        }
-
-        _client = SSHClient(
-          socket,
-          username: sshSettings.username,
-          identities: [...SSHKeyPair.fromPem(privateKey, passphrase)],
-          onUserInfoRequest: (request) => _handleUserInfoRequest(request),
-        );
-      }
-
-      // Wait for authentication to complete
-      await _client!.authenticated;
-
-      _log.info('SSH connection established');
-    } catch (e) {
-      _log.warning('SSH connection failed: $e');
-      _client?.close();
-      _client = null;
-      rethrow;
-    }
+    await _backend.connect(
+      inlinePassword: inlinePassword,
+      inlinePrivateKey: inlinePrivateKey,
+      inlinePassphrase: inlinePassphrase,
+    );
   }
 
-  /// Execute a shell command on the remote server
-  ///
-  /// [command] - The shell command to execute
-  /// [secrets] - Optional map of environment variable names to secret values
-  ///             e.g., {'AWS_KEY': 'secret123', 'DB_PASSWORD': 'pass456'}
-  /// Returns a map with 'stdout', 'stderr', and 'exitCode'
-  ///
-  /// Security: Uses process substitution to avoid exposing secrets in process list
+  /// Execute a shell command
   Future<Map<String, dynamic>> executeCommand(
     String command, {
     Map<String, String>? secrets,
-    // ignore: avoid_private_typedef_parameters
-    bool isRetry =
-        false, // Internal: prevents infinite recursion on connection retry
+    bool isRetry = false,
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
     _log.info('Executing command: $command');
 
-    // Auto-connect if not connected or connection is stale
+    // Auto-connect if not connected
     if (!isConnected) {
-      if (_sshSettings == null) {
-        _log.warning(
-          'No SSH settings configured for this project',
-        );
+      if (_sshSettings == null && _backend is SshShellBackend) {
+        _log.warning('No SSH settings configured for this project');
         throw Exception('SSH settings not configured for this project');
       }
 
-      // Clean up stale client if it exists
-      if (_client != null) {
-        _log.info('Cleaning up stale connection...');
-        _client = null;
-      }
-
-      _log.info('Auto-connecting to SSH server...');
-      await connect(_sshSettings);
+      _log.info('Auto-connecting...');
+      await _backend.connect();
     }
 
     try {
@@ -145,15 +124,11 @@ class ShellService {
 
         for (var entry in secrets.entries) {
           if (entry.value.isNotEmpty) {
-            // Validate environment variable name to prevent injection
             if (!_isValidEnvVarName(entry.key)) {
-              _log.warning(
-                'Invalid environment variable name: ${entry.key}',
-              );
+              _log.warning('Invalid environment variable name: ${entry.key}');
               continue;
             }
 
-            // Base64 encode the secret to safely handle any characters
             final encodedValue = base64.encode(utf8.encode(entry.value));
             envExports.writeln(
               "export ${entry.key}=\$(echo '$encodedValue' | base64 -d)",
@@ -162,21 +137,17 @@ class ShellService {
           }
         }
 
-        // Build secure command using process substitution
         finalCommand = '''
 bash -c "source <(cat <<'DECAMP_SECRETS'
 ${envExports}DECAMP_SECRETS
 ) && ${_escapeForCommand(command)}"
 ''';
       } else {
-        // No secrets - execute command directly
         finalCommand = command;
       }
 
-      // Execute command and capture output
-      final session = await _client!.execute(finalCommand);
+      final session = await _backend.execute(finalCommand);
 
-      // Collect stdout and stderr
       final stdoutBuffer = BytesBuilder(copy: false);
       final stderrBuffer = BytesBuilder(copy: false);
       final stdoutDone = Completer<void>();
@@ -200,16 +171,13 @@ ${envExports}DECAMP_SECRETS
         onError: stderrDone.completeError,
       );
 
-      // Wait for both streams to complete
       await stdoutDone.future;
       await stderrDone.future;
-
-      // Wait for session to complete to get exit code
       await session.done;
 
       final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
-      final exitCode = session.exitCode ?? 0;
+      final exitCode = await session.exitCode;
 
       _log.info(
         'Command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
@@ -222,107 +190,53 @@ ${envExports}DECAMP_SECRETS
         'executed': true,
       };
     } catch (e) {
-      // Check if this is a connection-related error that we can retry
-      if (!isRetry && _isConnectionError(e) && _sshSettings != null) {
-        _log.warning(
-          'Command failed due to connection error: $e. Attempting reconnect...',
-        );
-
-        // Clean up and try to reconnect
-        _client = null;
-        await connect(_sshSettings);
-
-        _log.info(
-          'Reconnected, retrying command...',
-        );
-        // Retry the command once
-        return executeCommand(
-          command,
-          secrets: secrets,
-          isRetry: true,
-          onStdout: onStdout,
-          onStderr: onStderr,
-        );
+      if (!isRetry && _backend is SshShellBackend && _sshSettings != null) {
+        if (_isConnectionError(e)) {
+          _log.warning(
+              'Command failed due to connection error: $e. Attempting reconnect...');
+          _backend.disconnect();
+          await _backend.connect();
+          return executeCommand(
+            command,
+            secrets: secrets,
+            isRetry: true,
+            onStdout: onStdout,
+            onStderr: onStderr,
+          );
+        }
       }
-
       _log.warning('Command execution failed: $e');
       rethrow;
     }
   }
 
-  /// Execute a shell command with full control over stdin/stdout/stderr
-  /// Returns a session that can be used for interactive commands
-  Future<SSHSession> createSession() async {
-    // Auto-connect if not connected or connection is stale
+  Future<ShellSession> createSession() async {
     if (!isConnected) {
-      if (_sshSettings == null) {
-        _log.warning(
-          'No SSH settings configured for this project',
-        );
-        throw Exception('SSH settings not configured for this project');
-      }
-
-      // Clean up stale client if it exists
-      if (_client != null) {
-        _log.info('Cleaning up stale connection...');
-        _client = null;
-      }
-
-      _log.info('Auto-connecting to SSH server...');
-      await connect(_sshSettings);
+      await _backend.connect();
     }
-
-    try {
-      final session = await _client!.shell();
-      _log.info('Interactive session created');
-      return session;
-    } catch (e) {
-      _log.warning('Failed to create session: $e');
-      rethrow;
-    }
+    return _backend.createSession();
   }
 
-  /// Disconnect from SSH server
   void disconnect() {
-    if (_client != null) {
-      _log.info('Disconnecting from SSH');
-      _client!.close();
-      _client = null;
-    }
+    _backend.disconnect();
   }
 
-  /// Check if currently connected to SSH server
-  /// Note: This checks if the client exists and hasn't been closed,
-  /// but the connection may still be stale. Connection errors are handled
-  /// automatically with retry logic in executeCommand and executeWithSudo.
-  bool get isConnected => _client != null && !_client!.isClosed;
+  bool get isConnected => _backend.isConnected;
 
-  /// Check if an exception indicates a connection problem that may be recoverable
-  /// by reconnecting
   bool _isConnectionError(Object e) {
-    // SSHStateError with 'Transport is closed' indicates stale connection
     if (e is SSHStateError) return true;
-    // SSHSocketError indicates network-level issues
     if (e is SSHSocketError) return true;
-    // SSHChannelOpenError may indicate connection issues
     if (e is SSHChannelOpenError) return true;
     return false;
   }
 
-  /// Validate a shell command before execution
-  /// Returns null if valid, error message if invalid
   String? validateCommand(String command) {
     if (command.trim().isEmpty) {
       return 'Command cannot be empty';
     }
-
-    // Add more validation as needed
-    // e.g., check for dangerous commands, syntax validation, etc.
-
-    return null; // Valid
+    return null;
   }
 
-  /// Check if a command requires elevated privileges
   bool requiresSudo(String command) {
     final trimmed = command.trim();
     return trimmed.startsWith('sudo ') ||
@@ -330,47 +244,18 @@ ${envExports}DECAMP_SECRETS
         trimmed.contains('mkfs');
   }
 
-  /// Execute a command with sudo privileges and optional secret injection
-  ///
-  /// [command] - The command to execute with sudo (don't include 'sudo' prefix)
-  /// [sudoPasswordSecretId] - Optional secret ID for the sudo password
-  ///                          If null, assumes passwordless sudo or cached credentials
-  /// [secrets] - Optional map of environment variable names to secret values
-  ///             e.g., {'AWS_KEY': 'secret123', 'DB_PASSWORD': 'pass456'}
-  ///
-  /// Returns a map with 'stdout', 'stderr', 'exitCode', and 'executed'
-  ///
-  /// Security: Uses process substitution to avoid exposing secrets in process list
   Future<Map<String, dynamic>> executeWithSudo({
     required String command,
     String? sudoPasswordSecretId,
     Map<String, String>? secrets,
-    // ignore: avoid_private_typedef_parameters
-    bool isRetry =
-        false, // Internal: prevents infinite recursion on connection retry
+    bool isRetry = false,
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
-    // Auto-connect if not connected or connection is stale
     if (!isConnected) {
-      if (_sshSettings == null) {
-        _log.warning(
-          'No SSH settings configured for this project',
-        );
-        throw Exception('SSH settings not configured for this project');
-      }
-
-      // Clean up stale client if it exists
-      if (_client != null) {
-        _log.info('Cleaning up stale connection...');
-        _client = null;
-      }
-
-      _log.info('Auto-connecting to SSH server...');
-      await connect(_sshSettings);
+      await _backend.connect();
     }
 
-    // Get sudo password from secrets if provided
     String? sudoPassword;
     if (sudoPasswordSecretId != null &&
         _keychain != null &&
@@ -380,14 +265,10 @@ ${envExports}DECAMP_SECRETS
         sudoPasswordSecretId,
       );
       if (sudoPassword == null || sudoPassword.isEmpty) {
-        _log.warning(
-          'Sudo password not found in secrets',
-        );
         throw Exception('Sudo password not found in secrets');
       }
     }
 
-    // Build environment variable exports for secrets
     final envExports = StringBuffer();
     final secretsToRedact = <String>[];
     if (sudoPassword != null) {
@@ -397,15 +278,9 @@ ${envExports}DECAMP_SECRETS
     if (secrets != null && secrets.isNotEmpty) {
       for (var entry in secrets.entries) {
         if (entry.value.isNotEmpty) {
-          // Validate environment variable name to prevent injection
           if (!_isValidEnvVarName(entry.key)) {
-            _log.warning(
-              'Invalid environment variable name: ${entry.key}',
-            );
             continue;
           }
-
-          // Base64 encode the secret to safely handle any characters
           final encodedValue = base64.encode(utf8.encode(entry.value));
           envExports.writeln(
             "export ${entry.key}=\$(echo '$encodedValue' | base64 -d)",
@@ -415,20 +290,14 @@ ${envExports}DECAMP_SECRETS
       }
     }
 
-    // Build secure command using process substitution
-    // This avoids exposing secrets in the process list
-    // Secrets are base64-encoded to prevent injection attacks while preserving content
     String secureCommand;
 
     if (sudoPassword != null) {
-      // Generate unique askpass script path to prevent tampering between sessions
       final askpassPath = '/tmp/decamp_askpass_\$\$';
       final encodedSudoPassword = base64.encode(utf8.encode(sudoPassword));
 
       secureCommand = '''
 bash -c "
-# Create unique askpass helper for this execution with secure permissions
-# Use umask to ensure file is created with 600 permissions, then add execute
 (umask 077 && cat > $askpassPath <<'ASKPASS_EOF'
 #!/bin/sh
 echo \\\"\\\$SUDO_PASSWORD\\\"
@@ -436,18 +305,15 @@ ASKPASS_EOF
 )
 chmod 700 $askpassPath
 
-# Source secrets and execute with sudo
 source <(cat <<'DECAMP_SECRETS'
 ${envExports}export SUDO_PASSWORD=\$(echo '$encodedSudoPassword' | base64 -d)
 DECAMP_SECRETS
 ) && SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'
 
-# Clean up askpass script
 rm -f $askpassPath
 "
 ''';
     } else {
-      // No sudo password - use regular sudo (assumes passwordless or cached credentials)
       secureCommand = '''
 bash -c "source <(cat <<'DECAMP_SECRETS'
 ${envExports}DECAMP_SECRETS
@@ -455,15 +321,11 @@ ${envExports}DECAMP_SECRETS
 ''';
     }
 
-    // Log command with redacted secrets
-    _log.info(
-      'Executing sudo command: sudo $command (secrets redacted)',
-    );
+    _log.info('Executing sudo command: sudo $command (secrets redacted)');
 
     try {
-      final session = await _client!.execute(secureCommand);
+      final session = await _backend.execute(secureCommand);
 
-      // Collect stdout and stderr
       final stdoutBuffer = BytesBuilder(copy: false);
       final stderrBuffer = BytesBuilder(copy: false);
       final stdoutDone = Completer<void>();
@@ -487,20 +349,13 @@ ${envExports}DECAMP_SECRETS
         onError: stderrDone.completeError,
       );
 
-      // Wait for both streams to complete
       await stdoutDone.future;
       await stderrDone.future;
-
-      // Wait for session to complete to get exit code
       await session.done;
 
       final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
-      final exitCode = session.exitCode ?? -1;
-
-      _log.info(
-        'Sudo command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
-      );
+      final exitCode = await session.exitCode;
 
       return {
         'stdout': _redactSecrets(stdout, secretsToRedact),
@@ -509,60 +364,160 @@ ${envExports}DECAMP_SECRETS
         'executed': true,
       };
     } catch (e) {
-      // Check if this is a connection-related error that we can retry
-      if (!isRetry && _isConnectionError(e) && _sshSettings != null) {
-        _log.warning(
-          'Sudo command failed due to connection error: $e. Attempting reconnect...',
-        );
-
-        // Clean up and try to reconnect
-        _client = null;
-        await connect(_sshSettings);
-
-        _log.info(
-          'Reconnected, retrying sudo command...',
-        );
-        // Retry the command once
-        return executeWithSudo(
-          command: command,
-          sudoPasswordSecretId: sudoPasswordSecretId,
-          secrets: secrets,
-          isRetry: true,
-          onStdout: onStdout,
-          onStderr: onStderr,
-        );
+      if (!isRetry && _backend is SshShellBackend && _sshSettings != null) {
+        if (_isConnectionError(e)) {
+          _log.warning(
+              'Sudo command failed due to connection error: $e. Attempting reconnect...');
+          _backend.disconnect();
+          await _backend.connect();
+          return executeWithSudo(
+            command: command,
+            sudoPasswordSecretId: sudoPasswordSecretId,
+            secrets: secrets,
+            isRetry: true,
+            onStdout: onStdout,
+            onStderr: onStderr,
+          );
+        }
       }
-
       _log.warning('Sudo command execution failed: $e');
       rethrow;
     }
   }
 
-  /// Escape command string for bash -c execution
-  ///
-  /// This only escapes the command itself (not secrets, which are base64-encoded)
-  /// Handles single quotes by using the '\'' technique
   String _escapeForCommand(String input) {
-    // For single-quoted strings in bash, only single quotes need escaping
-    // We use the '\'' technique: close quote, escaped quote, open quote
     return input.replaceAll("'", "'\\''");
   }
 
-  /// Validate environment variable name
-  /// Only allow alphanumeric characters and underscores, must start with letter or underscore
   bool _isValidEnvVarName(String name) {
     return RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name);
   }
 
-  /// Handle SSH keyboard-interactive requests
+  String _redactSecrets(String text, List<String> secrets) {
+    var redacted = text;
+    for (var secret in secrets) {
+      if (secret.isNotEmpty) {
+        redacted = redacted.replaceAll(secret, '***REDACTED***');
+      }
+    }
+    return redacted;
+  }
+}
+
+class SshShellBackend implements ShellBackend {
+  static final _log = Logger('SshShellBackend');
+
+  SSHClient? _client;
+  final SshSettings _settings;
+  final KeychainService? _keychain;
+  final String? _projectId;
+  bool _isConnectionCancelled = false;
+
+  @override
+  UserPromptCallback? onUserPrompt;
+
+  SshShellBackend(this._settings, this._keychain, this._projectId);
+
+  @override
+  bool get isConnected => _client != null && !_client!.isClosed;
+
+  @override
+  Future<void> connect({
+    String? inlinePassword,
+    String? inlinePrivateKey,
+    String? inlinePassphrase,
+  }) async {
+    _isConnectionCancelled = false;
+    try {
+      _log.info(
+        'Connecting to SSH: ${_settings.username}@${_settings.host}:${_settings.port}',
+      );
+
+      final password =
+          await _getCredential(inlinePassword, _settings.passwordSecretId);
+      final privateKey =
+          await _getCredential(inlinePrivateKey, _settings.privateKeySecretId);
+      final passphrase =
+          await _getCredential(inlinePassphrase, _settings.passphraseSecretId);
+
+      if (_isConnectionCancelled) return;
+
+      final socket = await SSHSocket.connect(
+        _settings.host,
+        _settings.port,
+        timeout: const Duration(seconds: 30),
+      );
+
+      if (_isConnectionCancelled) {
+        socket.destroy();
+        return;
+      }
+
+      if (_settings.authMethod == SshAuthMethod.password) {
+        if (password == null || password.isEmpty) {
+          throw Exception('Password not found in secrets');
+        }
+
+        _client = SSHClient(
+          socket,
+          username: _settings.username,
+          onPasswordRequest: () => password,
+          onUserInfoRequest: (request) =>
+              _handleUserInfoRequest(request, passwordFallback: password),
+        );
+      } else {
+        if (privateKey == null || privateKey.isEmpty) {
+          throw Exception('Private key not found in secrets');
+        }
+
+        _client = SSHClient(
+          socket,
+          username: _settings.username,
+          identities: [...SSHKeyPair.fromPem(privateKey, passphrase)],
+          onUserInfoRequest: (request) => _handleUserInfoRequest(request),
+        );
+      }
+
+      await _client!.authenticated;
+      _log.info('SSH connection established');
+    } catch (e) {
+      _log.warning('SSH connection failed: $e');
+      _client?.close();
+      _client = null;
+      rethrow;
+    }
+  }
+
+  @override
+  void disconnect() {
+    _isConnectionCancelled = true;
+    if (_client != null) {
+      _log.info('Disconnecting from SSH');
+      _client!.close();
+      _client = null;
+    }
+  }
+
+  @override
+  Future<ShellSession> execute(String command) async {
+    if (!isConnected) throw Exception('Not connected');
+    final session = await _client!.execute(command);
+    return SshShellSession(session);
+  }
+
+  @override
+  Future<ShellSession> createSession() async {
+    if (!isConnected) throw Exception('Not connected');
+    final session = await _client!.shell();
+    return SshShellSession(session);
+  }
+
   Future<List<String>> _handleUserInfoRequest(
     SSHUserInfoRequest request, {
     String? passwordFallback,
   }) async {
     final prompts = request.prompts;
     if (onUserPrompt == null) {
-      // If no callback provided, try to use the stored password for the first prompt
-      // This is a fallback for servers that use keyboard-interactive for simple password auth
       if (passwordFallback != null && prompts.isNotEmpty) {
         final promptText = prompts.first.promptText;
         if (promptText.toLowerCase().contains('password') ||
@@ -581,24 +536,123 @@ ${envExports}DECAMP_SECRETS
     return answers;
   }
 
-  /// Redact secrets from output text
-  String _redactSecrets(String text, List<String> secrets) {
-    var redacted = text;
-    for (var secret in secrets) {
-      if (secret.isNotEmpty) {
-        redacted = redacted.replaceAll(secret, '***REDACTED***');
-      }
-    }
-    return redacted;
-  }
-
-  /// Get credential from inline value or keychain
-  /// Returns inline value if provided, otherwise fetches from keychain
   Future<String?> _getCredential(String? inlineValue, String? secretId) async {
     if (inlineValue != null) return inlineValue;
     if (_keychain == null || _projectId == null || secretId == null) {
       return null;
     }
     return await _keychain.getProjectSecret(_projectId, secretId);
+  }
+}
+
+class SshShellSession implements ShellSession {
+  final SSHSession _session;
+  SshShellSession(this._session);
+
+  @override
+  Stream<Uint8List> get stdout => _session.stdout;
+
+  @override
+  Stream<Uint8List> get stderr => _session.stderr;
+
+  @override
+  Future<int> get exitCode => _session.done.then((_) => _session.exitCode ?? 0);
+
+  @override
+  Future<void> get done => _session.done;
+
+  @override
+  void write(Uint8List data) => _session.write(data);
+
+  @override
+  void close() => _session.close();
+}
+
+class LocalShellBackend implements ShellBackend {
+  @override
+  UserPromptCallback? onUserPrompt;
+
+  @override
+  bool get isConnected => true;
+
+  @override
+  Future<void> connect({
+    String? inlinePassword,
+    String? inlinePrivateKey,
+    String? inlinePassphrase,
+  }) async {
+    // No-op
+  }
+
+  @override
+  void disconnect() {
+    // No-op
+  }
+
+  @override
+  Future<ShellSession> execute(String command) async {
+    final process = await Process.start('bash', ['-c', command]);
+    return LocalShellSession(process);
+  }
+
+  @override
+  Future<ShellSession> createSession() async {
+    final process = await Process.start('bash', []);
+    return LocalShellSession(process);
+  }
+}
+
+class LocalShellSession implements ShellSession {
+  final Process _process;
+  LocalShellSession(this._process);
+
+  @override
+  Stream<Uint8List> get stdout =>
+      _process.stdout.map((d) => Uint8List.fromList(d));
+
+  @override
+  Stream<Uint8List> get stderr =>
+      _process.stderr.map((d) => Uint8List.fromList(d));
+
+  @override
+  Future<int> get exitCode => _process.exitCode;
+
+  @override
+  Future<void> get done => _process.exitCode.then((_) {});
+
+  @override
+  void write(Uint8List data) => _process.stdin.add(data);
+
+  @override
+  void close() => _process.kill();
+}
+
+class UnconfiguredShellBackend implements ShellBackend {
+  @override
+  UserPromptCallback? onUserPrompt;
+
+  @override
+  bool get isConnected => false;
+
+  @override
+  Future<void> connect({
+    String? inlinePassword,
+    String? inlinePrivateKey,
+    String? inlinePassphrase,
+  }) async {
+    throw Exception('SSH settings not configured for this project');
+  }
+
+  @override
+  void disconnect() {}
+
+  @override
+  Future<ShellSession> execute(String command) async {
+    throw Exception('SSH settings not configured for this project');
+  }
+
+  @override
+  Future<ShellSession> createSession() async {
+    throw Exception('SSH settings not configured for this project');
   }
 }

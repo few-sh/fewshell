@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:async/async.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:agent_core/agent_core.dart';
 
@@ -370,38 +372,63 @@ class LlmService {
 
   /// Test API connection with the provided settings
   /// Returns null if successful, or an error message if failed
-  Future<String?> testConnection({
+  CancelableOperation<String?> testConnection({
     required LlmApiSettings config,
     required String apiKey,
-  }) async {
-    try {
-      final provider = await createProvider(config, apiKey);
-      final messages = [ChatMessage.user('Hi')];
-      final stream = provider.chatStream(messages);
-      bool receivedResponse = false;
+  }) {
+    StreamSubscription? subscription;
 
-      await for (final event in stream.timeout(
-        const Duration(seconds: 30),
-        onTimeout: (sink) {
-          sink.addError(Exception('Connection timeout after 30 seconds'));
-          sink.close();
-        },
-      )) {
-        if (event is TextDeltaEvent) {
-          receivedResponse = true;
-          break;
-        } else if (event is ErrorEvent) {
-          return 'API Error: ${event.error}';
+    final completer = CancelableCompleter<String?>(onCancel: () {
+      subscription?.cancel();
+    });
+
+    Future<void> run() async {
+      try {
+        final provider = await createProvider(config, apiKey);
+        final messages = [ChatMessage.user('Hi')];
+        final stream = provider.chatStream(messages);
+
+        subscription = stream.timeout(
+          const Duration(seconds: 30),
+          onTimeout: (sink) {
+            sink.addError(Exception('Connection timeout after 30 seconds'));
+            sink.close();
+          },
+        ).listen(
+          (event) {
+            if (completer.isCanceled) return;
+
+            if (event is TextDeltaEvent) {
+              if (!completer.isCompleted) completer.complete(null);
+              subscription?.cancel();
+            } else if (event is ErrorEvent) {
+              if (!completer.isCompleted) {
+                completer.complete('API Error: ${event.error}');
+              }
+              subscription?.cancel();
+            }
+          },
+          onError: (e) {
+            if (!completer.isCanceled && !completer.isCompleted) {
+              completer.complete(e.toString());
+            }
+          },
+          onDone: () {
+            if (!completer.isCanceled && !completer.isCompleted) {
+              completer.complete('No response received from API');
+            }
+          },
+          cancelOnError: true,
+        );
+      } catch (e) {
+        if (!completer.isCanceled && !completer.isCompleted) {
+          completer.complete(e.toString());
         }
       }
-
-      if (!receivedResponse) {
-        return 'No response received from API';
-      }
-
-      return null;
-    } catch (e) {
-      return e.toString();
     }
+
+    run();
+
+    return completer.operation;
   }
 }
