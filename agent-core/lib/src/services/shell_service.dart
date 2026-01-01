@@ -37,6 +37,7 @@ abstract class ShellSession {
   Future<int> get exitCode;
   Future<void> get done;
   void write(Uint8List data);
+  void kill(ProcessSignal signal);
   void close();
 }
 
@@ -97,6 +98,7 @@ class ShellService {
   Future<Map<String, dynamic>> executeCommand(
     String command, {
     Map<String, String>? secrets,
+    Stream<ProcessSignal>? abortSignal,
     bool isRetry = false,
     void Function(String)? onStdout,
     void Function(String)? onStderr,
@@ -148,6 +150,14 @@ ${envExports}DECAMP_SECRETS
 
       final session = await _backend.execute(finalCommand);
 
+      StreamSubscription<ProcessSignal>? abortSubscription;
+      if (abortSignal != null) {
+        abortSubscription = abortSignal.listen((signal) {
+          _log.info('Aborting command with signal: $signal');
+          session.kill(signal);
+        });
+      }
+
       final stdoutBuffer = BytesBuilder(copy: false);
       final stderrBuffer = BytesBuilder(copy: false);
       final stdoutDone = Completer<void>();
@@ -174,6 +184,7 @@ ${envExports}DECAMP_SECRETS
       await stdoutDone.future;
       await stderrDone.future;
       await session.done;
+      await abortSubscription?.cancel();
 
       final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
@@ -248,6 +259,7 @@ ${envExports}DECAMP_SECRETS
     required String command,
     String? sudoPasswordSecretId,
     Map<String, String>? secrets,
+    Stream<ProcessSignal>? abortSignal,
     bool isRetry = false,
     void Function(String)? onStdout,
     void Function(String)? onStderr,
@@ -326,6 +338,14 @@ ${envExports}DECAMP_SECRETS
     try {
       final session = await _backend.execute(secureCommand);
 
+      StreamSubscription<ProcessSignal>? abortSubscription;
+      if (abortSignal != null) {
+        abortSubscription = abortSignal.listen((signal) {
+          _log.info('Aborting sudo command with signal: $signal');
+          session.kill(signal);
+        });
+      }
+
       final stdoutBuffer = BytesBuilder(copy: false);
       final stderrBuffer = BytesBuilder(copy: false);
       final stdoutDone = Completer<void>();
@@ -352,6 +372,7 @@ ${envExports}DECAMP_SECRETS
       await stdoutDone.future;
       await stderrDone.future;
       await session.done;
+      await abortSubscription?.cancel();
 
       final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
       final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
@@ -565,6 +586,30 @@ class SshShellSession implements ShellSession {
   void write(Uint8List data) => _session.write(data);
 
   @override
+  void kill(ProcessSignal signal) {
+    SSHSignal? sshSignal;
+    if (signal == ProcessSignal.sigint) {
+      sshSignal = SSHSignal.INT;
+    } else if (signal == ProcessSignal.sigterm) {
+      sshSignal = SSHSignal.TERM;
+    } else if (signal == ProcessSignal.sigkill) {
+      sshSignal = SSHSignal.KILL;
+    } else if (signal == ProcessSignal.sigquit) {
+      sshSignal = SSHSignal.QUIT;
+    } else if (signal == ProcessSignal.sighup) {
+      sshSignal = SSHSignal.HUP;
+    } else if (signal == ProcessSignal.sigusr1) {
+      sshSignal = SSHSignal.USR1;
+    } else if (signal == ProcessSignal.sigusr2) {
+      sshSignal = SSHSignal.USR2;
+    }
+
+    if (sshSignal != null) {
+      _session.kill(sshSignal);
+    }
+  }
+
+  @override
   void close() => _session.close();
 }
 
@@ -622,6 +667,9 @@ class LocalShellSession implements ShellSession {
 
   @override
   void write(Uint8List data) => _process.stdin.add(data);
+
+  @override
+  void kill(ProcessSignal signal) => _process.kill(signal);
 
   @override
   void close() => _process.kill();
