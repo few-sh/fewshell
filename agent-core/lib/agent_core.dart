@@ -4,6 +4,7 @@ export 'src/agent_loop.dart';
 export 'src/types.dart';
 export 'src/controllers/chat_controller.dart';
 export 'src/models/tool_action.dart';
+export 'src/models/secret.dart';
 export 'src/utils/secret_redactor.dart';
 export 'src/services/fetch_tool.dart';
 export 'src/services/sqlite_logger.dart';

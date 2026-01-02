@@ -1,3 +1,4 @@
+import 'package:agent_core/agent_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -92,8 +93,8 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   }
 
   Widget _buildUserSecretsTab() {
-    return FutureBuilder<Map<String, String>>(
-      future: ref.watch(keychainServiceProvider).listGlobalSecrets(),
+    return FutureBuilder<Map<String, Secret>>(
+      future: ref.watch(keychainServiceProvider).listGlobalSecretObjects(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -244,7 +245,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
   }
 
   Widget _buildSecretsList(
-    Map<String, String> secrets, {
+    Map<String, Secret> secrets, {
     required bool isGlobal,
     String? projectId,
   }) {
@@ -255,7 +256,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       itemCount: sortedKeys.length,
       itemBuilder: (context, index) {
         final key = sortedKeys[index];
-        final value = secrets[key]!;
+        final secret = secrets[key]!;
 
         return Center(
           child: ConstrainedBox(
@@ -268,7 +269,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
             ),
             child: _buildSecretCard(
               key: key,
-              value: value,
+              secret: secret,
               isGlobal: isGlobal,
               projectId: projectId,
             ),
@@ -280,7 +281,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
   Widget _buildSecretCard({
     required String key,
-    required String value,
+    required Secret secret,
     required bool isGlobal,
     String? projectId,
   }) {
@@ -314,7 +315,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                       child: const Icon(LucideIcons.pencil, size: 16),
                       onPressed: () => _showEditSecretDialog(
                         key: key,
-                        value: value,
+                        secret: secret,
                         isGlobal: isGlobal,
                         projectId: projectId,
                       ),
@@ -342,7 +343,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                         alignment: Alignment.topLeft,
                         curve: Curves.easeInOut,
                         child: Text(
-                          isObscured ? '••••••••••••••••' : value,
+                          isObscured ? '••••••••••••••••' : secret.value,
                           style: theme.textTheme.p.copyWith(
                             fontFamily: 'monospace',
                             color: theme.colorScheme.mutedForeground,
@@ -367,6 +368,19 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                       },
                     ),
                   ],
+                ),
+                const SizedBox(height: 8),
+                ShadSwitch(
+                  value: secret.isVisibleToLlm,
+                  onChanged: (value) => _toggleVisibility(
+                    key: key,
+                    secret: secret,
+                    isVisible: value,
+                    isGlobal: isGlobal,
+                    projectId: projectId,
+                  ),
+                  label: const Text('Visible to AI'),
+                  sublabel: const Text('Include this secret in the AI context'),
                 ),
               ],
             ),
@@ -462,15 +476,16 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       title: isGlobal ? 'Add User Secret' : 'Add Project Secret',
       onSave: (key, value) async {
         try {
+          final secret = Secret(value: value);
           if (isGlobal) {
             await ref
                 .read(keychainServiceProvider)
-                .saveGlobalSecret(key, value);
+                .saveGlobalSecretObject(key, secret);
           } else {
             if (projectId != null) {
               await ref
                   .read(keychainServiceProvider)
-                  .saveProjectSecret(projectId, key, value);
+                  .saveProjectSecretObject(projectId, key, secret);
             }
           }
 
@@ -499,25 +514,26 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
 
   Future<void> _showEditSecretDialog({
     required String key,
-    required String value,
+    required Secret secret,
     required bool isGlobal,
     String? projectId,
   }) async {
     await SecretDialog.show(
       context,
       existingKey: key,
-      existingValue: value,
+      existingValue: secret.value,
       onSave: (_, newValue) async {
         try {
+          final newSecret = secret.copyWith(value: newValue);
           if (isGlobal) {
             await ref
                 .read(keychainServiceProvider)
-                .saveGlobalSecret(key, newValue);
+                .saveGlobalSecretObject(key, newSecret);
           } else {
             if (projectId != null) {
               await ref
                   .read(keychainServiceProvider)
-                  .saveProjectSecret(projectId, key, newValue);
+                  .saveProjectSecretObject(projectId, key, newSecret);
             }
           }
 
@@ -542,6 +558,44 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
         }
       },
     );
+  }
+
+  Future<void> _toggleVisibility({
+    required String key,
+    required Secret secret,
+    required bool isVisible,
+    required bool isGlobal,
+    String? projectId,
+  }) async {
+    try {
+      final newSecret = secret.copyWith(isVisibleToLlm: isVisible);
+      if (isGlobal) {
+        await ref
+            .read(keychainServiceProvider)
+            .saveGlobalSecretObject(key, newSecret);
+      } else {
+        if (projectId != null) {
+          await ref
+              .read(keychainServiceProvider)
+              .saveProjectSecretObject(projectId, key, newSecret);
+        }
+      }
+      if (mounted) {
+        setState(() {}); // Refresh the list
+      }
+    } catch (e) {
+      if (mounted) {
+        ShadToaster.of(context).show(
+          ShadToast(
+            description: Text('Error updating visibility: $e'),
+            action: ShadButton.destructive(
+              child: const Text('Dismiss'),
+              onPressed: () => ShadToaster.of(context).hide(),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _confirmDeleteSecret({
