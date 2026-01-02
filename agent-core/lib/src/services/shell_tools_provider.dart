@@ -38,6 +38,18 @@ final shellTools = [
           description:
               'Brief explanation of what this command does and why it\'s needed',
         ),
+        'secrets': ParameterProperty(
+          propertyType: 'array',
+          description:
+              'Optional list of secret keys to inject as environment variables for this command execution. '
+              'The agent will set these secrets as environment variables before running the command. '
+              'Each secret key will be available as an environment variable with the same name during command execution.',
+          items: ParameterProperty(
+            propertyType: 'string',
+            description:
+                'The environment variable name of the secret to inject. It must match exactly the name from the secret list section of your instructions.',
+          ),
+        ),
       },
       required: ['command', 'sudo_required', 'explanation'],
     ),

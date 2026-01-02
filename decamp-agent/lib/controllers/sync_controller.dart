@@ -359,17 +359,28 @@ class _AgentSession {
 
             if (toolCall.function.name == kExecuteShellCommand) {
               final command = params['command'] as String;
+              final sudoRequired = params['sudo_required'] as bool? ?? false;
               final secrets = params['secrets'] != null
-                  ? Map<String, String>.from(params['secrets'])
+                  ? List<String>.from(params['secrets'] as List)
                   : null;
               _log.info(
                 'Executing shell command. Abort controller: $abortController',
               );
-              final result = await _shellService.executeCommand(
-                command,
-                secrets: secrets,
-                abortSignal: abortController.stream,
-              );
+
+              final Map<String, dynamic> result;
+              if (sudoRequired) {
+                result = await _shellService.executeWithSudo(
+                  command: command,
+                  secrets: secrets,
+                  abortSignal: abortController.stream,
+                );
+              } else {
+                result = await _shellService.executeCommand(
+                  command,
+                  secrets: secrets,
+                  abortSignal: abortController.stream,
+                );
+              }
               await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {

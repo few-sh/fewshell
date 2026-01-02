@@ -97,7 +97,7 @@ class ShellService {
   /// Execute a shell command
   Future<Map<String, dynamic>> executeCommand(
     String command, {
-    Map<String, String>? secrets,
+    List<String>? secrets,
     Stream<ProcessSignal>? abortSignal,
     bool isRetry = false,
     void Function(String)? onStdout,
@@ -120,11 +120,13 @@ class ShellService {
       String finalCommand;
       final secretsToRedact = <String>[];
 
+      final resolvedSecrets = await _resolveSecrets(secrets);
+
       // If secrets are provided, wrap command with secret injection
-      if (secrets != null && secrets.isNotEmpty) {
+      if (resolvedSecrets.isNotEmpty) {
         final envExports = StringBuffer();
 
-        for (var entry in secrets.entries) {
+        for (var entry in resolvedSecrets.entries) {
           if (entry.value.isNotEmpty) {
             if (!_isValidEnvVarName(entry.key)) {
               _log.warning('Invalid environment variable name: ${entry.key}');
@@ -259,7 +261,7 @@ ${envExports}DECAMP_SECRETS
   Future<Map<String, dynamic>> executeWithSudo({
     required String command,
     String? sudoPasswordSecretId,
-    Map<String, String>? secrets,
+    List<String>? secrets,
     Stream<ProcessSignal>? abortSignal,
     bool isRetry = false,
     void Function(String)? onStdout,
@@ -288,8 +290,10 @@ ${envExports}DECAMP_SECRETS
       secretsToRedact.add(sudoPassword);
     }
 
-    if (secrets != null && secrets.isNotEmpty) {
-      for (var entry in secrets.entries) {
+    final resolvedSecrets = await _resolveSecrets(secrets);
+
+    if (resolvedSecrets.isNotEmpty) {
+      for (var entry in resolvedSecrets.entries) {
         if (entry.value.isNotEmpty) {
           if (!_isValidEnvVarName(entry.key)) {
             continue;
@@ -424,6 +428,24 @@ ${envExports}DECAMP_SECRETS
       }
     }
     return redacted;
+  }
+
+  Future<Map<String, String>> _resolveSecrets(List<String>? secretKeys) async {
+    final resolved = <String, String>{};
+    if (secretKeys == null ||
+        secretKeys.isEmpty ||
+        _keychain == null ||
+        _projectId == null) {
+      return resolved;
+    }
+
+    for (final key in secretKeys) {
+      final value = await _keychain.getProjectSecret(_projectId, key);
+      if (value != null) {
+        resolved[key] = value;
+      }
+    }
+    return resolved;
   }
 }
 
