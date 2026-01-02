@@ -9,9 +9,10 @@ class SecretDialog {
   /// When [existingKey] is provided, the dialog is in "edit" mode.
   static Future<void> show(
     BuildContext context, {
-    required Function(String key, String value) onSave,
+    required Function(String key, String value, bool isVisibleToLlm) onSave,
     String? existingKey,
     String? existingValue,
+    bool? initialIsVisibleToLlm,
     String? title,
   }) async {
     final isEditMode = existingKey != null;
@@ -22,6 +23,7 @@ class SecretDialog {
         title: title ?? (isEditMode ? 'Edit Secret' : 'Add Secret'),
         initialKey: existingKey,
         initialValue: existingValue ?? '',
+        initialIsVisibleToLlm: initialIsVisibleToLlm ?? true,
         onSave: onSave,
       ),
     );
@@ -33,12 +35,14 @@ class _SecretDialogForm extends StatefulWidget {
   final String title;
   final String? initialKey;
   final String initialValue;
-  final Function(String key, String value) onSave;
+  final bool initialIsVisibleToLlm;
+  final Function(String key, String value, bool isVisibleToLlm) onSave;
 
   const _SecretDialogForm({
     required this.title,
     this.initialKey,
     required this.initialValue,
+    required this.initialIsVisibleToLlm,
     required this.onSave,
   });
 
@@ -50,6 +54,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
   late final TextEditingController _keyController;
   late final TextEditingController _valueController;
   bool _obscureValue = true;
+  late bool _isVisibleToLlm;
 
   bool get _isEditMode => widget.initialKey != null;
 
@@ -58,6 +63,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
     super.initState();
     _keyController = TextEditingController(text: widget.initialKey);
     _valueController = TextEditingController(text: widget.initialValue);
+    _isVisibleToLlm = widget.initialIsVisibleToLlm;
   }
 
   @override
@@ -133,6 +139,17 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              ShadSwitch(
+                value: _isVisibleToLlm,
+                onChanged: (value) {
+                  setState(() {
+                    _isVisibleToLlm = value;
+                  });
+                },
+                label: const Text('Visible to AI'),
+                sublabel: const Text('Include this secret in the AI context'),
+              ),
             ],
           ),
         ),
@@ -171,7 +188,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
       return;
     }
 
-    widget.onSave(key, value);
+    widget.onSave(key, value, _isVisibleToLlm);
     Navigator.of(context).pop();
   }
 }

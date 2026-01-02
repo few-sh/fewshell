@@ -474,9 +474,9 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
     await SecretDialog.show(
       context,
       title: isGlobal ? 'Add User Secret' : 'Add Project Secret',
-      onSave: (key, value) async {
+      onSave: (key, value, isVisibleToLlm) async {
         try {
-          final secret = Secret(value: value);
+          final secret = Secret(value: value, isVisibleToLlm: isVisibleToLlm);
           if (isGlobal) {
             await ref
                 .read(keychainServiceProvider)
@@ -522,9 +522,13 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       context,
       existingKey: key,
       existingValue: secret.value,
-      onSave: (_, newValue) async {
+      initialIsVisibleToLlm: secret.isVisibleToLlm,
+      onSave: (_, newValue, isVisibleToLlm) async {
         try {
-          final newSecret = secret.copyWith(value: newValue);
+          final newSecret = secret.copyWith(
+            value: newValue,
+            isVisibleToLlm: isVisibleToLlm,
+          );
           if (isGlobal) {
             await ref
                 .read(keychainServiceProvider)
