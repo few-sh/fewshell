@@ -1,8 +1,11 @@
 import 'dart:convert';
 
 import 'package:llm_dart/llm_dart.dart';
+import 'package:logging/logging.dart';
 
 import 'types.dart';
+
+final _log = Logger('AgentLoop');
 
 /// Runs the agent loop: LLM → tool calls → approval → execution → repeat
 ///
@@ -183,10 +186,12 @@ Future<AgentLoopResult> runAgentLoop({
 class _StreamResult {
   final String text;
   final List<ToolCall> toolCalls;
+  final UsageInfo? usage;
 
   _StreamResult({
     required this.text,
     required this.toolCalls,
+    this.usage,
   });
 }
 
@@ -200,6 +205,7 @@ Future<_StreamResult> _streamFromLlm({
 }) async {
   final buffer = StringBuffer();
   final toolCallMap = <String, ToolCall>{};
+  UsageInfo? usage;
 
   await for (final event in llmStream(
     conversation,
@@ -237,8 +243,11 @@ Future<_StreamResult> _streamFromLlm({
         // Ignore thinking events for now
         break;
 
-      case CompletionEvent():
-        // Stream complete
+      case CompletionEvent(response: final response):
+        if (response.usage != null) {
+          usage = response.usage;
+          _log.info('LLM usage: $usage');
+        }
         break;
 
       case ErrorEvent(error: final error):
@@ -249,5 +258,6 @@ Future<_StreamResult> _streamFromLlm({
   return _StreamResult(
     text: buffer.toString(),
     toolCalls: toolCallMap.values.toList(),
+    usage: usage,
   );
 }
