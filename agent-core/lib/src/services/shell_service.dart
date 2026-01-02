@@ -210,6 +210,7 @@ ${envExports}DECAMP_SECRETS
           return executeCommand(
             command,
             secrets: secrets,
+            abortSignal: abortSignal,
             isRetry: true,
             onStdout: onStdout,
             onStderr: onStderr,
@@ -395,6 +396,7 @@ ${envExports}DECAMP_SECRETS
             command: command,
             sudoPasswordSecretId: sudoPasswordSecretId,
             secrets: secrets,
+            abortSignal: abortSignal,
             isRetry: true,
             onStdout: onStdout,
             onStderr: onStderr,

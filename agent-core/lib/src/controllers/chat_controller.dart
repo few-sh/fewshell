@@ -83,7 +83,7 @@ class ChatController extends StateNotifier<ChatState> {
   void abortCommand(MultiplexedWebSocketChannel? syncChannel) {
     _log.info('Aborting command...');
     _isAborted = true;
-    _currentAbortController?.add(ProcessSignal.sigint);
+    _currentAbortController?.add(ProcessSignal.sigterm);
     _currentLlmCancelToken?.cancel('Aborted by user');
 
     if (syncChannel != null) {

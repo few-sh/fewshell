@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
@@ -137,6 +138,7 @@ class _AgentSession {
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
   CancelToken? _currentCancelToken;
+  StreamController<ProcessSignal>? _currentAbortController;
 
   // Streaming state
   String? _streamingMessageId;
@@ -159,6 +161,7 @@ class _AgentSession {
   void _handleAbort(Map<String, dynamic> data) {
     _log.info('🛑 Received abort request');
     _currentCancelToken?.cancel('Aborted by user');
+    _currentAbortController?.add(ProcessSignal.sigterm);
   }
 
   void _handleApproval(Map<String, dynamic> data) {
@@ -316,6 +319,9 @@ class _AgentSession {
         );
 
         _currentCancelToken = CancelToken();
+        // ignore: close_sinks
+        final abortController = StreamController<ProcessSignal>.broadcast();
+        _currentAbortController = abortController;
 
         await runAgentLoop(
           llmStream: (conv, tools, {cancelToken}) {
@@ -356,8 +362,14 @@ class _AgentSession {
               final secrets = params['secrets'] != null
                   ? Map<String, String>.from(params['secrets'])
                   : null;
-              final result =
-                  await _shellService.executeCommand(command, secrets: secrets);
+              _log.info(
+                'Executing shell command. Abort controller: $abortController',
+              );
+              final result = await _shellService.executeCommand(
+                command,
+                secrets: secrets,
+                abortSignal: abortController.stream,
+              );
               await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
@@ -487,6 +499,8 @@ class _AgentSession {
         }
       } finally {
         _currentCancelToken = null;
+        await _currentAbortController?.close();
+        _currentAbortController = null;
 
         // Ensure any pending DB writes are finished before unlocking
         try {
