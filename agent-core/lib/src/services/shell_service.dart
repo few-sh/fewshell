@@ -589,22 +589,16 @@ class SshShellSession implements ShellSession {
 
   @override
   void kill(ProcessSignal signal) {
-    SSHSignal? sshSignal;
-    if (signal == ProcessSignal.sigint) {
-      sshSignal = SSHSignal.INT;
-    } else if (signal == ProcessSignal.sigterm) {
-      sshSignal = SSHSignal.TERM;
-    } else if (signal == ProcessSignal.sigkill) {
-      sshSignal = SSHSignal.KILL;
-    } else if (signal == ProcessSignal.sigquit) {
-      sshSignal = SSHSignal.QUIT;
-    } else if (signal == ProcessSignal.sighup) {
-      sshSignal = SSHSignal.HUP;
-    } else if (signal == ProcessSignal.sigusr1) {
-      sshSignal = SSHSignal.USR1;
-    } else if (signal == ProcessSignal.sigusr2) {
-      sshSignal = SSHSignal.USR2;
-    }
+    final sshSignal = switch (signal) {
+      ProcessSignal.sigint => SSHSignal.INT,
+      ProcessSignal.sigterm => SSHSignal.TERM,
+      ProcessSignal.sigkill => SSHSignal.KILL,
+      ProcessSignal.sigquit => SSHSignal.QUIT,
+      ProcessSignal.sighup => SSHSignal.HUP,
+      ProcessSignal.sigusr1 => SSHSignal.USR1,
+      ProcessSignal.sigusr2 => SSHSignal.USR2,
+      _ => null,
+    };
 
     if (sshSignal != null) {
       _session.kill(sshSignal);
