@@ -12,7 +12,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 ### Critical path tasks (before first customer onboarding)
 
-[ ] A stop button (ability to cancel a chat stream or any command)
+[X] A stop button (ability to cancel a chat stream or any command)
 
 [X] Project settings replication for LLM settings and secrets
 
@@ -29,7 +29,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [ ] Always SUMMARIZE log and HTML outputs that are larger than X (tool outputs in general). (IDEA: Add summarize as part of the request tool)
 
-[ ] ERROR HANDLING - stuck loading when error
+[X] ERROR HANDLING - stuck loading when error
 
 [ ] For the header, leave a small button to show it
 
