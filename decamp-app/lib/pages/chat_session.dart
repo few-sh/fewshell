@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/shell_service_provider.dart';
 import 'package:decamp/components/ssh_prompt_dialog.dart';
 import 'package:decamp/components/main_drawer.dart';
@@ -109,6 +110,21 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           (_currentMatchIndex - 1 + _searchMatches.length) %
           _searchMatches.length;
     });
+  }
+
+  void _handleAbort() {
+    final currentSessionId = ref.read(currentSessionIdProvider);
+    final chatController = ref.read(
+      chatControllerProvider(currentSessionId).notifier,
+    );
+
+    final currentProject = ref.read(currentProjectProvider);
+    MultiplexedWebSocketChannel? syncChannel;
+    if (currentProject != null) {
+      syncChannel = ref.read(syncServiceProvider).getChannel(currentProject.id);
+    }
+
+    chatController.abortCommand(syncChannel);
   }
 
   /// Create a new chat session
@@ -395,7 +411,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                   else
                     ChatInput(
                       onSend: _handleSendMessage,
-                      enabled: !isLoading && hasProject,
+                      onAbort: chatState.isLoading ? _handleAbort : null,
+                      isLoading: isLoading,
+                      enabled: hasProject,
                       focusNode: _inputFocusNode,
                     ),
                 ],

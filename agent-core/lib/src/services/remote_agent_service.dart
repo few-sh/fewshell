@@ -50,6 +50,10 @@ Future<AgentLoopResult> runRemoteAgentLoop({
         if (!completer.isCompleted) {
           completer.complete(const AgentLoopCompleted());
         }
+      } else if (type == 'cancelled') {
+        if (!completer.isCompleted) {
+          completer.complete(const AgentLoopCancelled());
+        }
       } else if (type == 'error') {
         if (!completer.isCompleted) {
           completer.complete(

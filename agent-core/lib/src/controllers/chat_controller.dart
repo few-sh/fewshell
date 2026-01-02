@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:state_notifier/state_notifier.dart';
 import 'package:llm_dart/llm_dart.dart';
@@ -30,6 +31,9 @@ class ChatController extends StateNotifier<ChatState> {
   final String? sessionId;
 
   final _activeMessageController = StreamController<MessageEntity>.broadcast();
+  StreamController<ProcessSignal>? _currentAbortController;
+  CancelToken? _currentLlmCancelToken;
+  bool _isAborted = false;
 
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
@@ -73,6 +77,19 @@ class ChatController extends StateNotifier<ChatState> {
   /// Reset state when session changes (called by provider when session changes)
   void resetForNewSession() {
     state = const ChatState();
+  }
+
+  /// Abort the currently running command
+  void abortCommand(MultiplexedWebSocketChannel? syncChannel) {
+    _log.info('Aborting command...');
+    _isAborted = true;
+    _currentAbortController?.add(ProcessSignal.sigterm);
+    _currentLlmCancelToken?.cancel('Aborted by user');
+
+    if (syncChannel != null) {
+      _log.info('Sending abort_chat to server');
+      syncChannel.sendCustomMessage({'type': 'abort_chat'});
+    }
   }
 
   /// Build conversation history from database messages
@@ -374,46 +391,57 @@ class ChatController extends StateNotifier<ChatState> {
         final dbMessages = await _messageDao.getMessagesBySession(sessionId);
         final conversation = _buildConversationHistory(dbMessages);
 
-        result = await runAgentLoop(
-          llmStream: (conv, tools) =>
-              _llmService.streamChat(conv, tools: tools),
-          tools: shellTools,
-          conversation: conversation,
-          getConversation: () async {
-            // Rebuild conversation from database each iteration (single source of truth)
-            final dbMessages =
-                await _messageDao.getMessagesBySession(sessionId);
-            return _buildConversationHistory(dbMessages);
-          },
-          requestApproval: handleRequestApproval,
-          executeToolCall: (toolCall) async {
-            if (currentToolMessageId != null) {
-              // Refresh current entity just in case
-              currentEntity =
-                  await _messageDao.getMessage(currentToolMessageId!);
-            }
+        _currentLlmCancelToken = CancelToken();
 
-            final toolOutputBuffer = StringBuffer();
-            void onOutput(String data) {
-              toolOutputBuffer.write(data);
-              if (currentEntity != null) {
-                // Construct display content: original content + code block with output
-                final displayContent =
-                    '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
-                _activeMessageController.add(
-                  currentEntity!.copyWith(content: displayContent),
-                );
+        try {
+          result = await runAgentLoop(
+            llmStream: (conv, tools, {cancelToken}) => _llmService.streamChat(
+              conv,
+              tools: tools,
+              cancelToken: cancelToken,
+            ),
+            tools: shellTools,
+            conversation: conversation,
+            cancelToken: _currentLlmCancelToken,
+            getConversation: () async {
+              // Rebuild conversation from database each iteration (single source of truth)
+              final dbMessages =
+                  await _messageDao.getMessagesBySession(sessionId);
+              return _buildConversationHistory(dbMessages);
+            },
+            requestApproval: handleRequestApproval,
+            executeToolCall: (toolCall) async {
+              if (currentToolMessageId != null) {
+                // Refresh current entity just in case
+                currentEntity =
+                    await _messageDao.getMessage(currentToolMessageId!);
               }
-            }
 
-            // Execute and return result as JSON string
-            final result = await _executeToolCall(toolCall, onOutput: onOutput);
-            await _sessionDao.touchSession(sessionId);
-            return jsonEncode(result);
-          },
-          onAssistantMessage: handleAssistantMessage,
-          onToolResultMessage: handleToolResultMessage,
-        );
+              final toolOutputBuffer = StringBuffer();
+              void onOutput(String data) {
+                toolOutputBuffer.write(data);
+                if (currentEntity != null) {
+                  // Construct display content: original content + code block with output
+                  final displayContent =
+                      '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
+                  _activeMessageController.add(
+                    currentEntity!.copyWith(content: displayContent),
+                  );
+                }
+              }
+
+              // Execute and return result as JSON string
+              final result =
+                  await _executeToolCall(toolCall, onOutput: onOutput);
+              await _sessionDao.touchSession(sessionId);
+              return jsonEncode(result);
+            },
+            onAssistantMessage: handleAssistantMessage,
+            onToolResultMessage: handleToolResultMessage,
+          );
+        } finally {
+          _currentLlmCancelToken = null;
+        }
       }
 
       // Handle result
@@ -448,6 +476,14 @@ class ChatController extends StateNotifier<ChatState> {
 
       if (mounted) state = state.copyWith(isLoading: false);
     } catch (e) {
+      if (e is CancelledError) {
+        _log.info('Operation cancelled by user');
+        if (mounted) {
+          state = state.copyWith(isLoading: false);
+        }
+        return;
+      }
+
       // TODO: Should not try to get ai usernme and use 'System' instead
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);
@@ -496,18 +532,23 @@ class ChatController extends StateNotifier<ChatState> {
 
       Map<String, dynamic> result;
 
+      _currentAbortController = StreamController<ProcessSignal>.broadcast();
+      _isAborted = false;
+
       try {
         if (sudoRequired) {
           result = await _shellService.executeWithSudo(
             command: command,
             sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
                 _sshSettings?.passwordSecretId,
+            abortSignal: _currentAbortController!.stream,
             onStdout: (data) => onOutput?.call(data),
             onStderr: (data) => onOutput?.call(data),
           );
         } else {
           result = await _shellService.executeCommand(
             command,
+            abortSignal: _currentAbortController!.stream,
             onStdout: (data) => onOutput?.call(data),
             onStderr: (data) => onOutput?.call(data),
           );
@@ -521,6 +562,18 @@ class ChatController extends StateNotifier<ChatState> {
           'stderr': 'Error executing command: $errorMessage',
           'exitCode': -1,
           'executed': false,
+        };
+      } finally {
+        await _currentAbortController?.close();
+        _currentAbortController = null;
+      }
+
+      if (_isAborted) {
+        _isAborted = false;
+        return {
+          'success': false,
+          'data': result,
+          'error': 'Command execution aborted by user',
         };
       }
 

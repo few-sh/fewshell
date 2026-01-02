@@ -37,11 +37,20 @@ class AgentLoopError extends AgentLoopResult {
   const AgentLoopError(this.message, {this.messageId});
 }
 
+/// Exception thrown when the agent loop is aborted by the user
+class AgentAbortException implements Exception {
+  final String message;
+  const AgentAbortException([this.message = 'Aborted by user']);
+  @override
+  String toString() => 'AgentAbortException: $message';
+}
+
 /// Callback types for the agent loop
 typedef LlmStreamFunction = Stream<ChatStreamEvent> Function(
   List<ChatMessage> conversation,
-  List<Tool> tools,
-);
+  List<Tool> tools, {
+  CancelToken? cancelToken,
+});
 
 typedef ApprovalFunction = Future<List<PendingToolCall>?> Function(
   List<PendingToolCall> toolCalls,

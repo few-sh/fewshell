@@ -49,6 +49,7 @@ Future<AgentLoopResult> runAgentLoop({
   TextDeltaCallback? onTextDelta,
   MessageCallback? onAssistantMessage,
   ToolResultMessageCallback? onToolResultMessage,
+  CancelToken? cancelToken,
 }) async {
   // Work with a mutable copy if using in-memory conversation
   var messages = conversation != null
@@ -56,6 +57,11 @@ Future<AgentLoopResult> runAgentLoop({
       : <ChatMessage>[];
 
   while (true) {
+    // Check for cancellation at start of loop
+    if (cancelToken?.isCancelled ?? false) {
+      return const AgentLoopCancelled();
+    }
+
     // Get fresh conversation if provider is available (e.g., from database)
     if (getConversation != null) {
       messages = await getConversation();
@@ -67,6 +73,7 @@ Future<AgentLoopResult> runAgentLoop({
       tools: tools,
       conversation: messages,
       onTextDelta: onTextDelta,
+      cancelToken: cancelToken,
     );
 
     // If no tool calls, we're done
@@ -133,6 +140,8 @@ Future<AgentLoopResult> runAgentLoop({
       String resultString;
       try {
         resultString = await executeToolCall(toolCall);
+      } on AgentAbortException {
+        return const AgentLoopCancelled();
       } catch (e) {
         // Return error as result so LLM can reason about it
         resultString = jsonEncode({
@@ -187,11 +196,16 @@ Future<_StreamResult> _streamFromLlm({
   required List<Tool> tools,
   required List<ChatMessage> conversation,
   TextDeltaCallback? onTextDelta,
+  CancelToken? cancelToken,
 }) async {
   final buffer = StringBuffer();
   final toolCallMap = <String, ToolCall>{};
 
-  await for (final event in llmStream(conversation, tools)) {
+  await for (final event in llmStream(
+    conversation,
+    tools,
+    cancelToken: cancelToken,
+  )) {
     switch (event) {
       case TextDeltaEvent(delta: final delta):
         buffer.write(delta);

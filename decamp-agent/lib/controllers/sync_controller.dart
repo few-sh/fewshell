@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
@@ -119,7 +120,8 @@ class SyncController {
           'payload': msg['payload'],
         });
       } else if (msg['type'] == 'start_chat' ||
-          msg['type'] == 'approval_response') {
+          msg['type'] == 'approval_response' ||
+          msg['type'] == 'abort_chat') {
         agentSession.handleMessage(msg);
       }
     });
@@ -135,6 +137,8 @@ class _AgentSession {
   final ShellService _shellService = ShellService.local(null, null);
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
+  CancelToken? _currentCancelToken;
+  StreamController<ProcessSignal>? _currentAbortController;
 
   // Streaming state
   String? _streamingMessageId;
@@ -149,7 +153,15 @@ class _AgentSession {
       _startChat(msg);
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
+    } else if (msg['type'] == 'abort_chat') {
+      _handleAbort(msg);
     }
+  }
+
+  void _handleAbort(Map<String, dynamic> data) {
+    _log.info('🛑 Received abort request');
+    _currentCancelToken?.cancel('Aborted by user');
+    _currentAbortController?.add(ProcessSignal.sigterm);
   }
 
   void _handleApproval(Map<String, dynamic> data) {
@@ -306,12 +318,22 @@ class _AgentSession {
           systemInstruction: systemInstruction,
         );
 
+        _currentCancelToken = CancelToken();
+        // ignore: close_sinks
+        final abortController = StreamController<ProcessSignal>.broadcast();
+        _currentAbortController = abortController;
+
         await runAgentLoop(
-          llmStream: (conv, tools) {
-            return provider.chatStream(conv, tools: tools);
+          llmStream: (conv, tools, {cancelToken}) {
+            return provider.chatStream(
+              conv,
+              tools: tools,
+              cancelToken: cancelToken,
+            );
           },
           tools: shellTools,
           conversation: conversation,
+          cancelToken: _currentCancelToken,
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
 
@@ -340,8 +362,14 @@ class _AgentSession {
               final secrets = params['secrets'] != null
                   ? Map<String, String>.from(params['secrets'])
                   : null;
-              final result =
-                  await _shellService.executeCommand(command, secrets: secrets);
+              _log.info(
+                'Executing shell command. Abort controller: $abortController',
+              );
+              final result = await _shellService.executeCommand(
+                command,
+                secrets: secrets,
+                abortSignal: abortController.stream,
+              );
               await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
@@ -391,12 +419,6 @@ class _AgentSession {
             String? id =
                 _streamingMessageId ?? db!.messageDao.generateMessageId();
 
-            // Reset streaming state
-            _streamingMessageId = null;
-            _streamingContent.clear();
-            _streamingCreatedAt = null;
-            _lastDbWrite = Future.value(); // Reset chain
-
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             // Determine if this is a tool use message or a text message
             final messageType = message.messageType;
@@ -441,37 +463,89 @@ class _AgentSession {
 
         channel.sendCustomMessage({'type': 'complete'});
       } catch (e, st) {
-        _log.severe('Error running agent loop: $e, $st');
+        if (e is CancelledError) {
+          _log.info('Agent loop cancelled by user');
+          channel.sendCustomMessage({'type': 'cancelled'});
+        } else {
+          _log.severe('Error running agent loop: $e, $st');
 
-        final messageId = db!.messageDao.generateMessageId();
+          final messageId = db!.messageDao.generateMessageId();
 
-        // Try to insert error message if we have session ID and DB
-        if (sessionId != null && db != null) {
+          // Try to insert error message if we have session ID and DB
+          if (sessionId != null && db != null) {
+            try {
+              final config = data['config'] as Map<String, dynamic>?;
+              final model = config?['model'] as String? ?? 'Ops Agent';
+
+              await db!.messageDao.insertMessageWithId(
+                id: messageId,
+                sessionId: sessionId,
+                userId: 'ai',
+                userName: model,
+                content: 'Sorry, I encountered an error: $e',
+                isVisibleToLlm: false,
+              );
+              await db!.sessionDao.touchSession(sessionId);
+            } catch (innerE) {
+              _log.severe('Failed to insert error message: $innerE');
+            }
+          }
+
+          channel.sendCustomMessage({
+            'type': 'error',
+            'message_id': messageId,
+            'message': e.toString(),
+          });
+        }
+      } finally {
+        _currentCancelToken = null;
+        await _currentAbortController?.close();
+        _currentAbortController = null;
+
+        // Ensure any pending DB writes are finished before unlocking
+        try {
+          await _lastDbWrite;
+        } catch (e) {
+          _log.warning('Error waiting for last DB write: $e');
+        }
+
+        if (_streamingMessageId != null && db != null) {
+          // Clean up any streaming message placeholder
           try {
             final config = data['config'] as Map<String, dynamic>?;
             final model = config?['model'] as String? ?? 'Ops Agent';
 
             await db!.messageDao.insertMessageWithId(
-              id: messageId,
-              sessionId: sessionId,
+              id: _streamingMessageId!,
+              sessionId: sessionId!,
               userId: 'ai',
               userName: model,
-              content: 'Sorry, I encountered an error: $e',
-              isVisibleToLlm: false,
+              content: _streamingContent.toString(),
+              isStreaming: false,
+              isVisibleToLlm: true,
             );
-            await db!.sessionDao.touchSession(sessionId);
-          } catch (innerE) {
-            _log.severe('Failed to insert error message: $innerE');
+          } catch (e) {
+            _log.warning(
+              'Error cleaning up streaming message placeholder: $e',
+            );
           }
         }
+        // Reset streaming state
+        _streamingMessageId = null;
+        _streamingContent.clear();
+        _streamingCreatedAt = null;
+        _lastDbWrite = Future.value(); // Reset chain
 
-        channel.sendCustomMessage({
-          'type': 'error',
-          'message_id': messageId,
-          'message': e.toString(),
-        });
+        if (sessionId != null) {
+          await _unlockSession(sessionId);
+        }
       }
-    } finally {
+    } catch (e) {
+      _log.severe('Error starting chat', e);
+      channel.sendCustomMessage({
+        'type': 'error',
+        'message': e.toString(),
+      });
       if (sessionId != null) {
         await _unlockSession(sessionId);
       }
