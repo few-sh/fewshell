@@ -485,7 +485,7 @@ class $SnippetsTable extends Snippets
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
       'name', aliasedName, false,
       additionalChecks:
-          GeneratedColumn.checkTextLength(minTextLength: 1, maxTextLength: 255),
+          GeneratedColumn.checkTextLength(minTextLength: 0, maxTextLength: 255),
       type: DriftSqlType.string,
       requiredDuringInsert: true);
   static const VerificationMeta _contentMeta =
