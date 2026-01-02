@@ -32,9 +32,9 @@ void main() {
       // 1. Mock Secure Storage
       FlutterSecureStorage.setMockInitialValues({});
       const storage = FlutterSecureStorage();
-      keychainService = KeychainService(
-        FlutterSecureStorageImpl(storage: storage),
-      );
+      final secureStorage = FlutterSecureStorageImpl(storage: storage);
+      final secretsCrdt = SecretsCrdt(secureStorage);
+      keychainService = KeychainService(secretsCrdt);
 
       // 2. Mock Shared Preferences (required by settings providers)
       SharedPreferences.setMockInitialValues({});

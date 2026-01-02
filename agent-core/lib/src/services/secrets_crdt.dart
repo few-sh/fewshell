@@ -4,8 +4,10 @@ import 'package:crdt/crdt.dart';
 import 'package:crdt/map_crdt.dart';
 import 'package:logging/logging.dart';
 import 'package:agent_core/src/secrets_storage/secure_storage.dart';
+import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
+import 'package:agent_core/src/models/secret.dart';
 
-class SecretsCrdt extends MapCrdt implements SecureStorage {
+class SecretsCrdt extends MapCrdt implements SecretsStorage {
   static final _log = Logger('SecretsCrdt');
   final SecureStorage _storage;
   final StreamController<void> _changeController = StreamController.broadcast();
@@ -29,9 +31,18 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
           final json = jsonDecode(entry.value) as Map<String, dynamic>;
           // Check if it looks like our CRDT format
           if (json.containsKey('hlc')) {
+            var value = json['value'];
+            // If we have the separate field, construct the Secret map
+            if (json.containsKey('isVisibleToLlm')) {
+              value = {
+                'value': value,
+                'isVisibleToLlm': json['isVisibleToLlm']
+              };
+            }
+
             records.add({
               'key': entry.key,
-              'value': json['value'],
+              'value': value,
               'hlc': Hlc.parse(json['hlc']),
               'is_deleted': json['is_deleted'] ?? false,
               'modified': json['modified'] ?? DateTime.now().toIso8601String(),
@@ -73,6 +84,10 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
   Future<void> put(String table, String key, dynamic value,
       [bool isDeleted = false]) async {
     _log.info('Putting secret: $key (deleted: $isDeleted)');
+    // Ensure value is encodable (Secret object or Map)
+    if (value is Secret) {
+      value = value.toJson();
+    }
     await super.put(table, key, value, isDeleted);
     await _saveKey(key);
     _changeController.add(null);
@@ -103,12 +118,24 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
           value = null;
         }
 
-        final json = jsonEncode({
-          'value': value,
+        final Map<String, dynamic> jsonMap = {
           'hlc': hlc.toString(),
           'is_deleted': isDeleted,
           'modified': modified,
-        });
+        };
+
+        if (value is Map<String, dynamic>) {
+          jsonMap['value'] = value['value'];
+          jsonMap['isVisibleToLlm'] = value['isVisibleToLlm'];
+        } else if (value is Secret) {
+          jsonMap['value'] = value.value;
+          jsonMap['isVisibleToLlm'] = value.isVisibleToLlm;
+        } else {
+          // String or null
+          jsonMap['value'] = value;
+        }
+
+        final json = jsonEncode(jsonMap);
 
         await _storage.write(key: key, value: json);
         _log.info('Saved secret: $key');
@@ -120,20 +147,28 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
     }
   }
 
-  // SecureStorage implementation
+  // New API methods
 
   @override
-  Future<void> write({required String key, required String value}) async {
+  Future<void> write({required String key, required Secret value}) async {
     await ready;
     await put('secrets', key, value);
   }
 
   @override
-  Future<String?> read({required String key}) async {
+  Future<Secret?> read({required String key}) async {
     await ready;
     final value = super.get('secrets', key);
     _log.info('Read secret $key: ${value != null ? 'found' : 'not found'}');
-    return value as String?;
+    if (value == null) return null;
+    if (value is Map<String, dynamic>) {
+      return Secret.fromJson(value);
+    }
+    // Fallback for legacy data if any slipped through
+    if (value is String) {
+      return Secret(value: value);
+    }
+    return null;
   }
 
   @override
@@ -143,14 +178,19 @@ class SecretsCrdt extends MapCrdt implements SecureStorage {
   }
 
   @override
-  Future<Map<String, String>> readAll() async {
+  Future<Map<String, Secret>> readAll() async {
     await ready;
     final changeset = getChangeset();
     final records = changeset['secrets'] ?? [];
-    final result = <String, String>{};
+    final result = <String, Secret>{};
     for (final record in records) {
       if (record['is_deleted'] != true) {
-        result[record['key'] as String] = record['value'] as String;
+        final val = record['value'];
+        if (val is Map<String, dynamic>) {
+          result[record['key'] as String] = Secret.fromJson(val);
+        } else if (val is String) {
+          result[record['key'] as String] = Secret(value: val);
+        }
       }
     }
     return result;
