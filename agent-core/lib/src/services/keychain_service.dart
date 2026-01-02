@@ -57,19 +57,8 @@ class KeychainService {
     return value != null;
   }
 
-  /// Save a project-scoped secret.
-  /// Key format: "project:{projectId}:{secretName}"
-  Future<void> saveProjectSecret(
-    String projectId,
-    String secretName,
-    String value,
-  ) async {
-    final key = _buildProjectSecretKey(projectId, secretName);
-    await saveSecret(key, value);
-  }
-
   /// Save a project-scoped secret object.
-  Future<void> saveProjectSecretObject(
+  Future<void> saveProjectSecret(
     String projectId,
     String secretName,
     Secret secret,
@@ -166,15 +155,8 @@ class KeychainService {
     }
   }
 
-  /// Save a global (non-project-specific) secret.
-  /// Key format: "global:{secretName}"
-  Future<void> saveGlobalSecret(String secretName, String value) async {
-    final key = _buildGlobalSecretKey(secretName);
-    await saveSecret(key, value);
-  }
-
   /// Save a global (non-project-specific) secret object.
-  Future<void> saveGlobalSecretObject(String secretName, Secret secret) async {
+  Future<void> saveGlobalSecret(String secretName, Secret secret) async {
     final key = _buildGlobalSecretKey(secretName);
     await saveSecretObject(key, secret);
   }

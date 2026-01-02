@@ -480,12 +480,12 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
           if (isGlobal) {
             await ref
                 .read(keychainServiceProvider)
-                .saveGlobalSecretObject(key, secret);
+                .saveGlobalSecret(key, secret);
           } else {
             if (projectId != null) {
               await ref
                   .read(keychainServiceProvider)
-                  .saveProjectSecretObject(projectId, key, secret);
+                  .saveProjectSecret(projectId, key, secret);
             }
           }
 
@@ -532,12 +532,12 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
           if (isGlobal) {
             await ref
                 .read(keychainServiceProvider)
-                .saveGlobalSecretObject(key, newSecret);
+                .saveGlobalSecret(key, newSecret);
           } else {
             if (projectId != null) {
               await ref
                   .read(keychainServiceProvider)
-                  .saveProjectSecretObject(projectId, key, newSecret);
+                  .saveProjectSecret(projectId, key, newSecret);
             }
           }
 
@@ -576,12 +576,12 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
       if (isGlobal) {
         await ref
             .read(keychainServiceProvider)
-            .saveGlobalSecretObject(key, newSecret);
+            .saveGlobalSecret(key, newSecret);
       } else {
         if (projectId != null) {
           await ref
               .read(keychainServiceProvider)
-              .saveProjectSecretObject(projectId, key, newSecret);
+              .saveProjectSecret(projectId, key, newSecret);
         }
       }
       if (mounted) {
