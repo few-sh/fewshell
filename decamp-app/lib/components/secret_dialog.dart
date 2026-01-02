@@ -100,6 +100,8 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                 controller: _keyController,
                 placeholder: const Text('e.g., API_KEY, DATABASE_URL'),
                 enabled: !_isEditMode,
+                autocorrect: false,
+                enableSuggestions: false,
                 textCapitalization: TextCapitalization.characters,
               ),
               Padding(
@@ -120,6 +122,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                   controller: _valueController,
                   placeholder: const Text('Enter the secret value'),
                   autocorrect: false,
+                  enableSuggestions: false,
                   obscureText: _obscureValue,
                   minLines: 1,
                   maxLines: _obscureValue ? 1 : null,
