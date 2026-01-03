@@ -13,7 +13,7 @@ class ProjectSnippets extends Table {
   TextColumn get projectId => text().nullable()();
 
   /// Snippet name
-  TextColumn get name => text().withLength(min: 1, max: 255)();
+  TextColumn get name => text().withLength(min: 0, max: 255)();
 
   /// Snippet content (code or command)
   TextColumn get content => text()();

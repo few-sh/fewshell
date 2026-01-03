@@ -19,9 +19,9 @@ final keychainServiceProvider = Provider<KeychainService>((ref) {
 
 /// Provider to watch project secrets
 final projectSecretsProvider =
-    StreamProvider.family<Map<String, String>, String>((ref, projectId) {
+    StreamProvider.family<Map<String, Secret>, String>((ref, projectId) {
       final keychain = ref.watch(keychainServiceProvider);
-      return keychain.watchProjectSecrets(projectId);
+      return keychain.watchProjectSecretObjects(projectId);
     });
 
 /// Provider to get all secrets (global and project merged)

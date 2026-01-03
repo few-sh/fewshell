@@ -214,7 +214,7 @@ class GlobalLlmSettingsNotifier extends BaseLlmSettingsNotifier {
   Future<void> _saveSecret(String identifier, String key) {
     return _keychainService.saveGlobalSecret(
       LlmApiKeychainKeys.buildGlobalKey(identifier),
-      key,
+      Secret(value: key, isVisibleToLlm: false),
     );
   }
 
@@ -271,7 +271,7 @@ class ProjectLlmSettingsNotifier extends BaseLlmSettingsNotifier {
     return _keychainService.saveProjectSecret(
       _projectId,
       LlmApiKeychainKeys.buildProjectKey(_projectId, identifier),
-      key,
+      Secret(value: key, isVisibleToLlm: false),
     );
   }
 

@@ -64,14 +64,18 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         password != null &&
         password.isNotEmpty) {
       passwordSecretId = _generateSecretId('ssh_password');
-      await _keychain.saveProjectSecret(_projectId, passwordSecretId, password);
+      await _keychain.saveProjectSecret(
+        _projectId,
+        passwordSecretId,
+        Secret(value: password, isVisibleToLlm: false),
+      );
     } else if (authMethod == SshAuthMethod.privateKey) {
       if (privateKey != null && privateKey.isNotEmpty) {
         privateKeySecretId = _generateSecretId('ssh_privatekey');
         await _keychain.saveProjectSecret(
           _projectId,
           privateKeySecretId,
-          privateKey,
+          Secret(value: privateKey, isVisibleToLlm: false),
         );
       }
       if (passphrase != null && passphrase.isNotEmpty) {
@@ -79,7 +83,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         await _keychain.saveProjectSecret(
           _projectId,
           passphraseSecretId,
-          passphrase,
+          Secret(value: passphrase, isVisibleToLlm: false),
         );
       }
     }
@@ -90,7 +94,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
       await _keychain.saveProjectSecret(
         _projectId,
         sudoPasswordSecretId,
-        sudoPassword,
+        Secret(value: sudoPassword, isVisibleToLlm: false),
       );
     }
 
@@ -165,7 +169,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         await _keychain.saveProjectSecret(
           _projectId,
           passwordSecretId,
-          password,
+          Secret(value: password, isVisibleToLlm: false),
         );
       }
 
@@ -205,7 +209,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         await _keychain.saveProjectSecret(
           _projectId,
           privateKeySecretId,
-          privateKey,
+          Secret(value: privateKey, isVisibleToLlm: false),
         );
       }
 
@@ -216,7 +220,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
           await _keychain.saveProjectSecret(
             _projectId,
             passphraseSecretId,
-            passphrase,
+            Secret(value: passphrase, isVisibleToLlm: false),
           );
         } else if (passphraseSecretId != null) {
           // Clear passphrase if empty string provided
@@ -233,7 +237,7 @@ class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {
         await _keychain.saveProjectSecret(
           _projectId,
           sudoPasswordSecretId,
-          sudoPassword,
+          Secret(value: sudoPassword, isVisibleToLlm: false),
         );
       } else if (sudoPasswordSecretId != null) {
         // Clear sudo password if empty string provided

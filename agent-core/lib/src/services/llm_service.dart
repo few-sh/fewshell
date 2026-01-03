@@ -158,17 +158,21 @@ class LlmService {
     }
 
     // Fetch all secret names (global + project merged)
-    final globalSecrets = await keychainService.listGlobalSecrets();
-    final Map<String, String> secretsMap = {...globalSecrets};
+    final globalSecrets = await keychainService.listGlobalSecretObjects();
+    final Map<String, Secret> secretsMap = {...globalSecrets};
 
     if (currentProjectId != null) {
-      final projectSecrets = await keychainService.listProjectSecrets(
+      final projectSecrets = await keychainService.listProjectSecretObjects(
         currentProjectId!,
       );
       secretsMap.addAll(projectSecrets);
     }
 
-    final secretNames = secretsMap.keys.toList()..sort();
+    final secretNames = secretsMap.entries
+        .where((e) => e.value.isVisibleToLlm)
+        .map((e) => e.key)
+        .toList()
+      ..sort();
 
     // Fetch snippets
     List<SnippetEntity> userSnippets = [];

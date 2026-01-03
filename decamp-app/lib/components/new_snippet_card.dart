@@ -331,6 +331,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
           child: ShadInput(
             controller: _contentController,
             placeholder: const Text('Command (e.g., kubectl get pods)'),
+            autocorrect: false,
             minLines: 2,
             maxLines: null,
             decoration: const ShadDecoration(border: ShadBorder.none),

@@ -1,9 +1,10 @@
-import 'package:agent_core/agent_core.dart';
+import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
+import 'package:agent_core/src/models/secret.dart';
 
 /// Service for securely storing and retrieving secrets using platform keychain.
 /// Uses iOS Keychain on iOS and Android Keystore on Android.
 class KeychainService {
-  final SecureStorage _storage;
+  final SecretsStorage _storage;
   final Stream<void>? _changeStream;
 
   KeychainService(this._storage, {Stream<void>? changeStream})
@@ -12,12 +13,23 @@ class KeychainService {
   /// Save a secret value with the given key.
   /// Overwrites existing value if key already exists.
   Future<void> saveSecret(String key, String value) async {
-    await _storage.write(key: key, value: value);
+    await _storage.write(key: key, value: Secret(value: value));
+  }
+
+  /// Save a secret object with the given key.
+  Future<void> saveSecretObject(String key, Secret secret) async {
+    await _storage.write(key: key, value: secret);
   }
 
   /// Retrieve a secret value by key.
   /// Returns null if key doesn't exist.
   Future<String?> getSecret(String key) async {
+    final secret = await _storage.read(key: key);
+    return secret?.value;
+  }
+
+  /// Retrieve a secret object by key.
+  Future<Secret?> getSecretObject(String key) async {
     return await _storage.read(key: key);
   }
 
@@ -29,7 +41,7 @@ class KeychainService {
 
   /// List all secret keys stored.
   /// Returns empty map if no secrets exist.
-  Future<Map<String, String>> listAllSecrets() async {
+  Future<Map<String, Secret>> listAllSecrets() async {
     return await _storage.readAll();
   }
 
@@ -45,21 +57,27 @@ class KeychainService {
     return value != null;
   }
 
-  /// Save a project-scoped secret.
-  /// Key format: "project:{projectId}:{secretName}"
+  /// Save a project-scoped secret object.
   Future<void> saveProjectSecret(
     String projectId,
     String secretName,
-    String value,
+    Secret secret,
   ) async {
     final key = _buildProjectSecretKey(projectId, secretName);
-    await saveSecret(key, value);
+    await saveSecretObject(key, secret);
   }
 
   /// Retrieve a project-scoped secret.
   Future<String?> getProjectSecret(String projectId, String secretName) async {
     final key = _buildProjectSecretKey(projectId, secretName);
     return await getSecret(key);
+  }
+
+  /// Retrieve a project-scoped secret object.
+  Future<Secret?> getProjectSecretObject(
+      String projectId, String secretName) async {
+    final key = _buildProjectSecretKey(projectId, secretName);
+    return await getSecretObject(key);
   }
 
   /// Delete a project-scoped secret.
@@ -75,6 +93,23 @@ class KeychainService {
     final projectPrefix = 'project:$projectId:';
 
     final projectSecrets = <String, String>{};
+    for (final entry in allSecrets.entries) {
+      if (entry.key.startsWith(projectPrefix)) {
+        // Extract secret name from key
+        final secretName = entry.key.substring(projectPrefix.length);
+        projectSecrets[secretName] = entry.value.value;
+      }
+    }
+
+    return projectSecrets;
+  }
+
+  /// List all secret objects for a specific project.
+  Future<Map<String, Secret>> listProjectSecretObjects(String projectId) async {
+    final allSecrets = await listAllSecrets();
+    final projectPrefix = 'project:$projectId:';
+
+    final projectSecrets = <String, Secret>{};
     for (final entry in allSecrets.entries) {
       if (entry.key.startsWith(projectPrefix)) {
         // Extract secret name from key
@@ -99,6 +134,19 @@ class KeychainService {
     }
   }
 
+  /// Watch secret objects for a specific project.
+  Stream<Map<String, Secret>> watchProjectSecretObjects(
+      String projectId) async* {
+    // Yield initial value
+    yield await listProjectSecretObjects(projectId);
+
+    if (_changeStream != null) {
+      await for (final _ in _changeStream) {
+        yield await listProjectSecretObjects(projectId);
+      }
+    }
+  }
+
   /// Delete all secrets for a specific project.
   Future<void> deleteAllProjectSecrets(String projectId) async {
     final projectSecrets = await listProjectSecrets(projectId);
@@ -107,17 +155,22 @@ class KeychainService {
     }
   }
 
-  /// Save a global (non-project-specific) secret.
-  /// Key format: "global:{secretName}"
-  Future<void> saveGlobalSecret(String secretName, String value) async {
+  /// Save a global (non-project-specific) secret object.
+  Future<void> saveGlobalSecret(String secretName, Secret secret) async {
     final key = _buildGlobalSecretKey(secretName);
-    await saveSecret(key, value);
+    await saveSecretObject(key, secret);
   }
 
   /// Retrieve a global secret.
   Future<String?> getGlobalSecret(String secretName) async {
     final key = _buildGlobalSecretKey(secretName);
     return await getSecret(key);
+  }
+
+  /// Retrieve a global secret object.
+  Future<Secret?> getGlobalSecretObject(String secretName) async {
+    final key = _buildGlobalSecretKey(secretName);
+    return await getSecretObject(key);
   }
 
   /// Delete a global secret.
@@ -132,6 +185,23 @@ class KeychainService {
     const globalPrefix = 'global:';
 
     final globalSecrets = <String, String>{};
+    for (final entry in allSecrets.entries) {
+      if (entry.key.startsWith(globalPrefix)) {
+        // Extract secret name from key
+        final secretName = entry.key.substring(globalPrefix.length);
+        globalSecrets[secretName] = entry.value.value;
+      }
+    }
+
+    return globalSecrets;
+  }
+
+  /// List all global secret objects.
+  Future<Map<String, Secret>> listGlobalSecretObjects() async {
+    final allSecrets = await listAllSecrets();
+    const globalPrefix = 'global:';
+
+    final globalSecrets = <String, Secret>{};
     for (final entry in allSecrets.entries) {
       if (entry.key.startsWith(globalPrefix)) {
         // Extract secret name from key

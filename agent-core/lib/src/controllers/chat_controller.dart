@@ -529,6 +529,9 @@ class ChatController extends StateNotifier<ChatState> {
     if (actionName == kExecuteShellCommand) {
       final command = params['command'] as String;
       final sudoRequired = params['sudo_required'] as bool? ?? false;
+      final secrets = params['secrets'] != null
+          ? List<String>.from(params['secrets'] as List)
+          : null;
 
       Map<String, dynamic> result;
 
@@ -541,6 +544,7 @@ class ChatController extends StateNotifier<ChatState> {
             command: command,
             sudoPasswordSecretId: _sshSettings?.sudoPasswordSecretId ??
                 _sshSettings?.passwordSecretId,
+            secrets: secrets,
             abortSignal: _currentAbortController!.stream,
             onStdout: (data) => onOutput?.call(data),
             onStderr: (data) => onOutput?.call(data),
@@ -548,6 +552,7 @@ class ChatController extends StateNotifier<ChatState> {
         } else {
           result = await _shellService.executeCommand(
             command,
+            secrets: secrets,
             abortSignal: _currentAbortController!.stream,
             onStdout: (data) => onOutput?.call(data),
             onStderr: (data) => onOutput?.call(data),
