@@ -18,8 +18,9 @@ void main(List<String> args) async {
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     final timestamp = record.time.toIso8601String();
+    final loggerName = record.loggerName;
     final level = record.level.name;
-    final message = '$timestamp [$level] ${record.message}';
+    final message = '$timestamp [$loggerName] [$level] ${record.message}';
     if (record.level >= Level.SEVERE) {
       stderr.writeln(message);
       if (record.error != null) stderr.writeln(record.error);
