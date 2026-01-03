@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:ffi';
 
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
@@ -12,6 +13,30 @@ import 'package:fewshell_agent/certs.dart';
 import 'package:agent_core/agent_core.dart';
 
 final _log = Logger('FewshellAgent');
+
+// FFI signature for signal(int, void (*)(int))
+typedef SignalFunc = Void Function(Int32);
+typedef SignalC = Pointer<NativeFunction<SignalFunc>> Function(
+    Int32, Pointer<NativeFunction<SignalFunc>>);
+typedef SignalDart = Pointer<NativeFunction<SignalFunc>> Function(
+    int, Pointer<NativeFunction<SignalFunc>>);
+
+void _resetSigpipe() {
+  try {
+    if (Platform.isMacOS || Platform.isLinux) {
+      final dylib = DynamicLibrary.process();
+      final signal = dylib.lookupFunction<SignalC, SignalDart>('signal');
+      // SIGPIPE is 13 on both macOS and Linux (x86/ARM).
+      const sigPipe = 13;
+      // SIG_DFL is 0.
+      final sigDfl = Pointer<NativeFunction<SignalFunc>>.fromAddress(0);
+      signal(sigPipe, sigDfl);
+      _log.info('Reset SIGPIPE to SIG_DFL');
+    }
+  } catch (e) {
+    _log.warning('Failed to reset SIGPIPE: $e');
+  }
+}
 
 void main(List<String> args) async {
   // Configure logging
@@ -32,6 +57,11 @@ void main(List<String> args) async {
 
   const version = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
   _log.info('Starting Fewshell Agent v$version');
+
+  // Reset SIGPIPE to default behavior (terminate) so that child processes
+  // (like bash) inherit it. Dart VM ignores it by default, which causes
+  // "Broken pipe" errors in subprocesses instead of silent termination.
+  _resetSigpipe();
 
   // Initialize SqliteLogger
   // ignore: unused_local_variable
