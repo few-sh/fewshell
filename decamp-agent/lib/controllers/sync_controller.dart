@@ -231,10 +231,15 @@ class _AgentSession {
     try {
       sessionId = data['sessionId'] as String?;
     } catch (e) {
-      channel.sendCustomMessage({
-        'type': 'error',
-        'message': 'Invalid session ID format: $e',
-      });
+      _log.warning('Invalid session ID format', e);
+      try {
+        channel.sendCustomMessage({
+          'type': 'error',
+          'message': 'Invalid session ID format: $e',
+        });
+      } catch (sendError) {
+        _log.warning('Failed to send error message: $sendError');
+      }
       return;
     }
 
@@ -242,10 +247,14 @@ class _AgentSession {
       final locked = await _lockSession(sessionId);
       if (!locked) {
         _log.warning('Chat already in progress for session $sessionId');
-        channel.sendCustomMessage({
-          'type': 'error',
-          'message': 'Chat already in progress for session $sessionId',
-        });
+        try {
+          channel.sendCustomMessage({
+            'type': 'error',
+            'message': 'Chat already in progress for session $sessionId',
+          });
+        } catch (sendError) {
+          _log.warning('Failed to send error message: $sendError');
+        }
         return;
       }
     }
@@ -522,11 +531,17 @@ class _AgentSession {
             }
           }
 
-          channel.sendCustomMessage({
-            'type': 'error',
-            'message_id': messageId,
-            'message': e.toString(),
-          });
+          try {
+            channel.sendCustomMessage({
+              'type': 'error',
+              'message_id': messageId,
+              'message': e.toString(),
+            });
+          } catch (sendError) {
+            _log.warning(
+              'Failed to send error message to client: $sendError. Original error: $e',
+            );
+          }
         }
       } finally {
         _currentCancelToken = null;
@@ -573,12 +588,20 @@ class _AgentSession {
       }
     } catch (e) {
       _log.severe('Error starting chat', e);
-      channel.sendCustomMessage({
-        'type': 'error',
-        'message': e.toString(),
-      });
+      try {
+        channel.sendCustomMessage({
+          'type': 'error',
+          'message': e.toString(),
+        });
+      } catch (sendError) {
+        _log.warning(
+          'Failed to send error message to client: $sendError. Original error: $e',
+        );
+      }
       if (sessionId != null) {
-        await _unlockSession(sessionId);
+        await _unlockSession(sessionId).catchError((e) {
+          _log.severe('Error unlocking session $sessionId: $e');
+        });
       }
     }
   }
