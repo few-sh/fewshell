@@ -146,22 +146,14 @@ class ShellService {
 $envExports
 $command
 ''';
-        commandToExecute = 'bash';
+        commandToExecute = scriptToPipe;
       } else {
         commandToExecute = command;
       }
 
       _log.info('Executing command: $commandToExecute');
-      if (scriptToPipe != null) {
-        _log.info('Piping script: $scriptToPipe');
-      }
 
       final session = await _backend.execute(commandToExecute);
-
-      if (scriptToPipe != null) {
-        session.write(utf8.encode(scriptToPipe));
-        session.close();
-      }
 
       StreamSubscription<ProcessSignal>? abortSubscription;
       if (abortSignal != null) {
@@ -666,11 +658,9 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> execute(String command) async {
-    if (command == 'bash') {
-      final process = await Process.start('bash', []);
-      return LocalShellSession(process);
-    }
-    final process = await Process.start('bash', ['-c', command]);
+    final process = await Process.start('bash', []);
+    process.stdin.writeln(command);
+    process.stdin.close();
     return LocalShellSession(process);
   }
 
