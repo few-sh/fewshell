@@ -51,7 +51,6 @@ class SyncController {
               (WebSocketChannel channel, String? protocol) async {
             final db = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
-            _setupCustomMessageHandling(multiplexed, 'Project', db);
 
             // Fork channels immediately to avoid race conditions
             final settingsChannel = multiplexed.fork('\u001E');
@@ -73,6 +72,15 @@ class SyncController {
               secretsCrdt,
               secretsChannel,
               verbose: true,
+            );
+
+            final keychain = KeychainService(secretsCrdt);
+            _setupCustomMessageHandling(
+              multiplexed,
+              'Project',
+              db: db,
+              projectId: projectId,
+              keychain: keychain,
             );
 
             _log.info(
@@ -105,10 +113,13 @@ class SyncController {
 
   void _setupCustomMessageHandling(
     MultiplexedWebSocketChannel channel,
-    String context, [
+    String context, {
     ProjectDatabase? db,
-  ]) {
-    final agentSession = _AgentSession(channel, db, _activeSessions);
+    String? projectId,
+    KeychainService? keychain,
+  }) {
+    final agentSession =
+        _AgentSession(channel, db, _activeSessions, projectId, keychain);
 
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
@@ -134,7 +145,7 @@ class _AgentSession {
   final MultiplexedWebSocketChannel channel;
   final ProjectDatabase? db;
   final Set<String> _activeSessions;
-  final ShellService _shellService = ShellService.local(null, null);
+  final ShellService _shellService;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
   CancelToken? _currentCancelToken;
@@ -146,11 +157,20 @@ class _AgentSession {
   DateTime? _streamingCreatedAt;
   Future<void> _lastDbWrite = Future.value();
 
-  _AgentSession(this.channel, this.db, this._activeSessions);
+  _AgentSession(
+    this.channel,
+    this.db,
+    this._activeSessions,
+    String? projectId,
+    KeychainService? keychain,
+  ) : _shellService = ShellService.local(keychain, projectId);
 
   void handleMessage(Map<String, dynamic> msg) {
     if (msg['type'] == 'start_chat') {
-      _startChat(msg);
+      // Give CRDT sync a moment to catch up with secrets
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _startChat(msg);
+      });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
     } else if (msg['type'] == 'abort_chat') {

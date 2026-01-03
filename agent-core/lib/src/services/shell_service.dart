@@ -443,6 +443,9 @@ ${envExports}DECAMP_SECRETS
       final value = await _keychain.getProjectSecret(_projectId, key);
       if (value != null) {
         resolved[key] = value;
+      } else {
+        _log.warning(
+            'Secret not found: $key for project: $_projectId. Keychain has secrets: ${(await _keychain.listProjectSecrets(_projectId)).keys.toList()}');
       }
     }
     return resolved;
