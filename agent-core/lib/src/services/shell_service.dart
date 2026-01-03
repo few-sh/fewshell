@@ -103,7 +103,7 @@ class ShellService {
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
-    _log.info('Executing command: $command');
+    _log.info('Executing command (secrets:$secrets): $command');
 
     // Auto-connect if not connected
     if (!isConnected) {
