@@ -223,173 +223,153 @@ class _MultiCommandApprovalOverlayState
                 const SizedBox(height: 16),
 
                 // List of commands
-                Column(
-                  children: [
-                    for (
-                      int index = 0;
-                      index < widget.actions.length;
-                      index++
-                    ) ...[
-                      if (index > 0) const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final action = widget.actions[index];
-                          final controller = _controllers[index];
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                action.isSelected = !action.isSelected;
-                                FocusScope.of(context).unfocus();
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: theme.colorScheme.border,
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: widget.actions.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final action = widget.actions[index];
+                    final controller = _controllers[index];
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          action.isSelected = !action.isSelected;
+                          FocusScope.of(context).unfocus();
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: theme.colorScheme.border),
+                          borderRadius: BorderRadius.circular(8),
+                          color: action.requiresPrivileges
+                              ? theme.colorScheme.destructive.withValues(
+                                  alpha: 0.05,
+                                )
+                              : theme.colorScheme.secondary.withValues(
+                                  alpha: 0.1,
                                 ),
-                                borderRadius: BorderRadius.circular(8),
-                                color: action.requiresPrivileges
-                                    ? theme.colorScheme.destructive.withValues(
-                                        alpha: 0.05,
-                                      )
-                                    : theme.colorScheme.secondary.withValues(
-                                        alpha: 0.1,
-                                      ),
-                              ),
-                              child: Row(
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ShadCheckbox(
+                              value: action.isSelected,
+                              onChanged: (value) {
+                                setState(() {
+                                  action.isSelected = value;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  ShadCheckbox(
-                                    value: action.isSelected,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        action.isSelected = value;
-                                      });
-                                    },
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            if (action.requiresPrivileges) ...[
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  top: 10,
-                                                ),
-                                                child: Icon(
-                                                  LucideIcons.shieldAlert,
-                                                  size: 16,
-                                                  color: theme
-                                                      .colorScheme
-                                                      .destructive,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 4),
-                                            ],
-                                            if (action.params['command'] !=
-                                                null)
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  top: 10,
-                                                ),
-                                                child: Text(
-                                                  action.requiresPrivileges
-                                                      ? 'sudo \$ '
-                                                      : '\$ ',
-                                                  style: TextStyle(
-                                                    fontFamily: 'monospace',
-                                                    fontSize: 14,
-                                                    color:
-                                                        action
-                                                            .requiresPrivileges
-                                                        ? theme
-                                                              .colorScheme
-                                                              .destructive
-                                                        : theme
-                                                              .colorScheme
-                                                              .primary,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            Expanded(
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      terminalTheme
-                                                          ?.backgroundColor ??
-                                                      Colors.black,
-                                                  borderRadius:
-                                                      BorderRadius.circular(8),
-                                                  border: Border.all(
-                                                    color:
-                                                        terminalTheme
-                                                            ?.borderColor ??
-                                                        Colors.grey,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                                child: ShadInput(
-                                                  contextMenuBuilder:
-                                                      adaptiveContextMenuBuilder,
-                                                  controller: controller,
-                                                  autocorrect: false,
-                                                  minLines: 1,
-                                                  maxLines: null,
-                                                  decoration:
-                                                      const ShadDecoration(
-                                                        border: ShadBorder.none,
-                                                      ),
-                                                  style: TextStyle(
-                                                    fontFamily: 'monospace',
-                                                    fontSize: 14,
-                                                    color:
-                                                        terminalTheme
-                                                            ?.textColor ??
-                                                        Colors
-                                                            .greenAccent
-                                                            .shade400,
-                                                    height: 1.5,
-                                                  ),
-                                                  onChanged: (value) {
-                                                    if (action.params
-                                                        .containsKey(
-                                                          'command',
-                                                        )) {
-                                                      action.params['command'] =
-                                                          value;
-                                                    }
-                                                  },
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (action.explanation.isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            action.explanation,
-                                            style: theme.textTheme.muted,
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      if (action.requiresPrivileges) ...[
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 10,
                                           ),
-                                        ],
+                                          child: Icon(
+                                            LucideIcons.shieldAlert,
+                                            size: 16,
+                                            color:
+                                                theme.colorScheme.destructive,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
                                       ],
-                                    ),
+                                      if (action.params['command'] != null)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 10,
+                                          ),
+                                          child: Text(
+                                            action.requiresPrivileges
+                                                ? 'sudo \$ '
+                                                : '\$ ',
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 14,
+                                              color: action.requiresPrivileges
+                                                  ? theme
+                                                        .colorScheme
+                                                        .destructive
+                                                  : theme.colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color:
+                                                terminalTheme
+                                                    ?.backgroundColor ??
+                                                Colors.black,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color:
+                                                  terminalTheme?.borderColor ??
+                                                  Colors.grey,
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: ShadInput(
+                                            contextMenuBuilder:
+                                                adaptiveContextMenuBuilder,
+                                            controller: controller,
+                                            autocorrect: false,
+                                            minLines: 1,
+                                            maxLines: null,
+                                            decoration: const ShadDecoration(
+                                              border: ShadBorder.none,
+                                            ),
+                                            style: TextStyle(
+                                              fontFamily: 'monospace',
+                                              fontSize: 14,
+                                              color:
+                                                  terminalTheme?.textColor ??
+                                                  Colors.greenAccent.shade400,
+                                              height: 1.5,
+                                            ),
+                                            onChanged: (value) {
+                                              if (action.params.containsKey(
+                                                'command',
+                                              )) {
+                                                action.params['command'] =
+                                                    value;
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                  if (action.explanation.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      action.explanation,
+                                      style: theme.textTheme.muted,
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ],
-                  ],
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 24),
