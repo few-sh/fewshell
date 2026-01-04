@@ -103,7 +103,7 @@ class ShellService {
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
-    _log.info('Executing command: $command');
+    _log.info('Executing command (secrets:$secrets): $command');
 
     // Auto-connect if not connected
     if (!isConnected) {
@@ -117,7 +117,8 @@ class ShellService {
     }
 
     try {
-      String finalCommand;
+      String commandToExecute;
+      String? scriptToPipe;
       final secretsToRedact = <String>[];
 
       final resolvedSecrets = await _resolveSecrets(secrets);
@@ -135,22 +136,24 @@ class ShellService {
 
             final encodedValue = base64.encode(utf8.encode(entry.value));
             envExports.writeln(
-              "export ${entry.key}=\$(echo '$encodedValue' | base64 -d)",
+              "export ${entry.key}=\"\$(echo '$encodedValue' | base64 -d)\"",
             );
             secretsToRedact.add(entry.value);
           }
         }
 
-        finalCommand = '''
-bash -c "source <(cat <<'DECAMP_SECRETS'
-${envExports}DECAMP_SECRETS
-) && ${_escapeForCommand(command)}"
+        scriptToPipe = '''
+$envExports
+$command
 ''';
+        commandToExecute = scriptToPipe;
       } else {
-        finalCommand = command;
+        commandToExecute = command;
       }
 
-      final session = await _backend.execute(finalCommand);
+      _log.info('Executing command: $commandToExecute');
+
+      final session = await _backend.execute(commandToExecute);
 
       StreamSubscription<ProcessSignal>? abortSubscription;
       if (abortSignal != null) {
@@ -193,7 +196,7 @@ ${envExports}DECAMP_SECRETS
       final exitCode = await session.exitCode;
 
       _log.info(
-        'Command executed. Exit code: $exitCode, stdout length: ${stdout.length}, stderr length: ${stderr.length}',
+        'Command executed. Exit code: $exitCode, stdout: $stdout, stderr: $stderr',
       );
 
       return {
@@ -300,48 +303,45 @@ ${envExports}DECAMP_SECRETS
           }
           final encodedValue = base64.encode(utf8.encode(entry.value));
           envExports.writeln(
-            "export ${entry.key}=\$(echo '$encodedValue' | base64 -d)",
+            "export ${entry.key}=\"\$(echo '$encodedValue' | base64 -d)\"",
           );
           secretsToRedact.add(entry.value);
         }
       }
     }
 
-    String secureCommand;
+    String secureScript;
 
     if (sudoPassword != null) {
       final askpassPath = '/tmp/decamp_askpass_\$\$';
       final encodedSudoPassword = base64.encode(utf8.encode(sudoPassword));
 
-      secureCommand = '''
-bash -c "
+      secureScript = '''
 (umask 077 && cat > $askpassPath <<'ASKPASS_EOF'
 #!/bin/sh
-echo \\\"\\\$SUDO_PASSWORD\\\"
+echo "\$SUDO_PASSWORD"
 ASKPASS_EOF
 )
 chmod 700 $askpassPath
 
-source <(cat <<'DECAMP_SECRETS'
-${envExports}export SUDO_PASSWORD=\$(echo '$encodedSudoPassword' | base64 -d)
-DECAMP_SECRETS
-) && SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'
+$envExports
+export SUDO_PASSWORD="\$(echo '$encodedSudoPassword' | base64 -d)"
+SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'
 
 rm -f $askpassPath
-"
 ''';
     } else {
-      secureCommand = '''
-bash -c "source <(cat <<'DECAMP_SECRETS'
-${envExports}DECAMP_SECRETS
-) && sudo bash -c '${_escapeForCommand(command)}'"
+      secureScript = '''
+$envExports
+sudo bash -c '${_escapeForCommand(command)}'
 ''';
     }
 
     _log.info('Executing sudo command: sudo $command (secrets redacted)');
 
     try {
-      final session = await _backend.execute(secureCommand);
+      final session = await _backend.execute(secureScript);
+      session.close();
 
       StreamSubscription<ProcessSignal>? abortSubscription;
       if (abortSignal != null) {
@@ -657,7 +657,9 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> execute(String command) async {
-    final process = await Process.start('bash', ['-c', command]);
+    final process = await Process.start('bash', []);
+    process.stdin.writeln(command);
+    process.stdin.close();
     return LocalShellSession(process);
   }
 
@@ -693,7 +695,7 @@ class LocalShellSession implements ShellSession {
   void kill(ProcessSignal signal) => _process.kill(signal);
 
   @override
-  void close() => _process.kill();
+  void close() => _process.stdin.close();
 }
 
 class UnconfiguredShellBackend implements ShellBackend {
