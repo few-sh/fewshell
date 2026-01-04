@@ -117,6 +117,7 @@ class MultiCommandApprovalOverlay extends StatefulWidget {
 class _MultiCommandApprovalOverlayState
     extends State<MultiCommandApprovalOverlay> {
   late List<TextEditingController> _controllers;
+  final Map<String, Set<String>> _excludedSecrets = {};
 
   @override
   void initState() {
@@ -137,6 +138,33 @@ class _MultiCommandApprovalOverlayState
   void _handleApprove() {
     final selectedActions = widget.actions
         .where((action) => action.isSelected)
+        .map((action) {
+          final excluded = _excludedSecrets[action.id];
+          if (excluded == null || excluded.isEmpty) {
+            return action;
+          }
+
+          final secrets =
+              (action.params['secrets'] as List?)?.cast<String>() ?? [];
+          if (secrets.isEmpty) {
+            return action;
+          }
+
+          final newSecrets = secrets
+              .where((s) => !excluded.contains(s))
+              .toList();
+
+          // Create a deep copy of params to avoid side effects
+          final newParams = Map<String, dynamic>.from(action.params);
+          newParams['secrets'] = newSecrets;
+
+          return ToolAction(
+            id: action.id,
+            toolName: action.toolName,
+            params: newParams,
+            isSelected: action.isSelected,
+          );
+        })
         .toList();
 
     if (selectedActions.isEmpty) {
@@ -386,6 +414,76 @@ class _MultiCommandApprovalOverlayState
                                     Text(
                                       action.explanation,
                                       style: theme.textTheme.muted,
+                                    ),
+                                  ],
+                                  if ((action.params['secrets'] as List?)
+                                          ?.isNotEmpty ??
+                                      false) ...[
+                                    const SizedBox(height: 8),
+                                    ShadSelect<String>.multiple(
+                                      minWidth: 200,
+                                      placeholder: const Text(
+                                        'Select secrets',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                      closeOnSelect: false,
+                                      initialValues:
+                                          (action.params['secrets'] as List)
+                                              .cast<String>()
+                                              .where(
+                                                (s) =>
+                                                    !(_excludedSecrets[action
+                                                                .id]
+                                                            ?.contains(s) ??
+                                                        false),
+                                              )
+                                              .toSet(),
+                                      onChanged: (selected) {
+                                        setState(() {
+                                          final allSecrets =
+                                              (action.params['secrets'] as List)
+                                                  .cast<String>();
+                                          final excluded = allSecrets
+                                              .where(
+                                                (s) => !selected.contains(s),
+                                              )
+                                              .toSet();
+                                          if (excluded.isEmpty) {
+                                            _excludedSecrets.remove(action.id);
+                                          } else {
+                                            _excludedSecrets[action.id] =
+                                                excluded;
+                                          }
+                                        });
+                                      },
+                                      options:
+                                          (action.params['secrets'] as List)
+                                              .cast<String>()
+                                              .map(
+                                                (secret) => ShadOption(
+                                                  value: secret,
+                                                  child: Text(
+                                                    secret,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                      selectedOptionsBuilder:
+                                          (context, values) {
+                                            return Text(
+                                              values.isEmpty
+                                                  ? 'No secrets selected'
+                                                  : values.join(', '),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            );
+                                          },
                                     ),
                                   ],
                                 ],
