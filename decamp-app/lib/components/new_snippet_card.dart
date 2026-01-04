@@ -5,6 +5,7 @@ import 'package:agent_core/agent_core.dart';
 import '../providers/snippet_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
+import '../utils/ui_utils.dart';
 
 class SnippetDraft {
   final String content;
@@ -311,6 +312,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
         ),
         const SizedBox(height: 12),
         ShadInput(
+          contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: _descriptionController,
           focusNode: _descriptionFocus,
           placeholder: const Text('Description (e.g., List all pods)'),
@@ -329,6 +331,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
             ),
           ),
           child: ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             controller: _contentController,
             placeholder: const Text('Command (e.g., kubectl get pods)'),
             autocorrect: false,

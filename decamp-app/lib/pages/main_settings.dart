@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../utils/ui_utils.dart';
 import '../services/project_importer.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
@@ -324,6 +325,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         ShadCard(
           padding: const EdgeInsets.all(16),
           child: ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             controller: controller,
             placeholder: const Text('Name'),
             autocorrect: false,
@@ -1050,6 +1052,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ShadInput(
+                contextMenuBuilder: adaptiveContextMenuBuilder,
                 controller: controller,
                 placeholder: const Text('ws://localhost:3123'),
                 autocorrect: false,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../utils/ui_utils.dart';
+
 /// Inline edit field for message editing
 /// Shows a text field with Save and Cancel buttons
 class MessageEditField extends StatefulWidget {
@@ -78,6 +80,7 @@ class _MessageEditFieldState extends State<MessageEditField> {
         mainAxisSize: MainAxisSize.min,
         children: [
           ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             controller: _controller,
             focusNode: _focusNode,
             maxLines: null,

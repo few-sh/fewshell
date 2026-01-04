@@ -6,6 +6,8 @@ import 'package:decamp/providers/user_provider.dart';
 import 'package:decamp/utils/globals.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../utils/ui_utils.dart';
+
 class FeedbackPage extends ConsumerStatefulWidget {
   const FeedbackPage({super.key});
 
@@ -154,12 +156,14 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ShadInput(
+              contextMenuBuilder: adaptiveContextMenuBuilder,
               controller: _nameController,
               placeholder: const Text('Name (optional)'),
               autocorrect: false,
             ),
             const SizedBox(height: 16),
             ShadInput(
+              contextMenuBuilder: adaptiveContextMenuBuilder,
               controller: _emailController,
               placeholder: const Text('Email (optional)'),
               autocorrect: false,
@@ -207,6 +211,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
             ),
             const SizedBox(height: 16),
             ShadInput(
+              contextMenuBuilder: adaptiveContextMenuBuilder,
               controller: _textController,
               minLines: 7,
               maxLines: 7,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../utils/ui_utils.dart';
 import 'saved_prompts_bottom_sheet.dart';
 
 /// Simple chat input field widget
@@ -95,6 +96,7 @@ class _ChatInputState extends State<ChatInput> {
           const SizedBox(width: 8),
           Expanded(
             child: ShadInput(
+              contextMenuBuilder: adaptiveContextMenuBuilder,
               controller: _controller,
               focusNode: _focusNode,
               enabled: isInputEnabled,

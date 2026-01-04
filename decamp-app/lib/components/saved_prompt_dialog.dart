@@ -5,6 +5,7 @@ import 'package:agent_core/agent_core.dart';
 import '../providers/saved_prompt_provider.dart';
 import '../providers/project_provider.dart';
 import '../themes/terminal_theme.dart';
+import '../utils/ui_utils.dart';
 
 /// Shows a modal dialog to create or edit a saved prompt
 Future<void> showSavedPromptDialog(
@@ -288,6 +289,7 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
 
         // Content Field
         ShadInput(
+          contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: _contentController,
           focusNode: _contentFocus,
           placeholder: const Text('Prompt Content'),
@@ -312,6 +314,7 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
 
         // Description Field
         ShadInput(
+          contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: _descriptionController,
           placeholder: const Text('Description (Optional)'),
           autocorrect: false,

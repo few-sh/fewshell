@@ -5,6 +5,7 @@ import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/components/selectable_list_view.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../utils/ui_utils.dart';
 import 'project_setup_page.dart';
 
 class ProjectsPage extends ConsumerWidget {
@@ -301,6 +302,7 @@ class _ProjectListItemState extends ConsumerState<_ProjectListItem> {
           ),
         ],
         child: ShadInput(
+          contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: controller,
           placeholder: const Text('Name'),
           autocorrect: false,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../utils/ui_utils.dart';
+
 /// Reusable dialog for adding or editing secrets
 class SecretDialog {
   /// Show dialog to add or edit a secret
@@ -97,6 +99,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
               Text('Environment Variable Name', style: theme.textTheme.small),
               const SizedBox(height: 4),
               ShadInput(
+                contextMenuBuilder: adaptiveContextMenuBuilder,
                 controller: _keyController,
                 placeholder: const Text('e.g., API_KEY, DATABASE_URL'),
                 enabled: !_isEditMode,
@@ -119,6 +122,7 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                 alignment: Alignment.topCenter,
                 curve: Curves.easeInOut,
                 child: ShadInput(
+                  contextMenuBuilder: adaptiveContextMenuBuilder,
                   controller: _valueController,
                   placeholder: const Text('Enter the secret value'),
                   autocorrect: false,

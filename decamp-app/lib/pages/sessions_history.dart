@@ -7,6 +7,8 @@ import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/components/selectable_list_view.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../utils/ui_utils.dart';
+
 class SessionsHistoryPage extends ConsumerWidget {
   const SessionsHistoryPage({super.key});
 
@@ -321,6 +323,7 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
           ),
         ],
         child: ShadInput(
+          contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: controller,
           placeholder: const Text('Name'),
           autocorrect: false,

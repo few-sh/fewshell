@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/providers/user_provider.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import '../utils/ui_utils.dart';
+
 class UserBadge extends ConsumerWidget {
   const UserBadge({super.key});
 
@@ -63,6 +65,7 @@ class UserBadge extends ConsumerWidget {
             ),
           ],
           child: ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             controller: controller,
             placeholder: const Text('Enter username'),
             autocorrect: false,

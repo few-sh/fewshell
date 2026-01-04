@@ -5,6 +5,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../providers/saved_prompt_provider.dart';
 import '../components/saved_prompt_dialog.dart';
 import '../components/confirmation_dialog.dart';
+import '../utils/ui_utils.dart';
 
 /// Reusable card widget for displaying a saved prompt
 class SavedPromptCard extends ConsumerStatefulWidget {
@@ -129,6 +130,7 @@ class _SavedPromptCardState extends ConsumerState<SavedPromptCard> {
           const SizedBox(height: 8),
           // Content
           ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             initialValue: widget.prompt.content,
             readOnly: true,
             maxLines: null,

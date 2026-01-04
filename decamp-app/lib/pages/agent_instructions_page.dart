@@ -8,6 +8,7 @@ import '../providers/project_provider.dart';
 import '../components/project_title_bar.dart';
 import '../components/agent_instruction_preview_modal.dart';
 import '../themes/shad_layout_theme.dart';
+import '../utils/ui_utils.dart';
 
 /// Agent Instructions page with User and Project settings tabs
 class AgentInstructionsPage extends ConsumerStatefulWidget {
@@ -827,6 +828,7 @@ class _InstructionSectionState extends ConsumerState<_InstructionSection> {
         Text(widget.subtitle, style: theme.textTheme.muted),
         const SizedBox(height: 12),
         ShadInput(
+          contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: widget.controller,
           placeholder: const Text('Enter instruction in markdown format...'),
           autocorrect: false,
@@ -891,6 +893,7 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
           ),
           const SizedBox(height: 8),
           ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             controller: widget.controller,
             placeholder: const Text('Enter model-specific instruction...'),
             autocorrect: false,

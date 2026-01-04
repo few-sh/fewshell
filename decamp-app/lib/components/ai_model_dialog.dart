@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:async/async.dart';
+import '../utils/ui_utils.dart';
 import '../providers/llm_settings_provider.dart';
 import '../providers/project_provider.dart';
 import '../providers/llm_service_provider.dart';
@@ -249,6 +250,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                       });
 
                       return ShadInput(
+                        contextMenuBuilder: adaptiveContextMenuBuilder,
                         controller: fieldTextEditingController,
                         focusNode: fieldFocusNode,
                         placeholder: const Text('Start typing to search...'),
@@ -287,6 +289,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               Text('API URL', style: theme.textTheme.small),
               const SizedBox(height: 4),
               ShadInput(
+                contextMenuBuilder: adaptiveContextMenuBuilder,
                 controller: _urlController,
                 placeholder: const Text('https://api.example.com/v1'),
                 autocorrect: false,
@@ -297,6 +300,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
               Text('API Key', style: theme.textTheme.small),
               const SizedBox(height: 4),
               ShadInput(
+                contextMenuBuilder: adaptiveContextMenuBuilder,
                 controller: _apiKeyController,
                 placeholder: Text(
                   _isEditMode
@@ -332,6 +336,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                         Text('Max Tokens', style: theme.textTheme.small),
                         const SizedBox(height: 4),
                         ShadInput(
+                          contextMenuBuilder: adaptiveContextMenuBuilder,
                           controller: _maxTokensController,
                           placeholder: const Text('Optional'),
                           autocorrect: false,
@@ -348,6 +353,7 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                         Text('Temperature', style: theme.textTheme.small),
                         const SizedBox(height: 4),
                         ShadInput(
+                          contextMenuBuilder: adaptiveContextMenuBuilder,
                           controller: _temperatureController,
                           placeholder: const Text('0.0 - 2.0'),
                           autocorrect: false,

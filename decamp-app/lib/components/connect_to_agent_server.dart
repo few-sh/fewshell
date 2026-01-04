@@ -6,6 +6,8 @@ import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/providers/project_provider.dart';
 
+import '../utils/ui_utils.dart';
+
 class ConnectToAgentServerDialog extends ConsumerStatefulWidget {
   const ConnectToAgentServerDialog({super.key});
 
@@ -180,6 +182,7 @@ class _ConnectToAgentServerDialogState
           const Text('Enter the remote URL for global sync:'),
           const SizedBox(height: 10),
           ShadInput(
+            contextMenuBuilder: adaptiveContextMenuBuilder,
             controller: _controller,
             placeholder: const Text('wss://...'),
             autocorrect: false,
