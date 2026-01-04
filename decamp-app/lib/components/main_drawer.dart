@@ -227,7 +227,7 @@ class MainDrawer extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Copyright 2025 Fewshot Corp',
+                    'Copyright 2026 Fewshot Corp',
                     style: theme.textTheme.muted.copyWith(fontSize: 11),
                   ),
                   const SizedBox(height: 4),
