@@ -441,6 +441,20 @@ class _MultiCommandApprovalOverlayState
                                           style: theme.textTheme.muted,
                                         ),
                                       ],
+                                      if (action.toolName ==
+                                          'execute_shell_command') ...[
+                                        const SizedBox(height: 8),
+                                        ShadSwitch(
+                                          value: action.requiresPrivileges,
+                                          onChanged: (value) {
+                                            setState(() {
+                                              action.params['sudo_required'] =
+                                                  value;
+                                            });
+                                          },
+                                          label: const Text('Run as sudo'),
+                                        ),
+                                      ],
                                       const SizedBox(height: 8),
                                       Row(
                                         children: [
