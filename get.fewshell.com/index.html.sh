@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# get.few.sh
+# get.fewshell.com
 # This bash script is intentionally stored as index.html
 # Cloudflare build command converts index.html.sh to index.html
-# Install: curl -LsSf get.few.sh | bash
+# Install: curl -LsSf get.fewshell.com | bash
 
 set -u
 
@@ -42,8 +42,8 @@ print_banner() {
     echo -e "This script will transfer credentials to your mobile device."
     echo -e "The information is only used to generate a QR code."
     echo -e "The data will be safely stored in your phone's keychain."
-    echo -e "Full contents of this script at https://get.few.sh"
-    echo -e "Explanation of script at https://get.few.sh/explain"
+    echo -e "Full contents of this script at https://get.fewshell.com"
+    echo -e "Explanation of script at https://get.fewshell.com/explain"
     echo -e ""
     echo -e "${BOLD}Steps that follow:${RESET}"
     echo -e "  ${GREEN}1.${RESET} Name your project ${DIM}(auto-detect, manual, or skip)${RESET}"
