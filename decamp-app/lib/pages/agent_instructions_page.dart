@@ -145,14 +145,6 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
                   ),
                   child: Row(
                     children: [
-                      Expanded(
-                        child: Text(
-                          _tabController.index == 0
-                              ? 'Configure default instructions for all AI models'
-                              : 'Configure project-specific instructions',
-                          style: theme.textTheme.muted,
-                        ),
-                      ),
                       ShadButton.outline(
                         leading: const Icon(LucideIcons.eye),
                         onPressed: _handlePreview,
@@ -166,6 +158,7 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
                         child: const Text('Save'),
                       ),
                     ],
+                    mainAxisAlignment: MainAxisAlignment.end,
                   ),
                 ),
               ),
