@@ -173,200 +173,165 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
         ),
         ShadButton(onPressed: _save, child: const Text('Save')),
       ],
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600),
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 16),
-              Text('API Type', style: theme.textTheme.small),
-              const SizedBox(height: 4),
-              ShadSelect<LlmApiType>(
-                initialValue: _selectedApiType,
-                selectedOptionBuilder: (context, value) =>
-                    Text(value.displayName),
-                options: LlmApiType.values.map((type) {
-                  return ShadOption(value: type, child: Text(type.displayName));
-                }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      _selectedApiType = value;
-                      // Update URL to default for selected API type
-                      _urlController.text = value.defaultBaseUrl;
-                      // Auto-populate model identifier with default model
-                      // (unless in edit mode)
-                      if (!_isEditMode) {
-                        _identifierController.text = value.defaultModelId;
-                      }
-                    });
-                  }
-                },
-                placeholder: const Text('Select API Type'),
-              ),
-              const SizedBox(height: 12),
-              Text('Model Identifier', style: theme.textTheme.small),
-              const SizedBox(height: 4),
-              Autocomplete<String>(
-                initialValue: TextEditingValue(
-                  text: _identifierController.text,
-                ),
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  if (textEditingValue.text.isEmpty) {
-                    return _supportedModels;
-                  }
-                  return _supportedModels.where((String option) {
-                    return option.toLowerCase().contains(
-                      textEditingValue.text.toLowerCase(),
+      child: GestureDetector(
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            controller: _scrollController,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 16),
+                Text('API Type', style: theme.textTheme.small),
+                const SizedBox(height: 4),
+                ShadSelect<LlmApiType>(
+                  initialValue: _selectedApiType,
+                  selectedOptionBuilder: (context, value) =>
+                      Text(value.displayName),
+                  options: LlmApiType.values.map((type) {
+                    return ShadOption(
+                      value: type,
+                      child: Text(type.displayName),
                     );
-                  });
-                },
-                onSelected: (String selection) {
-                  _identifierController.text = selection;
-                },
-                fieldViewBuilder:
-                    (
-                      BuildContext context,
-                      TextEditingController fieldTextEditingController,
-                      FocusNode fieldFocusNode,
-                      VoidCallback onFieldSubmitted,
-                    ) {
-                      // Sync our controller with the autocomplete's controller
-                      if (_identifierController.text !=
-                          fieldTextEditingController.text) {
-                        fieldTextEditingController.text =
-                            _identifierController.text;
-                      }
-                      // Listen to changes in the autocomplete field
-                      fieldTextEditingController.addListener(() {
-                        if (_identifierController.text !=
-                            fieldTextEditingController.text) {
-                          _identifierController.text =
-                              fieldTextEditingController.text;
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedApiType = value;
+                        // Update URL to default for selected API type
+                        _urlController.text = value.defaultBaseUrl;
+                        // Auto-populate model identifier with default model
+                        // (unless in edit mode)
+                        if (!_isEditMode) {
+                          _identifierController.text = value.defaultModelId;
                         }
                       });
-
-                      return ShadInput(
-                        contextMenuBuilder: adaptiveContextMenuBuilder,
-                        controller: fieldTextEditingController,
-                        focusNode: fieldFocusNode,
-                        placeholder: const Text('Start typing to search...'),
-                      );
-                    },
-                optionsViewBuilder: (context, onSelected, options) {
-                  return Align(
-                    alignment: Alignment.topLeft,
-                    child: Material(
-                      elevation: 4,
-                      child: SizedBox(
-                        width: 300,
-                        height: 200,
-                        child: ListView.builder(
-                          padding: EdgeInsets.zero,
-                          itemCount: options.length,
-                          itemBuilder: (BuildContext context, int index) {
-                            final String option = options.elementAt(index);
-                            return InkWell(
-                              onTap: () {
-                                onSelected(option);
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text(option),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
-              Text('API URL', style: theme.textTheme.small),
-              const SizedBox(height: 4),
-              ShadInput(
-                contextMenuBuilder: adaptiveContextMenuBuilder,
-                controller: _urlController,
-                placeholder: const Text('https://api.example.com/v1'),
-                autocorrect: false,
-                minLines: 1,
-                maxLines: null,
-              ),
-              const SizedBox(height: 12),
-              Text('API Key', style: theme.textTheme.small),
-              const SizedBox(height: 4),
-              ShadInput(
-                contextMenuBuilder: adaptiveContextMenuBuilder,
-                controller: _apiKeyController,
-                placeholder: Text(
-                  _isEditMode
-                      ? 'Leave blank to keep current key'
-                      : 'Enter your API key',
+                    }
+                  },
+                  placeholder: const Text('Select API Type'),
                 ),
-                autocorrect: false,
-                obscureText: _obscureApiKey,
-                minLines: 1,
-                maxLines: _obscureApiKey ? 1 : null,
-                trailing: ShadButton.ghost(
-                  width: 24,
-                  height: 24,
-                  padding: EdgeInsets.zero,
-                  child: Icon(
-                    _obscureApiKey ? LucideIcons.eye : LucideIcons.eyeOff,
-                    size: 16,
+                const SizedBox(height: 12),
+                Text('Model Identifier', style: theme.textTheme.small),
+                const SizedBox(height: 4),
+                Autocomplete<String>(
+                  initialValue: TextEditingValue(
+                    text: _identifierController.text,
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _obscureApiKey = !_obscureApiKey;
+                  optionsBuilder: (TextEditingValue textEditingValue) {
+                    if (textEditingValue.text.isEmpty) {
+                      return _supportedModels;
+                    }
+                    return _supportedModels.where((String option) {
+                      return option.toLowerCase().contains(
+                        textEditingValue.text.toLowerCase(),
+                      );
                     });
                   },
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Max Tokens', style: theme.textTheme.small),
-                        const SizedBox(height: 4),
-                        ShadInput(
+                  onSelected: (String selection) {
+                    _identifierController.text = selection;
+                  },
+                  fieldViewBuilder:
+                      (
+                        BuildContext context,
+                        TextEditingController fieldTextEditingController,
+                        FocusNode fieldFocusNode,
+                        VoidCallback onFieldSubmitted,
+                      ) {
+                        // Sync our controller with the autocomplete's controller
+                        if (_identifierController.text !=
+                            fieldTextEditingController.text) {
+                          fieldTextEditingController.text =
+                              _identifierController.text;
+                        }
+                        // Listen to changes in the autocomplete field
+                        fieldTextEditingController.addListener(() {
+                          if (_identifierController.text !=
+                              fieldTextEditingController.text) {
+                            _identifierController.text =
+                                fieldTextEditingController.text;
+                          }
+                        });
+
+                        return ShadInput(
                           contextMenuBuilder: adaptiveContextMenuBuilder,
-                          controller: _maxTokensController,
-                          placeholder: const Text('Optional'),
-                          autocorrect: false,
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Temperature', style: theme.textTheme.small),
-                        const SizedBox(height: 4),
-                        ShadInput(
-                          contextMenuBuilder: adaptiveContextMenuBuilder,
-                          controller: _temperatureController,
-                          placeholder: const Text('0.0 - 2.0'),
-                          autocorrect: false,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                          controller: fieldTextEditingController,
+                          focusNode: fieldFocusNode,
+                          placeholder: const Text('Start typing to search...'),
+                        );
+                      },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        child: SizedBox(
+                          width: 300,
+                          height: 200,
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: options.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              final String option = options.elementAt(index);
+                              return InkWell(
+                                onTap: () {
+                                  onSelected(option);
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Text(option),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                Text('API URL', style: theme.textTheme.small),
+                const SizedBox(height: 4),
+                ShadInput(
+                  contextMenuBuilder: adaptiveContextMenuBuilder,
+                  controller: _urlController,
+                  placeholder: const Text('https://api.example.com/v1'),
+                  autocorrect: false,
+                  minLines: 1,
+                  maxLines: null,
+                ),
+                const SizedBox(height: 12),
+                Text('API Key', style: theme.textTheme.small),
+                const SizedBox(height: 4),
+                ShadInput(
+                  contextMenuBuilder: adaptiveContextMenuBuilder,
+                  controller: _apiKeyController,
+                  placeholder: Text(
+                    _isEditMode
+                        ? 'Leave blank to keep current key'
+                        : 'Enter your API key',
                   ),
-                ],
-              ),
-              if (_isEditMode) ...[
+                  autocorrect: false,
+                  obscureText: _obscureApiKey,
+                  minLines: 1,
+                  maxLines: _obscureApiKey ? 1 : null,
+                  trailing: ShadButton.ghost(
+                    width: 24,
+                    height: 24,
+                    padding: EdgeInsets.zero,
+                    child: Icon(
+                      _obscureApiKey ? LucideIcons.eye : LucideIcons.eyeOff,
+                      size: 16,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureApiKey = !_obscureApiKey;
+                      });
+                    },
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -374,91 +339,137 @@ class _AIModelDialogFormState extends ConsumerState<_AIModelDialogForm> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Enabled', style: theme.textTheme.small),
-                          Text(
-                            'Allow this model to be used',
-                            style: theme.textTheme.muted,
+                          Text('Max Tokens', style: theme.textTheme.small),
+                          const SizedBox(height: 4),
+                          ShadInput(
+                            contextMenuBuilder: adaptiveContextMenuBuilder,
+                            controller: _maxTokensController,
+                            placeholder: const Text('Optional'),
+                            autocorrect: false,
+                            keyboardType: TextInputType.number,
                           ),
                         ],
                       ),
                     ),
-                    ShadSwitch(
-                      value: _enabled,
-                      onChanged: (value) {
-                        setState(() {
-                          _enabled = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 16),
-              ShadButton.outline(
-                onPressed: _isTestingConnection ? _abortTest : _testConnection,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_isTestingConnection)
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      const Icon(LucideIcons.network, size: 16),
-                    const SizedBox(width: 8),
-                    Text(_isTestingConnection ? 'Abort' : 'Test Connection'),
-                  ],
-                ),
-              ),
-
-              // Display test result message
-              if (_testResultMessage != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  key: _testResultKey,
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: _testResultSuccess == true
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : theme.colorScheme.destructive.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _testResultSuccess == true
-                          ? Colors.green
-                          : theme.colorScheme.destructive,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _testResultSuccess == true
-                            ? LucideIcons.circleCheck
-                            : LucideIcons.circleAlert,
-                        color: _testResultSuccess == true
-                            ? Colors.green
-                            : theme.colorScheme.destructive,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _testResultMessage!,
-                          style: TextStyle(
-                            color: _testResultSuccess == true
-                                ? Colors.green.shade700
-                                : theme.colorScheme.destructive,
-                            fontSize: 13,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Temperature', style: theme.textTheme.small),
+                          const SizedBox(height: 4),
+                          ShadInput(
+                            contextMenuBuilder: adaptiveContextMenuBuilder,
+                            controller: _temperatureController,
+                            placeholder: const Text('0.0 - 2.0'),
+                            autocorrect: false,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (_isEditMode) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Enabled', style: theme.textTheme.small),
+                            Text(
+                              'Allow this model to be used',
+                              style: theme.textTheme.muted,
+                            ),
+                          ],
                         ),
+                      ),
+                      ShadSwitch(
+                        value: _enabled,
+                        onChanged: (value) {
+                          setState(() {
+                            _enabled = value;
+                          });
+                        },
                       ),
                     ],
                   ),
+                ],
+                const SizedBox(height: 16),
+                ShadButton.outline(
+                  onPressed: _isTestingConnection
+                      ? _abortTest
+                      : _testConnection,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (_isTestingConnection)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else
+                        const Icon(LucideIcons.network, size: 16),
+                      const SizedBox(width: 8),
+                      Text(_isTestingConnection ? 'Abort' : 'Test Connection'),
+                    ],
+                  ),
                 ),
+
+                // Display test result message
+                if (_testResultMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    key: _testResultKey,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _testResultSuccess == true
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : theme.colorScheme.destructive.withValues(
+                              alpha: 0.1,
+                            ),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _testResultSuccess == true
+                            ? Colors.green
+                            : theme.colorScheme.destructive,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _testResultSuccess == true
+                              ? LucideIcons.circleCheck
+                              : LucideIcons.circleAlert,
+                          color: _testResultSuccess == true
+                              ? Colors.green
+                              : theme.colorScheme.destructive,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _testResultMessage!,
+                            style: TextStyle(
+                              color: _testResultSuccess == true
+                                  ? Colors.green.shade700
+                                  : theme.colorScheme.destructive,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
