@@ -37,6 +37,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   static final _log = Logger('ChatSession');
 
   bool _previousKeyboardVisible = false;
+  bool _forceAppBarVisible = false;
   final FocusNode _inputFocusNode = FocusNode();
 
   // Search state
@@ -293,6 +294,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         if (mounted) {
           setState(() {
             _previousKeyboardVisible = keyboardVisible;
+            if (!keyboardVisible) {
+              _forceAppBarVisible = false;
+            }
           });
         }
       });
@@ -306,12 +310,16 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       child: Scaffold(
         appBar: PreferredSize(
           preferredSize: Size.fromHeight(
-            keyboardVisible ? 0 : kToolbarHeight + topPadding,
+            (keyboardVisible && !_forceAppBarVisible)
+                ? 0
+                : kToolbarHeight + topPadding,
           ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
-            height: keyboardVisible ? 0 : kToolbarHeight + topPadding,
+            height: (keyboardVisible && !_forceAppBarVisible)
+                ? 0
+                : kToolbarHeight + topPadding,
             child: AppBar(
               title: ProjectTitleBar(
                 title: currentProjectName,
@@ -434,10 +442,74 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                   totalCommands: chatState.executionProgress!.totalCommands,
                   commandName: chatState.executionProgress!.commandName,
                 ),
+
+              // Reveal control
+              if (keyboardVisible && !_forceAppBarVisible)
+                Positioned(
+                  top: topPadding,
+                  left: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _forceAppBarVisible = true),
+                    onVerticalDragEnd: (details) {
+                      if (details.primaryVelocity! > 0) {
+                        setState(() => _forceAppBarVisible = true);
+                      }
+                    },
+                    child: Center(
+                      child: CustomPaint(
+                        size: const Size(200, 20),
+                        painter: RevealTabPainter(
+                          color: ShadTheme.of(context).colorScheme.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       ),
     );
   }
+}
+
+class RevealTabPainter extends CustomPainter {
+  final Color color;
+
+  RevealTabPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final visualHeight = size.height * 0.4;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke;
+
+    final path = Path();
+    path.moveTo(0, 0); // Top left
+    path.lineTo(visualHeight, visualHeight); // Bottom left
+    path.lineTo(size.width - visualHeight, visualHeight); // Bottom right
+    path.lineTo(size.width, 0); // Top right
+    // path.close();
+
+    canvas.drawPath(path, paint);
+
+    // Optional: Add a small handle line
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(size.width / 2 - 10, visualHeight / 2),
+      Offset(size.width / 2 + 10, visualHeight / 2),
+      linePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
