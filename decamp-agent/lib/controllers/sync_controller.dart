@@ -192,19 +192,29 @@ class _AgentSession {
         final approvedCalls =
             (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
         final pending = _currentPendingCalls ?? [];
+        final pendingById = {for (var p in pending) p.id: p};
 
-        final approved = approvedCalls.map((callData) {
-          final id = callData['id'] as String;
-          final arguments = callData['arguments'] as Map<String, dynamic>;
-          final original = pending.firstWhere((p) => p.id == id);
+        final approved = approvedCalls
+            .map((callData) {
+              final id = callData['id'] as String;
+              final original = pendingById[id];
+              if (original == null) {
+                _log.warning(
+                  'Could not find original pending call for id: $id',
+                );
+                return null;
+              }
+              final arguments = callData['arguments'] as Map<String, dynamic>;
 
-          return PendingToolCall(
-            id: id,
-            name: original.name,
-            arguments: arguments,
-            originalToolCall: original.originalToolCall,
-          );
-        }).toList();
+              return PendingToolCall(
+                id: id,
+                name: original.name,
+                arguments: arguments,
+                originalToolCall: original.originalToolCall,
+              );
+            })
+            .whereType<PendingToolCall>()
+            .toList();
 
         _approvalCompleter!.complete(approved);
       } else if (data['approvedIds'] != null) {

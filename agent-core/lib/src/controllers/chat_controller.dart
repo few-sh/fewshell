@@ -280,15 +280,25 @@ class ChatController extends StateNotifier<ChatState> {
         );
 
         // Return the approved subset of PendingToolCalls with updated arguments
-        return selectedActions.map((action) {
-          final original = pendingCalls.firstWhere((pc) => pc.id == action.id);
-          return PendingToolCall(
-            id: original.id,
-            name: original.name,
-            arguments: action.params,
-            originalToolCall: original.originalToolCall,
-          );
-        }).toList();
+        final pendingCallsById = {for (var pc in pendingCalls) pc.id: pc};
+        return selectedActions
+            .map((action) {
+              final original = pendingCallsById[action.id];
+              if (original == null) {
+                _log.warning(
+                  'Could not find original pending call for action id: ${action.id}',
+                );
+                return null;
+              }
+              return PendingToolCall(
+                id: original.id,
+                name: original.name,
+                arguments: action.params,
+                originalToolCall: original.originalToolCall,
+              );
+            })
+            .whereType<PendingToolCall>()
+            .toList();
       }
 
       Future<void> handleAssistantMessage(ChatMessage message,
