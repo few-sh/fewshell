@@ -340,8 +340,7 @@ sudo bash -c '${_escapeForCommand(command)}'
     _log.info('Executing sudo command: sudo $command (secrets redacted)');
 
     try {
-      final session = await _backend.execute('bash');
-      session.write(utf8.encode(secureScript));
+      final session = await _backend.execute(secureScript);
       session.close();
 
       StreamSubscription<ProcessSignal>? abortSubscription;
