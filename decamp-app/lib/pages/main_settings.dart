@@ -48,62 +48,66 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const ProjectTitleBar(title: 'Settings'),
-        leading: ShadButton.ghost(
-          width: 32,
-          height: 32,
-          padding: EdgeInsets.zero,
-          decoration: const ShadDecoration(border: ShadBorder.none),
-          onPressed: () => Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const ChatSession()),
-            (route) => false,
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const ProjectTitleBar(title: 'Settings'),
+          leading: ShadButton.ghost(
+            width: 32,
+            height: 32,
+            padding: EdgeInsets.zero,
+            decoration: const ShadDecoration(border: ShadBorder.none),
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ChatSession()),
+              (route) => false,
+            ),
+            child: const Icon(LucideIcons.arrowLeft, size: 16),
           ),
-          child: const Icon(LucideIcons.arrowLeft, size: 16),
         ),
-      ),
-      body: Column(
-        children: [
-          // Stationary tab bar
-          Container(
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: theme.colorScheme.border),
-              ),
-            ),
-            alignment: Alignment.center,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth:
-                    Theme.of(
-                      context,
-                    ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
-                    800,
-              ),
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: theme.colorScheme.primary,
-                labelColor: theme.colorScheme.primary,
-                unselectedLabelColor: theme.colorScheme.mutedForeground,
-                labelStyle: theme.textTheme.list.copyWith(
-                  fontWeight: FontWeight.bold,
+        body: Column(
+          children: [
+            // Stationary tab bar
+            Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: theme.colorScheme.border),
                 ),
-                tabs: const [
-                  Tab(text: 'User Settings'),
-                  Tab(text: 'Project Settings'),
-                ],
+              ),
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth:
+                      Theme.of(
+                        context,
+                      ).extension<ShadLayoutTheme>()?.centeredContentMaxWidth ??
+                      800,
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: theme.colorScheme.primary,
+                  labelColor: theme.colorScheme.primary,
+                  unselectedLabelColor: theme.colorScheme.mutedForeground,
+                  labelStyle: theme.textTheme.list.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  onTap: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                  tabs: const [
+                    Tab(text: 'User Settings'),
+                    Tab(text: 'Project Settings'),
+                  ],
+                ),
               ),
             ),
-          ),
-          // Scrollable content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [_buildUserSettings(), _buildProjectSettings()],
+            // Scrollable content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [_buildUserSettings(), _buildProjectSettings()],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -144,6 +148,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         800;
 
     return ListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.symmetric(vertical: 16),
       itemCount: children.length,
       itemBuilder: (context, index) {
