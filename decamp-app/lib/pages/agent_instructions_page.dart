@@ -125,83 +125,87 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
           if (context.mounted) Navigator.of(context).pop();
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const ProjectTitleBar(title: 'Agent Instructions'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.of(context).maybePop(),
+      child: GestureDetector(
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: Scaffold(
+          appBar: AppBar(
+            title: const ProjectTitleBar(title: 'Agent Instructions'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
           ),
-        ),
-        body: Column(
-          children: [
-            // Preview and Save buttons
-            Padding(
-              padding: pagePadding,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
-                  ),
-                  child: Row(
-                    children: [
-                      ShadButton.outline(
-                        leading: const Icon(LucideIcons.eye),
-                        onPressed: _handlePreview,
-                        child: const Text('Preview'),
-                      ),
-                      const SizedBox(width: 8),
-                      ShadButton(
-                        enabled: _hasChanges,
-                        onPressed: _handleSave,
-                        leading: const Icon(LucideIcons.save),
-                        child: const Text('Save'),
-                      ),
-                    ],
-                    mainAxisAlignment: MainAxisAlignment.end,
+          body: Column(
+            children: [
+              // Preview and Save buttons
+              Padding(
+                padding: pagePadding,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
+                    ),
+                    child: Row(
+                      children: [
+                        ShadButton.outline(
+                          leading: const Icon(LucideIcons.eye),
+                          onPressed: _handlePreview,
+                          child: const Text('Preview'),
+                        ),
+                        const SizedBox(width: 8),
+                        ShadButton(
+                          enabled: _hasChanges,
+                          onPressed: _handleSave,
+                          leading: const Icon(LucideIcons.save),
+                          child: const Text('Save'),
+                        ),
+                      ],
+                      mainAxisAlignment: MainAxisAlignment.end,
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Tab Bar
-            TabBar(
-              controller: _tabController,
-              labelColor: theme.colorScheme.foreground,
-              unselectedLabelColor: theme.colorScheme.mutedForeground,
-              indicatorColor: theme.colorScheme.primary,
-              tabs: const [
-                Tab(text: 'User Settings'),
-                Tab(text: 'Project Settings'),
-              ],
-            ),
-
-            const ShadSeparator.horizontal(),
-
-            // Tab Content
-            Expanded(
-              child: TabBarView(
+              // Tab Bar
+              TabBar(
                 controller: _tabController,
-                children: [
-                  UserSettingsTab(
-                    key: _userTabKey,
-                    onChanged: _handleTabChanges,
-                  ),
-                  currentProject != null
-                      ? ProjectSettingsTab(
-                          key: _projectTabKey,
-                          projectId: currentProject.id,
-                          onChanged: _handleTabChanges,
-                        )
-                      : const Center(
-                          child: Text(
-                            'No project selected. Please select a project first.',
-                          ),
-                        ),
+                labelColor: theme.colorScheme.foreground,
+                unselectedLabelColor: theme.colorScheme.mutedForeground,
+                indicatorColor: theme.colorScheme.primary,
+                onTap: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                tabs: const [
+                  Tab(text: 'User Settings'),
+                  Tab(text: 'Project Settings'),
                 ],
               ),
-            ),
-          ],
+
+              const ShadSeparator.horizontal(),
+
+              // Tab Content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    UserSettingsTab(
+                      key: _userTabKey,
+                      onChanged: _handleTabChanges,
+                    ),
+                    currentProject != null
+                        ? ProjectSettingsTab(
+                            key: _projectTabKey,
+                            projectId: currentProject.id,
+                            onChanged: _handleTabChanges,
+                          )
+                        : const Center(
+                            child: Text(
+                              'No project selected. Please select a project first.',
+                            ),
+                          ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -376,6 +380,7 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
     });
 
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: pagePadding,
       children: [
         Center(
@@ -694,6 +699,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
     });
 
     return ListView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: pagePadding,
       children: [
         Center(
