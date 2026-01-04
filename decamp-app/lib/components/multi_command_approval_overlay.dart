@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -71,10 +72,28 @@ class MultiCommandApprovalOverlay extends StatefulWidget {
     final result = await show(context, actions);
     if (context.mounted) {
       if (result != null) {
-        ShadToaster.of(context).show(
-          ShadToast(
-            title: const Text('Approved'),
-            description: Text('Approved ${result.length} actions'),
+        final encoder = const JsonEncoder.withIndent('  ');
+        final resultString = result
+            .map((action) {
+              return 'Tool: ${action.toolName}\nParams: ${encoder.convert(action.params)}';
+            })
+            .join('\n\n');
+
+        showShadDialog(
+          context: context,
+          builder: (context) => ShadDialog(
+            title: const Text('Approved Actions'),
+            actions: [
+              ShadButton(
+                child: const Text('Close'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+            child: Container(
+              width: double.maxFinite,
+              constraints: const BoxConstraints(maxHeight: 400),
+              child: SingleChildScrollView(child: SelectableText(resultString)),
+            ),
           ),
         );
       } else {
