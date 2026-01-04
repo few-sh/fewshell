@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/shell_service_provider.dart';
+import 'package:decamp/providers/llm_service_provider.dart';
 import 'package:decamp/components/ssh_prompt_dialog.dart';
 import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
@@ -237,6 +238,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
 
+    // Watch active model
+    final activeModelAsync = ref.watch(activeModelIdentifierProvider);
+    final activeModel = activeModelAsync.valueOrNull;
+
     // Inject SSH prompt callback
     if (currentProject != null) {
       final shellServiceProv = shellServiceProvider(currentProject.id);
@@ -415,6 +420,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       isLoading: isLoading,
                       enabled: hasProject,
                       focusNode: _inputFocusNode,
+                      hintText: activeModel != null
+                          ? 'Send to $activeModel'
+                          : 'No LLM Model selected.',
                     ),
                 ],
               ),

@@ -37,3 +37,9 @@ final llmServiceProvider = Provider<LlmService>((ref) {
     globalSettings: globalSettings,
   );
 });
+
+/// Provider for the active model identifier
+final activeModelIdentifierProvider = FutureProvider<String?>((ref) async {
+  final llmService = ref.watch(llmServiceProvider);
+  return llmService.getActiveModelIdentifier();
+});
