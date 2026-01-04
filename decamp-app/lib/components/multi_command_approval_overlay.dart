@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../themes/terminal_theme.dart';
+import '../utils/ui_utils.dart';
 
 /// Overlay widget that shows multiple tool action approvals in a scrollable list
 /// Returns selected actions when approved, null when cancelled
@@ -88,6 +90,24 @@ class MultiCommandApprovalOverlay extends StatefulWidget {
 
 class _MultiCommandApprovalOverlayState
     extends State<MultiCommandApprovalOverlay> {
+  late List<TextEditingController> _controllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllers = widget.actions.map((action) {
+      return TextEditingController(text: action.primaryDisplay);
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _controllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
   void _handleApprove() {
     final selectedActions = widget.actions
         .where((action) => action.isSelected)
@@ -129,193 +149,278 @@ class _MultiCommandApprovalOverlayState
   @override
   Widget build(BuildContext context) {
     final theme = ShadTheme.of(context);
+    final terminalTheme = Theme.of(context).extension<TerminalTheme>();
     final allSelected = widget.actions.every((a) => a.isSelected);
 
-    return ShadSheet(
-      title: Row(
-        children: [
-          Icon(LucideIcons.wrench, color: theme.colorScheme.primary, size: 24),
-          const SizedBox(width: 12),
-          const Text('Tool Execution Request'),
-        ],
-      ),
-      description: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Review and approve actions ($_selectedCount of ${widget.actions.length} selected)',
-          ),
-          if (_privilegedCount > 0) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  LucideIcons.shieldAlert,
-                  size: 16,
-                  color: theme.colorScheme.destructive,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$_privilegedCount ${_privilegedCount == 1 ? 'action requires' : 'actions require'} elevated privileges',
-                  style: TextStyle(
-                    color: theme.colorScheme.destructive,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: ShadSheet(
+        title: Row(
           children: [
-            // Select All checkbox
-            Row(
-              children: [
-                ShadCheckbox(value: allSelected, onChanged: _toggleSelectAll),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => _toggleSelectAll(!allSelected),
-                  child: const Text(
-                    'Select All',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+            Icon(
+              LucideIcons.wrench,
+              color: theme.colorScheme.primary,
+              size: 24,
             ),
-
-            const SizedBox(height: 16),
-
-            // Scrollable list of commands
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.6,
+            const SizedBox(width: 12),
+            const Text('Tool Execution Request'),
+          ],
+        ),
+        description: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Review and approve actions ($_selectedCount of ${widget.actions.length} selected)',
+            ),
+            if (_privilegedCount > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    LucideIcons.shieldAlert,
+                    size: 16,
+                    color: theme.colorScheme.destructive,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$_privilegedCount ${_privilegedCount == 1 ? 'action requires' : 'actions require'} elevated privileges',
+                    style: TextStyle(
+                      color: theme.colorScheme.destructive,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: widget.actions.length,
-                separatorBuilder: (context, index) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final action = widget.actions[index];
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        action.isSelected = !action.isSelected;
-                      });
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: theme.colorScheme.border),
-                        borderRadius: BorderRadius.circular(8),
-                        color: action.requiresPrivileges
-                            ? theme.colorScheme.destructive.withValues(
-                                alpha: 0.05,
-                              )
-                            : theme.colorScheme.secondary.withValues(
-                                alpha: 0.1,
-                              ),
+            ],
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Select All checkbox
+                Row(
+                  children: [
+                    ShadCheckbox(
+                      value: allSelected,
+                      onChanged: _toggleSelectAll,
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => _toggleSelectAll(!allSelected),
+                      child: const Text(
+                        'Select All',
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ShadCheckbox(
-                            value: action.isSelected,
-                            onChanged: (value) {
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // List of commands
+                Column(
+                  children: [
+                    for (
+                      int index = 0;
+                      index < widget.actions.length;
+                      index++
+                    ) ...[
+                      if (index > 0) const SizedBox(height: 8),
+                      Builder(
+                        builder: (context) {
+                          final action = widget.actions[index];
+                          final controller = _controllers[index];
+                          return GestureDetector(
+                            onTap: () {
                               setState(() {
-                                action.isSelected = value;
+                                action.isSelected = !action.isSelected;
+                                FocusScope.of(context).unfocus();
                               });
                             },
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    if (action.requiresPrivileges) ...[
-                                      Icon(
-                                        LucideIcons.shieldAlert,
-                                        size: 16,
-                                        color: theme.colorScheme.destructive,
-                                      ),
-                                      const SizedBox(width: 4),
-                                    ],
-                                    if (action.params['command'] != null)
-                                      Text(
-                                        action.requiresPrivileges
-                                            ? 'sudo \$ '
-                                            : '\$ ',
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 14,
-                                          color: action.requiresPrivileges
-                                              ? theme.colorScheme.destructive
-                                              : theme.colorScheme.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    Expanded(
-                                      child: Text(
-                                        action.primaryDisplay,
-                                        style: const TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: theme.colorScheme.border,
                                 ),
-                                if (action.explanation.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    action.explanation,
-                                    style: theme.textTheme.muted,
+                                borderRadius: BorderRadius.circular(8),
+                                color: action.requiresPrivileges
+                                    ? theme.colorScheme.destructive.withValues(
+                                        alpha: 0.05,
+                                      )
+                                    : theme.colorScheme.secondary.withValues(
+                                        alpha: 0.1,
+                                      ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ShadCheckbox(
+                                    value: action.isSelected,
+                                    onChanged: (value) {
+                                      setState(() {
+                                        action.isSelected = value;
+                                      });
+                                    },
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (action.requiresPrivileges) ...[
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 10,
+                                                ),
+                                                child: Icon(
+                                                  LucideIcons.shieldAlert,
+                                                  size: 16,
+                                                  color: theme
+                                                      .colorScheme
+                                                      .destructive,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 4),
+                                            ],
+                                            if (action.params['command'] !=
+                                                null)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                  top: 10,
+                                                ),
+                                                child: Text(
+                                                  action.requiresPrivileges
+                                                      ? 'sudo \$ '
+                                                      : '\$ ',
+                                                  style: TextStyle(
+                                                    fontFamily: 'monospace',
+                                                    fontSize: 14,
+                                                    color:
+                                                        action
+                                                            .requiresPrivileges
+                                                        ? theme
+                                                              .colorScheme
+                                                              .destructive
+                                                        : theme
+                                                              .colorScheme
+                                                              .primary,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            Expanded(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      terminalTheme
+                                                          ?.backgroundColor ??
+                                                      Colors.black,
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  border: Border.all(
+                                                    color:
+                                                        terminalTheme
+                                                            ?.borderColor ??
+                                                        Colors.grey,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: ShadInput(
+                                                  contextMenuBuilder:
+                                                      adaptiveContextMenuBuilder,
+                                                  controller: controller,
+                                                  autocorrect: false,
+                                                  minLines: 1,
+                                                  maxLines: null,
+                                                  decoration:
+                                                      const ShadDecoration(
+                                                        border: ShadBorder.none,
+                                                      ),
+                                                  style: TextStyle(
+                                                    fontFamily: 'monospace',
+                                                    fontSize: 14,
+                                                    color:
+                                                        terminalTheme
+                                                            ?.textColor ??
+                                                        Colors
+                                                            .greenAccent
+                                                            .shade400,
+                                                    height: 1.5,
+                                                  ),
+                                                  onChanged: (value) {
+                                                    if (action.params
+                                                        .containsKey(
+                                                          'command',
+                                                        )) {
+                                                      action.params['command'] =
+                                                          value;
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (action.explanation.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            action.explanation,
+                                            style: theme.textTheme.muted,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
                                 ],
-                              ],
+                              ),
                             ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Action buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ShadButton.outline(
+                      onPressed: _handleCancel,
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 12),
+                    ShadButton(
+                      onPressed: _handleApprove,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(LucideIcons.play, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Run ${_selectedCount > 1 ? '$_selectedCount Actions' : 'Action'}',
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Action buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                ShadButton.outline(
-                  onPressed: _handleCancel,
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 12),
-                ShadButton(
-                  onPressed: _handleApprove,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(LucideIcons.play, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Run ${_selectedCount > 1 ? '$_selectedCount Actions' : 'Action'}',
-                      ),
-                    ],
-                  ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
