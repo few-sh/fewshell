@@ -28,38 +28,43 @@ class MultiCommandApprovalOverlay extends StatefulWidget {
     final actions = [
       ToolAction(
         id: '1',
-        toolName: 'run_in_terminal',
+        toolName: 'execute_shell_command',
         params: {
-          'command': 'ls -la',
-          'explanation': 'List all files in the current directory',
+          'command': 'df -h',
+          'explanation': 'Check available disk space on the server',
+          'sudo_required': false,
         },
         isSelected: true,
       ),
       ToolAction(
         id: '2',
-        toolName: 'fetch_webpage',
+        toolName: 'execute_shell_command',
         params: {
-          'url': 'https://example.com',
-          'method': 'GET',
-          'explanation': 'Fetch the example.com homepage',
+          'command': 'systemctl restart nginx',
+          'explanation': 'Restart the Nginx web server to apply changes',
+          'sudo_required': true,
         },
         isSelected: true,
       ),
       ToolAction(
         id: '3',
-        toolName: 'run_in_terminal',
+        toolName: 'fetch',
         params: {
-          'command': 'sudo rm -rf /',
-          'explanation': 'Dangerous command requiring privileges',
-          'sudo_required': true,
+          'url': 'http://localhost:8080/health',
+          'method': 'GET',
+          'explanation': 'Check the health status of the local service',
         },
-        isSelected: false,
+        isSelected: true,
       ),
       ToolAction(
         id: '4',
-        toolName: 'custom_tool',
-        params: {'explanation': 'A custom tool action'},
-        isSelected: true,
+        toolName: 'execute_shell_command',
+        params: {
+          'command': 'tail -n 50 /var/log/syslog',
+          'explanation': 'Read the last 50 lines of the system log',
+          'sudo_required': true,
+        },
+        isSelected: false,
       ),
     ];
 
