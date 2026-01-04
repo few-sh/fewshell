@@ -442,47 +442,57 @@ class _MultiCommandApprovalOverlayState
                                         ),
                                       ],
                                       const SizedBox(height: 8),
-                                      ShadSelect<String>.multiple(
-                                        minWidth: 200,
-                                        placeholder: const Text(
-                                          'Add Secrets',
-                                          style: TextStyle(fontSize: 12),
-                                        ),
-                                        closeOnSelect: false,
-                                        initialValues:
-                                            _selectedSecrets[action.id] ?? {},
-                                        onChanged: (selected) {
-                                          setState(() {
-                                            _selectedSecrets[action.id] =
-                                                selected.toSet();
-                                          });
-                                        },
-                                        options: allOptions
-                                            .map(
-                                              (secret) => ShadOption(
-                                                value: secret,
-                                                child: Text(
-                                                  secret,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
+                                      Row(
+                                        children: [
+                                          const Icon(LucideIcons.key, size: 16),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: ShadSelect<String>.multiple(
+                                              minWidth: 200,
+                                              placeholder: const Text(
+                                                'Add Secrets',
+                                                style: TextStyle(fontSize: 12),
                                               ),
-                                            )
-                                            .toList(),
-                                        selectedOptionsBuilder:
-                                            (context, values) {
-                                              return Text(
-                                                values.isEmpty
-                                                    ? 'No secrets selected'
-                                                    : values.join(', '),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                ),
-                                              );
-                                            },
+                                              closeOnSelect: false,
+                                              initialValues:
+                                                  _selectedSecrets[action.id] ??
+                                                  {},
+                                              onChanged: (selected) {
+                                                setState(() {
+                                                  _selectedSecrets[action.id] =
+                                                      selected.toSet();
+                                                });
+                                              },
+                                              options: allOptions
+                                                  .map(
+                                                    (secret) => ShadOption(
+                                                      value: secret,
+                                                      child: Text(
+                                                        secret,
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  )
+                                                  .toList(),
+                                              selectedOptionsBuilder:
+                                                  (context, values) {
+                                                    return Text(
+                                                      values.isEmpty
+                                                          ? 'No secrets selected'
+                                                          : values.join(', '),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                      ),
+                                                    );
+                                                  },
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
