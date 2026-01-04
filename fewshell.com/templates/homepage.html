@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{%- block title -%}
+{{ section.title }} | {{ config.title }}
+{%- endblock -%}
+
+{%- block main -%}
+{%- filter indent -%}{%- filter indent -%}
+<article class="post content">
+    <h1 class="post-title">{{ section.title }}</h1>
+    {{ section.content | safe }}
+</article>
+{% endfilter %}{% endfilter %}
+{%- endblock -%}

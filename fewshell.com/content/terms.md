@@ -11,7 +11,7 @@ last_updated = "December 1, 2025"
 These Terms of Use constitute a legally binding
 agreement made between you, whether personally or on
 behalf of an entity (“you”) and Fewshot Corp., doing
-business as few.sh ("few.sh", “we”, “us”, or “our”),
+business asfewshell.com ("fewshell.com", “we”, “us”, or “our”),
 concerning your access to and use of the https://few.sh
 website as well as any other media form, media channel,
 mobile website or mobile application related, linked, or

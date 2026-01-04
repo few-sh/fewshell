@@ -1,7 +1,7 @@
 +++
 title = "Fewshell"
-date = 2025-01-01
-template = "page.html"
+
+template = "homepage.html"
 [extra]
 stylesheets = ["css/custom.css"]
 +++

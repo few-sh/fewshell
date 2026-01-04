@@ -15,7 +15,7 @@ and why we might collect, store, use, and/or share
 </p>
 <ul>
 <li>
-Visit our website at few.sh, or any website of ours
+Visit our website atfewshell.com, or any website of ours
 that links to this privacy notice
 </li>
 <li>
@@ -49,7 +49,7 @@ process?</strong
 >
 When you visit, use, or navigate our Services, we
 may process personal information depending on how
-you interact with few.sh and the Services, the
+you interact withfewshell.com and the Services, the
 choices you make, and the products and features you
 use.
 </li>

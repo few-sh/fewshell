@@ -1,8 +1,8 @@
 # The URL the site will be built for
-base_url = "https://few.sh"
+base_url = "https://fewshell.com"
 
 # The site title and description; used in feeds by default.
-title = "Fewshot Corp"
+title = "Fewshell"
 description = "A mobile AI-assistant for DevOps practitioners and on-calls."
 
 # The theme to use
@@ -41,7 +41,7 @@ show_default_author = false
 
 main_menu = [
     { name = "Home", url = "", trailing_slash = true },
-    { name = "Fewshell", url = "fewshell", trailing_slash = true },
+
     { name = "Contact", url = "contact", trailing_slash = true },
 ]
 
