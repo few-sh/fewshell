@@ -15,7 +15,7 @@ const neonShadColorScheme = ShadColorScheme(
   secondary: Color(0xFF00E5FF),
   secondaryForeground: Colors.black,
   muted: Color(0xFF1E1E4E),
-  mutedForeground: Color(0xFFA1A3C1),
+  mutedForeground: Color(0xFF65689a),
   accent: Color(0xFFFF4DFF),
   accentForeground: Colors.white,
   destructive: Color(0xFFFF453A),

@@ -1054,7 +1054,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ShadInput(
                 contextMenuBuilder: adaptiveContextMenuBuilder,
                 controller: controller,
-                placeholder: const Text('ws://localhost:3123'),
+                placeholder: const Text('wss://example.com:3123'),
                 autocorrect: false,
                 enableSuggestions: false,
                 leading: const Padding(
