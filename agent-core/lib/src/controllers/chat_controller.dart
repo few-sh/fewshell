@@ -279,10 +279,16 @@ class ChatController extends StateNotifier<ChatState> {
           '✅ User approved ${selectedActions.length} tool calls',
         );
 
-        // Return the approved subset of PendingToolCalls
-        return pendingCalls
-            .where((pc) => selectedActions.any((a) => a.id == pc.id))
-            .toList();
+        // Return the approved subset of PendingToolCalls with updated arguments
+        return selectedActions.map((action) {
+          final original = pendingCalls.firstWhere((pc) => pc.id == action.id);
+          return PendingToolCall(
+            id: original.id,
+            name: original.name,
+            arguments: action.params,
+            originalToolCall: original.originalToolCall,
+          );
+        }).toList();
       }
 
       Future<void> handleAssistantMessage(ChatMessage message,
