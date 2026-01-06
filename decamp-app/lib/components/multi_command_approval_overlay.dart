@@ -400,6 +400,8 @@ class _MultiCommandApprovalOverlayState
                                                 ),
                                               ),
                                               child: ShadInput(
+                                                readOnly:
+                                                    action.toolName == 'fetch',
                                                 contextMenuBuilder:
                                                     adaptiveContextMenuBuilder,
                                                 controller: controller,
