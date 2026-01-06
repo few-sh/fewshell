@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
 import 'package:agent_core/src/models/secret.dart';
 
@@ -6,6 +7,9 @@ import 'package:agent_core/src/models/secret.dart';
 class KeychainService {
   final SecretsStorage _storage;
   final Stream<void>? _changeStream;
+
+  /// Expose the change stream for external listeners
+  Stream<void> get onChange => _changeStream ?? const Stream.empty();
 
   KeychainService(this._storage, {Stream<void>? changeStream})
       : _changeStream = changeStream;
@@ -211,6 +215,41 @@ class KeychainService {
     }
 
     return globalSecrets;
+  }
+
+  /// Watch for changes and return a list of secret keys that are visible to LLM.
+  /// Includes global secrets and project-specific secrets if projectId is provided.
+  Stream<List<String>> watchVisibleSecretKeys({String? projectId}) async* {
+    // Initial yield
+    yield await _getVisibleKeys(projectId);
+
+    if (_changeStream != null) {
+      await for (final _ in _changeStream) {
+        yield await _getVisibleKeys(projectId);
+      }
+    }
+  }
+
+  Future<List<String>> _getVisibleKeys(String? projectId) async {
+    final allSecrets = await listAllSecrets();
+    final visibleKeys = <String>{};
+    final projectPrefix = projectId != null ? 'project:$projectId:' : null;
+    const globalPrefix = 'global:';
+
+    for (final entry in allSecrets.entries) {
+      final key = entry.key;
+      final secret = entry.value;
+
+      if (!secret.isVisibleToLlm) continue;
+
+      if (projectPrefix != null && key.startsWith(projectPrefix)) {
+        visibleKeys.add(key.substring(projectPrefix.length));
+      } else if (key.startsWith(globalPrefix)) {
+        visibleKeys.add(key.substring(globalPrefix.length));
+      }
+    }
+
+    return visibleKeys.toList()..sort();
   }
 
   // Private helper methods

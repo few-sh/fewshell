@@ -186,17 +186,46 @@ class _AgentSession {
 
   void _handleApproval(Map<String, dynamic> data) {
     _log.info('✅ Received approval response');
-    final approvedIds = (data['approvedIds'] as List?)?.cast<String>();
 
     if (_approvalCompleter != null && !_approvalCompleter!.isCompleted) {
-      if (approvedIds == null) {
-        _approvalCompleter!.complete(null);
-      } else {
-        // Filter pending calls
+      if (data['approvedCalls'] != null) {
+        final approvedCalls =
+            (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
+        final pending = _currentPendingCalls ?? [];
+        final pendingById = {for (var p in pending) p.id: p};
+
+        final approved = approvedCalls
+            .map((callData) {
+              final id = callData['id'] as String;
+              final original = pendingById[id];
+              if (original == null) {
+                _log.warning(
+                  'Could not find original pending call for id: $id',
+                );
+                return null;
+              }
+              final arguments = callData['arguments'] as Map<String, dynamic>;
+
+              return PendingToolCall(
+                id: id,
+                name: original.name,
+                arguments: arguments,
+                originalToolCall: original.originalToolCall,
+              );
+            })
+            .whereType<PendingToolCall>()
+            .toList();
+
+        _approvalCompleter!.complete(approved);
+      } else if (data['approvedIds'] != null) {
+        final approvedIds = (data['approvedIds'] as List).cast<String>();
         final pending = _currentPendingCalls ?? [];
         final approved =
             pending.where((c) => approvedIds.contains(c.id)).toList();
         _approvalCompleter!.complete(approved);
+      } else {
+        // Cancelled
+        _approvalCompleter!.complete(null);
       }
     }
   }

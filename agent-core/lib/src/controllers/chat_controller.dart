@@ -279,9 +279,25 @@ class ChatController extends StateNotifier<ChatState> {
           '✅ User approved ${selectedActions.length} tool calls',
         );
 
-        // Return the approved subset of PendingToolCalls
-        return pendingCalls
-            .where((pc) => selectedActions.any((a) => a.id == pc.id))
+        // Return the approved subset of PendingToolCalls with updated arguments
+        final pendingCallsById = {for (var pc in pendingCalls) pc.id: pc};
+        return selectedActions
+            .map((action) {
+              final original = pendingCallsById[action.id];
+              if (original == null) {
+                _log.warning(
+                  'Could not find original pending call for action id: ${action.id}',
+                );
+                return null;
+              }
+              return PendingToolCall(
+                id: original.id,
+                name: original.name,
+                arguments: action.params,
+                originalToolCall: original.originalToolCall,
+              );
+            })
+            .whereType<PendingToolCall>()
             .toList();
       }
 

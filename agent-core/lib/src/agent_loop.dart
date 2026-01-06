@@ -123,8 +123,17 @@ Future<AgentLoopResult> runAgentLoop({
       return const AgentLoopCancelled();
     }
 
-    // Get the approved ToolCalls
-    final approvedToolCalls = approved.map((p) => p.originalToolCall).toList();
+    // Get the approved ToolCalls with potentially updated arguments
+    final approvedToolCalls = approved.map((p) {
+      return ToolCall(
+        id: p.originalToolCall.id,
+        callType: p.originalToolCall.callType,
+        function: FunctionCall(
+          name: p.name,
+          arguments: jsonEncode(p.arguments),
+        ),
+      );
+    }).toList();
 
     // Build and save assistant message with tool use
     final assistantMessage = ChatMessage.toolUse(

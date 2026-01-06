@@ -42,10 +42,24 @@ Future<AgentLoopResult> runRemoteAgentLoop({
 
         final approved = await requestApproval(pendingCalls);
 
-        channel.sendCustomMessage({
-          'type': 'approval_response',
-          'approvedIds': approved?.map((c) => c.id).toList()
-        });
+        if (approved == null) {
+          channel.sendCustomMessage({
+            'type': 'approval_response',
+            'approvedIds': null, // Explicitly null for cancellation
+          });
+        } else {
+          channel.sendCustomMessage({
+            'type': 'approval_response',
+            'approvedCalls': approved
+                .map((c) => {
+                      'id': c.id,
+                      'arguments': c.arguments,
+                    })
+                .toList(),
+            // Keep approvedIds for backward compatibility if needed, though we prefer approvedCalls
+            'approvedIds': approved.map((c) => c.id).toList()
+          });
+        }
       } else if (type == 'complete') {
         if (!completer.isCompleted) {
           completer.complete(const AgentLoopCompleted());
