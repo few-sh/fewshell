@@ -713,8 +713,45 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> execute(String command) async {
-    final process = await Process.start('bash', []);
-    process.stdin.writeln(command);
+    // We use a temporary file to execute the command. This achieves three goals:
+    // 1. Secrets are not visible in `ps` (unlike `bash -c`).
+    // 2. We can use `script` (on macOS) to allocate a PTY for unbuffered streaming.
+    // 3. The process tree is simpler, ensuring `kill()` works.
+    final tempDir = Directory.systemTemp.createTempSync('decamp_cmd_');
+    final scriptFile = File('${tempDir.path}/script.sh');
+    if (!Platform.isWindows) {
+      await Process.run('chmod', ['700', scriptFile.path]);
+    }
+    await scriptFile.writeAsString(command);
+
+    Process process;
+    if (Platform.isMacOS) {
+      // Use script to force PTY behavior (unbuffered flushing).
+      // -F: flush immediately, -q: quiet
+      process = await Process.start(
+        'script',
+        ['-F', '-q', '/dev/null', 'bash', scriptFile.path],
+        environment: {
+          // Suppress macOS zsh update warning
+          'BASH_SILENCE_DEPRECATION_WARNING': '1',
+        },
+      );
+    } else {
+      // Fallback for Linux/Windows.
+      // This fixes the 'kill' issue (process tree) and hides secrets,
+      // but doesn't necessarily solve buffering (no PTY).
+      process = await Process.start('bash', [scriptFile.path]);
+    }
+
+    // Cleanup temp file when process ends
+    process.exitCode.whenComplete(() {
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    });
+
     process.stdin.close();
     return LocalShellSession(process);
   }
