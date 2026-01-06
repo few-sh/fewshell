@@ -168,10 +168,33 @@ $command
       final stdoutDone = Completer<void>();
       final stderrDone = Completer<void>();
 
+      // Use chunked decoders to handle split UTF-8 characters properly
+      ByteConversionSink? stdoutDecoder;
+      if (onStdout != null) {
+        stdoutDecoder = utf8.decoder.startChunkedConversion(
+          ChunkedConversionSink.withCallback((text) {
+            for (final chunk in text) {
+              onStdout(chunk);
+            }
+          }),
+        );
+      }
+
+      ByteConversionSink? stderrDecoder;
+      if (onStderr != null) {
+        stderrDecoder = utf8.decoder.startChunkedConversion(
+          ChunkedConversionSink.withCallback((text) {
+            for (final chunk in text) {
+              onStderr(chunk);
+            }
+          }),
+        );
+      }
+
       session.stdout.listen(
         (data) {
           stdoutBuffer.add(data);
-          onStdout?.call(String.fromCharCodes(data));
+          stdoutDecoder?.add(data);
         },
         onDone: stdoutDone.complete,
         onError: stdoutDone.completeError,
@@ -180,7 +203,7 @@ $command
       session.stderr.listen(
         (data) {
           stderrBuffer.add(data);
-          onStderr?.call(String.fromCharCodes(data));
+          stderrDecoder?.add(data);
         },
         onDone: stderrDone.complete,
         onError: stderrDone.completeError,
@@ -191,8 +214,13 @@ $command
       await session.done;
       await abortSubscription?.cancel();
 
-      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
-      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      stdoutDecoder?.close();
+      stderrDecoder?.close();
+
+      final stdout =
+          utf8.decode(stdoutBuffer.takeBytes(), allowMalformed: true);
+      final stderr =
+          utf8.decode(stderrBuffer.takeBytes(), allowMalformed: true);
       final exitCode = await session.exitCode;
 
       _log.info(
@@ -356,10 +384,33 @@ sudo bash -c '${_escapeForCommand(command)}'
       final stdoutDone = Completer<void>();
       final stderrDone = Completer<void>();
 
+      // Use chunked decoders to handle split UTF-8 characters properly
+      ByteConversionSink? stdoutDecoder;
+      if (onStdout != null) {
+        stdoutDecoder = utf8.decoder.startChunkedConversion(
+          ChunkedConversionSink.withCallback((text) {
+            for (final chunk in text) {
+              onStdout(chunk);
+            }
+          }),
+        );
+      }
+
+      ByteConversionSink? stderrDecoder;
+      if (onStderr != null) {
+        stderrDecoder = utf8.decoder.startChunkedConversion(
+          ChunkedConversionSink.withCallback((text) {
+            for (final chunk in text) {
+              onStderr(chunk);
+            }
+          }),
+        );
+      }
+
       session.stdout.listen(
         (data) {
           stdoutBuffer.add(data);
-          onStdout?.call(String.fromCharCodes(data));
+          stdoutDecoder?.add(data);
         },
         onDone: stdoutDone.complete,
         onError: stdoutDone.completeError,
@@ -368,7 +419,7 @@ sudo bash -c '${_escapeForCommand(command)}'
       session.stderr.listen(
         (data) {
           stderrBuffer.add(data);
-          onStderr?.call(String.fromCharCodes(data));
+          stderrDecoder?.add(data);
         },
         onDone: stderrDone.complete,
         onError: stderrDone.completeError,
@@ -379,8 +430,13 @@ sudo bash -c '${_escapeForCommand(command)}'
       await session.done;
       await abortSubscription?.cancel();
 
-      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
-      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      stdoutDecoder?.close();
+      stderrDecoder?.close();
+
+      final stdout =
+          utf8.decode(stdoutBuffer.takeBytes(), allowMalformed: true);
+      final stderr =
+          utf8.decode(stderrBuffer.takeBytes(), allowMalformed: true);
       final exitCode = await session.exitCode;
 
       return {
