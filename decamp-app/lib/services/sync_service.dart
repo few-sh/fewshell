@@ -316,6 +316,7 @@ class SyncService {
         secretsCrdt,
         secretsChannel,
         verbose: true,
+        changesetBuilder: secretsCrdt.getProjectChangesetBuilder(projectId),
       );
 
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {

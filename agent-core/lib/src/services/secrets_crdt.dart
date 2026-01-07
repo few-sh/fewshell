@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:crdt/crdt.dart';
 import 'package:crdt/map_crdt.dart';
+import 'package:crdt_sync/crdt_sync.dart';
 import 'package:logging/logging.dart';
 import 'package:agent_core/src/secrets_storage/secure_storage.dart';
 import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
@@ -203,6 +204,43 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
     for (final key in all.keys) {
       await delete(key: key);
     }
+  }
+
+  ChangesetBuilder getProjectChangesetBuilder(String projectId) {
+    return ({
+      Iterable<String>? onlyTables,
+      String? onlyNodeId,
+      String? exceptNodeId,
+      Hlc? modifiedOn,
+      Hlc? modifiedAfter,
+    }) {
+      final changeset = getChangeset(
+        onlyTables: onlyTables,
+        // onlyNodeId: onlyNodeId, // Not filtering by nodeId here because the server may need all nodes' data including its own, since its secrets are ephemeral
+        exceptNodeId: exceptNodeId,
+        modifiedOn: modifiedOn,
+        modifiedAfter: modifiedAfter,
+      );
+
+      if (changeset.containsKey('secrets')) {
+        final records = changeset['secrets']!;
+        final prefix = 'project:$projectId:';
+
+        // Filter records that match the project prefix
+        final filteredRecords = records.where((record) {
+          final key = record['key'] as String;
+          return key.startsWith(prefix);
+        }).toList();
+
+        if (filteredRecords.isEmpty) {
+          changeset.remove('secrets');
+        } else {
+          changeset['secrets'] = filteredRecords;
+        }
+      }
+
+      return changeset;
+    };
   }
 
   Future<void> close() async {
