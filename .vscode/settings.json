@@ -3,4 +3,9 @@
     "chat.tools.terminal.autoApprove": {
         "dart analyze": true,
     },
+    "remote.portsAttributes": {
+        "3123": {
+            "localPort": 4000
+        }
+    }
 }
