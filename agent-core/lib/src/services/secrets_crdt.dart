@@ -18,6 +18,8 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
     ready = _load();
   }
 
+  bool _initialChangeset = true;
+
   Stream<void> get onChange => _changeController.stream;
 
   Future<void> _load() async {
@@ -206,41 +208,45 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
     }
   }
 
-  ChangesetBuilder getProjectChangesetBuilder(String projectId) {
-    return ({
-      Iterable<String>? onlyTables,
-      String? onlyNodeId,
-      String? exceptNodeId,
-      Hlc? modifiedOn,
-      Hlc? modifiedAfter,
-    }) {
-      final changeset = getChangeset(
-        onlyTables: onlyTables,
-        // onlyNodeId: onlyNodeId, // Not filtering by nodeId here because the server may need all nodes' data including its own, since its secrets are ephemeral
-        exceptNodeId: exceptNodeId,
-        modifiedOn: modifiedOn,
-        modifiedAfter: modifiedAfter,
-      );
+  FutureOr<CrdtChangeset> changesetFunction({
+    required String projectId,
+    Iterable<String>? onlyTables,
+    String? onlyNodeId,
+    String? exceptNodeId,
+    Hlc? modifiedOn,
+    Hlc? modifiedAfter,
+  }) {
+    if (_initialChangeset) {
+      _log.info('Generating initial changeset for project $projectId');
+    }
+    final changeset = getChangeset(
+      onlyTables: onlyTables,
+      onlyNodeId: _initialChangeset
+          ? null // Not filtering by nodeId here because the server may need all nodes' data including its own, since its secrets are ephemeral
+          : onlyNodeId,
+      exceptNodeId: exceptNodeId,
+      modifiedOn: modifiedOn,
+      modifiedAfter: modifiedAfter,
+    );
+    _initialChangeset = false;
 
-      if (changeset.containsKey('secrets')) {
-        final records = changeset['secrets']!;
-        final prefix = 'project:$projectId:';
+    if (changeset.containsKey('secrets')) {
+      final records = changeset['secrets']!;
+      final prefix = 'project:$projectId:';
 
-        // Filter records that match the project prefix
-        final filteredRecords = records.where((record) {
-          final key = record['key'] as String;
-          return key.startsWith(prefix);
-        }).toList();
+      // Filter records that match the project prefix
+      final filteredRecords = records.where((record) {
+        final key = record['key'] as String;
+        return key.startsWith(prefix);
+      }).toList();
 
-        if (filteredRecords.isEmpty) {
-          changeset.remove('secrets');
-        } else {
-          changeset['secrets'] = filteredRecords;
-        }
+      if (filteredRecords.isEmpty) {
+        changeset.remove('secrets');
+      } else {
+        changeset['secrets'] = filteredRecords;
       }
-
-      return changeset;
-    };
+    }
+    return changeset;
   }
 
   Future<void> close() async {

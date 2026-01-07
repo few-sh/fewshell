@@ -316,7 +316,21 @@ class SyncService {
         secretsCrdt,
         secretsChannel,
         verbose: true,
-        changesetBuilder: secretsCrdt.getProjectChangesetBuilder(projectId),
+        changesetBuilder:
+            ({
+              exceptNodeId,
+              modifiedAfter,
+              modifiedOn,
+              onlyNodeId,
+              onlyTables,
+            }) async => await secretsCrdt.changesetFunction(
+              projectId: projectId,
+              onlyTables: onlyTables,
+              onlyNodeId: onlyNodeId,
+              exceptNodeId: exceptNodeId,
+              modifiedOn: modifiedOn,
+              modifiedAfter: modifiedAfter,
+            ),
       );
 
       _projectSubscription = _projectChannel!.onCustomMessage.listen((msg) {
