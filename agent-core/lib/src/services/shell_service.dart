@@ -185,7 +185,6 @@ $command
 
       session.stdout.listen(
         (data) {
-          print("STDOUT: ${utf8.decode(data)}");
           stdoutBuffer.add(data);
           stdoutDecoder?.add(data);
         },
@@ -394,7 +393,6 @@ sudo bash -c '${_escapeForCommand(command)}'
 
       session.stdout.listen(
         (data) {
-          print("STDOUT: ${utf8.decode(data)}");
           stdoutBuffer.add(data);
           stdoutDecoder?.add(data);
         },

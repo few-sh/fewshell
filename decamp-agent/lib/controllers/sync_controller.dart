@@ -415,30 +415,26 @@ class _AgentSession {
                 ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
                 : <String, dynamic>{};
 
-            _streamingMessageId = db!.messageDao.generateMessageId();
-            _streamingCreatedAt = DateTime.now();
-
-            _lastDbWrite = _lastDbWrite.then((_) async {
-              // Insert placeholder message for tool call start
-              final companion = MessageEntityCompanion(
-                id: Value(_streamingMessageId!),
-                sessionId: Value(currentSessionId),
-                userId: const Value('user'),
-                userName: const Value('System'),
-                content: const Value('```bash\n'), // Initial content
-                timestamp: Value(DateTime.now()),
-                createdAt: Value(DateTime.now()),
-                messageKind: const Value(MessageKind.toolResult),
-                isStreaming: const Value(true),
-              );
-              await db!.messageDao.insertMessage(companion);
-            }).catchError((e) {
-              _log.warning(
-                'Error writing streaming message: $e',
-              );
-            });
-
             if (toolCall.function.name == kExecuteShellCommand) {
+              _streamingMessageId = db!.messageDao.generateMessageId();
+              _streamingCreatedAt = DateTime.now();
+
+              _asyncDbWrite(() async {
+                // Insert placeholder message for tool call start
+                final companion = MessageEntityCompanion(
+                  id: Value(_streamingMessageId!),
+                  sessionId: Value(currentSessionId),
+                  userId: const Value('user'),
+                  userName: const Value('System'),
+                  content: const Value('```bash\n'), // Initial content
+                  timestamp: Value(DateTime.now()),
+                  createdAt: Value(DateTime.now()),
+                  messageKind: const Value(MessageKind.toolResult),
+                  isStreaming: const Value(true),
+                );
+                await db!.messageDao.insertMessage(companion);
+              });
+
               final command = params['command'] as String;
               final sudoRequired = params['sudo_required'] as bool? ?? false;
               final secrets = params['secrets'] != null
@@ -453,14 +449,10 @@ class _AgentSession {
                 //_log.info('Command delta: $data');
                 toolOutputBuffer.write(data);
                 if (_streamingMessageId != null) {
-                  _lastDbWrite = _lastDbWrite.then((_) async {
+                  _asyncDbWrite(() async {
                     await db!.messageDao.appendMessageContent(
                       messageId: _streamingMessageId!,
                       appendContent: data,
-                    );
-                  }).catchError((e) {
-                    _log.warning(
-                      'Error writing streaming message: $e',
                     );
                   });
                 }
@@ -522,13 +514,8 @@ class _AgentSession {
               isStreaming: const Value(true),
             );
 
-            _lastDbWrite = _lastDbWrite.then((_) async {
+            _asyncDbWrite(() async {
               await db!.messageDao.insertMessage(companion);
-            }).catchError((e) {
-              _log.warning(
-                'Error writing streaming message: $e',
-              );
-              // Return void to satisfy the Future<void> chain
             });
           },
           onAssistantMessage: (message, {String? messageId}) async {
@@ -684,5 +671,11 @@ class _AgentSession {
         });
       }
     }
+  }
+
+  void _asyncDbWrite(Future<void> Function() write) {
+    _lastDbWrite = _lastDbWrite.then((_) => write()).catchError((e) {
+      _log.warning('Error writing streaming message: $e');
+    });
   }
 }
