@@ -189,7 +189,7 @@ class ToolResultFormatter {
 
     // Header with status
     if (success) {
-      buffer.writeln('✅ Command Executed Successfully:\n');
+      buffer.writeln('✅ Command Executed Successfully.\n');
     } else {
       buffer.writeln('❌ **Command Failed**\n');
     }
@@ -214,11 +214,6 @@ class ToolResultFormatter {
       }
     }
 
-    // Exit code (show if not 0 or if command failed)
-    if (!success || exitCode != 0) {
-      buffer.writeln('**Exit Code:** `$exitCode`\n');
-    }
-
     // Stdout section (if available)
     if (stdout.isNotEmpty) {
       // Try to detect if output looks like it should have syntax highlighting
@@ -238,6 +233,11 @@ class ToolResultFormatter {
       buffer.writeln('```');
       buffer.writeln(stderr);
       buffer.writeln('```\n');
+    }
+
+    // Exit code (show if not 0 or if command failed)
+    if (!success || exitCode != 0) {
+      buffer.writeln('**Exit Code:** `$exitCode`\n');
     }
 
     // If no output at all

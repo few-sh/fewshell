@@ -241,6 +241,44 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     );
   }
 
+  /// Append content to an existing message
+  Future<MessageEntity?> appendMessageContent({
+    required String messageId,
+    required String appendContent,
+  }) async {
+    // Get the current message
+    final message = await getMessage(messageId);
+    if (message == null) return null;
+
+    final now = DateTime.now();
+
+    // Build the update companion
+    final companion = MessageEntityCompanion(
+      id: Value(messageId),
+      sessionId: Value(message.sessionId),
+      userId: Value(message.userId),
+      userName: Value(message.userName),
+      content: Value('${message.content}$appendContent'),
+      timestamp: Value(message.timestamp),
+      createdAt: Value(message.createdAt),
+      editedAt: Value(now),
+      isStreaming: Value(message.isStreaming),
+      isVisibleToLlm: Value(message.isVisibleToLlm),
+      messageKind: Value(message.messageKind),
+      imageUrl: Value(message.imageUrl),
+      toolCallsJson: Value(message.toolCallsJson),
+      toolResultsJson: Value(message.toolResultsJson),
+    );
+
+    final success = await updateMessage(companion);
+    if (!success) return null;
+
+    return message.copyWith(
+      content: '${message.content}$appendContent',
+      editedAt: Value(now),
+    );
+  }
+
   /// Delete all messages after a specific message (by timestamp)
   /// Used when editing a message to remove subsequent conversation
   Future<int> deleteMessagesAfter({

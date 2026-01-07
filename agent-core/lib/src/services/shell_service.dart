@@ -168,10 +168,25 @@ $command
       final stdoutDone = Completer<void>();
       final stderrDone = Completer<void>();
 
+      // Use chunked decoders to handle split UTF-8 characters properly
+      ByteConversionSink? stdoutDecoder;
+      if (onStdout != null) {
+        stdoutDecoder = utf8.decoder.startChunkedConversion(
+          _StreamingStringSink(onStdout),
+        );
+      }
+
+      ByteConversionSink? stderrDecoder;
+      if (onStderr != null) {
+        stderrDecoder = utf8.decoder.startChunkedConversion(
+          _StreamingStringSink(onStderr),
+        );
+      }
+
       session.stdout.listen(
         (data) {
           stdoutBuffer.add(data);
-          onStdout?.call(String.fromCharCodes(data));
+          stdoutDecoder?.add(data);
         },
         onDone: stdoutDone.complete,
         onError: stdoutDone.completeError,
@@ -180,7 +195,7 @@ $command
       session.stderr.listen(
         (data) {
           stderrBuffer.add(data);
-          onStderr?.call(String.fromCharCodes(data));
+          stderrDecoder?.add(data);
         },
         onDone: stderrDone.complete,
         onError: stderrDone.completeError,
@@ -191,8 +206,13 @@ $command
       await session.done;
       await abortSubscription?.cancel();
 
-      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
-      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      stdoutDecoder?.close();
+      stderrDecoder?.close();
+
+      final stdout =
+          utf8.decode(stdoutBuffer.takeBytes(), allowMalformed: true);
+      final stderr =
+          utf8.decode(stderrBuffer.takeBytes(), allowMalformed: true);
       final exitCode = await session.exitCode;
 
       _log.info(
@@ -356,10 +376,25 @@ sudo bash -c '${_escapeForCommand(command)}'
       final stdoutDone = Completer<void>();
       final stderrDone = Completer<void>();
 
+      // Use chunked decoders to handle split UTF-8 characters properly
+      ByteConversionSink? stdoutDecoder;
+      if (onStdout != null) {
+        stdoutDecoder = utf8.decoder.startChunkedConversion(
+          _StreamingStringSink(onStdout),
+        );
+      }
+
+      ByteConversionSink? stderrDecoder;
+      if (onStderr != null) {
+        stderrDecoder = utf8.decoder.startChunkedConversion(
+          _StreamingStringSink(onStderr),
+        );
+      }
+
       session.stdout.listen(
         (data) {
           stdoutBuffer.add(data);
-          onStdout?.call(String.fromCharCodes(data));
+          stdoutDecoder?.add(data);
         },
         onDone: stdoutDone.complete,
         onError: stdoutDone.completeError,
@@ -368,7 +403,7 @@ sudo bash -c '${_escapeForCommand(command)}'
       session.stderr.listen(
         (data) {
           stderrBuffer.add(data);
-          onStderr?.call(String.fromCharCodes(data));
+          stderrDecoder?.add(data);
         },
         onDone: stderrDone.complete,
         onError: stderrDone.completeError,
@@ -379,8 +414,13 @@ sudo bash -c '${_escapeForCommand(command)}'
       await session.done;
       await abortSubscription?.cancel();
 
-      final stdout = String.fromCharCodes(stdoutBuffer.takeBytes());
-      final stderr = String.fromCharCodes(stderrBuffer.takeBytes());
+      stdoutDecoder?.close();
+      stderrDecoder?.close();
+
+      final stdout =
+          utf8.decode(stdoutBuffer.takeBytes(), allowMalformed: true);
+      final stderr =
+          utf8.decode(stderrBuffer.takeBytes(), allowMalformed: true);
       final exitCode = await session.exitCode;
 
       return {
@@ -657,8 +697,45 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> execute(String command) async {
-    final process = await Process.start('bash', []);
-    process.stdin.writeln(command);
+    // We use a temporary file to execute the command. This achieves three goals:
+    // 1. Secrets are not visible in `ps` (unlike `bash -c`).
+    // 2. We can use `script` (on macOS) to allocate a PTY for unbuffered streaming.
+    // 3. The process tree is simpler, ensuring `kill()` works.
+    final tempDir = Directory.systemTemp.createTempSync('decamp_cmd_');
+    final scriptFile = File('${tempDir.path}/script.sh');
+    if (!Platform.isWindows) {
+      await Process.run('chmod', ['700', scriptFile.path]);
+    }
+    await scriptFile.writeAsString(command);
+
+    Process process;
+    if (Platform.isMacOS) {
+      // Use script to force PTY behavior (unbuffered flushing).
+      // -F: flush immediately, -q: quiet
+      process = await Process.start(
+        'script',
+        ['-F', '-q', '/dev/null', 'bash', scriptFile.path],
+        environment: {
+          // Suppress macOS zsh update warning
+          'BASH_SILENCE_DEPRECATION_WARNING': '1',
+        },
+      );
+    } else {
+      // Fallback for Linux/Windows.
+      // This fixes the 'kill' issue (process tree) and hides secrets,
+      // but doesn't necessarily solve buffering (no PTY).
+      process = await Process.start('bash', [scriptFile.path]);
+    }
+
+    // Cleanup temp file when process ends
+    process.exitCode.whenComplete(() {
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    });
+
     process.stdin.close();
     return LocalShellSession(process);
   }
@@ -726,4 +803,20 @@ class UnconfiguredShellBackend implements ShellBackend {
   Future<ShellSession> createSession() async {
     throw Exception('SSH settings not configured for this project');
   }
+}
+
+class _StreamingStringSink implements Sink<String> {
+  final void Function(String) _callback;
+
+  _StreamingStringSink(this._callback);
+
+  @override
+  void add(String data) {
+    if (data.isNotEmpty) {
+      _callback(data);
+    }
+  }
+
+  @override
+  void close() {}
 }
