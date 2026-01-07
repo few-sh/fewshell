@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
 import 'saved_prompts_bottom_sheet.dart';
@@ -59,6 +60,29 @@ class _ChatInputState extends State<ChatInput> {
     _controller.clear();
   }
 
+  void _insertNewline() {
+    if (!widget.enabled || widget.isLoading) return;
+
+    final text = _controller.text;
+    final selection = _controller.selection;
+    final int start = selection.start;
+    final int end = selection.end;
+
+    if (start < 0) {
+      final newText = '$text\n';
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newText.length),
+      );
+    } else {
+      final newText = text.replaceRange(start, end, '\n');
+      _controller.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: start + 1),
+      );
+    }
+  }
+
   void _showSavedPrompts() {
     showModalBottomSheet(
       context: context,
@@ -95,18 +119,26 @@ class _ChatInputState extends State<ChatInput> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: ShadInput(
-              contextMenuBuilder: adaptiveContextMenuBuilder,
-              controller: _controller,
-              focusNode: _focusNode,
-              enabled: isInputEnabled,
-              minLines: 1,
-              //              maxLines: 5,
-              autofocus: false,
-              autocorrect: false,
-              enableSuggestions: false,
-              placeholder: Text(widget.hintText),
-              onSubmitted: isInputEnabled ? (_) => _handleSend() : null,
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.enter, shift: true):
+                    _insertNewline,
+                const SingleActivator(LogicalKeyboardKey.enter): _handleSend,
+              },
+              child: ShadInput(
+                contextMenuBuilder: adaptiveContextMenuBuilder,
+                controller: _controller,
+                focusNode: _focusNode,
+                enabled: isInputEnabled,
+                minLines: 1,
+                maxLines: 12,
+                keyboardType: TextInputType.multiline,
+                autofocus: false,
+                autocorrect: false,
+                enableSuggestions: false,
+                placeholder: Text(widget.hintText),
+                onSubmitted: isInputEnabled ? (_) => _handleSend() : null,
+              ),
             ),
           ),
           const SizedBox(width: 8),
