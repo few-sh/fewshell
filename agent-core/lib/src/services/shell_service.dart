@@ -172,27 +172,20 @@ $command
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
         stdoutDecoder = utf8.decoder.startChunkedConversion(
-          ChunkedConversionSink.withCallback((text) {
-            for (final chunk in text) {
-              onStdout(chunk);
-            }
-          }),
+          _StreamingStringSink(onStdout),
         );
       }
 
       ByteConversionSink? stderrDecoder;
       if (onStderr != null) {
         stderrDecoder = utf8.decoder.startChunkedConversion(
-          ChunkedConversionSink.withCallback((text) {
-            for (final chunk in text) {
-              onStderr(chunk);
-            }
-          }),
+          _StreamingStringSink(onStderr),
         );
       }
 
       session.stdout.listen(
         (data) {
+          print("STDOUT: ${utf8.decode(data)}");
           stdoutBuffer.add(data);
           stdoutDecoder?.add(data);
         },
@@ -388,27 +381,20 @@ sudo bash -c '${_escapeForCommand(command)}'
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
         stdoutDecoder = utf8.decoder.startChunkedConversion(
-          ChunkedConversionSink.withCallback((text) {
-            for (final chunk in text) {
-              onStdout(chunk);
-            }
-          }),
+          _StreamingStringSink(onStdout),
         );
       }
 
       ByteConversionSink? stderrDecoder;
       if (onStderr != null) {
         stderrDecoder = utf8.decoder.startChunkedConversion(
-          ChunkedConversionSink.withCallback((text) {
-            for (final chunk in text) {
-              onStderr(chunk);
-            }
-          }),
+          _StreamingStringSink(onStderr),
         );
       }
 
       session.stdout.listen(
         (data) {
+          print("STDOUT: ${utf8.decode(data)}");
           stdoutBuffer.add(data);
           stdoutDecoder?.add(data);
         },
@@ -819,4 +805,20 @@ class UnconfiguredShellBackend implements ShellBackend {
   Future<ShellSession> createSession() async {
     throw Exception('SSH settings not configured for this project');
   }
+}
+
+class _StreamingStringSink implements Sink<String> {
+  final void Function(String) _callback;
+
+  _StreamingStringSink(this._callback);
+
+  @override
+  void add(String data) {
+    if (data.isNotEmpty) {
+      _callback(data);
+    }
+  }
+
+  @override
+  void close() {}
 }
