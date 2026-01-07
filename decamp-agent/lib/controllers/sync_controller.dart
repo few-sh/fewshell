@@ -415,6 +415,29 @@ class _AgentSession {
                 ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
                 : <String, dynamic>{};
 
+            _streamingMessageId = db!.messageDao.generateMessageId();
+            _streamingCreatedAt = DateTime.now();
+
+            _lastDbWrite = _lastDbWrite.then((_) async {
+              // Insert placeholder message for tool call start
+              final companion = MessageEntityCompanion(
+                id: Value(_streamingMessageId!),
+                sessionId: Value(currentSessionId),
+                userId: const Value('user'),
+                userName: const Value('System'),
+                content: const Value('```bash\n'), // Initial content
+                timestamp: Value(DateTime.now()),
+                createdAt: Value(DateTime.now()),
+                messageKind: const Value(MessageKind.toolResult),
+                isStreaming: const Value(true),
+              );
+              await db!.messageDao.insertMessage(companion);
+            }).catchError((e) {
+              _log.warning(
+                'Error writing streaming message: $e',
+              );
+            });
+
             if (toolCall.function.name == kExecuteShellCommand) {
               final command = params['command'] as String;
               final sudoRequired = params['sudo_required'] as bool? ?? false;
@@ -425,20 +448,47 @@ class _AgentSession {
                 'Executing shell command. Abort controller: $abortController',
               );
 
+              final toolOutputBuffer = StringBuffer();
+              void onOutput(String data) {
+                //_log.info('Command delta: $data');
+                toolOutputBuffer.write(data);
+                if (_streamingMessageId != null) {
+                  _lastDbWrite = _lastDbWrite.then((_) async {
+                    await db!.messageDao.appendMessageContent(
+                      messageId: _streamingMessageId!,
+                      appendContent: data,
+                    );
+                  }).catchError((e) {
+                    _log.warning(
+                      'Error writing streaming message: $e',
+                    );
+                  });
+                }
+              }
+
               final Map<String, dynamic> result;
               if (sudoRequired) {
                 result = await _shellService.executeWithSudo(
                   command: command,
                   secrets: secrets,
                   abortSignal: abortController.stream,
+                  onStdout: onOutput,
+                  onStderr: onOutput,
                 );
               } else {
                 result = await _shellService.executeCommand(
                   command,
                   secrets: secrets,
                   abortSignal: abortController.stream,
+                  onStdout: onOutput,
+                  onStderr: onOutput,
                 );
               }
+              await _lastDbWrite.catchError((e) {
+                _log.warning(
+                  'Error writing streaming message: $e',
+                );
+              });
               await db!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
@@ -518,7 +568,8 @@ class _AgentSession {
           }) async {
             String? id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
-            id = db!.messageDao.generateMessageId();
+            id = _streamingMessageId ?? db!.messageDao.generateMessageId();
+            _streamingMessageId = null;
             await db!.messageDao.insertMessage(
               message.toMessageCompanion(
                 sessionId: currentSessionId,
