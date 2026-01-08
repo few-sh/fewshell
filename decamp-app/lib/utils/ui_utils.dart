@@ -6,8 +6,23 @@ Widget adaptiveContextMenuBuilder(
 ) {
   // Use AdaptiveTextSelectionToolbar.buttonItems to allow customizing buttons
   // and ensuring we wrap it in a TapRegion to prevent focus loss.
-  final List<ContextMenuButtonItem> buttonItems =
-      editableTextState.contextMenuButtonItems;
+  final List<ContextMenuButtonItem> buttonItems = List.from(
+    editableTextState.contextMenuButtonItems,
+  );
+
+  for (int i = 0; i < buttonItems.length; i++) {
+    final item = buttonItems[i];
+    // Create a wrapper that performs the action and then hides the toolbar.
+    // We skip 'selectAll' as users often want to perform an action on the selection immediately after.
+    if (item.type != ContextMenuButtonType.selectAll) {
+      buttonItems[i] = item.copyWith(
+        onPressed: () {
+          item.onPressed?.call();
+          editableTextState.hideToolbar();
+        },
+      );
+    }
+  }
 
   final Widget toolbar = AdaptiveTextSelectionToolbar.buttonItems(
     anchors: editableTextState.contextMenuAnchors,
