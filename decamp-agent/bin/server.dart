@@ -21,20 +21,36 @@ typedef SignalC = Pointer<NativeFunction<SignalFunc>> Function(
 typedef SignalDart = Pointer<NativeFunction<SignalFunc>> Function(
     int, Pointer<NativeFunction<SignalFunc>>);
 
-void _resetSigpipe() {
+// Keep listener alive
+NativeCallable<SignalFunc>? _sigPipeListener;
+
+void _setupSigPipeHandler() {
   try {
     if (Platform.isMacOS || Platform.isLinux) {
       final dylib = DynamicLibrary.process();
       final signal = dylib.lookupFunction<SignalC, SignalDart>('signal');
+
       // SIGPIPE is 13 on both macOS and Linux (x86/ARM).
       const sigPipe = 13;
-      // SIG_DFL is 0.
-      final sigDfl = Pointer<NativeFunction<SignalFunc>>.fromAddress(0);
-      signal(sigPipe, sigDfl);
-      _log.info('Reset SIGPIPE to SIG_DFL');
+
+      // Create a native callable listener.
+      // This creates a function pointer that, when called, posts a message to the
+      // current isolate to run the callback.
+      // 1. Being a specific function address, exec() will reset SIGPIPE to SIG_DFL in children.
+      // 2. Being a listener, it handles the signal in the parent without crashing.
+      _sigPipeListener = NativeCallable<SignalFunc>.listener((int signal) {
+        // No-op: Just ignore the signal.
+        // The callback runs on the main isolate event loop, so it's thread-safe,
+        // but we avoid logging to keep it lightweight.
+        // ignore: avoid_print
+        print("Received SIGPIPE (signal $signal), ignoring.");
+      });
+
+      signal(sigPipe, _sigPipeListener!.nativeFunction);
+      _log.info('Set SIGPIPE handler to NativeCallable listener');
     }
   } catch (e) {
-    _log.warning('Failed to reset SIGPIPE: $e');
+    _log.warning('Failed to setup SIGPIPE handler: $e');
   }
 }
 
@@ -58,10 +74,10 @@ void main(List<String> args) async {
   const version = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
   _log.info('Starting Fewshell Agent v$version');
 
-  // Reset SIGPIPE to default behavior (terminate) so that child processes
-  // (like bash) inherit it. Dart VM ignores it by default, which causes
-  // "Broken pipe" errors in subprocesses instead of silent termination.
-  _resetSigpipe();
+  // Configure custom SIGPIPE handler.
+  // This ensures that child processes (via exec) reset to SIG_DFL (terminate on broken pipe),
+  // while the server process itself logs and ignores it.
+  _setupSigPipeHandler();
 
   // Initialize SqliteLogger
   // ignore: unused_local_variable
@@ -175,6 +191,8 @@ void main(List<String> args) async {
       onError: (e) {
         _log.severe('HttpServer stream error', e);
       },
+      onDone: () =>
+          _log.severe('HttpServer stream closed. This is unexpected!'),
     );
 
     final scheme = 'https';
