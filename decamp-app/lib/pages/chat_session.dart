@@ -129,6 +129,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     chatController.abortCommand(syncChannel);
   }
 
+  // FIXME: This logic is duplicated with SessionController.createNewSession
+  // and also does not belong here.
   /// Create a new chat session
   Future<void> _createNewSession() async {
     final currentProject = ref.read(currentProjectProvider);

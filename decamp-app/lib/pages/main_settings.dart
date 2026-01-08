@@ -359,6 +359,9 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
                 )
               : <LlmApiSettings>[]);
 
+    // FIXME: Sloppy and incorrect way to get current default model.
+    // It should reuse and follow the same logic as used in the main app.
+
     // Get the current default identifier
     final String? currentDefault;
     if (isGlobal) {
