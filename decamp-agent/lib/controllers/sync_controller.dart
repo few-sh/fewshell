@@ -17,6 +17,7 @@ class SyncController {
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
   final SecretsService secretsService;
+  // FIXME: This is duplicating the functionality of session mutexes of SQLite. Switch to SQLite-based locking.
   final Set<String> _activeSessions = {};
 
   SyncController(this.dbManager, this.settingsService, this.secretsService);
@@ -49,7 +50,7 @@ class SyncController {
           final projectId = segments[1];
           return webSocketHandler(
               (WebSocketChannel channel, String? protocol) async {
-            final db = await dbManager.getProjectDatabase(projectId);
+            final projectDb = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
 
             // Fork channels immediately to avoid race conditions
@@ -78,7 +79,7 @@ class SyncController {
             _setupCustomMessageHandling(
               multiplexed,
               'Project',
-              db: db,
+              db: projectDb,
               projectId: projectId,
               keychain: keychain,
             );
@@ -87,7 +88,7 @@ class SyncController {
               'Starting CrdtSync for project $projectId',
             );
             final sync = CrdtSync.server(
-              db.crdt,
+              projectDb.crdt,
               multiplexed,
               verbose: true,
             );
@@ -143,7 +144,7 @@ class _AgentSession {
   static final _log = Logger('AgentSession');
 
   final MultiplexedWebSocketChannel channel;
-  final ProjectDatabase? db;
+  final ProjectDatabase? projectDb;
   final Set<String> _activeSessions;
   final ShellService _shellService;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
@@ -159,7 +160,7 @@ class _AgentSession {
 
   _AgentSession(
     this.channel,
-    this.db,
+    this.projectDb,
     this._activeSessions,
     String? projectId,
     KeychainService? keychain,
@@ -235,8 +236,8 @@ class _AgentSession {
       return false;
     }
 
-    if (db != null) {
-      final acquired = await db!.sessionMutexDao.acquireLock(sessionId);
+    if (projectDb != null) {
+      final acquired = await projectDb!.sessionMutexDao.acquireLock(sessionId);
       if (!acquired) {
         return false;
       }
@@ -248,8 +249,8 @@ class _AgentSession {
 
   Future<void> _unlockSession(String sessionId) async {
     _activeSessions.remove(sessionId);
-    if (db != null) {
-      await db!.sessionMutexDao.unlock(sessionId);
+    if (projectDb != null) {
+      await projectDb!.sessionMutexDao.unlock(sessionId);
     }
   }
 
@@ -294,7 +295,7 @@ class _AgentSession {
         final triggerMessageJson =
             data['triggerMessage'] as Map<String, dynamic>?;
 
-        if (sessionId == null || db == null) {
+        if (sessionId == null || projectDb == null) {
           throw Exception(
             'Session ID and Database required',
           );
@@ -307,7 +308,8 @@ class _AgentSession {
             '📥 Received trigger message, upserting...',
           );
           final triggerMessage = MessageEntity.fromJson(triggerMessageJson);
-          await db!.messageDao.insertMessage(triggerMessage.toCompanion(true));
+          await projectDb!.messageDao
+              .insertMessage(triggerMessage.toCompanion(true));
           _log.info(
             '✅ Trigger message ${triggerMessage.id} upserted!',
           );
@@ -317,7 +319,7 @@ class _AgentSession {
         // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
         // Also filter out messages not visible to LLM
         final dbMessages =
-            await db!.messageDao.getMessagesBySession(currentSessionId);
+            await projectDb!.messageDao.getMessagesBySession(currentSessionId);
         final conversation = dbMessages
             .where((m) => !m.isStreaming && m.isVisibleToLlm)
             .map((m) => m.toChatMessage())
@@ -416,7 +418,7 @@ class _AgentSession {
                 : <String, dynamic>{};
 
             if (toolCall.function.name == kExecuteShellCommand) {
-              _streamingMessageId = db!.messageDao.generateMessageId();
+              _streamingMessageId = projectDb!.messageDao.generateMessageId();
               _streamingCreatedAt = DateTime.now();
 
               _asyncDbWrite(() async {
@@ -432,7 +434,7 @@ class _AgentSession {
                   messageKind: const Value(MessageKind.toolResult),
                   isStreaming: const Value(true),
                 );
-                await db!.messageDao.insertMessage(companion);
+                await projectDb!.messageDao.insertMessage(companion);
               });
 
               final command = params['command'] as String;
@@ -450,7 +452,7 @@ class _AgentSession {
                 toolOutputBuffer.write(data);
                 if (_streamingMessageId != null) {
                   _asyncDbWrite(() async {
-                    await db!.messageDao.appendMessageContent(
+                    await projectDb!.messageDao.appendMessageContent(
                       messageId: _streamingMessageId!,
                       appendContent: data,
                     );
@@ -481,11 +483,11 @@ class _AgentSession {
                   'Error writing streaming message: $e',
                 );
               });
-              await db!.sessionDao.touchSession(currentSessionId);
+              await projectDb!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result);
             } else if (toolCall.function.name == kFetch) {
               final result = await FetchTool.execute(params);
-              await db!.sessionDao.touchSession(currentSessionId);
+              await projectDb!.sessionDao.touchSession(currentSessionId);
               return jsonEncode(result['data']);
             }
 
@@ -493,7 +495,7 @@ class _AgentSession {
           },
           onTextDelta: (delta) {
             if (_streamingMessageId == null) {
-              _streamingMessageId = db!.messageDao.generateMessageId();
+              _streamingMessageId = projectDb!.messageDao.generateMessageId();
               _streamingCreatedAt = DateTime.now();
             }
             _streamingContent.write(delta);
@@ -515,21 +517,21 @@ class _AgentSession {
             );
 
             _asyncDbWrite(() async {
-              await db!.messageDao.insertMessage(companion);
+              await projectDb!.messageDao.insertMessage(companion);
             });
           },
           onAssistantMessage: (message, {String? messageId}) async {
             // Wait for any pending streaming writes to finish
             await _lastDbWrite;
 
-            String? id =
-                _streamingMessageId ?? db!.messageDao.generateMessageId();
+            String? id = _streamingMessageId ??
+                projectDb!.messageDao.generateMessageId();
 
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             // Determine if this is a tool use message or a text message
             final messageType = message.messageType;
             if (messageType is ToolUseMessage) {
-              await db!.messageDao.insertMessage(
+              await projectDb!.messageDao.insertMessage(
                 message.toMessageCompanion(
                   sessionId: currentSessionId,
                   id: id,
@@ -537,7 +539,7 @@ class _AgentSession {
                 ),
               );
             } else {
-              await db!.messageDao.insertMessageWithId(
+              await projectDb!.messageDao.insertMessageWithId(
                 id: id,
                 sessionId: currentSessionId,
                 userId: 'ai',
@@ -546,7 +548,7 @@ class _AgentSession {
                 isStreaming: false,
               );
             }
-            await db!.sessionDao.touchSession(currentSessionId);
+            await projectDb!.sessionDao.touchSession(currentSessionId);
           },
           onToolResultMessage: (
             message, {
@@ -555,16 +557,17 @@ class _AgentSession {
           }) async {
             String? id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
-            id = _streamingMessageId ?? db!.messageDao.generateMessageId();
+            id = _streamingMessageId ??
+                projectDb!.messageDao.generateMessageId();
             _streamingMessageId = null;
-            await db!.messageDao.insertMessage(
+            await projectDb!.messageDao.insertMessage(
               message.toMessageCompanion(
                 sessionId: currentSessionId,
                 id: id,
                 toolCallMessage: toolCallMessage,
               ),
             );
-            await db!.sessionDao.touchSession(currentSessionId);
+            await projectDb!.sessionDao.touchSession(currentSessionId);
           },
         );
 
@@ -576,15 +579,15 @@ class _AgentSession {
         } else {
           _log.severe('Error running agent loop: $e, $st');
 
-          final messageId = db!.messageDao.generateMessageId();
+          final messageId = projectDb!.messageDao.generateMessageId();
 
           // Try to insert error message if we have session ID and DB
-          if (sessionId != null && db != null) {
+          if (sessionId != null && projectDb != null) {
             try {
               final config = data['config'] as Map<String, dynamic>?;
               final model = config?['model'] as String? ?? 'Ops Agent';
 
-              await db!.messageDao.insertMessageWithId(
+              await projectDb!.messageDao.insertMessageWithId(
                 id: messageId,
                 sessionId: sessionId,
                 userId: 'ai',
@@ -592,7 +595,7 @@ class _AgentSession {
                 content: 'Sorry, I encountered an error: $e',
                 isVisibleToLlm: false,
               );
-              await db!.sessionDao.touchSession(sessionId);
+              await projectDb!.sessionDao.touchSession(sessionId);
             } catch (innerE) {
               _log.severe('Failed to insert error message: $innerE');
             }
@@ -622,13 +625,13 @@ class _AgentSession {
           _log.warning('Error waiting for last DB write: $e');
         }
 
-        if (_streamingMessageId != null && db != null) {
+        if (_streamingMessageId != null && projectDb != null) {
           // Clean up any streaming message placeholder
           try {
             final config = data['config'] as Map<String, dynamic>?;
             final model = config?['model'] as String? ?? 'Ops Agent';
 
-            await db!.messageDao.insertMessageWithId(
+            await projectDb!.messageDao.insertMessageWithId(
               id: _streamingMessageId!,
               sessionId: sessionId!,
               userId: 'ai',
