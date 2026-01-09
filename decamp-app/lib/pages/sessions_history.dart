@@ -188,6 +188,18 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
                         ],
                       ),
                       if (isSelected) _buildActiveIndicator(context),
+                      Row(
+                        children: [
+                          SelectableText(
+                            id,
+                            style: theme.textTheme.muted.copyWith(
+                              fontSize: 8,
+                              color: theme.colorScheme.mutedForeground,
+                            ),
+                            contextMenuBuilder: adaptiveContextMenuBuilder,
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
