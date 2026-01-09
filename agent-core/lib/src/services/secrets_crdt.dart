@@ -250,6 +250,6 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
   }
 
   Future<void> close() async {
-    // No-op as we save immediately
+    _log.info('Disposed SecretsCrdt');
   }
 }

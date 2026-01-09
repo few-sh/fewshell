@@ -1,9 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import '../services/storage/flutter_secure_storage_impl.dart';
+import 'project_provider.dart';
 
 /// Provider for SecretsCrdt
 final secretsCrdtProvider = Provider<SecretsCrdt>((ref) {
+  // Re-create the CRDT when the project ID changes.
+  ref.watch(currentProjectIdProvider);
+
   final storage = FlutterSecureStorageImpl();
   final crdt = SecretsCrdt(storage);
   ref.onDispose(() => crdt.close());
