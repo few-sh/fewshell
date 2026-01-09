@@ -27,6 +27,11 @@ import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/components/connect_to_agent_server.dart';
 
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
+import 'package:decamp/providers/project_provider.dart';
+
 class DebugPage extends ConsumerWidget {
   const DebugPage({super.key});
 
@@ -162,6 +167,22 @@ class DebugPage extends ConsumerWidget {
                   ),
                 ),
 
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('Open/Copy Document Directory'),
+                    onPressed: () => _handleDocumentDirectory(context),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: ShadButton.outline(
+                    child: const Text('Open/Copy Project Directory'),
+                    onPressed: () => _handleProjectDirectory(context, ref),
+                  ),
+                ),
+
                 // Add more as needed/possible
               ],
             ),
@@ -236,6 +257,73 @@ class DebugPage extends ConsumerWidget {
         ).overrideWith((ref) => mockNotifier),
       ],
     );
+  }
+
+  Future<void> _handleDocumentDirectory(BuildContext context) async {
+    final dir = await getApplicationDocumentsDirectory();
+    if (Platform.isIOS) {
+      await Clipboard.setData(ClipboardData(text: dir.path));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document directory path copied to clipboard'),
+          ),
+        );
+      }
+    } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      if (Platform.isMacOS) {
+        await Process.run('open', [dir.path]);
+      } else if (Platform.isWindows) {
+        await Process.run('explorer.exe', [dir.path]);
+      } else if (Platform.isLinux) {
+        await Process.run('xdg-open', [dir.path]);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Opening document directory...')),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleProjectDirectory(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final projectId = ref.watch(currentProjectIdProvider);
+    if (projectId == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No project selected')));
+      }
+      return;
+    }
+    final baseDir = await getApplicationDocumentsDirectory();
+    final projectDir = Directory('${baseDir.path}/projects/$projectId');
+    if (Platform.isIOS) {
+      await Clipboard.setData(ClipboardData(text: projectDir.path));
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Project directory path copied to clipboard'),
+          ),
+        );
+      }
+    } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+      if (Platform.isMacOS) {
+        await Process.run('open', [projectDir.path]);
+      } else if (Platform.isWindows) {
+        await Process.run('explorer.exe', [projectDir.path]);
+      } else if (Platform.isLinux) {
+        await Process.run('xdg-open', [projectDir.path]);
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Opening project directory...')),
+        );
+      }
+    }
   }
 }
 
