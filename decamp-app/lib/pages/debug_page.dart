@@ -27,10 +27,14 @@ import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/components/connect_to_agent_server.dart';
 
+import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:decamp/providers/project_provider.dart';
+import 'package:decamp/providers/session_provider.dart';
+import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/providers/settings_provider.dart';
 
 class DebugPage extends ConsumerWidget {
   const DebugPage({super.key});
@@ -184,6 +188,8 @@ class DebugPage extends ConsumerWidget {
                 ),
 
                 // Add more as needed/possible
+                const SizedBox(height: 20),
+                _buildDebugInfoCard(ref),
               ],
             ),
           ),
@@ -324,6 +330,67 @@ class DebugPage extends ConsumerWidget {
         );
       }
     }
+  }
+
+  Widget _buildDebugInfoCard(WidgetRef ref) {
+    final project = ref.watch(currentProjectProvider);
+    final session = ref.watch(currentSessionProvider);
+    final nodeId = ref.watch(nodeIdProvider);
+    final globalSettings = ref.watch(globalSettingsProvider);
+    final projectSettings = project != null
+        ? ref.watch(projectSettingsProvider(project.id))
+        : null;
+
+    const jsonEncoder = JsonEncoder.withIndent('  ');
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Debug Info',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            SelectableText('Node ID: $nodeId'),
+            const Divider(),
+            const Text(
+              'Current Project:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SelectableText(
+              project != null ? jsonEncoder.convert(project.toJson()) : 'None',
+            ),
+            const Divider(),
+            const Text(
+              'Current Session:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SelectableText(
+              session != null ? jsonEncoder.convert(session.toJson()) : 'None',
+            ),
+            const Divider(),
+            const Text(
+              'Global Settings:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SelectableText(jsonEncoder.convert(globalSettings.toJson())),
+            const Divider(),
+            const Text(
+              'Project Settings:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SelectableText(
+              projectSettings != null
+                  ? jsonEncoder.convert(projectSettings.toJson())
+                  : 'None',
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
