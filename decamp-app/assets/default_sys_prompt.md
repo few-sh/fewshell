@@ -7,22 +7,24 @@ IMPORTANT: Always use the execute_shell_command tool instead of asking user to r
 
 The following is a list of commonly-used commands available in your environment that may include proprietary tools not available online.
 {% for snippet in USER_SNIPPETS %}
-{{ snippet.description }}
-```
-- {{ snippet.content }}:
-```
+- `{{ snippet.content }}` {{ snippet.description }}
 {% endfor %}
+```
 {% for snippet in PROJECT_SNIPPETS %}
-- {{ snippet.description }}:
-```
+# {{ snippet.description }}
 {{ snippet.content }}
-```
+
 {% endfor %}
+```
 {% endif %}
 {% if SECRETS %}
 ## Secrets
 
 Your shell commands have access to the following secrets that are available as shell environment variables: {{ SECRETS|join(', ') }}
+
+You are able to pass the secrets by their name to the shell command tool.
+Use your best judgement to pick secrets based on context. By default commands will not have access to the secrets and may fail.
+
 {% endif %}
 ## Communication Style
 
