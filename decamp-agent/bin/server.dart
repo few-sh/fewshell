@@ -17,9 +17,9 @@ final _log = Logger('FewshellAgent');
 // FFI signature for signal(int, void (*)(int))
 typedef SignalFunc = Void Function(Int32);
 typedef SignalC = Pointer<NativeFunction<SignalFunc>> Function(
-    Int32, Pointer<NativeFunction<SignalFunc>>);
+    Int32, Pointer<NativeFunction<SignalFunc>>,);
 typedef SignalDart = Pointer<NativeFunction<SignalFunc>> Function(
-    int, Pointer<NativeFunction<SignalFunc>>);
+    int, Pointer<NativeFunction<SignalFunc>>,);
 
 // Keep listener alive
 NativeCallable<SignalFunc>? _sigPipeListener;

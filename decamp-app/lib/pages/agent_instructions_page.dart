@@ -146,6 +146,7 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
                       maxWidth: layoutTheme?.centeredContentMaxWidth ?? 800,
                     ),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         ShadButton.outline(
                           leading: const Icon(LucideIcons.eye),
@@ -160,7 +161,6 @@ class _AgentInstructionsPageState extends ConsumerState<AgentInstructionsPage>
                           child: const Text('Save'),
                         ),
                       ],
-                      mainAxisAlignment: MainAxisAlignment.end,
                     ),
                   ),
                 ),

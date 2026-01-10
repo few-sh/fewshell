@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:crdt/crdt.dart';
 import 'package:crdt/map_crdt.dart';
-import 'package:crdt_sync/crdt_sync.dart';
 import 'package:logging/logging.dart';
 import 'package:agent_core/src/secrets_storage/secure_storage.dart';
 import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
