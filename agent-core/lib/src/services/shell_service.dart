@@ -14,6 +14,8 @@ import 'keychain_service.dart';
 /// Callback for interactive user prompts (e.g. 2FA, password)
 typedef UserPromptCallback = Future<String> Function(String prompt, bool echo);
 
+final _log = Logger('ShellService');
+
 /// Abstract interface for shell execution backend
 abstract class ShellBackend {
   Future<void> connect({
@@ -708,6 +710,8 @@ class LocalShellBackend implements ShellBackend {
     }
     await scriptFile.writeAsString(command);
 
+    _log.info('Executing local command without PTY: $command');
+
     Process process;
     if (Platform.isMacOS) {
       // Use script to force PTY behavior (unbuffered flushing).
@@ -724,17 +728,21 @@ class LocalShellBackend implements ShellBackend {
       // Fallback for Linux/Windows.
       // This fixes the 'kill' issue (process tree) and hides secrets,
       // but doesn't necessarily solve buffering (no PTY).
+
       process = await Process.start('bash', [scriptFile.path]);
     }
 
     // Cleanup temp file when process ends
     process.exitCode.whenComplete(() {
+      _log.info('Cleaning up temporary command file: ${scriptFile.path}');
       try {
         tempDir.deleteSync(recursive: true);
       } catch (e) {
         // Ignore cleanup errors
       }
     });
+
+    _log.info('Started local process with PID: ${process.pid}');
 
     process.stdin.close();
     return LocalShellSession(process);
