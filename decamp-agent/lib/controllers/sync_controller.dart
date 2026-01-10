@@ -127,7 +127,7 @@ class SyncController {
     channel.onCustomMessage.listen((msg) {
       _log.info('Server ($context): Received custom message: $msg');
       if (msg['type'] == 'PING') {
-        channel.sendCustomMessage({
+        channel.safeSendCustomMessage({
           'type': 'PONG',
           'payload': msg['payload'],
         });
@@ -262,14 +262,11 @@ class _AgentSession {
       sessionId = data['sessionId'] as String?;
     } catch (e) {
       _log.warning('Invalid session ID format', e);
-      try {
-        channel.sendCustomMessage({
-          'type': 'error',
-          'message': 'Invalid session ID format: $e',
-        });
-      } catch (sendError) {
-        _log.warning('Failed to send error message: $sendError');
-      }
+
+      channel.safeSendCustomMessage({
+        'type': 'error',
+        'message': 'Invalid session ID format: $e',
+      });
       return;
     }
 
@@ -277,14 +274,10 @@ class _AgentSession {
       final locked = await _lockSession(sessionId);
       if (!locked) {
         _log.warning('Chat already in progress for session $sessionId');
-        try {
-          channel.sendCustomMessage({
-            'type': 'error',
-            'message': 'Chat already in progress for session $sessionId',
-          });
-        } catch (sendError) {
-          _log.warning('Failed to send error message: $sendError');
-        }
+        channel.safeSendCustomMessage({
+          'type': 'error',
+          'message': 'Chat already in progress for session $sessionId',
+        });
         return;
       }
     }
@@ -397,7 +390,7 @@ class _AgentSession {
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
 
-            channel.sendCustomMessage({
+            channel.safeSendCustomMessage({
               'type': 'request_approval',
               'tools': pendingCalls
                   .map(
@@ -571,11 +564,11 @@ class _AgentSession {
           },
         );
 
-        channel.sendCustomMessage({'type': 'complete'});
+        channel.safeSendCustomMessage({'type': 'complete'});
       } catch (e, st) {
         if (e is CancelledError) {
           _log.info('Agent loop cancelled by user');
-          channel.sendCustomMessage({'type': 'cancelled'});
+          channel.safeSendCustomMessage({'type': 'cancelled'});
         } else {
           _log.severe('Error running agent loop: $e, $st');
 
@@ -601,17 +594,11 @@ class _AgentSession {
             }
           }
 
-          try {
-            channel.sendCustomMessage({
-              'type': 'error',
-              'message_id': messageId,
-              'message': e.toString(),
-            });
-          } catch (sendError) {
-            _log.warning(
-              'Failed to send error message to client: $sendError. Original error: $e',
-            );
-          }
+          channel.safeSendCustomMessage({
+            'type': 'error',
+            'message_id': messageId,
+            'message': e.toString(),
+          });
         }
       } finally {
         _currentCancelToken = null;
@@ -658,16 +645,11 @@ class _AgentSession {
       }
     } catch (e) {
       _log.severe('Error starting chat', e);
-      try {
-        channel.sendCustomMessage({
-          'type': 'error',
-          'message': e.toString(),
-        });
-      } catch (sendError) {
-        _log.warning(
-          'Failed to send error message to client: $sendError. Original error: $e',
-        );
-      }
+      channel.safeSendCustomMessage({
+        'type': 'error',
+        'message': e.toString(),
+      });
+
       if (sessionId != null) {
         await _unlockSession(sessionId).catchError((e) {
           _log.severe('Error unlocking session $sessionId: $e');

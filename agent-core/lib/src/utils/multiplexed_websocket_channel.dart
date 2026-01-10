@@ -146,6 +146,18 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
     _inner.sink.add('$_customPrefix${jsonEncode(message)}');
   }
 
+  /// Sends a custom message without throwing exceptions, returning true if sent successfully, false if an error occurred.
+  bool safeSendCustomMessage(Map<String, dynamic> message) {
+    // Chain sending to ensure order with other processing
+    try {
+      _inner.sink.add('$_customPrefix${jsonEncode(message)}');
+      return true;
+    } catch (e, stackTrace) {
+      _log.warning('Could not send custom message', e, stackTrace);
+    }
+    return false;
+  }
+
   Stream<Map<String, dynamic>> get onCustomMessage =>
       _customMessageController.stream;
 
