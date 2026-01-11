@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
@@ -326,10 +327,59 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
 
   Future<void> _handleExport() async {
     final id = widget.session.id;
+
+    final exportType = await showShadDialog<String>(
+      context: context,
+      builder: (context) => ShadDialog(
+        title: const Text('Export Session'),
+        description: const Text('Choose a format'),
+        actions: [
+          ShadButton.ghost(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ShadButton.outline(
+              child: const Row(
+                children: [
+                  Icon(LucideIcons.fileText, size: 16),
+                  SizedBox(width: 8),
+                  Text('Markdown'),
+                ],
+              ),
+              onPressed: () => Navigator.pop(context, 'markdown'),
+            ),
+            const SizedBox(height: 8),
+            ShadButton.outline(
+              child: const Row(
+                children: [
+                  Icon(LucideIcons.code, size: 16),
+                  SizedBox(width: 8),
+                  Text('JSON'),
+                ],
+              ),
+              onPressed: () => Navigator.pop(context, 'json'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (exportType == null || !mounted) return;
+
     try {
-      final file = await ref
-          .read(sessionExporterProvider)
-          .exportSessionToJson(id);
+      final exporter = ref.read(sessionExporterProvider);
+      final File? file;
+
+      if (exportType == 'json') {
+        file = await exporter.exportSessionToJson(id);
+      } else {
+        file = await exporter.exportSessionToMarkdown(id);
+      }
 
       if (!mounted) return;
       if (file == null) return;
