@@ -4,6 +4,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/project_provider.dart';
 import 'package:decamp/providers/session_provider.dart';
 import 'package:decamp/providers/database_provider.dart';
+import 'package:decamp/services/session_exporter.dart';
 import 'package:decamp/components/selectable_list_view.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
@@ -283,6 +284,14 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
           _handleRename();
         },
       ),
+      ShadContextMenuItem(
+        leading: const Icon(LucideIcons.download),
+        child: const Text('Export'),
+        onPressed: () {
+          _menuController.toggle();
+          _handleExport();
+        },
+      ),
       if (widget.viewMode == SelectableViewMode.active)
         ShadContextMenuItem(
           leading: const Icon(LucideIcons.archive),
@@ -313,6 +322,33 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
         },
       ),
     ];
+  }
+
+  Future<void> _handleExport() async {
+    final id = widget.session.id;
+    try {
+      final file = await ref
+          .read(sessionExporterProvider)
+          .exportSessionToJson(id);
+
+      if (!mounted) return;
+
+      ShadToaster.of(context).show(
+        ShadToast(
+          title: const Text('Export Successful'),
+          description: Text('Session exported to ${file.path}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ShadToaster.of(context).show(
+        ShadToast.destructive(
+          title: const Text('Export Failed'),
+          description: Text(e.toString()),
+        ),
+      );
+    }
   }
 
   Future<void> _handleRename() async {
