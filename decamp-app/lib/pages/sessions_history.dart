@@ -332,6 +332,7 @@ class _SessionListItemState extends ConsumerState<_SessionListItem> {
           .exportSessionToJson(id);
 
       if (!mounted) return;
+      if (file == null) return;
 
       ShadToaster.of(context).show(
         ShadToast(

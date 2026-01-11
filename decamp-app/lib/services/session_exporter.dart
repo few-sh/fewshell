@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/database_provider.dart';
+import 'package:file_selector/file_selector.dart';
 
 /// Provider for the SessionExporter service
 final sessionExporterProvider = Provider<SessionExporter>((ref) {
@@ -31,9 +32,9 @@ class SessionExporter {
 
   /// Exports session messages to a JSON file.
   ///
-  /// Returns the written [File] object.
+  /// Returns the written [File] object, or null if cancelled.
   /// Throws [SessionExportException] if export fails.
-  Future<File> exportSessionToJson(String sessionId) async {
+  Future<File?> exportSessionToJson(String sessionId) async {
     try {
       final messages = await _messageDao.getMessagesBySession(sessionId);
 
@@ -49,8 +50,27 @@ class SessionExporter {
       final fileName =
           'session_${sessionId}_${DateTime.now().millisecondsSinceEpoch}.json';
 
-      final directory = await getApplicationDocumentsDirectory();
-      final file = File('${directory.path}/$fileName');
+      String? path;
+
+      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+        final FileSaveLocation? result = await getSaveLocation(
+          suggestedName: fileName,
+          acceptedTypeGroups: [
+            const XTypeGroup(
+              label: 'JSON',
+              extensions: ['json'],
+              mimeTypes: ['application/json'],
+            ),
+          ],
+        );
+        path = result?.path;
+        if (path == null) return null;
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        path = '${directory.path}/$fileName';
+      }
+
+      final file = File(path);
 
       return await file.writeAsString(content);
     } catch (e, stackTrace) {

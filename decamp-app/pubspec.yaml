@@ -74,6 +74,7 @@ dependencies:
   stream_channel: ^2.1.4
   shadcn_ui: ^0.43.0
   async: ^2.13.0
+  file_selector: ^1.1.0
 
 dependency_overrides:
   postgres_crdt: 3.0.0
