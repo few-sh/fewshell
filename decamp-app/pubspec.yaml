@@ -160,4 +160,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
+  macos:
+    generate: true
+    image_path: "assets/icon/fewshell_app_icon_v0.png"
   image_path: "assets/icon/fewshell_app_icon_v0.png"
