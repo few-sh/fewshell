@@ -39,7 +39,7 @@ abstract class ShellSession {
   Future<int> get exitCode;
   Future<void> get done;
   void write(Uint8List data);
-  void kill(ProcessSignal signal);
+  Future<void> kill(ProcessSignal signal);
   void close();
 }
 
@@ -655,7 +655,7 @@ class SshShellSession implements ShellSession {
   void write(Uint8List data) => _session.write(data);
 
   @override
-  void kill(ProcessSignal signal) {
+  Future<void> kill(ProcessSignal signal) async {
     final sshSignal = switch (signal) {
       ProcessSignal.sigint => SSHSignal.INT,
       ProcessSignal.sigterm => SSHSignal.TERM,
@@ -758,6 +758,7 @@ class LocalShellBackend implements ShellBackend {
 class LocalShellSession implements ShellSession {
   final Process _process;
   LocalShellSession(this._process);
+  static final _log = Logger('LocalShellSession');
 
   @override
   Stream<Uint8List> get stdout =>
@@ -777,7 +778,59 @@ class LocalShellSession implements ShellSession {
   void write(Uint8List data) => _process.stdin.add(data);
 
   @override
-  void kill(ProcessSignal signal) => _process.kill(signal);
+  Future<void> kill(ProcessSignal signal) async {
+    _log.info('Killing local process ${_process.pid} with signal $signal');
+
+    // Only wait and escalate if the intention was to terminate the process
+    if (signal != ProcessSignal.sigint &&
+        signal != ProcessSignal.sigterm &&
+        signal != ProcessSignal.sigquit) {
+      _process.kill(signal);
+      return;
+    }
+
+    _process.kill(signal);
+
+    if (await _waitForExit(const Duration(seconds: 5))) return;
+
+    if (signal != ProcessSignal.sigterm) {
+      _log.warning(
+          'Process did not exit after signal $signal, escalating to SIGTERM');
+      _process.kill(ProcessSignal.sigterm);
+      if (await _waitForExit(const Duration(seconds: 5))) return;
+    }
+
+    _log.warning('Process did not exit, escalating to SIGKILL');
+    _killTree();
+  }
+
+  void _killTree() {
+    if (Platform.isWindows) {
+      try {
+        // TODO: This needs tested on windows.
+        Process.runSync(
+            'taskkill', ['/F', '/T', '/PID', _process.pid.toString()]);
+        return;
+      } catch (e) {
+        _log.warning('Failed to run taskkill: $e');
+      }
+    }
+    _process.kill(ProcessSignal.sigkill);
+  }
+
+  Future<bool> _waitForExit(Duration duration) async {
+    _log.info(
+        'Waiting up to ${duration.inSeconds} seconds for process ${_process.pid} to exit');
+    try {
+      await _process.exitCode.timeout(duration);
+      _log.info('Process ${_process.pid} exited successfully');
+      return true;
+    } on TimeoutException {
+      _log.warning(
+          'Process ${_process.pid} did not exit within ${duration.inSeconds} seconds');
+      return false;
+    }
+  }
 
   @override
   void close() => _process.stdin.close();
