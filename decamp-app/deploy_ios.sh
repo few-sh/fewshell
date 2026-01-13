@@ -8,11 +8,11 @@ EXPORT_OPTIONS_PLIST="ios/ExportOptions.plist"
 # Ensure we are in the decamp-app directory
 cd "$(dirname "$0")"
 
-# Load environment variables from .env.deploy_ios if it exists
-if [ -f ".env.deploy_ios" ]; then
+# Load environment variables from .env.deploy_appstore if it exists
+if [ -f ".env.deploy_appstore" ]; then
     echo "📄 Loading environment variables from .env.deploy_ios..."
     set -a
-    source .env.deploy_ios
+    source .env.deploy_appstore
     set +a
 fi
 
