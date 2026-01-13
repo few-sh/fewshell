@@ -311,6 +311,18 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
       },
     );
 
-    return markdown;
+    return SelectionArea(
+      contextMenuBuilder: (context, selectableRegionState) {
+        try {
+          return AdaptiveTextSelectionToolbar.selectableRegion(
+            selectableRegionState: selectableRegionState,
+          );
+        } catch (e) {
+          // Workaround for crash when scrolling and selecting
+          return const SizedBox.shrink();
+        }
+      },
+      child: markdown,
+    );
   }
 }
