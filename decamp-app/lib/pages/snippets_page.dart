@@ -472,6 +472,22 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
                       },
                     ),
                     ShadContextMenuItem(
+                      leading: const Icon(LucideIcons.pencil),
+                      child: const Text('Duplicate'),
+                      onPressed: () {
+                        _menuController.hide();
+                        showNewSnippetDialog(
+                          context,
+                          title: 'Duplicate Snippet',
+                          initialDescription:
+                              'Copy of ${widget.snippet.description}',
+                          initialContent: widget.snippet.content,
+                          isGlobal: widget.isGlobal,
+                          initialIsVisibleToLlm: widget.snippet.isVisibleToLlm,
+                        );
+                      },
+                    ),
+                    ShadContextMenuItem(
                       leading: Icon(
                         LucideIcons.trash2,
                         color: theme.colorScheme.destructive,
