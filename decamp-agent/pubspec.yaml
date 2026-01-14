@@ -1,6 +1,6 @@
 name: fewshell_agent
 description: Agent service for Fewshell - handles shell commands and real-time communication
-version: 0.1.12
+version: 0.1.13
 publish_to: none
 
 environment:
