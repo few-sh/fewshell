@@ -170,6 +170,12 @@ $command
       final stdoutDone = Completer<void>();
       final stderrDone = Completer<void>();
 
+      // Ensure stream completers complete when session ends (handles abrupt termination)
+      session.done.then((_) {
+        if (!stdoutDone.isCompleted) stdoutDone.complete();
+        if (!stderrDone.isCompleted) stderrDone.complete();
+      });
+
       // Use chunked decoders to handle split UTF-8 characters properly
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
@@ -203,9 +209,13 @@ $command
         onError: stderrDone.completeError,
       );
 
+      _log.fine("Waiting for command output to complete...");
       await stdoutDone.future;
+      _log.fine("Waiting for stderr to complete...");
       await stderrDone.future;
+      _log.fine("Waiting for session to complete...");
       await session.done;
+      _log.fine("Waiting for abort subscription to complete...");
       await abortSubscription?.cancel();
 
       stdoutDecoder?.close();
@@ -377,6 +387,12 @@ sudo bash -c '${_escapeForCommand(command)}'
       final stderrBuffer = BytesBuilder(copy: false);
       final stdoutDone = Completer<void>();
       final stderrDone = Completer<void>();
+
+      // Ensure stream completers complete when session ends (handles abrupt termination)
+      session.done.then((_) {
+        if (!stdoutDone.isCompleted) stdoutDone.complete();
+        if (!stderrDone.isCompleted) stderrDone.complete();
+      });
 
       // Use chunked decoders to handle split UTF-8 characters properly
       ByteConversionSink? stdoutDecoder;
