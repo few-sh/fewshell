@@ -226,7 +226,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
       setState(() {
         _existingSnippet = match;
         if (match != null) {
-          _descriptionController.text = match.name;
+          _descriptionController.text = match.description ?? "";
           _isVisibleToLlm = match.isVisibleToLlm;
           _isGlobalSelection = match.projectId == null;
         }
