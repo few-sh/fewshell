@@ -25,9 +25,15 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
 
   MultiplexedWebSocketChannel(this._inner, {this.awaitSync}) {
     _inner.stream.listen((data) {
+      // _log.fine('Received data on multiplexed channel: $data');
       // Chain processing to ensure order.
       // We use catchError to ensure the chain continues even if a previous task failed.
-      _pending = _pending.catchError((_) {}).then((_) async {
+      _pending = _pending.catchError((error, stackTrace) {
+        _log.warning(
+            'Previous message processing failed, continuing with next message',
+            error,
+            stackTrace);
+      }).then((_) async {
         try {
           // Check forked channels first
           bool handled = false;
