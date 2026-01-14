@@ -196,8 +196,12 @@ $command
           stdoutBuffer.add(data);
           stdoutDecoder?.add(data);
         },
-        onDone: stdoutDone.complete,
-        onError: stdoutDone.completeError,
+        onDone: () {
+          if (!stdoutDone.isCompleted) stdoutDone.complete();
+        },
+        onError: (e, s) {
+          if (!stdoutDone.isCompleted) stdoutDone.completeError(e, s);
+        },
       );
 
       session.stderr.listen(
@@ -205,8 +209,12 @@ $command
           stderrBuffer.add(data);
           stderrDecoder?.add(data);
         },
-        onDone: stderrDone.complete,
-        onError: stderrDone.completeError,
+        onDone: () {
+          if (!stderrDone.isCompleted) stderrDone.complete();
+        },
+        onError: (e, s) {
+          if (!stderrDone.isCompleted) stderrDone.completeError(e, s);
+        },
       );
 
       _log.fine("Waiting for command output to complete...");
@@ -414,8 +422,12 @@ sudo bash -c '${_escapeForCommand(command)}'
           stdoutBuffer.add(data);
           stdoutDecoder?.add(data);
         },
-        onDone: stdoutDone.complete,
-        onError: stdoutDone.completeError,
+        onDone: () {
+          if (!stdoutDone.isCompleted) stdoutDone.complete();
+        },
+        onError: (e, s) {
+          if (!stdoutDone.isCompleted) stdoutDone.completeError(e, s);
+        },
       );
 
       session.stderr.listen(
@@ -423,8 +435,12 @@ sudo bash -c '${_escapeForCommand(command)}'
           stderrBuffer.add(data);
           stderrDecoder?.add(data);
         },
-        onDone: stderrDone.complete,
-        onError: stderrDone.completeError,
+        onDone: () {
+          if (!stderrDone.isCompleted) stderrDone.complete();
+        },
+        onError: (e, s) {
+          if (!stderrDone.isCompleted) stderrDone.completeError(e, s);
+        },
       );
 
       await stdoutDone.future;
