@@ -2,9 +2,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'chat_state.freezed.dart';
 
-// DEPRECATED: ChatState should not be used because it does not persist across app restarts and
-// does not replicate. We should rely strictly on the SQLite database for determining the chat state.
-
 /// Execution progress information
 @freezed
 class ExecutionProgress with _$ExecutionProgress {
@@ -16,14 +13,12 @@ class ExecutionProgress with _$ExecutionProgress {
 }
 
 /// State for the chat session
-/// Contains only transient UI state that doesn't belong in providers
-/// Data that exists in providers (like currentModelIdentifier) should be accessed directly from providers
+/// Contains only transient UI state that doesn't belong in providers.
+/// Loading state is now managed via SessionMutexDao (currentSessionLockProvider)
+/// to ensure consistency between local and remote execution.
 @freezed
 class ChatState with _$ChatState {
   const factory ChatState({
-    // Loading state
-    @Default(false) bool isLoading,
-
     // Execution progress tracking
     ExecutionProgress? executionProgress,
 

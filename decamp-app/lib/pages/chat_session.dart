@@ -265,9 +265,9 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Watch chat state and messages
     final chatState = ref.watch(chatControllerProvider(currentSessionId));
-    final isSessionLocked =
+    // Use session lock as single source of truth for loading state
+    final isLoading =
         ref.watch(currentSessionLockProvider).valueOrNull ?? false;
-    final isLoading = chatState.isLoading || isSessionLocked;
 
     final chatController = ref.watch(
       chatControllerProvider(currentSessionId).notifier,
@@ -426,7 +426,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                   else
                     ChatInput(
                       onSend: _handleSendMessage,
-                      onAbort: chatState.isLoading ? _handleAbort : null,
+                      onAbort: isLoading ? _handleAbort : null,
                       isLoading: isLoading,
                       enabled: hasProject,
                       focusNode: _inputFocusNode,

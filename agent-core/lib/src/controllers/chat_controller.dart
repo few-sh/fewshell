@@ -23,6 +23,7 @@ class ChatController extends StateNotifier<ChatState> {
 
   final MessageDao _messageDao;
   final SessionDao _sessionDao;
+  final SessionMutexDao? _sessionMutexDao;
   final LlmService _llmService;
   final ShellService _shellService;
   final SecretRedactor _secretRedactor;
@@ -53,6 +54,7 @@ class ChatController extends StateNotifier<ChatState> {
   ChatController({
     required MessageDao messageDao,
     required SessionDao sessionDao,
+    SessionMutexDao? sessionMutexDao,
     required LlmService llmService,
     required ShellService shellService,
     required SecretRedactor secretRedactor,
@@ -61,6 +63,7 @@ class ChatController extends StateNotifier<ChatState> {
     this.sessionId,
   })  : _messageDao = messageDao,
         _sessionDao = sessionDao,
+        _sessionMutexDao = sessionMutexDao,
         _llmService = llmService,
         _shellService = shellService,
         _secretRedactor = secretRedactor,
@@ -219,9 +222,8 @@ class ChatController extends StateNotifier<ChatState> {
   /// If content is null, resends the last user message in the conversation.
   /// This is used for resend/edit operations.
   ///
-  /// Streaming is managed internally through ChatState:
-  /// - startStreaming: Sets streamingMessageId in state
-  /// - stopStreaming: Clears streaming state
+  /// For local execution, acquires a session lock via SessionMutexDao.
+  /// For remote execution, the server manages the lock.
   Future<void> sendMessage({
     String? content,
     String? userName,
@@ -232,7 +234,22 @@ class ChatController extends StateNotifier<ChatState> {
     void Function()? onNoConfig,
     MultiplexedWebSocketChannel? syncChannel,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    // Clear any previous error
+    if (mounted) state = state.copyWith(error: null);
+
+    // For local execution (no server), acquire lock via mutex
+    // For remote execution, server handles locking
+    final isLocalExecution = _project?.serverUrl == null;
+    if (isLocalExecution && _sessionMutexDao != null) {
+      final acquired = await _sessionMutexDao.acquireLock(sessionId);
+      if (!acquired) {
+        _log.warning('Could not acquire lock for session $sessionId');
+        if (mounted) {
+          state = state.copyWith(error: 'Session is busy');
+        }
+        return;
+      }
+    }
 
     try {
       // If content is provided, validate and save the new user message
@@ -243,7 +260,6 @@ class ChatController extends StateNotifier<ChatState> {
           userName: userName,
         );
         if (triggerMessage == null) {
-          if (mounted) state = state.copyWith(isLoading: false);
           onNoConfig?.call();
           return;
         }
@@ -259,7 +275,6 @@ class ChatController extends StateNotifier<ChatState> {
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
       if (config == null) {
-        if (mounted) state = state.copyWith(isLoading: false);
         onNoConfig?.call();
         return;
       }
@@ -369,8 +384,6 @@ class ChatController extends StateNotifier<ChatState> {
         if (syncChannel == null) {
           if (mounted) {
             state = state.copyWith(
-              isLoading: false,
-
               // TODO: Use a centralized error notification and logging system
               error: 'Cannot start remote chat: not connected to server',
             );
@@ -386,7 +399,6 @@ class ChatController extends StateNotifier<ChatState> {
         if (triggerMessage == null) {
           if (mounted) {
             state = state.copyWith(
-              isLoading: false,
               error: 'Cannot start remote chat: no context',
             );
           }
@@ -473,7 +485,7 @@ class ChatController extends StateNotifier<ChatState> {
             messageId: final messageId
           ):
           if (mounted) {
-            state = state.copyWith(isLoading: false, error: errorMsg);
+            state = state.copyWith(error: errorMsg);
           }
           final errorMessage = 'Sorry, I encountered an error: $errorMsg';
           final redactedError = await _secretRedactor.redact(errorMessage);
@@ -489,14 +501,9 @@ class ChatController extends StateNotifier<ChatState> {
           await _sessionDao.touchSession(sessionId);
           return;
       }
-
-      if (mounted) state = state.copyWith(isLoading: false);
     } catch (e) {
       if (e is CancelledError) {
         _log.info('Operation cancelled by user');
-        if (mounted) {
-          state = state.copyWith(isLoading: false);
-        }
         return;
       }
 
@@ -513,7 +520,12 @@ class ChatController extends StateNotifier<ChatState> {
       );
       await _sessionDao.touchSession(sessionId);
       if (mounted) {
-        state = state.copyWith(isLoading: false, error: e.toString());
+        state = state.copyWith(error: e.toString());
+      }
+    } finally {
+      // Release lock for local execution
+      if (isLocalExecution && _sessionMutexDao != null) {
+        await _sessionMutexDao.unlock(sessionId);
       }
     }
   }

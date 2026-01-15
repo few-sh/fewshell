@@ -187,9 +187,7 @@ abstract class _ExecutionProgress implements ExecutionProgress {
 
 /// @nodoc
 mixin _$ChatState {
-// Loading state
-  bool get isLoading =>
-      throw _privateConstructorUsedError; // Execution progress tracking
+// Execution progress tracking
   ExecutionProgress? get executionProgress =>
       throw _privateConstructorUsedError; // Error state
   String? get error => throw _privateConstructorUsedError;
@@ -206,8 +204,7 @@ abstract class $ChatStateCopyWith<$Res> {
   factory $ChatStateCopyWith(ChatState value, $Res Function(ChatState) then) =
       _$ChatStateCopyWithImpl<$Res, ChatState>;
   @useResult
-  $Res call(
-      {bool isLoading, ExecutionProgress? executionProgress, String? error});
+  $Res call({ExecutionProgress? executionProgress, String? error});
 
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
 }
@@ -227,15 +224,10 @@ class _$ChatStateCopyWithImpl<$Res, $Val extends ChatState>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? isLoading = null,
     Object? executionProgress = freezed,
     Object? error = freezed,
   }) {
     return _then(_value.copyWith(
-      isLoading: null == isLoading
-          ? _value.isLoading
-          : isLoading // ignore: cast_nullable_to_non_nullable
-              as bool,
       executionProgress: freezed == executionProgress
           ? _value.executionProgress
           : executionProgress // ignore: cast_nullable_to_non_nullable
@@ -270,8 +262,7 @@ abstract class _$$ChatStateImplCopyWith<$Res>
       __$$ChatStateImplCopyWithImpl<$Res>;
   @override
   @useResult
-  $Res call(
-      {bool isLoading, ExecutionProgress? executionProgress, String? error});
+  $Res call({ExecutionProgress? executionProgress, String? error});
 
   @override
   $ExecutionProgressCopyWith<$Res>? get executionProgress;
@@ -290,15 +281,10 @@ class __$$ChatStateImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? isLoading = null,
     Object? executionProgress = freezed,
     Object? error = freezed,
   }) {
     return _then(_$ChatStateImpl(
-      isLoading: null == isLoading
-          ? _value.isLoading
-          : isLoading // ignore: cast_nullable_to_non_nullable
-              as bool,
       executionProgress: freezed == executionProgress
           ? _value.executionProgress
           : executionProgress // ignore: cast_nullable_to_non_nullable
@@ -314,14 +300,8 @@ class __$$ChatStateImplCopyWithImpl<$Res>
 /// @nodoc
 
 class _$ChatStateImpl extends _ChatState {
-  const _$ChatStateImpl(
-      {this.isLoading = false, this.executionProgress, this.error})
-      : super._();
+  const _$ChatStateImpl({this.executionProgress, this.error}) : super._();
 
-// Loading state
-  @override
-  @JsonKey()
-  final bool isLoading;
 // Execution progress tracking
   @override
   final ExecutionProgress? executionProgress;
@@ -331,7 +311,7 @@ class _$ChatStateImpl extends _ChatState {
 
   @override
   String toString() {
-    return 'ChatState(isLoading: $isLoading, executionProgress: $executionProgress, error: $error)';
+    return 'ChatState(executionProgress: $executionProgress, error: $error)';
   }
 
   @override
@@ -339,16 +319,13 @@ class _$ChatStateImpl extends _ChatState {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$ChatStateImpl &&
-            (identical(other.isLoading, isLoading) ||
-                other.isLoading == isLoading) &&
             (identical(other.executionProgress, executionProgress) ||
                 other.executionProgress == executionProgress) &&
             (identical(other.error, error) || other.error == error));
   }
 
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, isLoading, executionProgress, error);
+  int get hashCode => Object.hash(runtimeType, executionProgress, error);
 
   /// Create a copy of ChatState
   /// with the given fields replaced by the non-null parameter values.
@@ -361,14 +338,11 @@ class _$ChatStateImpl extends _ChatState {
 
 abstract class _ChatState extends ChatState {
   const factory _ChatState(
-      {final bool isLoading,
-      final ExecutionProgress? executionProgress,
+      {final ExecutionProgress? executionProgress,
       final String? error}) = _$ChatStateImpl;
   const _ChatState._() : super._();
 
-// Loading state
-  @override
-  bool get isLoading; // Execution progress tracking
+// Execution progress tracking
   @override
   ExecutionProgress? get executionProgress; // Error state
   @override

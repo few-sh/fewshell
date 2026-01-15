@@ -26,9 +26,16 @@ final chatControllerProvider =
       final keychain = ref.watch(keychainServiceProvider);
       final secretRedactor = SecretRedactor(keychain, projectId);
 
+      // Get database facade
+      final db = ref.watch(databaseProvider);
+
+      // Get sessionMutexDao for local execution locking (may be null if no project)
+      final sessionMutexDao = db.projectDatabase?.sessionMutexDao;
+
       return ChatController(
-        messageDao: ref.watch(databaseProvider).messageDao,
-        sessionDao: ref.watch(databaseProvider).sessionDao,
+        messageDao: db.messageDao,
+        sessionDao: db.sessionDao,
+        sessionMutexDao: sessionMutexDao,
         llmService: ref.watch(llmServiceProvider),
         shellService: ref.watch(shellServiceProvider(projectId)),
         secretRedactor: secretRedactor,
