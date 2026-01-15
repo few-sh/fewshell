@@ -745,6 +745,9 @@ class LocalShellBackend implements ShellBackend {
         'script',
         ['-F', '-q', '/dev/null', 'bash', scriptFile.path],
         environment: {
+          // TERM=dumb disables terminal features (bracketed paste, colors, title)
+          // that produce escape sequences in the output
+          'TERM': 'dumb',
           'BASH_SILENCE_DEPRECATION_WARNING': '1',
         },
       );
@@ -759,10 +762,13 @@ class LocalShellBackend implements ShellBackend {
       await process.stdin.close();
     } else if (Platform.isLinux) {
       // Linux: stdin piping works, cleaner approach
-      // Must explicitly exit bash since script's PTY may not propagate EOF
+      // Must explicitly exit bash since script's PTY may not propagate EOF.
+      // TERM=dumb disables terminal features (bracketed paste, colors, title)
+      // that produce escape sequences in the output
       process = await Process.start(
         'script',
         ['-q', '-c', 'bash -s', '/dev/null'],
+        environment: {'TERM': 'dumb'},
       );
       process.stdin.writeln(command);
       process.stdin
