@@ -1,3 +1,8 @@
+# Server 0.1.14
+
+- Ensure secrets CRDT is ready before starting to use it
+- Fix "Bad state: Future already completed" crash
+
 # App 1.0.1+19
 
 - Add ability to duplicate snippet via context menu
