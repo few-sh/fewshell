@@ -1,3 +1,8 @@
+# App 1.0.1+20
+
+- Clean up / centralize session lock handling
+- Fix secrets not propagating from the client side after a reconnect
+
 # Server 0.1.14
 
 - Ensure secrets CRDT is ready before starting to use it
