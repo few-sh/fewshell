@@ -1,3 +1,8 @@
+# Server 0.1.16
+
+- Fix long-running processes failing to exit
+- Disable advanced (ansi) terminal features
+
 # Server 0.1.15
 
 - Hotfix: Fix short-lived terminal commands not producing any output.
