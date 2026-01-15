@@ -15,6 +15,7 @@ class SecretsService {
 
     final storage = await _storageFactory(projectId);
     final crdt = SecretsCrdt(storage);
+    await crdt.ready;
     _crdts[projectId] = crdt;
     return crdt;
   }
