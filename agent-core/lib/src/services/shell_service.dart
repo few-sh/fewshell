@@ -217,13 +217,13 @@ $command
         },
       );
 
-      _log.fine("Waiting for command output to complete...");
+      _log.fine('Waiting for command output to complete...');
       await stdoutDone.future;
-      _log.fine("Waiting for stderr to complete...");
+      _log.fine('Waiting for stderr to complete...');
       await stderrDone.future;
-      _log.fine("Waiting for session to complete...");
+      _log.fine('Waiting for session to complete...');
       await session.done;
-      _log.fine("Waiting for abort subscription to complete...");
+      _log.fine('Waiting for abort subscription to complete...');
       await abortSubscription?.cancel();
 
       stdoutDecoder?.close();
@@ -755,13 +755,18 @@ class LocalShellBackend implements ShellBackend {
           tempDir.deleteSync(recursive: true);
         } catch (_) {}
       }));
+
+      await process.stdin.close();
     } else if (Platform.isLinux) {
       // Linux: stdin piping works, cleaner approach
+      // Must explicitly exit bash since script's PTY may not propagate EOF
       process = await Process.start(
         'script',
         ['-q', '-c', 'bash -s', '/dev/null'],
       );
       process.stdin.writeln(command);
+      process.stdin
+          .writeln('exit \$?'); // Preserve exit code and ensure bash exits
       await process.stdin.close();
     } else {
       // Fallback for Windows
