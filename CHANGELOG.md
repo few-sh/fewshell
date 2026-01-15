@@ -1,3 +1,7 @@
+# Server 0.1.15
+
+- Hotfix: Fix short-lived terminal commands not producing any output.
+
 # App 1.0.1+20
 
 - Clean up / centralize session lock handling
