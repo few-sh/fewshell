@@ -311,6 +311,7 @@ class SyncService {
       // Secrets Sync
       final secretsCrdt = ref.read(secretsCrdtProvider);
       await secretsCrdt.ready;
+      secretsCrdt.resetInitialChangeset();
       final secretsChannel = _projectChannel!.fork('\u001D');
       _secretsSync = CrdtSync.client(
         secretsCrdt,

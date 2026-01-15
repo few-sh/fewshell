@@ -21,6 +21,12 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
 
   Stream<void> get onChange => _changeController.stream;
 
+  /// Resets the initial changeset flag so the next sync will send all secrets.
+  /// Call this when establishing a new sync connection.
+  void resetInitialChangeset() {
+    _initialChangeset = true;
+  }
+
   Future<void> _load() async {
     try {
       _log.info('Loading secrets from storage...');
