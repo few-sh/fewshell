@@ -169,6 +169,13 @@ else
             
             # Use npx wrangler for upload
             npx wrangler r2 object put "fewshell-releases/$OBJECT_KEY" --file "$FILE" --remote
+
+            # Upload to latest
+            LATEST_KEY="releases/latest/$FILENAME"
+            echo "    ⬆️  Uploading $FILENAME to $LATEST_KEY..."
+            # Use 'no-cache' to force clients to validate the ETag with R2 every time.
+            # R2 handles ETags automatically. If the file hasn't changed, R2 returns 304.
+            npx wrangler r2 object put "fewshell-releases/$LATEST_KEY" --file "$FILE" --remote --cc "no-cache"
         fi
     done
     echo "✅ Uploaded to R2."
