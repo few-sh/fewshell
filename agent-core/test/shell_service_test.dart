@@ -663,7 +663,7 @@ echo "Line 3"
 
     test('handles command with quotes and special characters', () async {
       final result = await shellService.executeCommand(
-        'echo "Test with \\"quotes\\" and \$special \`chars\`"',
+        r'echo "Test with \"quotes\" and $special `chars`"',
       );
       
       expect(result['exitCode'], equals(0));
