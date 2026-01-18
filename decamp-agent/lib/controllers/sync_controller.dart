@@ -20,43 +20,40 @@ class SyncController {
   // FIXME: This is duplicating the functionality of session mutexes of SQLite. Switch to SQLite-based locking.
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager, this.settingsService, this.secretsService) {
-    // Start background initialization - fire-and-forget is intentional.
-    // The cleanup happens asynchronously and doesn't block the controller
-    // from being ready to handle requests. Any errors are logged but don't
-    // prevent the server from starting.
-    _init();
+  static Future<SyncController> create(
+      DatabaseManager dbManager,
+      CrdtSettingsService settingsService,
+      SecretsService secretsService) async {
+    final controller =
+        SyncController._(dbManager, settingsService, secretsService);
+    await controller._init();
+    return controller;
   }
 
+  SyncController._(this.dbManager, this.settingsService, this.secretsService);
+
   /// Initialize the controller by cleaning up session mutexes for all projects.
-  /// 
-  /// This method is called from the constructor and runs asynchronously in the
-  /// background. It does not block controller construction or server startup.
-  /// 
-  /// The cleanup is resilient to errors - individual project failures are logged
-  /// but do not prevent other projects from being cleaned up or the server from
-  /// functioning normally.
-  /// 
+  ///
+  ///
   /// Assumptions:
   /// - SyncController is only initialized once at server start
   /// - The dbManager has already been initialized before SyncController creation
-  /// - Session mutexes can be safely cleaned up without affecting running sessions
-  ///   (the in-memory _activeSessions set handles current active sessions)
   Future<void> _init() async {
     try {
       _log.info('Initializing SyncController: cleaning up session mutexes');
-      
+
       // Get all projects from the global database
-      final projects = await dbManager.globalDatabase.projectDao.getAllProjects();
-      
-      _log.info('Found ${projects.length} projects, cleaning up mutexes...');
-      
+      final projects =
+          await dbManager.globalDatabase.projectDao.getAllProjects();
+
+      _log.info('Found ${projects.length} projects, preinitializing...');
+
       // Iterate through each project and cleanup session mutexes
       for (final project in projects) {
         try {
           final projectDb = await dbManager.getProjectDatabase(project.id);
           final cleanedCount = await projectDb.sessionMutexDao.cleanupAll();
-          
+
           _log.info(
             'Cleaned up $cleanedCount session mutex(es) for project ${project.id} (${project.name})',
           );
@@ -66,7 +63,7 @@ class SyncController {
           );
         }
       }
-      
+
       _log.info('SyncController initialization complete');
     } catch (e) {
       _log.severe('Error during SyncController initialization: $e');

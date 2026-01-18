@@ -119,7 +119,7 @@ void main(List<String> args) async {
     );
 
     // Initialize SyncController
-    final syncController = SyncController(
+    final syncController = await SyncController.create(
       dbManager,
       settingsService,
       secretsService,
