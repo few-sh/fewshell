@@ -21,12 +21,27 @@ class SyncController {
   final Set<String> _activeSessions = {};
 
   SyncController(this.dbManager, this.settingsService, this.secretsService) {
+    // Start background initialization - fire-and-forget is intentional.
+    // The cleanup happens asynchronously and doesn't block the controller
+    // from being ready to handle requests. Any errors are logged but don't
+    // prevent the server from starting.
     _init();
   }
 
   /// Initialize the controller by cleaning up session mutexes for all projects.
-  /// This is called at construction time and assumes the controller is only
-  /// initialized once at server start.
+  /// 
+  /// This method is called from the constructor and runs asynchronously in the
+  /// background. It does not block controller construction or server startup.
+  /// 
+  /// The cleanup is resilient to errors - individual project failures are logged
+  /// but do not prevent other projects from being cleaned up or the server from
+  /// functioning normally.
+  /// 
+  /// Assumptions:
+  /// - SyncController is only initialized once at server start
+  /// - The dbManager has already been initialized before SyncController creation
+  /// - Session mutexes can be safely cleaned up without affecting running sessions
+  ///   (the in-memory _activeSessions set handles current active sessions)
   Future<void> _init() async {
     try {
       _log.info('Initializing SyncController: cleaning up session mutexes');
