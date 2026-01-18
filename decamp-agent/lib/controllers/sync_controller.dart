@@ -20,7 +20,43 @@ class SyncController {
   // FIXME: This is duplicating the functionality of session mutexes of SQLite. Switch to SQLite-based locking.
   final Set<String> _activeSessions = {};
 
-  SyncController(this.dbManager, this.settingsService, this.secretsService);
+  SyncController(this.dbManager, this.settingsService, this.secretsService) {
+    _init();
+  }
+
+  /// Initialize the controller by cleaning up session mutexes for all projects.
+  /// This is called at construction time and assumes the controller is only
+  /// initialized once at server start.
+  Future<void> _init() async {
+    try {
+      _log.info('Initializing SyncController: cleaning up session mutexes');
+      
+      // Get all projects from the global database
+      final projects = await dbManager.globalDatabase.projectDao.getAllProjects();
+      
+      _log.info('Found ${projects.length} projects, cleaning up mutexes...');
+      
+      // Iterate through each project and cleanup session mutexes
+      for (final project in projects) {
+        try {
+          final projectDb = await dbManager.getProjectDatabase(project.id);
+          final cleanedCount = await projectDb.sessionMutexDao.cleanupAll();
+          
+          _log.info(
+            'Cleaned up $cleanedCount session mutex(es) for project ${project.id} (${project.name})',
+          );
+        } catch (e) {
+          _log.warning(
+            'Failed to cleanup mutexes for project ${project.id}: $e',
+          );
+        }
+      }
+      
+      _log.info('SyncController initialization complete');
+    } catch (e) {
+      _log.severe('Error during SyncController initialization: $e');
+    }
+  }
 
   Handler get handler {
     return (Request request) {
