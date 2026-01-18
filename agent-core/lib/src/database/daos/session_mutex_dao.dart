@@ -57,8 +57,9 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
   }
 
   /// Unlocks all mutexes by deleting all lock entries.
-  Future<void> cleanupAll() async {
-    await delete(sessionMutexes).go();
+  /// Returns the number of mutexes that were cleaned up.
+  Future<int> cleanupAll() {
+    return delete(sessionMutexes).go();
   }
 
   /// Refreshes the lock for [id] by updating the timestamp.
