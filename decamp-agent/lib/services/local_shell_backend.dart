@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:logging/logging.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:native_pty/native_pty.dart';
 
 final _log = Logger('LocalShellBackend');
 
@@ -30,105 +31,70 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> execute(String command) async {
-    // Use `script` to allocate a PTY for unbuffered streaming.
-    _log.info('Executing local command: $command');
+    _log.info('Executing local command via PTY: $command');
 
-    Process process;
-    if (Platform.isMacOS) {
-      // macOS: stdin piping doesn't work reliably with script, use temp file
-      final tempDir = Directory.systemTemp.createTempSync('decamp_cmd_');
-      final scriptFile = File('${tempDir.path}/cmd.sh');
-      await scriptFile.writeAsString(command);
+    // Use /bin/bash to ensure we have a standard shell environment
+    // TODO: Improve shell detection for Windows support
+    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
+    // TERM=dumb disables terminal features (bracketed paste, colors, title)
+    // that produce escape sequences in the output
+    final pty = NativePty.spawn(
+      shell,
+      [shell, '-c', command],
+      environment: {'TERM': 'dumb'},
+    );
 
-      process = await Process.start(
-        'script',
-        ['-F', '-q', '/dev/null', 'bash', scriptFile.path],
-        environment: {
-          // TERM=dumb disables terminal features (bracketed paste, colors, title)
-          // that produce escape sequences in the output
-          'TERM': 'dumb',
-          'BASH_SILENCE_DEPRECATION_WARNING': '1',
-        },
-      );
-
-      // Cleanup temp file when process ends
-      unawaited(
-        process.exitCode.whenComplete(() {
-          try {
-            tempDir.deleteSync(recursive: true);
-          } catch (_) {}
-        }),
-      );
-
-      await process.stdin.close();
-    } else if (Platform.isLinux) {
-      // Linux: stdin piping works, cleaner approach
-      // Must explicitly exit bash since script's PTY may not propagate EOF.
-      // TERM=dumb disables terminal features (bracketed paste, colors, title)
-      // that produce escape sequences in the output
-      process = await Process.start(
-        'script',
-        ['-q', '-c', 'bash -s', '/dev/null'],
-        environment: {'TERM': 'dumb'},
-      );
-      process.stdin.writeln(command);
-      process.stdin
-          .writeln('exit \$?'); // Preserve exit code and ensure bash exits
-      await process.stdin.close();
-    } else {
-      // Fallback for Windows
-      process = await Process.start('bash', ['-s']);
-      process.stdin.writeln(command);
-      await process.stdin.close();
-    }
-
-    _log.info('Started local process with PID: ${process.pid}');
-    return LocalShellSession(process);
+    return LocalShellSession(pty);
   }
 
   @override
   Future<ShellSession> createSession() async {
-    final process = await Process.start('bash', []);
-    return LocalShellSession(process);
+    final shell = Platform.environment['SHELL'] ??
+        (Platform.isWindows ? 'bash' : '/bin/bash');
+    final pty = NativePty.spawn(shell, [shell]);
+    return LocalShellSession(pty);
   }
 }
 
-/// Local shell session implementation wrapping a Process
+/// Local shell session implementation wrapping a NativePty
 class LocalShellSession implements ShellSession {
-  final Process _process;
-  LocalShellSession(this._process);
+  final NativePty _pty;
+  LocalShellSession(this._pty);
   static final _log = Logger('LocalShellSession');
 
   @override
-  Stream<Uint8List> get stdout =>
-      _process.stdout.map((d) => Uint8List.fromList(d));
+  Stream<Uint8List> get stdout => _pty.data;
 
   @override
-  Stream<Uint8List> get stderr =>
-      _process.stderr.map((d) => Uint8List.fromList(d));
+  Stream<Uint8List> get stderr => const Stream.empty();
 
   @override
-  Future<int> get exitCode => _process.exitCode;
+  Future<int> get exitCode async {
+    final code = await _pty.exitCode;
+    // Yield to allow PTY output to be processed before the session is considered done
+    await Future.delayed(const Duration(milliseconds: 50));
+    return code;
+  }
 
   @override
-  Future<void> get done => _process.exitCode.then((_) {});
+  Future<void> get done => exitCode.then((_) {});
 
   @override
-  void write(Uint8List data) => _process.stdin.add(data);
+  void write(Uint8List data) => _pty.writeBytes(data);
 
   @override
   Future<void> kill(ProcessSignal signal) async {
-    _log.info('Killing local process ${_process.pid} with signal $signal');
+    _log.info('Killing local PTY process with signal $signal');
 
     // Only wait and escalate if the intention was to terminate the process
     if (signal != ProcessSignal.sigint &&
         signal != ProcessSignal.sigterm &&
         signal != ProcessSignal.sigquit) {
-      _process.kill(signal);
+      _pty.kill(signal.signalNumber);
       return;
     }
 
-    _process.kill(signal);
+    _pty.kill(signal.signalNumber);
 
     if (await _waitForExit(const Duration(seconds: 5))) return;
 
@@ -136,42 +102,30 @@ class LocalShellSession implements ShellSession {
       _log.warning(
         'Process did not exit after signal $signal, escalating to SIGTERM',
       );
-      _process.kill(ProcessSignal.sigterm);
+      _pty.kill(ProcessSignal.sigterm.signalNumber);
       if (await _waitForExit(const Duration(seconds: 5))) return;
     }
 
     _log.warning('Process did not exit, escalating to SIGKILL');
-    _killTree();
-  }
-
-  void _killTree() {
-    if (Platform.isWindows) {
-      try {
-        // TODO: This needs tested on windows.
-        Process.runSync(
-            'taskkill', ['/F', '/T', '/PID', _process.pid.toString()]);
-        return;
-      } catch (e) {
-        _log.warning('Failed to run taskkill: $e');
-      }
-    }
-    _process.kill(ProcessSignal.sigkill);
+    _pty.kill(ProcessSignal.sigkill.signalNumber);
   }
 
   Future<bool> _waitForExit(Duration duration) async {
     _log.info(
-        'Waiting up to ${duration.inSeconds} seconds for process ${_process.pid} to exit');
+      'Waiting up to ${duration.inSeconds} seconds for process to exit',
+    );
     try {
-      await _process.exitCode.timeout(duration);
-      _log.info('Process ${_process.pid} exited successfully');
+      await _pty.exitCode.timeout(duration);
+      _log.info('Process exited successfully');
       return true;
     } on TimeoutException {
       _log.warning(
-          'Process ${_process.pid} did not exit within ${duration.inSeconds} seconds');
+        'Process did not exit within ${duration.inSeconds} seconds',
+      );
       return false;
     }
   }
 
   @override
-  void close() => _process.stdin.close();
+  void close() => _pty.close();
 }
