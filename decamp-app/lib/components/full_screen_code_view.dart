@@ -28,32 +28,44 @@ class FullScreenCodeView extends StatelessWidget {
         child: Stack(
           children: [
             // Scrollable code content
-            SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Hero(
-                tag: heroTag,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: terminalTheme.backgroundColor,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: terminalTheme.borderColor,
-                        width: 1,
+            SelectionArea(
+              contextMenuBuilder: (context, selectableRegionState) {
+                try {
+                  return AdaptiveTextSelectionToolbar.selectableRegion(
+                    selectableRegionState: selectableRegionState,
+                  );
+                } catch (e) {
+                  // Workaround for crash when scrolling and selecting
+                  return const SizedBox.shrink();
+                }
+              },
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Hero(
+                  tag: heroTag,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: terminalTheme.backgroundColor,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: terminalTheme.borderColor,
+                          width: 1,
+                        ),
                       ),
-                    ),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.all(12),
-                      child: Text(
-                        code,
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 14,
-                          color: terminalTheme.textColor,
-                          height: 1.5,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.all(12),
+                        child: Text(
+                          code,
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 14,
+                            color: terminalTheme.textColor,
+                            height: 1.5,
+                          ),
                         ),
                       ),
                     ),
