@@ -14,8 +14,6 @@ import 'keychain_service.dart';
 /// Callback for interactive user prompts (e.g. 2FA, password)
 typedef UserPromptCallback = Future<String> Function(String prompt, bool echo);
 
-final _log = Logger('ShellService');
-
 /// Abstract interface for shell execution backend
 abstract class ShellBackend {
   Future<void> connect({
