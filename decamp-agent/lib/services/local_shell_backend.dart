@@ -52,11 +52,13 @@ class LocalShellBackend implements ShellBackend {
       );
 
       // Cleanup temp file when process ends
-      unawaited(process.exitCode.whenComplete(() {
-        try {
-          tempDir.deleteSync(recursive: true);
-        } catch (_) {}
-      }));
+      unawaited(
+        process.exitCode.whenComplete(() {
+          try {
+            tempDir.deleteSync(recursive: true);
+          } catch (_) {}
+        }),
+      );
 
       await process.stdin.close();
     } else if (Platform.isLinux) {
@@ -132,7 +134,8 @@ class LocalShellSession implements ShellSession {
 
     if (signal != ProcessSignal.sigterm) {
       _log.warning(
-          'Process did not exit after signal $signal, escalating to SIGTERM');
+        'Process did not exit after signal $signal, escalating to SIGTERM',
+      );
       _process.kill(ProcessSignal.sigterm);
       if (await _waitForExit(const Duration(seconds: 5))) return;
     }

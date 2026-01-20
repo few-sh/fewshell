@@ -22,9 +22,10 @@ class SyncController {
   final Set<String> _activeSessions = {};
 
   static Future<SyncController> create(
-      DatabaseManager dbManager,
-      CrdtSettingsService settingsService,
-      SecretsService secretsService) async {
+    DatabaseManager dbManager,
+    CrdtSettingsService settingsService,
+    SecretsService secretsService,
+  ) async {
     final controller =
         SyncController._(dbManager, settingsService, secretsService);
     await controller._init();
