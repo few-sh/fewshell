@@ -42,6 +42,7 @@ class LocalShellBackend implements ShellBackend {
       shell,
       [shell, '-c', command],
       environment: {'TERM': 'dumb'},
+      autoDecodeUtf8: false,
     );
 
     return LocalShellSession(pty);
@@ -51,7 +52,11 @@ class LocalShellBackend implements ShellBackend {
   Future<ShellSession> createSession() async {
     final shell = Platform.environment['SHELL'] ??
         (Platform.isWindows ? 'bash' : '/bin/bash');
-    final pty = NativePty.spawn(shell, [shell]);
+    final pty = NativePty.spawn(
+      shell,
+      [shell],
+      autoDecodeUtf8: false,
+    );
     return LocalShellSession(pty);
   }
 }
@@ -69,15 +74,10 @@ class LocalShellSession implements ShellSession {
   Stream<Uint8List> get stderr => const Stream.empty();
 
   @override
-  Future<int> get exitCode async {
-    final code = await _pty.exitCode;
-    // Yield to allow PTY output to be processed before the session is considered done
-    await Future.delayed(const Duration(milliseconds: 50));
-    return code;
-  }
+  Future<int> get exitCode => _pty.exitCode;
 
   @override
-  Future<void> get done => exitCode.then((_) {});
+  Future<void> get done => _pty.exitCode.then((_) {});
 
   @override
   void write(Uint8List data) => _pty.writeBytes(data);
