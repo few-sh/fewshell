@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:test/test.dart';
-import 'package:agent_core/src/services/shell_service.dart';
-import 'package:agent_core/src/services/keychain_service.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
-import 'package:agent_core/src/models/secret.dart';
+import 'package:fewshell_agent/services/local_shell_backend.dart';
 
 /// Mock secrets storage for testing
 class MockSecretsStorage implements SecretsStorage {
@@ -48,7 +47,7 @@ void main() {
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('executes simple echo command', () async {
@@ -150,7 +149,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('streams stdout in real-time', () async {
@@ -227,7 +226,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('aborts command with SIGINT', () async {
@@ -314,7 +313,7 @@ echo "Line 3"
     setUp(() async {
       storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
       
       // Set up some test secrets
       await keychain.saveProjectSecret(
@@ -446,7 +445,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('handles syntax errors in bash', () async {
@@ -499,7 +498,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('backend is connected by default', () {
@@ -530,7 +529,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('executes multiple commands concurrently', () async {
@@ -603,7 +602,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('handles very long output', () async {
@@ -678,7 +677,7 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService.local(keychain, 'test-project');
+      shellService = ShellService(null, keychain, 'test-project', backend: LocalShellBackend());
     });
 
     test('detects current platform', () async {

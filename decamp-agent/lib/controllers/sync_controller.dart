@@ -10,6 +10,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import '../services/database_manager.dart';
+import '../services/local_shell_backend.dart';
 
 class SyncController {
   static final _log = Logger('SyncController');
@@ -212,7 +213,12 @@ class _AgentSession {
     this._activeSessions,
     String? projectId,
     KeychainService? keychain,
-  ) : _shellService = ShellService.local(keychain, projectId);
+  ) : _shellService = ShellService(
+          null,
+          keychain,
+          projectId,
+          backend: LocalShellBackend(),
+        );
 
   void handleMessage(Map<String, dynamic> msg) {
     if (msg['type'] == 'start_chat') {
