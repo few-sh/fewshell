@@ -1,3 +1,6 @@
 [submodule "llm_dart"]
 	path = llm_dart
 	url = https://github.com/few-sh/llm_dart.git
+[submodule "native_pty"]
+	path = native_pty
+	url = https://github.com/few-sh/native_pty.git
