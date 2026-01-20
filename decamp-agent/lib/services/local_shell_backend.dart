@@ -36,14 +36,23 @@ class LocalShellBackend implements ShellBackend {
     // Use /bin/bash to ensure we have a standard shell environment
     // TODO: Improve shell detection for Windows support
     final shell = Platform.isWindows ? 'bash' : '/bin/bash';
+
+    // Inherit environment variables but override TERM and ensure UTF-8 locale
+    final environment = Map<String, String>.from(Platform.environment);
+    environment['TERM'] = 'dumb';
+    environment['LANG'] = 'en_US.UTF-8';
+    environment['LC_ALL'] = 'en_US.UTF-8';
+
     // TERM=dumb disables terminal features (bracketed paste, colors, title)
     // that produce escape sequences in the output
     final pty = NativePty.spawn(
       shell,
-      [shell, '-c', command],
-      environment: {'TERM': 'dumb'},
+      [shell, '-i'],
+      environment: environment,
       autoDecodeUtf8: false,
     );
+
+    pty.write('$command\nexit\n');
 
     return LocalShellSession(pty);
   }
