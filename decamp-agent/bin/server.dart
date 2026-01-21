@@ -11,6 +11,7 @@ import 'package:fewshell_agent/services/database_manager.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:fewshell_agent/version.dart';
 
 final _log = Logger('FewshellAgent');
 
@@ -75,7 +76,7 @@ void main(List<String> args) async {
     }
   });
 
-  const version = String.fromEnvironment('APP_VERSION', defaultValue: 'dev');
+  const version = packageVersion;
   _log.info('Starting Fewshell Agent v$version');
 
   // Configure custom SIGPIPE handler.

@@ -74,7 +74,10 @@ build_arch() {
             echo '🔌 Compiling fewshell-server...' && \
             mkdir -p build/bin && \
             VERSION=\$(sed -n 's/^version: //p' pubspec.yaml) && \
-            dart build cli -t bin/server.dart -DAPP_VERSION=\$VERSION -o build/bin/fewshell-server && \
+            echo \"const packageVersion = '\$VERSION';\" > lib/version.dart && \
+            dart build cli -t bin/server.dart -o build/cli_out && \
+            cp build/cli_out/bundle/bin/server build/bin/fewshell-server && \
+            if [ -d "build/cli_out/bundle/lib" ]; then cp -r build/cli_out/bundle/lib/* build/bin/ || true; fi && \
             echo '🔧 Patching binary...' && \
             patchelf --set-rpath '\$ORIGIN' build/bin/fewshell-server && \
             echo '📦 Bundling system library...' && \
@@ -87,7 +90,7 @@ build_arch() {
     
     echo "🤐 Zipping binary and library..."
     # CD into build/bin so the zip structure is flat
-    (cd "$PROJECT_ROOT/build/bin" && zip -r "$ZIP_PATH" fewshell-server libsqlite3.so)
+    (cd "$PROJECT_ROOT/build/bin" && zip -r "$ZIP_PATH" .)
     
     # Also keep the raw binary for reference (or if user wants just that)
     cp "$PROJECT_ROOT/build/bin/fewshell-server" "$OUTPUT_PATH"
@@ -116,8 +119,14 @@ if [[ "$(uname)" == "Darwin" ]]; then
     # Native compilation - must run inside fewshell-agent dir
     (
         cd "$PROJECT_ROOT"
+        
+        # Generate version file
+        VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+        echo "const packageVersion = '$VERSION';" > lib/version.dart
+
         dart pub get
-        dart build exe bin/server.dart -o "$MACOS_OUTPUT_PATH"
+        dart build cli -t bin/server.dart -o build/macos_cli_out
+        mv build/macos_cli_out/bundle/bin/server "$MACOS_OUTPUT_PATH"
     )
     
     # Zip it (no need to bundle sqlite on macOS, it uses system framework)
