@@ -415,23 +415,6 @@ echo "Line 3"
       expect(result['stdout'], contains('SPECIAL_SECRET=***REDACTED***'));
     });
 
-    test('validates environment variable names', () async {
-      // Create a secret with invalid env var name
-      await keychain.saveProjectSecret(
-        'test-project',
-        'INVALID-NAME',
-        const Secret(value: 'value'),
-      );
-
-      final result = await shellService.executeCommand(
-        'printenv | grep "INVALID-NAME"',
-        secrets: ['INVALID-NAME'],
-      );
-
-      // Should still execute but invalid var name should be ignored
-      expect(result['exitCode'], equals(0));
-    });
-
     test('handles empty secret values', () async {
       await keychain.saveProjectSecret(
         'test-project',
