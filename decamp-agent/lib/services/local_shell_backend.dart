@@ -61,9 +61,14 @@ class LocalShellBackend implements ShellBackend {
   Future<ShellSession> createSession() async {
     final shell = Platform.environment['SHELL'] ??
         (Platform.isWindows ? 'bash' : '/bin/bash');
+    final environment = Map<String, String>.from(Platform.environment);
+    environment['TERM'] = 'dumb';
+    environment['LANG'] = 'en_US.UTF-8';
+    environment['LC_ALL'] = 'en_US.UTF-8';
     final pty = NativePty.spawn(
       shell,
-      [shell],
+      [shell, '-i'],
+      environment: environment,
       autoDecodeUtf8: false,
     );
     return LocalShellSession(pty);
