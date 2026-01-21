@@ -506,6 +506,12 @@ sudo bash -c '${_escapeForCommand(command)}'
     }
 
     for (final key in secretKeys) {
+      if (!_isValidEnvVarName(key)) {
+        _log.warning(
+            'Skipping secret with invalid environment variable name: $key');
+        continue;
+      }
+
       final value = await _keychain.getProjectSecret(_projectId, key);
       if (value != null) {
         resolved[key] = value;
@@ -699,8 +705,6 @@ class SshShellSession implements ShellSession {
   @override
   void close() => _session.close();
 }
-
-
 
 class UnconfiguredShellBackend implements ShellBackend {
   @override

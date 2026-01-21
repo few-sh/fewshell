@@ -424,7 +424,7 @@ echo "Line 3"
       );
 
       final result = await shellService.executeCommand(
-        'bash $scriptsDir/print_secrets.sh INVALID-NAME',
+        'printenv | grep "INVALID-NAME"',
         secrets: ['INVALID-NAME'],
       );
 
