@@ -35,7 +35,8 @@ class LocalShellBackend implements ShellBackend {
 
     // Use /bin/bash to ensure we have a standard shell environment
     // TODO: Improve shell detection for Windows support
-    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
+    final shell = Platform.environment['SHELL'] ??
+        (Platform.isWindows ? 'bash' : '/bin/bash');
 
     // Inherit environment variables but override TERM and ensure UTF-8 locale
     final environment = Map<String, String>.from(Platform.environment);
