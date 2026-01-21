@@ -48,7 +48,7 @@ void main() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('executes simple echo command', () async {
@@ -157,7 +157,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('streams stdout in real-time', () async {
@@ -235,7 +235,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('aborts command with SIGINT', () async {
@@ -257,7 +257,7 @@ echo "Line 3"
       // Command should be interrupted (exit code varies by platform/shell)
       // Just verify it didn't complete all iterations
       expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)));
+    }, timeout: const Timeout(Duration(seconds: 10)),);
 
     test('aborts command with SIGTERM', () async {
       final abortController = StreamController<ProcessSignal>();
@@ -275,7 +275,7 @@ echo "Line 3"
 
       // Command should be interrupted
       expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)));
+    }, timeout: const Timeout(Duration(seconds: 10)),);
 
     test('handles multiple abort signals gracefully', () async {
       final abortController = StreamController<ProcessSignal>();
@@ -295,7 +295,7 @@ echo "Line 3"
 
       // Should not complete all iterations
       expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)));
+    }, timeout: const Timeout(Duration(seconds: 10)),);
 
     test('handles abort of already completed command', () async {
       final abortController = StreamController<ProcessSignal>();
@@ -323,7 +323,7 @@ echo "Line 3"
       storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
 
       // Set up some test secrets
       await keychain.saveProjectSecret(
@@ -439,7 +439,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('handles syntax errors in bash', () async {
@@ -496,7 +496,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('backend is connected by default', () {
@@ -528,7 +528,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('executes multiple commands concurrently', () async {
@@ -591,7 +591,7 @@ echo "Line 3"
       // Both should be interrupted
       expect(results[0]['stdout'], isNot(contains('Task1-30')));
       expect(results[1]['stdout'], isNot(contains('Task2-30')));
-    }, timeout: const Timeout(Duration(seconds: 15)));
+    }, timeout: const Timeout(Duration(seconds: 15)),);
   });
 
   group('LocalShellBackend - Edge Cases', () {
@@ -602,7 +602,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('handles very long output', () async {
@@ -679,7 +679,7 @@ echo "Line 3"
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
       shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend());
+          backend: LocalShellBackend(),);
     });
 
     test('detects current platform', () async {
