@@ -74,7 +74,7 @@ build_arch() {
             echo '🔌 Compiling fewshell-server...' && \
             mkdir -p build/bin && \
             VERSION=\$(sed -n 's/^version: //p' pubspec.yaml) && \
-            dart compile exe bin/server.dart -DAPP_VERSION=\$VERSION -o build/bin/fewshell-server && \
+            dart build cli -t bin/server.dart -DAPP_VERSION=\$VERSION -o build/bin/fewshell-server && \
             echo '🔧 Patching binary...' && \
             patchelf --set-rpath '\$ORIGIN' build/bin/fewshell-server && \
             echo '📦 Bundling system library...' && \
@@ -117,7 +117,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
     (
         cd "$PROJECT_ROOT"
         dart pub get
-        dart compile exe bin/server.dart -o "$MACOS_OUTPUT_PATH"
+        dart build exe bin/server.dart -o "$MACOS_OUTPUT_PATH"
     )
     
     # Zip it (no need to bundle sqlite on macOS, it uses system framework)
