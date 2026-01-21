@@ -1,3 +1,9 @@
+# Server 0.1.17
+
+- Switch to native pty
+- Add session mutex cleanup on SyncController initialization
+- Move LocalShellBackend from agent-core to decamp-agent
+
 # Server 0.1.16
 
 - Fix long-running processes failing to exit
