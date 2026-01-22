@@ -194,26 +194,6 @@ class ToolResultFormatter {
       buffer.writeln('❌ **Command Failed**\n');
     }
 
-    // Try to find original command
-    if (originalToolCalls != null && toolCallId != null) {
-      try {
-        final originalCall = originalToolCalls.firstWhere(
-          (tc) => tc.id == toolCallId,
-          orElse: () => throw Exception('Not found'),
-        );
-        final args =
-            jsonDecode(originalCall.function.arguments) as Map<String, dynamic>;
-        final command = args['command'] as String?;
-        if (command != null) {
-          buffer.writeln('```bash');
-          buffer.writeln(command);
-          buffer.writeln('```\n');
-        }
-      } catch (_) {
-        // Ignore if not found or parsing fails
-      }
-    }
-
     // Stdout section (if available)
     if (stdout.isNotEmpty) {
       // Try to detect if output looks like it should have syntax highlighting
