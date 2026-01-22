@@ -1,3 +1,7 @@
+# App 1.0.1+21
+
+- Fix full screen code selection area
+
 # Server 0.1.17
 
 - Switch to native pty
