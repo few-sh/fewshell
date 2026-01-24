@@ -159,6 +159,19 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
       ],
     );
 
+    // Build spinner
+    Widget buildSpinner(Color color) {
+      if (!widget.message.isStreaming) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: color),
+        ),
+      );
+    }
+
     // Wrap user messages in a bubble container (content only, controls below)
     if (isUserBubble) {
       return Column(
@@ -177,7 +190,13 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
                 bottomRight: Radius.circular(0),
               ),
             ),
-            child: content,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                content,
+                buildSpinner(shadTheme.colorScheme.primaryForeground),
+              ],
+            ),
           ),
           const SizedBox(height: 4),
           controls,
@@ -189,7 +208,12 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
-      children: [content, const SizedBox(height: 4), controls],
+      children: [
+        content,
+        buildSpinner(shadTheme.colorScheme.primary),
+        const SizedBox(height: 4),
+        controls,
+      ],
     );
   }
 
