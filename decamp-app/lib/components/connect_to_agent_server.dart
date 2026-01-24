@@ -1,9 +1,9 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/services/sync_service.dart';
-import 'providers/providers.dart';
 
 import '../utils/ui_utils.dart';
 

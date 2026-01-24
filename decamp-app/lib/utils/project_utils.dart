@@ -2,7 +2,8 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:decamp/components/confirmation_dialog.dart';
-import 'providers/providers.dart';
+import 'package:decamp/providers/providers.dart';
+
 const _descriptors = [
   'Analog',
   'Binary',

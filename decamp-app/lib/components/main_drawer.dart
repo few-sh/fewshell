@@ -1,6 +1,6 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'providers/providers.dart';
 
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/main_settings.dart';

@@ -1,8 +1,8 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:agent_core/agent_core.dart';
-import 'providers/providers.dart';
 import '../themes/terminal_theme.dart';
 import '../utils/ui_utils.dart';
 

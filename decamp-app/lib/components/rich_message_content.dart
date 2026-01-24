@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
@@ -10,7 +11,6 @@ import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/utils/highlight_injector.dart';
-import 'providers/providers.dart';
 
 import 'package:logging/logging.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';

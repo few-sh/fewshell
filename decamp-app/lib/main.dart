@@ -9,7 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:agent_core/agent_core.dart';
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
-import 'providers/providers.dart';
+import 'package:decamp/providers/providers.dart';
 import 'services/sync_service.dart';
 import 'themes/neon_dark.dart';
 import 'themes/neon_light.dart';

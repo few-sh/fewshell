@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:agent_core/agent_core.dart';
-import 'providers/providers.dart';
+import 'package:decamp/providers/providers.dart';
 
 import 'package:decamp/utils/message_formatter.dart';
 import 'package:file_selector/file_selector.dart';

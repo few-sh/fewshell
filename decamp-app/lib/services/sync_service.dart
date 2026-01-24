@@ -11,7 +11,7 @@ import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/certs.dart';
-import 'providers/providers.dart';
+import 'package:decamp/providers/providers.dart';
 
 final _log = Logger('SyncService');
 

@@ -1,18 +1,12 @@
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:path_provider/path_provider.dart';
 import '../utils/default_prompt_loader.dart';
 
 // Circular import for provider access
-import 'providers.dart';
 
 // Re-export classes for providers.dart to import
-export 'package:agent_core/agent_core.dart' show 
-  CrdtSettingsService, 
-  AppSettings,
-  ProjectSettings,
-  AgentInstruction;
+export 'package:agent_core/agent_core.dart'
+    show CrdtSettingsService, AppSettings, ProjectSettings, AgentInstruction;
 
 /// StateNotifier for global settings
 class GlobalSettingsNotifier extends StateNotifier<AppSettings> {

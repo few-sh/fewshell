@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:agent_core/agent_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Circular import for provider access

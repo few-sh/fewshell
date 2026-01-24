@@ -1,13 +1,11 @@
+import 'package:decamp/providers/settings_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 
 // Circular import for provider access
-import 'providers.dart';
 
 // Re-export classes for providers.dart to import
-export 'package:agent_core/agent_core.dart' show 
-  SshSettings,
-  SshAuthMethod;
+export 'package:agent_core/agent_core.dart' show SshSettings, SshAuthMethod;
 
 /// Generate a unique ID for secrets
 String _generateSecretId(String prefix) {

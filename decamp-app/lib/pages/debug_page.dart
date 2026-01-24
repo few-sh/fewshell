@@ -1,9 +1,9 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/ssh_settings_dialog.dart';
-import 'providers/providers.dart';
 
 import 'package:decamp/pages/agent_instructions_page.dart';
 import 'package:decamp/pages/chat_session.dart';

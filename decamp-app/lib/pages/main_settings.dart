@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +10,6 @@ import '../utils/ui_utils.dart';
 import '../services/project_importer.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
-import 'providers/providers.dart';
 
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';

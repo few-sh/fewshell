@@ -1,7 +1,7 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'providers/providers.dart';
 import 'package:decamp/components/ssh_prompt_dialog.dart';
 import 'package:decamp/components/main_drawer.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';

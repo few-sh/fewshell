@@ -10,9 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
 import 'package:logging/logging.dart';
@@ -21,17 +19,21 @@ import 'package:logging/logging.dart';
 import 'theme_provider.dart' show ThemeNotifier;
 import 'user_provider.dart' show UserNotifier;
 import 'database_provider.dart' as db_provider;
-import 'settings_provider.dart' show GlobalSettingsNotifier, ProjectSettingsNotifier, CrdtSettingsService, AppSettings, ProjectSettings, AgentInstruction;
-import 'secret_provider.dart' show SecretsCrdt, KeychainService, Secret, SecretRedactor;
+import 'settings_provider.dart'
+    show
+        GlobalSettingsNotifier,
+        ProjectSettingsNotifier,
+        CrdtSettingsService,
+        AppSettings,
+        ProjectSettings;
 import 'project_provider.dart' show SelectedProjectNotifier, ProjectController;
 import 'session_provider.dart' show SelectedSessionNotifier, SessionController;
 import 'snippet_provider.dart' show SnippetController;
 import 'saved_prompt_provider.dart' show SavedPromptController;
-import 'llm_settings_provider.dart' show GlobalLlmSettingsNotifier, ProjectLlmSettingsNotifier, LlmApiSettings, LlmApiType;
-import 'ssh_settings_provider.dart' show ProjectSshSettingsNotifier, SshSettings, SshAuthMethod;
-import 'llm_service_provider.dart' show LlmService;
-import 'shell_service_provider.dart' show ShellService;
-import 'chat_controller_provider.dart' show ChatController, ChatState;
+import 'llm_settings_provider.dart'
+    show GlobalLlmSettingsNotifier, ProjectLlmSettingsNotifier, LlmApiSettings;
+import 'ssh_settings_provider.dart'
+    show ProjectSshSettingsNotifier, SshSettings;
 import '../services/storage/flutter_secure_storage_impl.dart';
 
 final _log = Logger('providers');
