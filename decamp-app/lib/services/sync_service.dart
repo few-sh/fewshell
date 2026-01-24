@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -60,6 +61,7 @@ class SyncService {
   ProjectDatabase? _currentProjectDb;
   _CancellationToken? _connectionToken;
   int _reconnectAttempts = 0;
+  AppLifecycleListener? _lifecycleListener;
 
   SyncService(this.ref) {
     _init();
@@ -78,6 +80,9 @@ class SyncService {
   }
 
   void _init() {
+    // Listen for app lifecycle changes to handle resume from background/suspend
+    _lifecycleListener = AppLifecycleListener(onResume: _handleAppResume);
+
     // Watch for database changes
     ref.listen(globalDatabaseProvider, (previous, next) {
       final project = ref.read(currentProjectProvider);
@@ -358,6 +363,7 @@ class SyncService {
     _globalChannel = null;
     _globalSubscription?.cancel();
     _globalSubscription = null;
+    _currentGlobalUrl = null;
   }
 
   void _scheduleReconnect() {
@@ -413,11 +419,38 @@ class SyncService {
   }
 
   void dispose() {
+    _lifecycleListener?.dispose();
+    _lifecycleListener = null;
     _disconnectGlobal();
     _resetProjectSync();
     _connectionStateController.close();
     _isSyncingController.close();
     _syncDebounceTimer?.cancel();
+  }
+
+  /// Called when the app resumes from background or device wakes from suspend.
+  /// Forces a reconnection to ensure we have a fresh WebSocket connection
+  /// and sync any changes that occurred while suspended.
+  void _handleAppResume() {
+    //TODO: This might not be the best solution, we might want to explore
+    // dedicated packages that monitor internet connection state.
+    // Alternatively, we could check how long the connection has been idle
+    // and only reconnect when we have not heard from it.
+    _log.info('App resumed - forcing reconnection to sync latest data');
+
+    // Force reconnect global sync if we have a server URL
+    if (_currentGlobalUrl != null) {
+      _disconnectGlobal();
+      final project = ref.read(currentProjectProvider);
+      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
+    }
+
+    // Force reconnect project sync if we have an active project
+    if (_currentProjectId != null && _currentProjectDb != null) {
+      _closeProjectConnection();
+      _reconnectAttempts = 0;
+      _connectProject(_currentProjectDb!, _currentProjectId!);
+    }
   }
 
   void _handleSyncActivity() {
