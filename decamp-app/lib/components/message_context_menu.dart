@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:decamp/providers/chat_controller_provider.dart';
+import 'providers/providers.dart';
+
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/new_snippet_card.dart';
 import 'package:decamp/components/saved_prompt_dialog.dart';
-import 'package:decamp/providers/session_provider.dart';
+
 import 'package:decamp/utils/globals.dart';
 import 'package:logging/logging.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';

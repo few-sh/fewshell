@@ -1,33 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'settings_provider.dart';
-import 'secret_provider.dart';
+
+// Circular import for provider access
+import 'providers.dart';
+
+// Re-export classes for providers.dart to import
+export 'package:agent_core/agent_core.dart' show 
+  SshSettings,
+  SshAuthMethod;
 
 /// Generate a unique ID for secrets
 String _generateSecretId(String prefix) {
   return '${prefix}_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch % 1000}';
 }
-
-/// Provider for project SSH settings (family provider)
-final projectSshSettingsProvider =
-    StateNotifierProvider.family<
-      ProjectSshSettingsNotifier,
-      SshSettings?,
-      String
-    >((ref, projectId) {
-      final projectSettings = ref.watch(projectSettingsProvider(projectId));
-      final keychain = ref.watch(keychainServiceProvider);
-      final settingsNotifier = ref.watch(
-        projectSettingsProvider(projectId).notifier,
-      );
-
-      return ProjectSshSettingsNotifier(
-        projectSettings?.sshSettings,
-        settingsNotifier,
-        keychain,
-        projectId,
-      );
-    });
 
 /// StateNotifier for managing SSH settings for a project
 class ProjectSshSettingsNotifier extends StateNotifier<SshSettings?> {

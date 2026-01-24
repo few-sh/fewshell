@@ -5,8 +5,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../themes/terminal_theme.dart';
 import '../utils/ui_utils.dart';
-import '../providers/project_provider.dart';
-import '../providers/secret_provider.dart';
+import 'providers/providers.dart';
 
 /// Overlay widget that shows multiple tool action approvals in a scrollable list
 /// Returns selected actions when approved, null when cancelled

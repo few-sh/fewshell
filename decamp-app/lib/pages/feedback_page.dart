@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:decamp/providers/user_provider.dart';
+import 'providers/providers.dart';
+
 import 'package:decamp/utils/globals.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 

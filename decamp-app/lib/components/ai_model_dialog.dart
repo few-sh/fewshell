@@ -4,10 +4,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:async/async.dart';
 import '../utils/ui_utils.dart';
-import '../providers/llm_settings_provider.dart';
-import '../providers/project_provider.dart';
-import '../providers/llm_service_provider.dart';
-
+import 'providers/providers.dart';
 /// Reusable dialog for adding or editing AI model configurations
 class AIModelDialog {
   /// Show dialog to add or edit an AI model

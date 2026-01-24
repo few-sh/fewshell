@@ -1,19 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'ssh_settings_provider.dart';
-import 'secret_provider.dart';
 
-/// Provider for the shell service
-/// Now requires a project ID to access SSH settings
-final shellServiceProvider = Provider.family<ShellService, String?>((
-  ref,
-  projectId,
-) {
-  if (projectId == null) {
-    return ShellService(null, null, null);
-  }
+// Circular import for provider access
+import 'providers.dart';
 
-  final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
-  final keychain = ref.watch(keychainServiceProvider);
-  return ShellService(sshSettings, keychain, projectId);
-});
+// Re-export classes for providers.dart to import
+export 'package:agent_core/agent_core.dart' show ShellService;
+
+// Shell service provider declarations are now in providers.dart
+// This file is kept for potential future shell service-related business logic

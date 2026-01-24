@@ -2,25 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:drift/drift.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'database_provider.dart';
-import 'theme_provider.dart';
-import 'session_provider.dart';
 
-/// Provider for streaming active projects
-final activeProjectsProvider = StreamProvider<List<ProjectEntity>>((ref) {
-  final globalDb = ref.watch(globalDatabaseProvider);
-  return globalDb.projectDao.watchAllProjects(isArchived: false);
-});
-
-/// Provider for streaming archived projects
-final archivedProjectsProvider = StreamProvider<List<ProjectEntity>>((ref) {
-  final globalDb = ref.watch(globalDatabaseProvider);
-  return globalDb.projectDao.watchAllProjects(isArchived: true);
-});
-
-// Deprecated: Alias to active for backward compatibility inside this refactor step if needed,
-// though we should switch usages.
-final projectsStreamProvider = activeProjectsProvider;
+// Circular import is OK in Dart - providers.dart imports this file for the classes,
+// and this file imports providers.dart for the provider objects  
+import 'providers.dart';
 
 /// StateNotifier for the currently selected project ID
 class SelectedProjectNotifier extends StateNotifier<String?> {
@@ -33,6 +18,7 @@ class SelectedProjectNotifier extends StateNotifier<String?> {
     final initialId = state;
     if (initialId != null) {
       Future.microtask(() {
+        // Import is circular, so we access it through ref.read directly
         _ref.read(sessionControllerProvider).ensureSessionSelected(initialId);
       });
     }
@@ -50,33 +36,6 @@ class SelectedProjectNotifier extends StateNotifier<String?> {
     }
   }
 }
-
-/// Provider for the currently selected project ID
-/// CONSOLIDATED: Selection state + Persistence logic in one place.
-final currentProjectIdProvider =
-    StateNotifierProvider<SelectedProjectNotifier, String?>((ref) {
-      final prefs = ref.watch(sharedPreferencesProvider);
-      return SelectedProjectNotifier(prefs, ref);
-    });
-
-/// Provider for the currently selected project
-/// SIMPLIFIED: Derived state
-final currentProjectProvider = Provider<ProjectEntity?>((ref) {
-  final projectId = ref.watch(currentProjectIdProvider);
-  if (projectId == null) return null;
-
-  return ref
-      .watch(projectsStreamProvider)
-      .whenOrNull(
-        data: (projects) {
-          try {
-            return projects.firstWhere((p) => p.id == projectId);
-          } catch (e) {
-            return null;
-          }
-        },
-      );
-});
 
 /// Controller for project actions
 class ProjectController {
@@ -114,6 +73,3 @@ class ProjectController {
     await globalDb.projectDao.updateProject(companion);
   }
 }
-
-/// Provider for the ProjectController
-final projectControllerProvider = Provider((ref) => ProjectController(ref));

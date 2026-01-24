@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'theme_provider.dart';
 
 class UserNotifier extends StateNotifier<String> {
   final SharedPreferences _prefs;
@@ -22,8 +21,3 @@ class UserNotifier extends StateNotifier<String> {
     await _prefs.setString(_key, username);
   }
 }
-
-final userProvider = StateNotifierProvider<UserNotifier, String>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  return UserNotifier(prefs);
-});

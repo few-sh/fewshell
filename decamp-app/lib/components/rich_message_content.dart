@@ -10,7 +10,8 @@ import 'package:decamp/components/message_context_menu.dart';
 import 'package:decamp/components/message_edit_field.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/utils/highlight_injector.dart';
-import 'package:decamp/providers/chat_controller_provider.dart';
+import 'providers/providers.dart';
+
 import 'package:logging/logging.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 

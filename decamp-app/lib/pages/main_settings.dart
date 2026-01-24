@@ -9,11 +9,8 @@ import '../utils/ui_utils.dart';
 import '../services/project_importer.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
-import '../providers/theme_provider.dart';
-import '../providers/project_provider.dart';
-import '../providers/llm_settings_provider.dart';
-import '../providers/ssh_settings_provider.dart';
-import '../providers/settings_provider.dart';
+import 'providers/providers.dart';
+
 import '../components/ai_model_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:decamp/providers/project_provider.dart';
-import 'package:decamp/providers/database_provider.dart';
+import 'providers/providers.dart';
 import 'package:decamp/components/selectable_list_view.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';

@@ -5,8 +5,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
 import 'ssh_prompt_dialog.dart';
-import '../providers/ssh_settings_provider.dart';
-
+import 'providers/providers.dart';
 /// Reusable dialog for configuring SSH/Remote Shell settings
 class SshSettingsDialog {
   /// Show dialog to configure SSH settings

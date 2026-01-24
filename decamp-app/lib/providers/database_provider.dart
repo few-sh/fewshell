@@ -1,46 +1,15 @@
 import 'dart:io';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:agent_core/agent_core.dart';
 import 'package:drift/drift.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
 import 'package:logging/logging.dart';
-import 'project_provider.dart';
-import 'theme_provider.dart';
 
 final _log = Logger('DatabaseProvider');
 
-final nodeIdProvider = Provider<String>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  var nodeId = prefs.getString('node_id');
-  if (nodeId == null) {
-    nodeId = const Uuid().v4();
-    prefs.setString('node_id', nodeId);
-  }
-  return nodeId;
-});
-
-/// Provider for the GlobalDatabase instance (decamp.db).
-final globalDatabaseProvider = Provider<GlobalDatabase>((ref) {
-  final nodeId = ref.watch(nodeIdProvider);
-  Crdt? crdt;
-  final database = GlobalDatabase(
-    _openGlobalConnection(nodeId, (c) => crdt = c),
-    crdtProvider: () => crdt!,
-  );
-
-  // Dispose database when provider is disposed
-  ref.onDispose(() {
-    _log.info('Closing global database');
-    database.close();
-  });
-
-  return database;
-});
-
-LazyDatabase _openGlobalConnection(
+/// Helper function to open global database connection
+/// Used by providers.dart
+LazyDatabase openGlobalConnection(
   String nodeId,
   void Function(Crdt) onCrdtCreated,
 ) {
@@ -56,30 +25,9 @@ LazyDatabase _openGlobalConnection(
   });
 }
 
-/// Provider for the ProjectDatabase instance.
-/// Returns null if no project is selected.
-final projectDatabaseProvider = Provider<ProjectDatabase?>((ref) {
-  final projectId = ref.watch(currentProjectIdProvider);
-  if (projectId == null) return null;
-
-  final nodeId = ref.watch(nodeIdProvider);
-  Crdt? crdt;
-
-  final database = ProjectDatabase(
-    _openProjectConnection(projectId, nodeId, (c) => crdt = c),
-    crdtProvider: () => crdt!,
-  );
-
-  // Dispose database when provider is disposed (e.g. project changed)
-  ref.onDispose(() {
-    _log.info('Closing project database for $projectId');
-    database.close();
-  });
-
-  return database;
-});
-
-LazyDatabase _openProjectConnection(
+/// Helper function to open project database connection
+/// Used by providers.dart
+LazyDatabase openProjectConnection(
   String projectId,
   String nodeId,
   void Function(Crdt) onCrdtCreated,
@@ -99,14 +47,3 @@ LazyDatabase _openProjectConnection(
     return result.executor;
   });
 }
-
-/// Provider for the DatabaseFacade.
-/// This replaces the old databaseProvider.
-/// Access DAOs directly: ref.watch(databaseProvider).projectDao
-final databaseProvider = Provider<DatabaseFacade>((ref) {
-  final globalDb = ref.watch(globalDatabaseProvider);
-  final projectDb = ref.watch(projectDatabaseProvider);
-  final projectId = ref.watch(currentProjectIdProvider);
-
-  return DatabaseFacade(globalDb, projectDb, projectId);
-});
