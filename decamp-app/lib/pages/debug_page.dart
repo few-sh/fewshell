@@ -1,4 +1,5 @@
 import 'package:decamp/providers/providers.dart';
+import 'package:decamp/providers/ssh_settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
