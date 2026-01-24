@@ -1,6 +1,7 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:decamp/providers/project_provider.dart';
+
 import 'package:decamp/pages/projects_page.dart';
 import 'package:decamp/pages/main_settings.dart';
 import 'package:decamp/pages/agent_instructions_page.dart';
@@ -8,7 +9,7 @@ import 'package:decamp/pages/secrets_page.dart';
 import 'package:decamp/pages/snippets_page.dart';
 import 'package:decamp/pages/saved_prompts_page.dart';
 import 'package:decamp/components/user_badge.dart';
-import 'package:decamp/providers/package_info_provider.dart';
+
 import 'package:decamp/pages/feedback_page.dart';
 import 'package:decamp/pages/debug_page.dart';
 import 'package:flutter/foundation.dart';

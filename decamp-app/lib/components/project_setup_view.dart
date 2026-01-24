@@ -1,10 +1,9 @@
 import 'dart:io';
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:decamp/providers/project_provider.dart';
-import 'package:decamp/providers/database_provider.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:decamp/components/expandable_code_block.dart';
 import 'package:decamp/utils/project_utils.dart';

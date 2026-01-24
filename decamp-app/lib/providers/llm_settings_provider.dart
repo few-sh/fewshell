@@ -1,42 +1,12 @@
+import 'package:decamp/providers/settings_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'settings_provider.dart';
-import 'secret_provider.dart';
 
-/// Provider for managing global LLM settings
-final globalLlmSettingsProvider =
-    StateNotifierProvider<GlobalLlmSettingsNotifier, List<LlmApiSettings>>((
-      ref,
-    ) {
-      final settings = ref.watch(globalSettingsProvider);
-      final settingsNotifier = ref.watch(globalSettingsProvider.notifier);
-      final keychainService = ref.watch(keychainServiceProvider);
-      return GlobalLlmSettingsNotifier(
-        settingsNotifier,
-        keychainService,
-        settings.llmSettings,
-      );
-    });
+// Circular import for provider access
 
-/// Provider for managing project-specific LLM settings (family provider)
-final projectLlmSettingsProvider =
-    StateNotifierProvider.family<
-      ProjectLlmSettingsNotifier,
-      List<LlmApiSettings>,
-      String
-    >((ref, projectId) {
-      final settings = ref.watch(projectSettingsProvider(projectId));
-      final settingsNotifier = ref.watch(
-        projectSettingsProvider(projectId).notifier,
-      );
-      final keychainService = ref.watch(keychainServiceProvider);
-      return ProjectLlmSettingsNotifier(
-        projectId,
-        settingsNotifier,
-        keychainService,
-        settings?.llmSettings ?? [],
-      );
-    });
+// Re-export classes for providers.dart to import
+export 'package:agent_core/agent_core.dart'
+    show LlmApiSettings, LlmApiType, LlmApiKeychainKeys;
 
 /// Base class for LLM settings logic to reduce duplication
 abstract class BaseLlmSettingsNotifier

@@ -1,22 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:agent_core/agent_core.dart';
-import '../providers/database_provider.dart';
 
-/// Stream provider for global saved prompts
-final globalSavedPromptsProvider = StreamProvider<List<SavedPromptEntity>>((
-  ref,
-) {
-  final db = ref.watch(databaseProvider);
-  return db.savedPromptDao.watchGlobalSavedPrompts();
-});
-
-/// Stream provider for project saved prompts (family provider)
-final projectSavedPromptsProvider =
-    StreamProvider.family<List<SavedPromptEntity>, String>((ref, projectId) {
-      final db = ref.watch(databaseProvider);
-      return db.savedPromptDao.watchProjectSavedPrompts(projectId);
-    });
+// Circular import for provider access
+import 'providers.dart';
 
 /// Controller for saved prompt mutations
 class SavedPromptController {
@@ -83,7 +70,3 @@ class SavedPromptController {
 
   String _generateSavedPromptId() => IdGenerator.savedPromptId();
 }
-
-final savedPromptControllerProvider = Provider(
-  (ref) => SavedPromptController(ref),
-);

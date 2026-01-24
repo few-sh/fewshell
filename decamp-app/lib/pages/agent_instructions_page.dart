@@ -1,10 +1,9 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../providers/settings_provider.dart';
-import '../providers/llm_settings_provider.dart';
-import '../providers/project_provider.dart';
+
 import '../components/project_title_bar.dart';
 import '../components/agent_instruction_preview_modal.dart';
 import '../themes/shad_layout_theme.dart';

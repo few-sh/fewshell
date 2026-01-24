@@ -1,20 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart';
 import 'package:agent_core/agent_core.dart';
-import '../providers/database_provider.dart';
 
-/// Stream provider for global snippets
-final globalSnippetsProvider = StreamProvider<List<SnippetEntity>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.snippetDao.watchGlobalSnippets();
-});
-
-/// Stream provider for project snippets (family provider)
-final projectSnippetsProvider =
-    StreamProvider.family<List<SnippetEntity>, String>((ref, projectId) {
-      final db = ref.watch(databaseProvider);
-      return db.snippetDao.watchProjectSnippets(projectId);
-    });
+// Circular import for provider access
+import 'providers.dart';
 
 /// Controller for snippet mutations
 class SnippetController {
@@ -112,5 +101,3 @@ class SnippetController {
 
   String _generateSnippetId() => IdGenerator.snippetId();
 }
-
-final snippetControllerProvider = Provider((ref) => SnippetController(ref));

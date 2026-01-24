@@ -1,31 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:agent_core/agent_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'database_provider.dart';
-import 'project_provider.dart';
-import 'theme_provider.dart';
 
-/// Provider for sessions of the currently selected project
-final currentProjectSessionsProvider = StreamProvider<List<SessionEntity>>(((
-  ref,
-) {
-  final projectId = ref.watch(currentProjectIdProvider);
-  if (projectId == null) {
-    return Stream.value([]);
-  }
-  final sessionDao = ref.watch(databaseProvider).sessionDao;
-  return sessionDao.watchNonArchivedSessionsByProject(projectId);
-}));
-
-/// Provider for archived sessions of the currently selected project
-final archivedSessionsProvider = StreamProvider<List<SessionEntity>>((ref) {
-  final projectId = ref.watch(currentProjectIdProvider);
-  if (projectId == null) {
-    return Stream.value([]);
-  }
-  final sessionDao = ref.watch(databaseProvider).sessionDao;
-  return sessionDao.watchArchivedSessionsByProject(projectId);
-});
+// Circular import for provider access
+import 'providers.dart';
 
 /// StateNotifier for the currently selected session ID
 class SelectedSessionNotifier extends StateNotifier<String?> {
@@ -42,25 +19,6 @@ class SelectedSessionNotifier extends StateNotifier<String?> {
     }
   }
 }
-
-/// Provider for the currently selected session ID
-final currentSessionIdProvider =
-    StateNotifierProvider<SelectedSessionNotifier, String?>((ref) {
-      final prefs = ref.watch(sharedPreferencesProvider);
-      return SelectedSessionNotifier(prefs, ref);
-    });
-
-/// Provider for the lock status of the current session
-final currentSessionLockProvider = StreamProvider<bool>((ref) {
-  final sessionId = ref.watch(currentSessionIdProvider);
-  if (sessionId == null) return Stream.value(false);
-
-  final db = ref.watch(databaseProvider);
-  // If project database is not loaded yet, return false
-  if (db.projectDatabase == null) return Stream.value(false);
-
-  return db.sessionMutexDao.watchLock(sessionId);
-});
 
 /// Controller for session logic
 class SessionController {
@@ -117,21 +75,3 @@ class SessionController {
     await projectDao.updateLastSessionDate(projectId, DateTime.now());
   }
 }
-
-final sessionControllerProvider = Provider((ref) => SessionController(ref));
-
-/// Provider for the currently selected session
-/// Returns null if no session is selected or session doesn't exist
-final currentSessionProvider = Provider<SessionEntity?>((ref) {
-  final sessionId = ref.watch(currentSessionIdProvider);
-  if (sessionId == null) return null;
-
-  final sessionsAsync = ref.watch(currentProjectSessionsProvider);
-  return sessionsAsync.whenData((sessions) {
-    try {
-      return sessions.firstWhere((s) => s.id == sessionId);
-    } catch (e) {
-      return null;
-    }
-  }).value;
-});

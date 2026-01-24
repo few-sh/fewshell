@@ -1,8 +1,9 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../providers/saved_prompt_provider.dart';
+
 import '../components/saved_prompt_dialog.dart';
 import '../components/confirmation_dialog.dart';
 import '../utils/ui_utils.dart';

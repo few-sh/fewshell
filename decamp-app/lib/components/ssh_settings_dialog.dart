@@ -1,3 +1,4 @@
+import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +6,6 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
 import 'ssh_prompt_dialog.dart';
-import '../providers/ssh_settings_provider.dart';
 
 /// Reusable dialog for configuring SSH/Remote Shell settings
 class SshSettingsDialog {

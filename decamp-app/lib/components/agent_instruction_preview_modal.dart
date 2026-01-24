@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import '../providers/llm_service_provider.dart';
+
+import '../providers/providers.dart';
 
 class AgentInstructionPreviewModal extends ConsumerStatefulWidget {
   final String instruction;

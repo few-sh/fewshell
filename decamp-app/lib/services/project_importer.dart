@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:decamp/providers/database_provider.dart';
-import 'package:decamp/providers/ssh_settings_provider.dart';
-import 'package:decamp/providers/llm_settings_provider.dart';
+import 'package:decamp/providers/providers.dart';
+
 import 'package:decamp/utils/project_utils.dart';
 
 final projectImporterProvider = Provider<ProjectImporter>((ref) {

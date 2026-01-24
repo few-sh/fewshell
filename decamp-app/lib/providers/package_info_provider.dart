@@ -1,6 +1,2 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-
-final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
-  return await PackageInfo.fromPlatform();
-});
+// PackageInfo provider is now in providers.dart
+// This file is kept for potential future PackageInfo-related business logic

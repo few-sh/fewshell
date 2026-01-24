@@ -1,27 +1,12 @@
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:path_provider/path_provider.dart';
 import '../utils/default_prompt_loader.dart';
 
-/// Provider for CrdtSettingsService
-final crdtSettingsServiceProvider = Provider<CrdtSettingsService>((ref) {
-  final service = CrdtSettingsService(getApplicationDocumentsDirectory, (
-    projectId,
-  ) async {
-    final dir = await getApplicationDocumentsDirectory();
-    return Directory('${dir.path}/projects/$projectId');
-  });
-  ref.onDispose(() => service.close());
-  return service;
-});
+// Circular import for provider access
 
-/// Provider for global app settings
-final globalSettingsProvider =
-    StateNotifierProvider<GlobalSettingsNotifier, AppSettings>((ref) {
-      final service = ref.watch(crdtSettingsServiceProvider);
-      return GlobalSettingsNotifier(service);
-    });
+// Re-export classes for providers.dart to import
+export 'package:agent_core/agent_core.dart'
+    show CrdtSettingsService, AppSettings, ProjectSettings, AgentInstruction;
 
 /// StateNotifier for global settings
 class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
@@ -65,17 +50,6 @@ class GlobalSettingsNotifier extends StateNotifier<AppSettings> {
     await _service.saveGlobalSettings(settings);
   }
 }
-
-/// Provider for project-specific settings (family provider)
-final projectSettingsProvider =
-    StateNotifierProvider.family<
-      ProjectSettingsNotifier,
-      ProjectSettings?,
-      String
-    >((ref, projectId) {
-      final service = ref.watch(crdtSettingsServiceProvider);
-      return ProjectSettingsNotifier(service, projectId);
-    });
 
 /// StateNotifier for project settings
 class ProjectSettingsNotifier extends StateNotifier<ProjectSettings?> {
