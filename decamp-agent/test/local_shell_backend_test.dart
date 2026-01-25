@@ -80,8 +80,9 @@ void main() {
     test('captures stderr correctly', () async {
       // Note: LocalShellBackend uses PTY which merges stderr into stdout
       // So stderr output will appear in stdout
-      final result =
-          await shellService.executeCommand('echo "error message" >&2');
+      final result = await shellService.executeCommand(
+        'echo "error message" >&2',
+      );
 
       // In PTY mode, stderr is redirected to stdout
       expect(result['stdout'], contains('error message'));
@@ -90,8 +91,9 @@ void main() {
 
     test('captures both stdout and stderr with mixed output script', () async {
       // Note: LocalShellBackend uses PTY which merges stderr into stdout
-      final result =
-          await shellService.executeCommand('bash $scriptsDir/mixed_output.sh');
+      final result = await shellService.executeCommand(
+        'bash $scriptsDir/mixed_output.sh',
+      );
 
       expect(result['stdout'], contains('stdout line 1'));
       expect(result['stdout'], contains('stdout line 2'));
@@ -112,14 +114,16 @@ void main() {
       expect(result0['exitCode'], equals(0));
 
       // Commands that produce error output even if exit code isn't preserved
-      final resultErr =
-          await shellService.executeCommand('ls /nonexistent 2>&1 || true');
+      final resultErr = await shellService.executeCommand(
+        'ls /nonexistent 2>&1 || true',
+      );
       expect(resultErr['stdout'], contains('No such file'));
     });
 
     test('handles command that does not exist', () async {
-      final result =
-          await shellService.executeCommand('nonexistent_command_xyz');
+      final result = await shellService.executeCommand(
+        'nonexistent_command_xyz',
+      );
 
       // Command not found behavior - check stdout contains error
       expect(result['stdout'], contains('not found'));
@@ -140,8 +144,9 @@ echo "Line 3"
     });
 
     test('handles commands with pipes', () async {
-      final result =
-          await shellService.executeCommand('echo "hello world" | tr a-z A-Z');
+      final result = await shellService.executeCommand(
+        'echo "hello world" | tr a-z A-Z',
+      );
 
       expect(result['stdout'], contains('HELLO WORLD'));
       expect(result['exitCode'], equals(0));
@@ -256,52 +261,44 @@ echo "Line 3"
       );
     });
 
-    test(
-      'aborts command with SIGINT',
-      () async {
-        final abortController = StreamController<ProcessSignal>();
+    test('aborts command with SIGINT', () async {
+      final abortController = StreamController<ProcessSignal>();
 
-        // Start a long-running command and abort it after a short delay
-        final resultFuture = shellService.executeCommand(
-          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-          abortSignal: abortController.stream,
-        );
+      // Start a long-running command and abort it after a short delay
+      final resultFuture = shellService.executeCommand(
+        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+        abortSignal: abortController.stream,
+      );
 
-        // Wait a bit then send abort signal
-        await Future.delayed(const Duration(milliseconds: 800));
-        abortController.add(ProcessSignal.sigint);
+      // Wait a bit then send abort signal
+      await Future.delayed(const Duration(milliseconds: 800));
+      abortController.add(ProcessSignal.sigint);
 
-        final result = await resultFuture;
-        await abortController.close();
+      final result = await resultFuture;
+      await abortController.close();
 
-        // Command should be interrupted (exit code varies by platform/shell)
-        // Just verify it didn't complete all iterations
-        expect(result['stdout'], isNot(contains('Second 30')));
-      },
-      timeout: const Timeout(Duration(seconds: 20)),
-    );
+      // Command should be interrupted (exit code varies by platform/shell)
+      // Just verify it didn't complete all iterations
+      expect(result['stdout'], isNot(contains('Second 30')));
+    }, timeout: const Timeout(Duration(seconds: 20)));
 
-    test(
-      'aborts command with SIGTERM',
-      () async {
-        final abortController = StreamController<ProcessSignal>();
+    test('aborts command with SIGTERM', () async {
+      final abortController = StreamController<ProcessSignal>();
 
-        final resultFuture = shellService.executeCommand(
-          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-          abortSignal: abortController.stream,
-        );
+      final resultFuture = shellService.executeCommand(
+        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+        abortSignal: abortController.stream,
+      );
 
-        await Future.delayed(const Duration(milliseconds: 800));
-        abortController.add(ProcessSignal.sigterm);
+      await Future.delayed(const Duration(milliseconds: 800));
+      abortController.add(ProcessSignal.sigterm);
 
-        final result = await resultFuture;
-        await abortController.close();
+      final result = await resultFuture;
+      await abortController.close();
 
-        // Command should be interrupted
-        expect(result['stdout'], isNot(contains('Second 30')));
-      },
-      timeout: const Timeout(Duration(seconds: 10)),
-    );
+      // Command should be interrupted
+      expect(result['stdout'], isNot(contains('Second 30')));
+    }, timeout: const Timeout(Duration(seconds: 10)));
 
     test(
       'aborts command with child processes using SIGINT',
@@ -375,6 +372,84 @@ echo "Line 3"
       expect(result['exitCode'], equals(0));
       expect(result['stdout'], contains('quick command'));
     });
+
+    test(
+      'kills signal-ignoring process and verifies no zombie processes remain',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
+
+        // Start a bash process that ignores SIGINT, SIGTERM, SIGHUP, and SIGQUIT
+        final scriptPath =
+            '${Directory.current.path}/test/scripts/signal_ignoring_process.sh';
+        final resultFuture = shellService.executeCommand(
+          'bash $scriptPath',
+          abortSignal: abortController.stream,
+        );
+
+        // Wait for the process to start and begin outputting
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        // Record the time when we start killing
+        final killStartTime = DateTime.now();
+
+        // Send SIGINT (which the process will ignore)
+        abortController.add(ProcessSignal.sigint);
+
+        final result = await resultFuture;
+        await abortController.close();
+
+        final killDuration = DateTime.now().difference(killStartTime);
+
+        // The process should have been killed (likely by SIGKILL after escalation)
+        expect(result['exitCode'], isNot(equals(0))); // Non-zero exit (killed)
+
+        // Should see that the process started
+        expect(result['stdout'], contains('Signal-ignoring process started'));
+
+        // Verify escalation happened: process should have received and ignored signals
+        expect(
+          result['stdout'],
+          anyOf([
+            contains('Received signal'),
+            contains('Received SIGINT'),
+            contains('Iteration'),
+          ]),
+        );
+
+        // Should complete within reasonable time (our escalation is ~6-8 seconds)
+        expect(
+          killDuration.inSeconds,
+          lessThan(15),
+          reason: 'Process should be killed within escalation timeout',
+        );
+
+        // Wait a bit to ensure any cleanup completes
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Debug: Check what processes exist before verification
+        // Verify no zombie or stuck processes remain
+        // Check for any remaining bash processes running our script
+        final checkResult = await shellService.executeCommand(
+          "ps aux | grep 'signal_ignoring_process.sh' | grep -v grep | wc -l",
+        );
+
+        // Extract just the number - look for lines that contain only digits and whitespace
+        final stdout = checkResult['stdout'].toString();
+        final match = RegExp(
+          r'^\s*(\d+)\s*$',
+          multiLine: true,
+        ).firstMatch(stdout);
+        final processCount = match != null ? int.parse(match.group(1)!) : -1;
+
+        expect(
+          processCount,
+          equals(0),
+          reason:
+              'No signal_ignoring_process.sh processes should be running, found $processCount',
+        );
+      },
+      timeout: const Timeout(Duration(seconds: 30)),
+    );
   });
 
   group('LocalShellBackend - Secrets', () {
@@ -524,23 +599,26 @@ echo "Line 3"
     });
 
     test('handles command not found', () async {
-      final result =
-          await shellService.executeCommand('nonexistent_cmd_xyz_123');
+      final result = await shellService.executeCommand(
+        'nonexistent_cmd_xyz_123',
+      );
 
       expect(result['stdout'], contains('not found'));
     });
 
     test('handles file not found', () async {
-      final result =
-          await shellService.executeCommand('cat /nonexistent/file/path.txt');
+      final result = await shellService.executeCommand(
+        'cat /nonexistent/file/path.txt',
+      );
 
       expect(result['stdout'], contains('No such file'));
     });
 
     test('handles permission denied', () async {
       // Try to read a file we don't have permission for
-      final result = await shellService
-          .executeCommand('cat /etc/shadow 2>&1 || echo "PERM_DENIED"');
+      final result = await shellService.executeCommand(
+        'cat /etc/shadow 2>&1 || echo "PERM_DENIED"',
+      );
 
       // Should either fail or echo our marker
       expect(result['stdout'], contains('PERM_DENIED'));
@@ -738,8 +816,9 @@ echo "Line 3"
     });
 
     test('handles glob patterns', () async {
-      final result =
-          await shellService.executeCommand('ls /usr/bin/[a-c]* | head -5');
+      final result = await shellService.executeCommand(
+        'ls /usr/bin/[a-c]* | head -5',
+      );
 
       expect(result['exitCode'], equals(0));
     });
