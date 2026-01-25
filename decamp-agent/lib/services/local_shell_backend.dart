@@ -116,14 +116,20 @@ class LocalShellSession implements ShellSession {
       // For SIGINT/SIGTERM, wait briefly for the interrupt to take effect
       await Future.delayed(const Duration(milliseconds: 100));
 
-      // The interrupt flushes the input buffer, so the queued 'exit' command is lost
-      // Write a new exit command if this is an execute() session
+      // Try sending exit command, but this only works if the foreground process
+      // has already terminated. If a process is ignoring signals, we'll escalate.
       if (_shouldExit) {
         _pty.write('exit\n');
       }
 
       // Wait for shell to exit after interrupt + exit
       if (await _waitForExit(const Duration(seconds: 2))) return;
+
+      // If process didn't exit, send another SIGINT to ensure it's interrupted
+      // This handles cases where the first signal was delivered but process is still cleaning up
+      _log.info('Process still running, sending additional SIGINT');
+      _pty.kill(effectiveSignal.signalNumber);
+      if (await _waitForExit(const Duration(seconds: 1))) return;
     }
 
     // For non-terminating signals, don't escalate
@@ -133,24 +139,20 @@ class LocalShellSession implements ShellSession {
       return;
     }
 
-    // For SIGTERM/SIGQUIT, wait a bit longer before escalating
+    // For SIGTERM/SIGQUIT that were translated to SIGINT, wait a bit longer
     if (signal != ProcessSignal.sigint) {
-      if (await _waitForExit(const Duration(seconds: 3))) return;
+      if (await _waitForExit(const Duration(seconds: 2))) return;
     }
 
-    // Still not exited, escalate to SIGTERM if we haven't already
-    if (signal != ProcessSignal.sigterm) {
-      _log.warning(
-        'Process did not exit after signal $signal, escalating to SIGTERM',
-      );
-      _pty.kill(ProcessSignal.sigterm.signalNumber);
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (_shouldExit) {
-        _pty.write('exit\n');
-      }
-      if (await _waitForExit(const Duration(seconds: 3))) return;
-    }
+    // Still not exited, escalate to SIGTERM (actual SIGTERM signal, not Ctrl-C)
+    // This is a stronger signal that's harder to ignore
+    _log.warning(
+      'Process did not exit after signal $signal, escalating to SIGTERM',
+    );
+    _pty.kill(ProcessSignal.sigterm.signalNumber);
+    if (await _waitForExit(const Duration(seconds: 3))) return;
 
+    // Last resort: SIGKILL cannot be caught or ignored
     _log.warning('Process did not exit, escalating to SIGKILL');
     _pty.kill(ProcessSignal.sigkill.signalNumber);
   }
