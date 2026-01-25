@@ -52,9 +52,12 @@ class LocalShellBackend implements ShellBackend {
       autoDecodeUtf8: false,
     );
 
-    pty.write('$command\nexit\n');
+    // Write command and exit on separate calls
+    // This ensures exit is queued but can still be interrupted cleanly
+    pty.write('$command\n');
+    pty.write('exit\n');
 
-    return LocalShellSession(pty);
+    return LocalShellSession(pty, shouldExit: true);
   }
 
   @override
@@ -70,14 +73,16 @@ class LocalShellBackend implements ShellBackend {
       environment: environment,
       autoDecodeUtf8: false,
     );
-    return LocalShellSession(pty);
+    return LocalShellSession(pty, shouldExit: false);
   }
 }
 
 /// Local shell session implementation wrapping a NativePty
 class LocalShellSession implements ShellSession {
   final NativePty _pty;
-  LocalShellSession(this._pty);
+  final bool _shouldExit;
+  LocalShellSession(this._pty, {required bool shouldExit})
+      : _shouldExit = shouldExit;
   static final _log = Logger('LocalShellSession');
 
   @override
@@ -98,33 +103,52 @@ class LocalShellSession implements ShellSession {
   @override
   Future<void> kill(ProcessSignal signal) async {
     _log.info('Killing local PTY process with signal $signal');
-    _pty.kill(signal.signalNumber);
 
-    if (signal == ProcessSignal.sigint) {
-      // Allow time for Ctrl-C to process and potentially flush input buffer
-      await Future.delayed(const Duration(milliseconds: 200));
-      // Ensure shell exits, since original 'exit' command might have been flushed
-      _pty.write('exit\n');
+    // In a PTY, SIGTERM doesn't interrupt foreground jobs effectively
+    // Translate SIGTERM to SIGINT for better interactive shell handling
+    final effectiveSignal =
+        (signal == ProcessSignal.sigterm) ? ProcessSignal.sigint : signal;
+
+    // Send the signal (NativePty.kill automatically translates to control codes in canonical mode)
+    _pty.kill(effectiveSignal.signalNumber);
+
+    if (signal == ProcessSignal.sigint || signal == ProcessSignal.sigterm) {
+      // For SIGINT/SIGTERM, wait briefly for the interrupt to take effect
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // The interrupt flushes the input buffer, so the queued 'exit' command is lost
+      // Write a new exit command if this is an execute() session
+      if (_shouldExit) {
+        _pty.write('exit\n');
+      }
+
+      // Wait for shell to exit after interrupt + exit
+      if (await _waitForExit(const Duration(seconds: 2))) return;
     }
 
-    // Only wait and escalate if the intention was to terminate the process
+    // For non-terminating signals, don't escalate
     if (signal != ProcessSignal.sigint &&
         signal != ProcessSignal.sigterm &&
         signal != ProcessSignal.sigquit) {
-      _pty.kill(signal.signalNumber);
       return;
     }
 
-    _pty.kill(signal.signalNumber);
+    // For SIGTERM/SIGQUIT, wait a bit longer before escalating
+    if (signal != ProcessSignal.sigint) {
+      if (await _waitForExit(const Duration(seconds: 3))) return;
+    }
 
-    if (await _waitForExit(const Duration(seconds: 5))) return;
-
+    // Still not exited, escalate to SIGTERM if we haven't already
     if (signal != ProcessSignal.sigterm) {
       _log.warning(
         'Process did not exit after signal $signal, escalating to SIGTERM',
       );
       _pty.kill(ProcessSignal.sigterm.signalNumber);
-      if (await _waitForExit(const Duration(seconds: 5))) return;
+      await Future.delayed(const Duration(milliseconds: 100));
+      if (_shouldExit) {
+        _pty.write('exit\n');
+      }
+      if (await _waitForExit(const Duration(seconds: 3))) return;
     }
 
     _log.warning('Process did not exit, escalating to SIGKILL');
