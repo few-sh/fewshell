@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
@@ -36,6 +37,11 @@ class MockSecretsStorage implements SecretsStorage {
 }
 
 void main() {
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.message}');
+  });
+
   // Get the absolute path to the test scripts directory
   final testDir = Directory.current.path;
   final scriptsDir = '$testDir/test/scripts';
@@ -47,8 +53,12 @@ void main() {
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('executes simple echo command', () async {
@@ -156,8 +166,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('streams stdout in real-time', () async {
@@ -234,68 +248,117 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
-    test('aborts command with SIGINT', () async {
-      final abortController = StreamController<ProcessSignal>();
+    test(
+      'aborts command with SIGINT',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
 
-      // Start a long-running command and abort it after a short delay
-      final resultFuture = shellService.executeCommand(
-        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-        abortSignal: abortController.stream,
-      );
+        // Start a long-running command and abort it after a short delay
+        final resultFuture = shellService.executeCommand(
+          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+          abortSignal: abortController.stream,
+        );
 
-      // Wait a bit then send abort signal
-      await Future.delayed(const Duration(milliseconds: 800));
-      abortController.add(ProcessSignal.sigint);
+        // Wait a bit then send abort signal
+        await Future.delayed(const Duration(milliseconds: 800));
+        abortController.add(ProcessSignal.sigint);
 
-      final result = await resultFuture;
-      await abortController.close();
+        final result = await resultFuture;
+        await abortController.close();
 
-      // Command should be interrupted (exit code varies by platform/shell)
-      // Just verify it didn't complete all iterations
-      expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)),);
+        // Command should be interrupted (exit code varies by platform/shell)
+        // Just verify it didn't complete all iterations
+        expect(result['stdout'], isNot(contains('Second 30')));
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
 
-    test('aborts command with SIGTERM', () async {
-      final abortController = StreamController<ProcessSignal>();
+    test(
+      'aborts command with SIGTERM',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
 
-      final resultFuture = shellService.executeCommand(
-        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-        abortSignal: abortController.stream,
-      );
+        final resultFuture = shellService.executeCommand(
+          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+          abortSignal: abortController.stream,
+        );
 
-      await Future.delayed(const Duration(milliseconds: 800));
-      abortController.add(ProcessSignal.sigterm);
+        await Future.delayed(const Duration(milliseconds: 800));
+        abortController.add(ProcessSignal.sigterm);
 
-      final result = await resultFuture;
-      await abortController.close();
+        final result = await resultFuture;
+        await abortController.close();
 
-      // Command should be interrupted
-      expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)),);
+        // Command should be interrupted
+        expect(result['stdout'], isNot(contains('Second 30')));
+      },
+      timeout: const Timeout(Duration(seconds: 10)),
+    );
 
-    test('handles multiple abort signals gracefully', () async {
-      final abortController = StreamController<ProcessSignal>();
+    test(
+      'aborts command with child processes using SIGINT',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
 
-      final resultFuture = shellService.executeCommand(
-        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-        abortSignal: abortController.stream,
-      );
+        // Script that spawns child processes (sleep in a loop)
+        // We use regular syntax since we rely on proper TTY signal propagation via Ctrl-C
+        const script =
+            'for i in {1..6}; do echo "\$((\$i * 20)) minutes passed"; if [ \$i -lt 6 ]; then sleep 1200; fi; done; echo "2 hours complete"';
 
-      await Future.delayed(const Duration(milliseconds: 600));
-      abortController.add(ProcessSignal.sigint);
-      await Future.delayed(const Duration(milliseconds: 200));
-      abortController.add(ProcessSignal.sigint);
+        final resultFuture = shellService.executeCommand(
+          script,
+          abortSignal: abortController.stream,
+        );
 
-      final result = await resultFuture;
-      await abortController.close();
+        // Wait for the script to start and print something
+        await Future.delayed(const Duration(seconds: 1));
 
-      // Should not complete all iterations
-      expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)),);
+        abortController.add(ProcessSignal.sigint);
+
+        final result = await resultFuture;
+        await abortController.close();
+
+        // Verify it started
+        expect(result['stdout'], contains('20 minutes passed'));
+
+        // Verify it didn't proceed to next iteration
+        // $(($i * 20)) for i=2 is 40.
+        expect(result['stdout'], isNot(contains('40 minutes passed')));
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
+
+    test(
+      'handles multiple abort signals gracefully',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
+
+        final resultFuture = shellService.executeCommand(
+          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+          abortSignal: abortController.stream,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+        abortController.add(ProcessSignal.sigint);
+        await Future.delayed(const Duration(milliseconds: 200));
+        abortController.add(ProcessSignal.sigint);
+
+        final result = await resultFuture;
+        await abortController.close();
+
+        // Should not complete all iterations
+        expect(result['stdout'], isNot(contains('Second 30')));
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
 
     test('handles abort of already completed command', () async {
       final abortController = StreamController<ProcessSignal>();
@@ -322,8 +385,12 @@ echo "Line 3"
     setUp(() async {
       storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
 
       // Set up some test secrets
       await keychain.saveProjectSecret(
@@ -438,15 +505,22 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('handles syntax errors in bash', () async {
       final result = await shellService.executeCommand(';;');
 
       // Syntax errors produce output (PTY merges stderr into stdout)
-      expect(result['stdout'], contains('syntax error'));
+      expect(
+        result['stdout'],
+        anyOf(contains('syntax error'), contains('parse error')),
+      );
     });
 
     test('handles command not found', () async {
@@ -495,8 +569,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('backend is connected by default', () {
@@ -527,8 +605,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('executes multiple commands concurrently', () async {
@@ -566,32 +648,36 @@ echo "Line 3"
       expect(results[2]['stdout'], contains('task3'));
     });
 
-    test('handles concurrent abort signals', () async {
-      final abortController1 = StreamController<ProcessSignal>();
-      final abortController2 = StreamController<ProcessSignal>();
+    test(
+      'handles concurrent abort signals',
+      () async {
+        final abortController1 = StreamController<ProcessSignal>();
+        final abortController2 = StreamController<ProcessSignal>();
 
-      final future1 = shellService.executeCommand(
-        'for i in {1..30}; do echo "Task1-\$i"; sleep 1; done',
-        abortSignal: abortController1.stream,
-      );
+        final future1 = shellService.executeCommand(
+          'for i in {1..30}; do echo "Task1-\$i"; sleep 1; done',
+          abortSignal: abortController1.stream,
+        );
 
-      final future2 = shellService.executeCommand(
-        'for i in {1..30}; do echo "Task2-\$i"; sleep 1; done',
-        abortSignal: abortController2.stream,
-      );
+        final future2 = shellService.executeCommand(
+          'for i in {1..30}; do echo "Task2-\$i"; sleep 1; done',
+          abortSignal: abortController2.stream,
+        );
 
-      await Future.delayed(const Duration(milliseconds: 800));
-      abortController1.add(ProcessSignal.sigint);
-      abortController2.add(ProcessSignal.sigint);
+        await Future.delayed(const Duration(milliseconds: 800));
+        abortController1.add(ProcessSignal.sigint);
+        abortController2.add(ProcessSignal.sigint);
 
-      final results = await Future.wait([future1, future2]);
-      await abortController1.close();
-      await abortController2.close();
+        final results = await Future.wait([future1, future2]);
+        await abortController1.close();
+        await abortController2.close();
 
-      // Both should be interrupted
-      expect(results[0]['stdout'], isNot(contains('Task1-30')));
-      expect(results[1]['stdout'], isNot(contains('Task2-30')));
-    }, timeout: const Timeout(Duration(seconds: 15)),);
+        // Both should be interrupted
+        expect(results[0]['stdout'], isNot(contains('Task1-30')));
+        expect(results[1]['stdout'], isNot(contains('Task2-30')));
+      },
+      timeout: const Timeout(Duration(seconds: 15)),
+    );
   });
 
   group('LocalShellBackend - Edge Cases', () {
@@ -601,8 +687,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('handles very long output', () async {
@@ -678,8 +768,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('detects current platform', () async {

@@ -34,9 +34,8 @@ class LocalShellBackend implements ShellBackend {
     _log.info('Executing local command via PTY: $command');
 
     // Use /bin/bash to ensure we have a standard shell environment
-    // TODO: Improve shell detection for Windows support
-    final shell = Platform.environment['SHELL'] ??
-        (Platform.isWindows ? 'bash' : '/bin/bash');
+    // Force bash instead of user's shell to ensure consistent behavior/syntax
+    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
 
     // Inherit environment variables but override TERM and ensure UTF-8 locale
     final environment = Map<String, String>.from(Platform.environment);
@@ -60,8 +59,7 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> createSession() async {
-    final shell = Platform.environment['SHELL'] ??
-        (Platform.isWindows ? 'bash' : '/bin/bash');
+    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
     final environment = Map<String, String>.from(Platform.environment);
     environment['TERM'] = 'dumb';
     environment['LANG'] = 'en_US.UTF-8';
@@ -100,6 +98,14 @@ class LocalShellSession implements ShellSession {
   @override
   Future<void> kill(ProcessSignal signal) async {
     _log.info('Killing local PTY process with signal $signal');
+    _pty.kill(signal.signalNumber);
+
+    if (signal == ProcessSignal.sigint) {
+      // Allow time for Ctrl-C to process and potentially flush input buffer
+      await Future.delayed(const Duration(milliseconds: 200));
+      // Ensure shell exits, since original 'exit' command might have been flushed
+      _pty.write('exit\n');
+    }
 
     // Only wait and escalate if the intention was to terminate the process
     if (signal != ProcessSignal.sigint &&
