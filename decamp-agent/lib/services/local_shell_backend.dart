@@ -34,9 +34,8 @@ class LocalShellBackend implements ShellBackend {
     _log.info('Executing local command via PTY: $command');
 
     // Use /bin/bash to ensure we have a standard shell environment
-    // TODO: Improve shell detection for Windows support
-    final shell = Platform.environment['SHELL'] ??
-        (Platform.isWindows ? 'bash' : '/bin/bash');
+    // Force bash instead of user's shell to ensure consistent behavior/syntax
+    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
 
     // Inherit environment variables but override TERM and ensure UTF-8 locale
     final environment = Map<String, String>.from(Platform.environment);
@@ -53,15 +52,17 @@ class LocalShellBackend implements ShellBackend {
       autoDecodeUtf8: false,
     );
 
-    pty.write('$command\nexit\n');
+    // Write command and exit on separate calls
+    // This ensures exit is queued but can still be interrupted cleanly
+    pty.write('$command\n');
+    pty.write('exit\n');
 
-    return LocalShellSession(pty);
+    return LocalShellSession(pty, shouldExit: true);
   }
 
   @override
   Future<ShellSession> createSession() async {
-    final shell = Platform.environment['SHELL'] ??
-        (Platform.isWindows ? 'bash' : '/bin/bash');
+    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
     final environment = Map<String, String>.from(Platform.environment);
     environment['TERM'] = 'dumb';
     environment['LANG'] = 'en_US.UTF-8';
@@ -72,14 +73,16 @@ class LocalShellBackend implements ShellBackend {
       environment: environment,
       autoDecodeUtf8: false,
     );
-    return LocalShellSession(pty);
+    return LocalShellSession(pty, shouldExit: false);
   }
 }
 
 /// Local shell session implementation wrapping a NativePty
 class LocalShellSession implements ShellSession {
   final NativePty _pty;
-  LocalShellSession(this._pty);
+  final bool _shouldExit;
+  LocalShellSession(this._pty, {required bool shouldExit})
+      : _shouldExit = shouldExit;
   static final _log = Logger('LocalShellSession');
 
   @override
@@ -101,26 +104,55 @@ class LocalShellSession implements ShellSession {
   Future<void> kill(ProcessSignal signal) async {
     _log.info('Killing local PTY process with signal $signal');
 
-    // Only wait and escalate if the intention was to terminate the process
+    // In a PTY, SIGTERM doesn't interrupt foreground jobs effectively
+    // Translate SIGTERM to SIGINT for better interactive shell handling
+    final effectiveSignal =
+        (signal == ProcessSignal.sigterm) ? ProcessSignal.sigint : signal;
+
+    // Send the signal (NativePty.kill automatically translates to control codes in canonical mode)
+    _pty.kill(effectiveSignal.signalNumber);
+
+    if (signal == ProcessSignal.sigint || signal == ProcessSignal.sigterm) {
+      // For SIGINT/SIGTERM, wait briefly for the interrupt to take effect
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Try sending exit command, but this only works if the foreground process
+      // has already terminated. If a process is ignoring signals, we'll escalate.
+      if (_shouldExit) {
+        _pty.write('exit\n');
+      }
+
+      // Wait for shell to exit after interrupt + exit
+      if (await _waitForExit(const Duration(seconds: 2))) return;
+
+      // If process didn't exit, send another SIGINT to ensure it's interrupted
+      // This handles cases where the first signal was delivered but process is still cleaning up
+      _log.info('Process still running, sending additional SIGINT');
+      _pty.kill(effectiveSignal.signalNumber);
+      if (await _waitForExit(const Duration(seconds: 1))) return;
+    }
+
+    // For non-terminating signals, don't escalate
     if (signal != ProcessSignal.sigint &&
         signal != ProcessSignal.sigterm &&
         signal != ProcessSignal.sigquit) {
-      _pty.kill(signal.signalNumber);
       return;
     }
 
-    _pty.kill(signal.signalNumber);
-
-    if (await _waitForExit(const Duration(seconds: 5))) return;
-
-    if (signal != ProcessSignal.sigterm) {
-      _log.warning(
-        'Process did not exit after signal $signal, escalating to SIGTERM',
-      );
-      _pty.kill(ProcessSignal.sigterm.signalNumber);
-      if (await _waitForExit(const Duration(seconds: 5))) return;
+    // For SIGTERM/SIGQUIT that were translated to SIGINT, wait a bit longer
+    if (signal != ProcessSignal.sigint) {
+      if (await _waitForExit(const Duration(seconds: 2))) return;
     }
 
+    // Still not exited, escalate to SIGTERM (actual SIGTERM signal, not Ctrl-C)
+    // This is a stronger signal that's harder to ignore
+    _log.warning(
+      'Process did not exit after signal $signal, escalating to SIGTERM',
+    );
+    _pty.kill(ProcessSignal.sigterm.signalNumber);
+    if (await _waitForExit(const Duration(seconds: 3))) return;
+
+    // Last resort: SIGKILL cannot be caught or ignored
     _log.warning('Process did not exit, escalating to SIGKILL');
     _pty.kill(ProcessSignal.sigkill.signalNumber);
   }

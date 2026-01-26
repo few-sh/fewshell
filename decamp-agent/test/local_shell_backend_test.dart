@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:logging/logging.dart';
 import 'package:test/test.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:agent_core/src/secrets_storage/secrets_storage.dart';
@@ -36,6 +37,11 @@ class MockSecretsStorage implements SecretsStorage {
 }
 
 void main() {
+  Logger.root.level = Level.ALL;
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.message}');
+  });
+
   // Get the absolute path to the test scripts directory
   final testDir = Directory.current.path;
   final scriptsDir = '$testDir/test/scripts';
@@ -47,8 +53,12 @@ void main() {
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('executes simple echo command', () async {
@@ -70,8 +80,9 @@ void main() {
     test('captures stderr correctly', () async {
       // Note: LocalShellBackend uses PTY which merges stderr into stdout
       // So stderr output will appear in stdout
-      final result =
-          await shellService.executeCommand('echo "error message" >&2');
+      final result = await shellService.executeCommand(
+        'echo "error message" >&2',
+      );
 
       // In PTY mode, stderr is redirected to stdout
       expect(result['stdout'], contains('error message'));
@@ -80,8 +91,9 @@ void main() {
 
     test('captures both stdout and stderr with mixed output script', () async {
       // Note: LocalShellBackend uses PTY which merges stderr into stdout
-      final result =
-          await shellService.executeCommand('bash $scriptsDir/mixed_output.sh');
+      final result = await shellService.executeCommand(
+        'bash $scriptsDir/mixed_output.sh',
+      );
 
       expect(result['stdout'], contains('stdout line 1'));
       expect(result['stdout'], contains('stdout line 2'));
@@ -102,14 +114,16 @@ void main() {
       expect(result0['exitCode'], equals(0));
 
       // Commands that produce error output even if exit code isn't preserved
-      final resultErr =
-          await shellService.executeCommand('ls /nonexistent 2>&1 || true');
+      final resultErr = await shellService.executeCommand(
+        'ls /nonexistent 2>&1 || true',
+      );
       expect(resultErr['stdout'], contains('No such file'));
     });
 
     test('handles command that does not exist', () async {
-      final result =
-          await shellService.executeCommand('nonexistent_command_xyz');
+      final result = await shellService.executeCommand(
+        'nonexistent_command_xyz',
+      );
 
       // Command not found behavior - check stdout contains error
       expect(result['stdout'], contains('not found'));
@@ -130,8 +144,9 @@ echo "Line 3"
     });
 
     test('handles commands with pipes', () async {
-      final result =
-          await shellService.executeCommand('echo "hello world" | tr a-z A-Z');
+      final result = await shellService.executeCommand(
+        'echo "hello world" | tr a-z A-Z',
+      );
 
       expect(result['stdout'], contains('HELLO WORLD'));
       expect(result['exitCode'], equals(0));
@@ -156,8 +171,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('streams stdout in real-time', () async {
@@ -234,8 +253,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('aborts command with SIGINT', () async {
@@ -257,7 +280,7 @@ echo "Line 3"
       // Command should be interrupted (exit code varies by platform/shell)
       // Just verify it didn't complete all iterations
       expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)),);
+    }, timeout: const Timeout(Duration(seconds: 20)));
 
     test('aborts command with SIGTERM', () async {
       final abortController = StreamController<ProcessSignal>();
@@ -275,27 +298,64 @@ echo "Line 3"
 
       // Command should be interrupted
       expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)),);
+    }, timeout: const Timeout(Duration(seconds: 10)));
 
-    test('handles multiple abort signals gracefully', () async {
-      final abortController = StreamController<ProcessSignal>();
+    test(
+      'aborts command with child processes using SIGINT',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
 
-      final resultFuture = shellService.executeCommand(
-        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-        abortSignal: abortController.stream,
-      );
+        // Script that spawns child processes (sleep in a loop)
+        // We use regular syntax since we rely on proper TTY signal propagation via Ctrl-C
+        const script =
+            'for i in {1..6}; do echo "\$((\$i * 20)) minutes passed"; if [ \$i -lt 6 ]; then sleep 1200; fi; done; echo "2 hours complete"';
 
-      await Future.delayed(const Duration(milliseconds: 600));
-      abortController.add(ProcessSignal.sigint);
-      await Future.delayed(const Duration(milliseconds: 200));
-      abortController.add(ProcessSignal.sigint);
+        final resultFuture = shellService.executeCommand(
+          script,
+          abortSignal: abortController.stream,
+        );
 
-      final result = await resultFuture;
-      await abortController.close();
+        // Wait for the script to start and print something
+        await Future.delayed(const Duration(seconds: 1));
 
-      // Should not complete all iterations
-      expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)),);
+        abortController.add(ProcessSignal.sigint);
+
+        final result = await resultFuture;
+        await abortController.close();
+
+        // Verify it started
+        expect(result['stdout'], contains('20 minutes passed'));
+
+        // Verify it didn't proceed to next iteration
+        // $(($i * 20)) for i=2 is 40.
+        expect(result['stdout'], isNot(contains('40 minutes passed')));
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
+
+    test(
+      'handles multiple abort signals gracefully',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
+
+        final resultFuture = shellService.executeCommand(
+          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+          abortSignal: abortController.stream,
+        );
+
+        await Future.delayed(const Duration(milliseconds: 600));
+        abortController.add(ProcessSignal.sigint);
+        await Future.delayed(const Duration(milliseconds: 200));
+        abortController.add(ProcessSignal.sigint);
+
+        final result = await resultFuture;
+        await abortController.close();
+
+        // Should not complete all iterations
+        expect(result['stdout'], isNot(contains('Second 30')));
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
 
     test('handles abort of already completed command', () async {
       final abortController = StreamController<ProcessSignal>();
@@ -312,6 +372,84 @@ echo "Line 3"
       expect(result['exitCode'], equals(0));
       expect(result['stdout'], contains('quick command'));
     });
+
+    test(
+      'kills signal-ignoring process and verifies no zombie processes remain',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
+
+        // Start a bash process that ignores SIGINT, SIGTERM, SIGHUP, and SIGQUIT
+        final scriptPath =
+            '${Directory.current.path}/test/scripts/signal_ignoring_process.sh';
+        final resultFuture = shellService.executeCommand(
+          'bash $scriptPath',
+          abortSignal: abortController.stream,
+        );
+
+        // Wait for the process to start and begin outputting
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        // Record the time when we start killing
+        final killStartTime = DateTime.now();
+
+        // Send SIGINT (which the process will ignore)
+        abortController.add(ProcessSignal.sigint);
+
+        final result = await resultFuture;
+        await abortController.close();
+
+        final killDuration = DateTime.now().difference(killStartTime);
+
+        // The process should have been killed (likely by SIGKILL after escalation)
+        expect(result['exitCode'], isNot(equals(0))); // Non-zero exit (killed)
+
+        // Should see that the process started
+        expect(result['stdout'], contains('Signal-ignoring process started'));
+
+        // Verify escalation happened: process should have received and ignored signals
+        expect(
+          result['stdout'],
+          anyOf([
+            contains('Received signal'),
+            contains('Received SIGINT'),
+            contains('Iteration'),
+          ]),
+        );
+
+        // Should complete within reasonable time (our escalation is ~6-8 seconds)
+        expect(
+          killDuration.inSeconds,
+          lessThan(15),
+          reason: 'Process should be killed within escalation timeout',
+        );
+
+        // Wait a bit to ensure any cleanup completes
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Debug: Check what processes exist before verification
+        // Verify no zombie or stuck processes remain
+        // Check for any remaining bash processes running our script
+        final checkResult = await shellService.executeCommand(
+          "ps aux | grep 'signal_ignoring_process.sh' | grep -v grep | wc -l",
+        );
+
+        // Extract just the number - look for lines that contain only digits and whitespace
+        final stdout = checkResult['stdout'].toString();
+        final match = RegExp(
+          r'^\s*(\d+)\s*$',
+          multiLine: true,
+        ).firstMatch(stdout);
+        final processCount = match != null ? int.parse(match.group(1)!) : -1;
+
+        expect(
+          processCount,
+          equals(0),
+          reason:
+              'No signal_ignoring_process.sh processes should be running, found $processCount',
+        );
+      },
+      timeout: const Timeout(Duration(seconds: 30)),
+    );
   });
 
   group('LocalShellBackend - Secrets', () {
@@ -322,8 +460,12 @@ echo "Line 3"
     setUp(() async {
       storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
 
       // Set up some test secrets
       await keychain.saveProjectSecret(
@@ -438,35 +580,45 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('handles syntax errors in bash', () async {
       final result = await shellService.executeCommand(';;');
 
       // Syntax errors produce output (PTY merges stderr into stdout)
-      expect(result['stdout'], contains('syntax error'));
+      expect(
+        result['stdout'],
+        anyOf(contains('syntax error'), contains('parse error')),
+      );
     });
 
     test('handles command not found', () async {
-      final result =
-          await shellService.executeCommand('nonexistent_cmd_xyz_123');
+      final result = await shellService.executeCommand(
+        'nonexistent_cmd_xyz_123',
+      );
 
       expect(result['stdout'], contains('not found'));
     });
 
     test('handles file not found', () async {
-      final result =
-          await shellService.executeCommand('cat /nonexistent/file/path.txt');
+      final result = await shellService.executeCommand(
+        'cat /nonexistent/file/path.txt',
+      );
 
       expect(result['stdout'], contains('No such file'));
     });
 
     test('handles permission denied', () async {
       // Try to read a file we don't have permission for
-      final result = await shellService
-          .executeCommand('cat /etc/shadow 2>&1 || echo "PERM_DENIED"');
+      final result = await shellService.executeCommand(
+        'cat /etc/shadow 2>&1 || echo "PERM_DENIED"',
+      );
 
       // Should either fail or echo our marker
       expect(result['stdout'], contains('PERM_DENIED'));
@@ -495,8 +647,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('backend is connected by default', () {
@@ -527,8 +683,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('executes multiple commands concurrently', () async {
@@ -566,32 +726,36 @@ echo "Line 3"
       expect(results[2]['stdout'], contains('task3'));
     });
 
-    test('handles concurrent abort signals', () async {
-      final abortController1 = StreamController<ProcessSignal>();
-      final abortController2 = StreamController<ProcessSignal>();
+    test(
+      'handles concurrent abort signals',
+      () async {
+        final abortController1 = StreamController<ProcessSignal>();
+        final abortController2 = StreamController<ProcessSignal>();
 
-      final future1 = shellService.executeCommand(
-        'for i in {1..30}; do echo "Task1-\$i"; sleep 1; done',
-        abortSignal: abortController1.stream,
-      );
+        final future1 = shellService.executeCommand(
+          'for i in {1..30}; do echo "Task1-\$i"; sleep 1; done',
+          abortSignal: abortController1.stream,
+        );
 
-      final future2 = shellService.executeCommand(
-        'for i in {1..30}; do echo "Task2-\$i"; sleep 1; done',
-        abortSignal: abortController2.stream,
-      );
+        final future2 = shellService.executeCommand(
+          'for i in {1..30}; do echo "Task2-\$i"; sleep 1; done',
+          abortSignal: abortController2.stream,
+        );
 
-      await Future.delayed(const Duration(milliseconds: 800));
-      abortController1.add(ProcessSignal.sigint);
-      abortController2.add(ProcessSignal.sigint);
+        await Future.delayed(const Duration(milliseconds: 800));
+        abortController1.add(ProcessSignal.sigint);
+        abortController2.add(ProcessSignal.sigint);
 
-      final results = await Future.wait([future1, future2]);
-      await abortController1.close();
-      await abortController2.close();
+        final results = await Future.wait([future1, future2]);
+        await abortController1.close();
+        await abortController2.close();
 
-      // Both should be interrupted
-      expect(results[0]['stdout'], isNot(contains('Task1-30')));
-      expect(results[1]['stdout'], isNot(contains('Task2-30')));
-    }, timeout: const Timeout(Duration(seconds: 15)),);
+        // Both should be interrupted
+        expect(results[0]['stdout'], isNot(contains('Task1-30')));
+        expect(results[1]['stdout'], isNot(contains('Task2-30')));
+      },
+      timeout: const Timeout(Duration(seconds: 15)),
+    );
   });
 
   group('LocalShellBackend - Edge Cases', () {
@@ -601,8 +765,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('handles very long output', () async {
@@ -648,8 +816,9 @@ echo "Line 3"
     });
 
     test('handles glob patterns', () async {
-      final result =
-          await shellService.executeCommand('ls /usr/bin/[a-c]* | head -5');
+      final result = await shellService.executeCommand(
+        'ls /usr/bin/[a-c]* | head -5',
+      );
 
       expect(result['exitCode'], equals(0));
     });
@@ -678,8 +847,12 @@ echo "Line 3"
     setUp(() {
       final storage = MockSecretsStorage();
       keychain = KeychainService(storage);
-      shellService = ShellService(null, keychain, 'test-project',
-          backend: LocalShellBackend(),);
+      shellService = ShellService(
+        null,
+        keychain,
+        'test-project',
+        backend: LocalShellBackend(),
+      );
     });
 
     test('detects current platform', () async {

@@ -59,6 +59,7 @@ class SyncService {
   _CancellationToken? _connectionToken;
   int _reconnectAttempts = 0;
   AppLifecycleListener? _lifecycleListener;
+  AppLifecycleState? _lastLifecycleState;
 
   SyncService(this.ref) {
     _init();
@@ -77,8 +78,10 @@ class SyncService {
   }
 
   void _init() {
-    // Listen for app lifecycle changes to handle resume from background/suspend
-    _lifecycleListener = AppLifecycleListener(onResume: _handleAppResume);
+    // Listen for app lifecycle changes
+    _lifecycleListener = AppLifecycleListener(
+      onStateChange: _handleLifecycleStateChange,
+    );
 
     // Watch for database changes
     ref.listen(globalDatabaseProvider, (previous, next) {
@@ -425,16 +428,25 @@ class SyncService {
     _syncDebounceTimer?.cancel();
   }
 
-  /// Called when the app resumes from background or device wakes from suspend.
-  /// Forces a reconnection to ensure we have a fresh WebSocket connection
-  /// and sync any changes that occurred while suspended.
-  void _handleAppResume() {
-    //TODO: This might not be the best solution, we might want to explore
-    // dedicated packages that monitor internet connection state.
-    // Alternatively, we could check how long the connection has been idle
-    // and only reconnect when we have not heard from it.
-    _log.info('App resumed - forcing reconnection to sync latest data');
+  /// Handle app lifecycle state changes.
+  /// On macOS, connections stay alive through inactive/hidden states.
+  /// Only reconnect when transitioning from paused->resumed (mobile scenario).
+  /// For system sleep/wake, rely on pingInterval timeout to detect dead connections.
+  void _handleLifecycleStateChange(AppLifecycleState state) {
+    _log.info('App lifecycle state: $_lastLifecycleState -> $state');
 
+    // On macOS: resumed, inactive, and hidden all keep connections alive
+    // Only paused (mobile-only) indicates actual suspension
+    if (state == AppLifecycleState.resumed &&
+        _lastLifecycleState == AppLifecycleState.paused) {
+      _log.info('App resumed from paused state, reconnecting');
+      _reconnectAll();
+    }
+
+    _lastLifecycleState = state;
+  }
+
+  void _reconnectAll() {
     // Force reconnect global sync if we have a server URL
     if (_currentGlobalUrl != null) {
       _disconnectGlobal();
@@ -582,6 +594,7 @@ class SyncService {
         uri,
         customClient: client,
         connectTimeout: timeout,
+        pingInterval: const Duration(seconds: 10),
       );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
