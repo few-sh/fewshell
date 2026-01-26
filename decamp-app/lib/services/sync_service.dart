@@ -582,6 +582,7 @@ class SyncService {
         uri,
         customClient: client,
         connectTimeout: timeout,
+        pingInterval: const Duration(seconds: 10),
       );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
