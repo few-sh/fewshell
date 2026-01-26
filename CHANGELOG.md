@@ -1,3 +1,9 @@
+# App 1.0.1+22
+
+- Add streaming animation indicator to RichMessageContent
+- Consolidate provider declarations into providers.dart
+- Fix stale data when resuming app after a long pause
+
 # App 1.0.1+21
 
 - Fix full screen code selection area
