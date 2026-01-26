@@ -2,6 +2,11 @@
 
 - Fix full screen code selection area
 
+# Server 0.1.18
+
+- Fix interrupt not working for local shell sessions for inline bash scripts in foreground mode
+- Fix crash due to race condition in native_pty
+
 # Server 0.1.17
 
 - Switch to native pty
