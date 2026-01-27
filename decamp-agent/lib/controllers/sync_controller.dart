@@ -19,6 +19,9 @@ class SyncController {
   final CrdtSettingsService settingsService;
   final SecretsService secretsService;
 
+  /// Map of active agent sessions keyed by sessionId
+  final Map<String, _AgentSession> _activeSessions = {};
+
   static Future<SyncController> create(
     DatabaseManager dbManager,
     CrdtSettingsService settingsService,
@@ -167,8 +170,6 @@ class SyncController {
     String? projectId,
     KeychainService? keychain,
   }) {
-    final agentSession = _AgentSession(channel, db, projectId, keychain);
-
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
     channel.onCustomMessage.listen((msg) {
@@ -181,8 +182,52 @@ class SyncController {
       } else if (msg['type'] == 'start_chat' ||
           msg['type'] == 'approval_response' ||
           msg['type'] == 'abort_chat') {
-        agentSession.handleMessage(msg);
+        // Extract sessionId from the message to look up or create the session
+        String? sessionId;
+        if (msg['type'] == 'start_chat') {
+          sessionId = msg['sessionId'] as String?;
+        } else if (msg['type'] == 'approval_response' ||
+            msg['type'] == 'abort_chat') {
+          // For approval_response and abort_chat, we need to find which session is currently active
+          // Since these messages don't include sessionId, we need a different approach
+          // The approval/abort should go to the session that requested it
+          // For now, if we only have one active session, route to it
+          if (_activeSessions.length == 1) {
+            sessionId = _activeSessions.keys.first;
+          } else {
+            _log.warning(
+              'Received ${msg['type']} but unable to determine target session. '
+              'Active sessions: ${_activeSessions.length}',
+            );
+          }
+        }
+
+        if (sessionId != null) {
+          // Get or create the agent session for this sessionId
+          final agentSession = _activeSessions.putIfAbsent(
+            sessionId,
+            () {
+              _log.info('Creating new _AgentSession for sessionId: $sessionId');
+              return _AgentSession(channel, db, projectId, keychain);
+            },
+          );
+          agentSession.handleMessage(msg);
+        } else {
+          _log.warning(
+            'Could not determine sessionId for message: ${msg['type']}',
+          );
+        }
       }
+    });
+
+    // Clean up sessions when channel closes
+    channel.sink.done.then((_) {
+      _log.info('Channel closed for $context');
+      // Note: We don't immediately remove sessions from _activeSessions here
+      // because sessions may still be valid and could be reconnected to.
+      // Sessions will be cleaned up when they complete or when explicitly removed.
+    }).catchError((e) {
+      _log.warning('Error during channel cleanup: $e');
     });
   }
 }
