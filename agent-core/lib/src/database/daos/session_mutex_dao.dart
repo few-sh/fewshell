@@ -77,6 +77,29 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
     return rowsAffected > 0;
   }
 
+  /// Checks if the session with [id] is currently locked.
+  /// Returns true if the session is locked and the lock is valid (not timed out).
+  Future<bool> isLocked(String id) async {
+    final now = DateTime.now();
+    final expiryThreshold = now.subtract(lockTimeout);
+
+    final existing = await (select(sessionMutexes)
+          ..where((t) =>
+              t.id.equals(id) &
+              const CustomExpression<bool>('is_deleted').equals(false)))
+        .getSingleOrNull();
+
+    if (existing == null) {
+      return false;
+    }
+
+    if (existing.timestamp.isBefore(expiryThreshold)) {
+      return false;
+    }
+
+    return true;
+  }
+
   /// Watch the lock status for a specific session [id].
   /// Returns true if the session is locked and the lock is valid (not timed out).
   /// Emits false automatically when the lock expires.

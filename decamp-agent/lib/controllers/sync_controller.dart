@@ -18,8 +18,6 @@ class SyncController {
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
   final SecretsService secretsService;
-  // FIXME: This is duplicating the functionality of session mutexes of SQLite. Switch to SQLite-based locking.
-  final Set<String> _activeSessions = {};
 
   static Future<SyncController> create(
     DatabaseManager dbManager,
@@ -169,8 +167,7 @@ class SyncController {
     String? projectId,
     KeychainService? keychain,
   }) {
-    final agentSession =
-        _AgentSession(channel, db, _activeSessions, projectId, keychain);
+    final agentSession = _AgentSession(channel, db, projectId, keychain);
 
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
@@ -195,7 +192,6 @@ class _AgentSession {
 
   final MultiplexedWebSocketChannel channel;
   final ProjectDatabase? projectDb;
-  final Set<String> _activeSessions;
   final ShellService _shellService;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
@@ -211,7 +207,6 @@ class _AgentSession {
   _AgentSession(
     this.channel,
     this.projectDb,
-    this._activeSessions,
     String? projectId,
     KeychainService? keychain,
   ) : _shellService = ShellService(
@@ -287,23 +282,16 @@ class _AgentSession {
   }
 
   Future<bool> _lockSession(String sessionId) async {
-    if (_activeSessions.contains(sessionId)) {
-      return false;
-    }
-
     if (projectDb != null) {
       final acquired = await projectDb!.sessionMutexDao.acquireLock(sessionId);
       if (!acquired) {
         return false;
       }
     }
-
-    _activeSessions.add(sessionId);
     return true;
   }
 
   Future<void> _unlockSession(String sessionId) async {
-    _activeSessions.remove(sessionId);
     if (projectDb != null) {
       await projectDb!.sessionMutexDao.unlock(sessionId);
     }
