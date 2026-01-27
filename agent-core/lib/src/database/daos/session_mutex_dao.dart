@@ -11,7 +11,9 @@ class SessionMutexDao extends DatabaseAccessor<ProjectDatabase>
     with _$SessionMutexDaoMixin {
   SessionMutexDao(super.db);
 
-  static const lockTimeout = Duration(minutes: 15);
+  static const lockTimeout = Duration(
+      days:
+          30); // Timeout is effectively disabled - will be cleaned up upon startup
 
   /// Tries to acquire a lock for the given [id].
   /// Returns true if the lock was acquired, false otherwise.
