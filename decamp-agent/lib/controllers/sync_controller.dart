@@ -22,6 +22,9 @@ class SyncController {
   /// Map of active agent sessions keyed by sessionId
   final Map<String, _AgentSession> _activeSessions = {};
 
+  /// Map to track which sessions belong to which channel (for cleanup)
+  final Map<MultiplexedWebSocketChannel, Set<String>> _sessionsByChannel = {};
+
   static Future<SyncController> create(
     DatabaseManager dbManager,
     CrdtSettingsService settingsService,
@@ -203,12 +206,27 @@ class SyncController {
         }
 
         if (sessionId != null) {
+          // Capture the non-null sessionId for use in closures
+          final capturedSessionId = sessionId;
+
           // Get or create the agent session for this sessionId
           final agentSession = _activeSessions.putIfAbsent(
-            sessionId,
+            capturedSessionId,
             () {
-              _log.info('Creating new _AgentSession for sessionId: $sessionId');
-              return _AgentSession(channel, db, projectId, keychain);
+              _log.info(
+                  'Creating new _AgentSession for sessionId: $capturedSessionId');
+              final session = _AgentSession(
+                channel,
+                db,
+                projectId,
+                keychain,
+                onComplete: () => _cleanupSessionIfNeeded(capturedSessionId),
+              );
+              // Track this session for this channel
+              _sessionsByChannel
+                  .putIfAbsent(channel, () => {})
+                  .add(capturedSessionId);
+              return session;
             },
           );
           agentSession.handleMessage(msg);
@@ -223,12 +241,48 @@ class SyncController {
     // Clean up sessions when channel closes
     channel.sink.done.then((_) {
       _log.info('Channel closed for $context');
-      // Note: We don't immediately remove sessions from _activeSessions here
-      // because sessions may still be valid and could be reconnected to.
-      // Sessions will be cleaned up when they complete or when explicitly removed.
+      // Mark all sessions for this channel as orphaned and clean them up if not locked
+      final sessionIds = _sessionsByChannel.remove(channel);
+      if (sessionIds != null) {
+        _log.info(
+          'Cleaning up ${sessionIds.length} session(s) for closed channel',
+        );
+        for (final sessionId in sessionIds) {
+          _cleanupSessionIfNeeded(sessionId);
+        }
+      }
     }).catchError((e) {
       _log.warning('Error during channel cleanup: $e');
     });
+  }
+
+  /// Clean up a session if it's no longer needed (not locked and channel closed)
+  Future<void> _cleanupSessionIfNeeded(String sessionId) async {
+    // FIXME: Session might leak if it's waiting on tool approval and user disconnects
+    final session = _activeSessions[sessionId];
+    if (session == null) return;
+
+    // Check if the session's channel is still in our tracking map
+    final hasActiveChannel = _sessionsByChannel.values.any(
+      (sessions) => sessions.contains(sessionId),
+    );
+
+    // If the channel is closed and the session is not currently locked, remove it
+    if (!hasActiveChannel) {
+      final isLocked = session.projectDb != null
+          ? await session.projectDb!.sessionMutexDao.isLocked(sessionId)
+          : false;
+
+      if (!isLocked) {
+        _log.info(
+            'Cleaning up session $sessionId (no active channel, not locked)');
+        _activeSessions.remove(sessionId);
+      } else {
+        _log.info(
+          'Session $sessionId has no active channel but is still locked, keeping for now',
+        );
+      }
+    }
   }
 }
 
@@ -238,6 +292,7 @@ class _AgentSession {
   final MultiplexedWebSocketChannel channel;
   final ProjectDatabase? projectDb;
   final ShellService _shellService;
+  final void Function() onComplete;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
   CancelToken? _currentCancelToken;
@@ -253,8 +308,9 @@ class _AgentSession {
     this.channel,
     this.projectDb,
     String? projectId,
-    KeychainService? keychain,
-  ) : _shellService = ShellService(
+    KeychainService? keychain, {
+    required this.onComplete,
+  }) : _shellService = ShellService(
           null,
           keychain,
           projectId,
@@ -729,6 +785,8 @@ class _AgentSession {
 
         if (sessionId != null) {
           await _unlockSession(sessionId);
+          // Trigger cleanup check after unlocking
+          onComplete();
         }
       }
     } catch (e) {
@@ -742,6 +800,8 @@ class _AgentSession {
         await _unlockSession(sessionId).catchError((e) {
           _log.severe('Error unlocking session $sessionId: $e');
         });
+        // Trigger cleanup check after unlocking
+        onComplete();
       }
     }
   }
