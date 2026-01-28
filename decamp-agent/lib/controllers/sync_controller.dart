@@ -232,7 +232,7 @@ class SyncController {
               .putIfAbsent(channel, () => {})
               .add(capturedSessionId);
 
-          agentSession.handleMessage(msg);
+          agentSession.handleMessage(msg, channel);
         } else {
           _log.warning(
             'Could not determine sessionId for message: ${msg['type']}',
@@ -296,9 +296,6 @@ class _AgentSession {
   /// Set of active channels for this session (supports reconnections)
   final Set<MultiplexedWebSocketChannel> _channels = {};
 
-  /// The most recently registered channel (used for sending messages)
-  MultiplexedWebSocketChannel? _currentChannel;
-
   final ProjectDatabase? projectDb;
   final ShellService _shellService;
   final void Function() onComplete;
@@ -328,10 +325,6 @@ class _AgentSession {
   /// Register a new channel with this session (handles reconnections)
   void registerChannel(MultiplexedWebSocketChannel channel) {
     _channels.add(channel);
-    if (_currentChannel != null) {
-      _currentChannel = channel;
-      _log.info('Switched current channel for session.');
-    }
     _log.info(
         'Registered channel with session. Total channels: ${_channels.length}');
   }
@@ -343,10 +336,6 @@ class _AgentSession {
     if (wasRegistered) {
       _log.info(
           'Unregistered channel from session. Remaining channels: ${_channels.length}');
-      // If we removed the current channel, pick another one or set to null
-      if (_currentChannel == channel) {
-        _currentChannel = _channels.isEmpty ? null : _channels.first;
-      }
     }
     return wasRegistered;
   }
@@ -354,19 +343,12 @@ class _AgentSession {
   /// Check if this session has any active channels
   bool get hasActiveChannels => _channels.isNotEmpty;
 
-  /// Get the current channel for sending messages
-  MultiplexedWebSocketChannel? get channel => _currentChannel;
-
-  void handleMessage(Map<String, dynamic> msg) {
-    if (channel == null) {
-      _log.warning('Cannot handle message: no active channel');
-      return;
-    }
-
+  void handleMessage(
+      Map<String, dynamic> msg, MultiplexedWebSocketChannel channel) {
     if (msg['type'] == 'start_chat') {
       // Give CRDT sync a moment to catch up with secrets
       Future.delayed(const Duration(milliseconds: 500), () {
-        _startChat(msg);
+        _startChat(msg, channel);
       });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
@@ -443,7 +425,8 @@ class _AgentSession {
     }
   }
 
-  Future<void> _startChat(Map<String, dynamic> data) async {
+  Future<void> _startChat(
+      Map<String, dynamic> data, MultiplexedWebSocketChannel channel) async {
     _log.info('🚀 Starting agent loop');
     String? sessionId;
 
@@ -452,7 +435,7 @@ class _AgentSession {
     } catch (e) {
       _log.warning('Invalid session ID format', e);
 
-      channel?.safeSendCustomMessage({
+      channel.safeSendCustomMessage({
         'type': 'error',
         'message': 'Invalid session ID format: $e',
       });
@@ -463,7 +446,7 @@ class _AgentSession {
       final locked = await _lockSession(sessionId);
       if (!locked) {
         _log.warning('Chat already in progress for session $sessionId');
-        channel?.safeSendCustomMessage({
+        channel.safeSendCustomMessage({
           'type': 'error',
           'message': 'Chat already in progress for session $sessionId',
         });
@@ -579,7 +562,7 @@ class _AgentSession {
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
 
-            channel?.safeSendCustomMessage({
+            channel.safeSendCustomMessage({
               'type': 'request_approval',
               'tools': pendingCalls
                   .map(
@@ -753,11 +736,11 @@ class _AgentSession {
           },
         );
 
-        channel?.safeSendCustomMessage({'type': 'complete'});
+        channel.safeSendCustomMessage({'type': 'complete'});
       } catch (e, st) {
         if (e is CancelledError) {
           _log.info('Agent loop cancelled by user');
-          channel?.safeSendCustomMessage({'type': 'cancelled'});
+          channel.safeSendCustomMessage({'type': 'cancelled'});
         } else {
           _log.severe('Error running agent loop: $e, $st');
 
@@ -783,7 +766,7 @@ class _AgentSession {
             }
           }
 
-          channel?.safeSendCustomMessage({
+          channel.safeSendCustomMessage({
             'type': 'error',
             'message_id': messageId,
             'message': e.toString(),
@@ -836,7 +819,7 @@ class _AgentSession {
       }
     } catch (e) {
       _log.severe('Error starting chat', e);
-      channel?.safeSendCustomMessage({
+      channel.safeSendCustomMessage({
         'type': 'error',
         'message': e.toString(),
       });
