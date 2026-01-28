@@ -91,7 +91,10 @@ class ChatController extends StateNotifier<ChatState> {
 
     if (syncChannel != null) {
       _log.info('Sending abort_chat to server');
-      syncChannel.sendCustomMessage({'type': 'abort_chat'});
+      syncChannel.sendCustomMessage({
+        'type': 'abort_chat',
+        'sessionId': sessionId,
+      });
     }
   }
 
