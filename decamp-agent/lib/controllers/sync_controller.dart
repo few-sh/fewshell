@@ -22,8 +22,8 @@ class SyncController {
   /// Map of active agent sessions keyed by sessionId
   final Map<String, _AgentSession> _activeSessions = {};
 
-  /// Map to track which sessions belong to which channel (for cleanup)
-  final Map<MultiplexedWebSocketChannel, Set<String>> _sessionsByChannel = {};
+  /// Track which sessionIds are associated with which channels for cleanup
+  final Map<MultiplexedWebSocketChannel, Set<String>> _sessionIdsByChannel = {};
 
   static Future<SyncController> create(
     DatabaseManager dbManager,
@@ -215,20 +215,23 @@ class SyncController {
             () {
               _log.info(
                   'Creating new _AgentSession for sessionId: $capturedSessionId');
-              final session = _AgentSession(
-                channel,
+              return _AgentSession(
                 db,
                 projectId,
                 keychain,
                 onComplete: () => _cleanupSessionIfNeeded(capturedSessionId),
               );
-              // Track this session for this channel
-              _sessionsByChannel
-                  .putIfAbsent(channel, () => {})
-                  .add(capturedSessionId);
-              return session;
             },
           );
+
+          // Register this channel with the session (handles both new and reused sessions)
+          agentSession.registerChannel(channel);
+
+          // Track this sessionId for this channel (for cleanup)
+          _sessionIdsByChannel
+              .putIfAbsent(channel, () => {})
+              .add(capturedSessionId);
+
           agentSession.handleMessage(msg);
         } else {
           _log.warning(
@@ -241,14 +244,17 @@ class SyncController {
     // Clean up sessions when channel closes
     channel.sink.done.then((_) {
       _log.info('Channel closed for $context');
-      // Mark all sessions for this channel as orphaned and clean them up if not locked
-      final sessionIds = _sessionsByChannel.remove(channel);
+      // Get all sessionIds that were using this channel
+      final sessionIds = _sessionIdsByChannel.remove(channel);
       if (sessionIds != null) {
-        _log.info(
-          'Cleaning up ${sessionIds.length} session(s) for closed channel',
-        );
+        // Unregister this channel from all affected sessions and trigger cleanup
         for (final sessionId in sessionIds) {
-          _cleanupSessionIfNeeded(sessionId);
+          final session = _activeSessions[sessionId];
+          if (session != null) {
+            session.unregisterChannel(channel);
+            // Trigger cleanup check
+            unawaited(_cleanupSessionIfNeeded(sessionId));
+          }
         }
       }
     }).catchError((e) {
@@ -262,12 +268,10 @@ class SyncController {
     final session = _activeSessions[sessionId];
     if (session == null) return;
 
-    // Check if the session's channel is still in our tracking map
-    final hasActiveChannel = _sessionsByChannel.values.any(
-      (sessions) => sessions.contains(sessionId),
-    );
+    // Check if the session has any active channels
+    final hasActiveChannel = session.hasActiveChannels;
 
-    // If the channel is closed and the session is not currently locked, remove it
+    // If no active channels and the session is not currently locked, remove it
     if (!hasActiveChannel) {
       final isLocked = session.projectDb != null
           ? await session.projectDb!.sessionMutexDao.isLocked(sessionId)
@@ -289,7 +293,12 @@ class SyncController {
 class _AgentSession {
   static final _log = Logger('AgentSession');
 
-  final MultiplexedWebSocketChannel channel;
+  /// Set of active channels for this session (supports reconnections)
+  final Set<MultiplexedWebSocketChannel> _channels = {};
+
+  /// The most recently registered channel (used for sending messages)
+  MultiplexedWebSocketChannel? _currentChannel;
+
   final ProjectDatabase? projectDb;
   final ShellService _shellService;
   final void Function() onComplete;
@@ -305,7 +314,6 @@ class _AgentSession {
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
-    this.channel,
     this.projectDb,
     String? projectId,
     KeychainService? keychain, {
@@ -317,7 +325,44 @@ class _AgentSession {
           backend: LocalShellBackend(),
         );
 
+  /// Register a new channel with this session (handles reconnections)
+  void registerChannel(MultiplexedWebSocketChannel channel) {
+    _channels.add(channel);
+    if (_currentChannel != null) {
+      _currentChannel = channel;
+      _log.info('Switched current channel for session.');
+    }
+    _log.info(
+        'Registered channel with session. Total channels: ${_channels.length}');
+  }
+
+  /// Unregister a channel from this session
+  /// Returns true if the channel was registered with this session
+  bool unregisterChannel(MultiplexedWebSocketChannel channel) {
+    final wasRegistered = _channels.remove(channel);
+    if (wasRegistered) {
+      _log.info(
+          'Unregistered channel from session. Remaining channels: ${_channels.length}');
+      // If we removed the current channel, pick another one or set to null
+      if (_currentChannel == channel) {
+        _currentChannel = _channels.isEmpty ? null : _channels.first;
+      }
+    }
+    return wasRegistered;
+  }
+
+  /// Check if this session has any active channels
+  bool get hasActiveChannels => _channels.isNotEmpty;
+
+  /// Get the current channel for sending messages
+  MultiplexedWebSocketChannel? get channel => _currentChannel;
+
   void handleMessage(Map<String, dynamic> msg) {
+    if (channel == null) {
+      _log.warning('Cannot handle message: no active channel');
+      return;
+    }
+
     if (msg['type'] == 'start_chat') {
       // Give CRDT sync a moment to catch up with secrets
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -407,7 +452,7 @@ class _AgentSession {
     } catch (e) {
       _log.warning('Invalid session ID format', e);
 
-      channel.safeSendCustomMessage({
+      channel?.safeSendCustomMessage({
         'type': 'error',
         'message': 'Invalid session ID format: $e',
       });
@@ -418,7 +463,7 @@ class _AgentSession {
       final locked = await _lockSession(sessionId);
       if (!locked) {
         _log.warning('Chat already in progress for session $sessionId');
-        channel.safeSendCustomMessage({
+        channel?.safeSendCustomMessage({
           'type': 'error',
           'message': 'Chat already in progress for session $sessionId',
         });
@@ -534,7 +579,7 @@ class _AgentSession {
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
 
-            channel.safeSendCustomMessage({
+            channel?.safeSendCustomMessage({
               'type': 'request_approval',
               'tools': pendingCalls
                   .map(
@@ -708,11 +753,11 @@ class _AgentSession {
           },
         );
 
-        channel.safeSendCustomMessage({'type': 'complete'});
+        channel?.safeSendCustomMessage({'type': 'complete'});
       } catch (e, st) {
         if (e is CancelledError) {
           _log.info('Agent loop cancelled by user');
-          channel.safeSendCustomMessage({'type': 'cancelled'});
+          channel?.safeSendCustomMessage({'type': 'cancelled'});
         } else {
           _log.severe('Error running agent loop: $e, $st');
 
@@ -738,7 +783,7 @@ class _AgentSession {
             }
           }
 
-          channel.safeSendCustomMessage({
+          channel?.safeSendCustomMessage({
             'type': 'error',
             'message_id': messageId,
             'message': e.toString(),
@@ -791,7 +836,7 @@ class _AgentSession {
       }
     } catch (e) {
       _log.severe('Error starting chat', e);
-      channel.safeSendCustomMessage({
+      channel?.safeSendCustomMessage({
         'type': 'error',
         'message': e.toString(),
       });
