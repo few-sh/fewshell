@@ -396,12 +396,6 @@ class _AgentSession {
             .toList();
 
         _approvalCompleter!.complete(approved);
-      } else if (data['approvedIds'] != null) {
-        final approvedIds = (data['approvedIds'] as List).cast<String>();
-        final pending = _currentPendingCalls ?? [];
-        final approved =
-            pending.where((c) => approvedIds.contains(c.id)).toList();
-        _approvalCompleter!.complete(approved);
       } else {
         // Cancelled
         _approvalCompleter!.complete(null);

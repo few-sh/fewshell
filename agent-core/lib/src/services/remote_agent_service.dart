@@ -45,7 +45,7 @@ Future<AgentLoopResult> runRemoteAgentLoop({
         if (approved == null) {
           channel.sendCustomMessage({
             'type': 'approval_response',
-            'approvedIds': null, // Explicitly null for cancellation
+            'approvedCalls': null, // Explicitly null for cancellation
           });
         } else {
           channel.sendCustomMessage({
@@ -56,8 +56,6 @@ Future<AgentLoopResult> runRemoteAgentLoop({
                       'arguments': c.arguments,
                     })
                 .toList(),
-            // Keep approvedIds for backward compatibility if needed, though we prefer approvedCalls
-            'approvedIds': approved.map((c) => c.id).toList()
           });
         }
       } else if (type == 'complete') {
