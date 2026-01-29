@@ -560,6 +560,25 @@ class _AgentSession {
           },
           executeToolCall: (toolCalls) async {
             final results = <String>[];
+            _streamingMessageId = projectDb!.messageDao.generateMessageId();
+            _streamingCreatedAt = DateTime.now();
+
+            _asyncDbWrite(() async {
+              // Insert placeholder message for tool call start
+              final companion = MessageEntityCompanion(
+                id: Value(_streamingMessageId!),
+                sessionId: Value(currentSessionId),
+                userId: const Value('user'),
+                userName: const Value('System'),
+                content: const Value('```bash\n'), // Initial content
+                timestamp: Value(DateTime.now()),
+                createdAt: Value(DateTime.now()),
+                messageKind: const Value(MessageKind.toolResult),
+                isStreaming: const Value(true),
+              );
+              await projectDb!.messageDao.insertMessage(companion);
+            });
+
             for (final toolCall in toolCalls) {
               final argumentsJson = toolCall.function.arguments;
               final params = argumentsJson.isNotEmpty
@@ -568,25 +587,6 @@ class _AgentSession {
 
               String result;
               if (toolCall.function.name == kExecuteShellCommand) {
-                _streamingMessageId = projectDb!.messageDao.generateMessageId();
-                _streamingCreatedAt = DateTime.now();
-
-                _asyncDbWrite(() async {
-                  // Insert placeholder message for tool call start
-                  final companion = MessageEntityCompanion(
-                    id: Value(_streamingMessageId!),
-                    sessionId: Value(currentSessionId),
-                    userId: const Value('user'),
-                    userName: const Value('System'),
-                    content: const Value('```bash\n'), // Initial content
-                    timestamp: Value(DateTime.now()),
-                    createdAt: Value(DateTime.now()),
-                    messageKind: const Value(MessageKind.toolResult),
-                    isStreaming: const Value(true),
-                  );
-                  await projectDb!.messageDao.insertMessage(companion);
-                });
-
                 final command = params['command'] as String;
                 final sudoRequired = params['sudo_required'] as bool? ?? false;
                 final secrets = params['secrets'] != null
