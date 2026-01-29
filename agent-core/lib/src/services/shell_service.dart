@@ -129,15 +129,21 @@ class ShellService {
             }
 
             final encodedValue = base64.encode(utf8.encode(entry.value));
+            secretsToRedact.add(entry.value);
+            secretsToRedact.add(encodedValue);
             envExports.writeln(
               "export ${entry.key}=\"\$(echo '$encodedValue' | base64 -d)\"",
             );
-            secretsToRedact.add(entry.value);
           }
         }
 
+        String secretsExports = '';
+        if (envExports.isNotEmpty) {
+          secretsExports = 'stty -echo\n${envExports.toString()}\nstty echo\n';
+        }
+
         scriptToPipe = '''
-$envExports
+$secretsExports
 $command
 ''';
         commandToExecute = scriptToPipe;
@@ -334,10 +340,11 @@ $command
             continue;
           }
           final encodedValue = base64.encode(utf8.encode(entry.value));
+          secretsToRedact.add(entry.value);
+          secretsToRedact.add(encodedValue);
           envExports.writeln(
             "export ${entry.key}=\"\$(echo '$encodedValue' | base64 -d)\"",
           );
-          secretsToRedact.add(entry.value);
         }
       }
     }
@@ -349,6 +356,7 @@ $command
       final encodedSudoPassword = base64.encode(utf8.encode(sudoPassword));
 
       secureScript = '''
+stty -echo
 (umask 077 && cat > $askpassPath <<'ASKPASS_EOF'
 #!/bin/sh
 echo "\$SUDO_PASSWORD"
@@ -358,13 +366,19 @@ chmod 700 $askpassPath
 
 $envExports
 export SUDO_PASSWORD="\$(echo '$encodedSudoPassword' | base64 -d)"
+stty echo
 SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'
+
 
 rm -f $askpassPath
 ''';
     } else {
+      String secretsExports = '';
+      if (envExports.isNotEmpty) {
+        secretsExports = 'stty -echo\n${envExports.toString()}\nstty echo\n';
+      }
       secureScript = '''
-$envExports
+$secretsExports
 sudo bash -c '${_escapeForCommand(command)}'
 ''';
     }
