@@ -186,58 +186,46 @@ class SyncController {
           msg['type'] == 'approval_response' ||
           msg['type'] == 'abort_chat') {
         // Extract sessionId from the message to look up or create the session
-        String? sessionId;
-        if (msg['type'] == 'start_chat') {
-          sessionId = msg['sessionId'] as String?;
-        } else if (msg['type'] == 'approval_response' ||
-            msg['type'] == 'abort_chat') {
-          // For approval_response and abort_chat, we need to find which session is currently active
-          // Since these messages don't include sessionId, we need a different approach
-          // The approval/abort should go to the session that requested it
-          // For now, if we only have one active session, route to it
-          if (_activeSessions.length == 1) {
-            sessionId = _activeSessions.keys.first;
-          } else {
-            _log.warning(
-              'Received ${msg['type']} but unable to determine target session. '
-              'Active sessions: ${_activeSessions.length}',
+        String? sessionId = msg['sessionId'] as String?;
+
+        if (sessionId == null || sessionId.isEmpty) {
+          _log.warning('Received message without valid sessionId: $msg');
+          channel.safeSendCustomMessage({
+            'type': 'error',
+            'message': 'Missing or invalid sessionId in message',
+          });
+          return;
+        }
+
+        // Capture the non-null sessionId for use in closures
+        final capturedSessionId = sessionId;
+
+        // Get or create the agent session for this sessionId
+        // FIXME: This is only appropriate for start_chat message as it makes no sense to
+        // spawn sessions for non-running chats and tools.
+        final agentSession = _activeSessions.putIfAbsent(
+          capturedSessionId,
+          () {
+            _log.info(
+                'Creating new _AgentSession for sessionId: $capturedSessionId');
+            return _AgentSession(
+              db,
+              projectId,
+              keychain,
+              onComplete: () => _cleanupSessionIfNeeded(capturedSessionId),
             );
-          }
-        }
+          },
+        );
 
-        if (sessionId != null) {
-          // Capture the non-null sessionId for use in closures
-          final capturedSessionId = sessionId;
+        // Register this channel with the session (handles both new and reused sessions)
+        agentSession.registerChannel(channel);
 
-          // Get or create the agent session for this sessionId
-          final agentSession = _activeSessions.putIfAbsent(
-            capturedSessionId,
-            () {
-              _log.info(
-                  'Creating new _AgentSession for sessionId: $capturedSessionId');
-              return _AgentSession(
-                db,
-                projectId,
-                keychain,
-                onComplete: () => _cleanupSessionIfNeeded(capturedSessionId),
-              );
-            },
-          );
+        // Track this sessionId for this channel (for cleanup)
+        _sessionIdsByChannel
+            .putIfAbsent(channel, () => {})
+            .add(capturedSessionId);
 
-          // Register this channel with the session (handles both new and reused sessions)
-          agentSession.registerChannel(channel);
-
-          // Track this sessionId for this channel (for cleanup)
-          _sessionIdsByChannel
-              .putIfAbsent(channel, () => {})
-              .add(capturedSessionId);
-
-          agentSession.handleMessage(msg, channel);
-        } else {
-          _log.warning(
-            'Could not determine sessionId for message: ${msg['type']}',
-          );
-        }
+        agentSession.handleMessage(msg, channel);
       }
     });
 
@@ -258,7 +246,7 @@ class SyncController {
         }
       }
     }).catchError((e) {
-      _log.warning('Error during channel cleanup: $e');
+      _log.severe('Error during channel cleanup: $e');
     });
   }
 
