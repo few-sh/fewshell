@@ -36,6 +36,8 @@ import 'ssh_settings_provider.dart'
     show ProjectSshSettingsNotifier, SshSettings;
 import '../services/storage/flutter_secure_storage_impl.dart';
 
+export 'notification_provider.dart';
+
 final _log = Logger('providers');
 
 // =============================================================================

@@ -81,8 +81,12 @@ class DecampApp extends ConsumerWidget {
       // Initialize SyncService
       ref.watch(syncServiceProvider);
       _log.info('SyncService initialized');
+
+      // Initialize NotificationService
+      ref.watch(notificationServiceProvider);
+      _log.info('NotificationService initialized');
     } catch (e, st) {
-      _log.severe('Error initializing SyncService', e, st);
+      _log.severe('Error initializing services', e, st);
     }
 
     final themeMode = ref.watch(themeProvider);
