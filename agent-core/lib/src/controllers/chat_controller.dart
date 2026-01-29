@@ -91,7 +91,10 @@ class ChatController extends StateNotifier<ChatState> {
 
     if (syncChannel != null) {
       _log.info('Sending abort_chat to server');
-      syncChannel.sendCustomMessage({'type': 'abort_chat'});
+      syncChannel.sendCustomMessage({
+        'type': 'abort_chat',
+        'sessionId': sessionId,
+      });
     }
   }
 
@@ -438,31 +441,35 @@ class ChatController extends StateNotifier<ChatState> {
               return _buildConversationHistory(dbMessages);
             },
             requestApproval: handleRequestApproval,
-            executeToolCall: (toolCall) async {
-              if (currentToolMessageId != null) {
-                // Refresh current entity just in case
-                currentEntity =
-                    await _messageDao.getMessage(currentToolMessageId!);
-              }
-
-              final toolOutputBuffer = StringBuffer();
-              void onOutput(String data) {
-                toolOutputBuffer.write(data);
-                if (currentEntity != null) {
-                  // Construct display content: original content + code block with output
-                  final displayContent =
-                      '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
-                  _activeMessageController.add(
-                    currentEntity!.copyWith(content: displayContent),
-                  );
+            executeToolCall: (toolCalls) async {
+              final results = <String>[];
+              for (final toolCall in toolCalls) {
+                if (currentToolMessageId != null) {
+                  // Refresh current entity just in case
+                  currentEntity =
+                      await _messageDao.getMessage(currentToolMessageId!);
                 }
-              }
 
-              // Execute and return result as JSON string
-              final result =
-                  await _executeToolCall(toolCall, onOutput: onOutput);
+                final toolOutputBuffer = StringBuffer();
+                void onOutput(String data) {
+                  toolOutputBuffer.write(data);
+                  if (currentEntity != null) {
+                    // Construct display content: original content + code block with output
+                    final displayContent =
+                        '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
+                    _activeMessageController.add(
+                      currentEntity!.copyWith(content: displayContent),
+                    );
+                  }
+                }
+
+                // Execute and return result as JSON string
+                final result =
+                    await _executeToolCall(toolCall, onOutput: onOutput);
+                results.add(jsonEncode(result));
+              }
               await _sessionDao.touchSession(sessionId);
-              return jsonEncode(result);
+              return results;
             },
             onAssistantMessage: handleAssistantMessage,
             onToolResultMessage: handleToolResultMessage,

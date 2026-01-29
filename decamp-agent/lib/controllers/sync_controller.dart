@@ -19,6 +19,12 @@ class SyncController {
   final CrdtSettingsService settingsService;
   final SecretsService secretsService;
 
+  /// Map of active agent sessions keyed by sessionId
+  final Map<String, _AgentSession> _activeSessions = {};
+
+  /// Track which sessionIds are associated with which channels for cleanup
+  final Map<MultiplexedWebSocketChannel, Set<String>> _sessionIdsByChannel = {};
+
   static Future<SyncController> create(
     DatabaseManager dbManager,
     CrdtSettingsService settingsService,
@@ -167,8 +173,6 @@ class SyncController {
     String? projectId,
     KeychainService? keychain,
   }) {
-    final agentSession = _AgentSession(channel, db, projectId, keychain);
-
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
     channel.onCustomMessage.listen((msg) {
@@ -181,18 +185,108 @@ class SyncController {
       } else if (msg['type'] == 'start_chat' ||
           msg['type'] == 'approval_response' ||
           msg['type'] == 'abort_chat') {
-        agentSession.handleMessage(msg);
+        // Extract sessionId from the message to look up or create the session
+        String? sessionId = msg['sessionId'] as String?;
+
+        if (sessionId == null || sessionId.isEmpty) {
+          _log.warning('Received message without valid sessionId: $msg');
+          channel.safeSendCustomMessage({
+            'type': 'error',
+            'message': 'Missing or invalid sessionId in message',
+          });
+          return;
+        }
+
+        // Capture the non-null sessionId for use in closures
+        final capturedSessionId = sessionId;
+
+        // Get or create the agent session for this sessionId
+        // FIXME: This is only appropriate for start_chat message as it makes no sense to
+        // spawn sessions for non-running chats and tools.
+        final agentSession = _activeSessions.putIfAbsent(
+          capturedSessionId,
+          () {
+            _log.info(
+                'Creating new _AgentSession for sessionId: $capturedSessionId');
+            return _AgentSession(
+              db,
+              projectId,
+              keychain,
+              onComplete: () => _cleanupSessionIfNeeded(capturedSessionId),
+            );
+          },
+        );
+
+        // Register this channel with the session (handles both new and reused sessions)
+        agentSession.registerChannel(channel);
+
+        // Track this sessionId for this channel (for cleanup)
+        _sessionIdsByChannel
+            .putIfAbsent(channel, () => {})
+            .add(capturedSessionId);
+
+        agentSession.handleMessage(msg, channel);
       }
     });
+
+    // Clean up sessions when channel closes
+    channel.sink.done.then((_) {
+      _log.info('Channel closed for $context');
+      // Get all sessionIds that were using this channel
+      final sessionIds = _sessionIdsByChannel.remove(channel);
+      if (sessionIds != null) {
+        // Unregister this channel from all affected sessions and trigger cleanup
+        for (final sessionId in sessionIds) {
+          final session = _activeSessions[sessionId];
+          if (session != null) {
+            session.unregisterChannel(channel);
+            // Trigger cleanup check
+            unawaited(_cleanupSessionIfNeeded(sessionId));
+          }
+        }
+      }
+    }).catchError((e) {
+      _log.severe('Error during channel cleanup: $e');
+    });
+  }
+
+  /// Clean up a session if it's no longer needed (not locked and channel closed)
+  Future<void> _cleanupSessionIfNeeded(String sessionId) async {
+    // FIXME: Session might leak if it's waiting on tool approval and user disconnects
+    final session = _activeSessions[sessionId];
+    if (session == null) return;
+
+    // Check if the session has any active channels
+    final hasActiveChannel = session.hasActiveChannels;
+
+    // If no active channels and the session is not currently locked, remove it
+    if (!hasActiveChannel) {
+      final isLocked = session.projectDb != null
+          ? await session.projectDb!.sessionMutexDao.isLocked(sessionId)
+          : false;
+
+      if (!isLocked) {
+        _log.info(
+            'Cleaning up session $sessionId (no active channel, not locked)');
+        _activeSessions.remove(sessionId);
+      } else {
+        _log.info(
+          'Session $sessionId has no active channel but is still locked, keeping for now',
+        );
+      }
+    }
   }
 }
 
 class _AgentSession {
   static final _log = Logger('AgentSession');
 
-  final MultiplexedWebSocketChannel channel;
+  /// Set of active channels for this session (supports reconnections)
+  final Set<MultiplexedWebSocketChannel> _channels = {};
+
   final ProjectDatabase? projectDb;
   final ShellService _shellService;
+  final void Function() onComplete;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
   CancelToken? _currentCancelToken;
@@ -205,22 +299,44 @@ class _AgentSession {
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
-    this.channel,
     this.projectDb,
     String? projectId,
-    KeychainService? keychain,
-  ) : _shellService = ShellService(
+    KeychainService? keychain, {
+    required this.onComplete,
+  }) : _shellService = ShellService(
           null,
           keychain,
           projectId,
           backend: LocalShellBackend(),
         );
 
-  void handleMessage(Map<String, dynamic> msg) {
+  /// Register a new channel with this session (handles reconnections)
+  void registerChannel(MultiplexedWebSocketChannel channel) {
+    _channels.add(channel);
+    _log.info(
+        'Registered channel with session. Total channels: ${_channels.length}');
+  }
+
+  /// Unregister a channel from this session
+  /// Returns true if the channel was registered with this session
+  bool unregisterChannel(MultiplexedWebSocketChannel channel) {
+    final wasRegistered = _channels.remove(channel);
+    if (wasRegistered) {
+      _log.info(
+          'Unregistered channel from session. Remaining channels: ${_channels.length}');
+    }
+    return wasRegistered;
+  }
+
+  /// Check if this session has any active channels
+  bool get hasActiveChannels => _channels.isNotEmpty;
+
+  void handleMessage(
+      Map<String, dynamic> msg, MultiplexedWebSocketChannel channel) {
     if (msg['type'] == 'start_chat') {
       // Give CRDT sync a moment to catch up with secrets
       Future.delayed(const Duration(milliseconds: 500), () {
-        _startChat(msg);
+        _startChat(msg, channel);
       });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
@@ -268,12 +384,6 @@ class _AgentSession {
             .toList();
 
         _approvalCompleter!.complete(approved);
-      } else if (data['approvedIds'] != null) {
-        final approvedIds = (data['approvedIds'] as List).cast<String>();
-        final pending = _currentPendingCalls ?? [];
-        final approved =
-            pending.where((c) => approvedIds.contains(c.id)).toList();
-        _approvalCompleter!.complete(approved);
       } else {
         // Cancelled
         _approvalCompleter!.complete(null);
@@ -297,7 +407,8 @@ class _AgentSession {
     }
   }
 
-  Future<void> _startChat(Map<String, dynamic> data) async {
+  Future<void> _startChat(
+      Map<String, dynamic> data, MultiplexedWebSocketChannel channel) async {
     _log.info('🚀 Starting agent loop');
     String? sessionId;
 
@@ -447,87 +558,93 @@ class _AgentSession {
             _approvalCompleter = completer;
             return completer.future;
           },
-          executeToolCall: (toolCall) async {
-            final argumentsJson = toolCall.function.arguments;
-            final params = argumentsJson.isNotEmpty
-                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-                : <String, dynamic>{};
+          executeToolCall: (toolCalls) async {
+            final results = <String>[];
+            _streamingMessageId = projectDb!.messageDao.generateMessageId();
+            _streamingCreatedAt = DateTime.now();
 
-            if (toolCall.function.name == kExecuteShellCommand) {
-              _streamingMessageId = projectDb!.messageDao.generateMessageId();
-              _streamingCreatedAt = DateTime.now();
-
-              _asyncDbWrite(() async {
-                // Insert placeholder message for tool call start
-                final companion = MessageEntityCompanion(
-                  id: Value(_streamingMessageId!),
-                  sessionId: Value(currentSessionId),
-                  userId: const Value('user'),
-                  userName: const Value('System'),
-                  content: const Value('```bash\n'), // Initial content
-                  timestamp: Value(DateTime.now()),
-                  createdAt: Value(DateTime.now()),
-                  messageKind: const Value(MessageKind.toolResult),
-                  isStreaming: const Value(true),
-                );
-                await projectDb!.messageDao.insertMessage(companion);
-              });
-
-              final command = params['command'] as String;
-              final sudoRequired = params['sudo_required'] as bool? ?? false;
-              final secrets = params['secrets'] != null
-                  ? List<String>.from(params['secrets'] as List)
-                  : null;
-              _log.info(
-                'Executing shell command. Abort controller: $abortController',
+            _asyncDbWrite(() async {
+              // Insert placeholder message for tool call start
+              final companion = MessageEntityCompanion(
+                id: Value(_streamingMessageId!),
+                sessionId: Value(currentSessionId),
+                userId: const Value('user'),
+                userName: const Value('System'),
+                content: const Value('```bash\n'), // Initial content
+                timestamp: Value(DateTime.now()),
+                createdAt: Value(DateTime.now()),
+                messageKind: const Value(MessageKind.toolResult),
+                isStreaming: const Value(true),
               );
+              await projectDb!.messageDao.insertMessage(companion);
+            });
 
-              final toolOutputBuffer = StringBuffer();
-              void onOutput(String data) {
-                //_log.info('Command delta: $data');
-                toolOutputBuffer.write(data);
-                if (_streamingMessageId != null) {
-                  _asyncDbWrite(() async {
-                    await projectDb!.messageDao.appendMessageContent(
-                      messageId: _streamingMessageId!,
-                      appendContent: data,
-                    );
-                  });
+            for (final toolCall in toolCalls) {
+              final argumentsJson = toolCall.function.arguments;
+              final params = argumentsJson.isNotEmpty
+                  ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+                  : <String, dynamic>{};
+
+              String result;
+              if (toolCall.function.name == kExecuteShellCommand) {
+                final command = params['command'] as String;
+                final sudoRequired = params['sudo_required'] as bool? ?? false;
+                final secrets = params['secrets'] != null
+                    ? List<String>.from(params['secrets'] as List)
+                    : null;
+                _log.info(
+                  'Executing shell command. Abort controller: $abortController',
+                );
+
+                final toolOutputBuffer = StringBuffer();
+                void onOutput(String data) {
+                  //_log.info('Command delta: $data');
+                  toolOutputBuffer.write(data);
+                  if (_streamingMessageId != null) {
+                    _asyncDbWrite(() async {
+                      await projectDb!.messageDao.appendMessageContent(
+                        messageId: _streamingMessageId!,
+                        appendContent: data,
+                      );
+                    });
+                  }
                 }
-              }
 
-              final Map<String, dynamic> result;
-              if (sudoRequired) {
-                result = await _shellService.executeWithSudo(
-                  command: command,
-                  secrets: secrets,
-                  abortSignal: abortController.stream,
-                  onStdout: onOutput,
-                  onStderr: onOutput,
-                );
+                final Map<String, dynamic> shellResult;
+                if (sudoRequired) {
+                  shellResult = await _shellService.executeWithSudo(
+                    command: command,
+                    secrets: secrets,
+                    abortSignal: abortController.stream,
+                    onStdout: onOutput,
+                    onStderr: onOutput,
+                  );
+                } else {
+                  shellResult = await _shellService.executeCommand(
+                    command,
+                    secrets: secrets,
+                    abortSignal: abortController.stream,
+                    onStdout: onOutput,
+                    onStderr: onOutput,
+                  );
+                }
+                await _lastDbWrite.catchError((e) {
+                  _log.warning(
+                    'Error writing streaming message: $e',
+                  );
+                });
+                await projectDb!.sessionDao.touchSession(currentSessionId);
+                result = jsonEncode(shellResult);
+              } else if (toolCall.function.name == kFetch) {
+                final fetchResult = await FetchTool.execute(params);
+                await projectDb!.sessionDao.touchSession(currentSessionId);
+                result = jsonEncode(fetchResult['data']);
               } else {
-                result = await _shellService.executeCommand(
-                  command,
-                  secrets: secrets,
-                  abortSignal: abortController.stream,
-                  onStdout: onOutput,
-                  onStderr: onOutput,
-                );
+                result = jsonEncode({'error': 'Unknown tool'});
               }
-              await _lastDbWrite.catchError((e) {
-                _log.warning(
-                  'Error writing streaming message: $e',
-                );
-              });
-              await projectDb!.sessionDao.touchSession(currentSessionId);
-              return jsonEncode(result);
-            } else if (toolCall.function.name == kFetch) {
-              final result = await FetchTool.execute(params);
-              await projectDb!.sessionDao.touchSession(currentSessionId);
-              return jsonEncode(result['data']);
+              results.add(result);
             }
-
-            return jsonEncode({'error': 'Unknown tool'});
+            return results;
           },
           onTextDelta: (delta) {
             if (_streamingMessageId == null) {
@@ -684,6 +801,8 @@ class _AgentSession {
 
         if (sessionId != null) {
           await _unlockSession(sessionId);
+          // Trigger cleanup check after unlocking
+          onComplete();
         }
       }
     } catch (e) {
@@ -697,6 +816,8 @@ class _AgentSession {
         await _unlockSession(sessionId).catchError((e) {
           _log.severe('Error unlocking session $sessionId: $e');
         });
+        // Trigger cleanup check after unlocking
+        onComplete();
       }
     }
   }
