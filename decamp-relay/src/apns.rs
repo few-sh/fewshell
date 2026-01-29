@@ -92,16 +92,27 @@ impl ApnsClient {
         let payload_str =
             serde_json::to_string(&payload).context("Failed to serialize notification payload")?;
 
+        debug!("APNs payload: {}", payload_str);
+
         let options = NotificationOptions {
             apns_topic: Some(&self.bundle_id),
             apns_priority: Some(Priority::High),
             ..Default::default()
         };
 
-        let builder = DefaultNotificationBuilder::new()
-            .set_body(&payload_str)
-            .set_sound("default");
-
+        // Build notification with title, body, and sound properly
+        let mut builder = DefaultNotificationBuilder::new();
+        
+        if let Some(title) = title {
+            builder = builder.set_title(title);
+        }
+        
+        builder = builder.set_body(body).set_sound("default");
+        
+        if let Some(badge) = badge {
+            builder = builder.set_badge(badge);
+        }
+        
         let notification = builder.build(device_token, options);
 
         let response = self
