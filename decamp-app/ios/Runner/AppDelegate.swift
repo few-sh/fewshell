@@ -10,6 +10,20 @@ import UserNotifications
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     
+    // Set up method channel for badge clearing
+    if let controller = window?.rootViewController as? FlutterViewController {
+      let channel = FlutterMethodChannel(name: "com.fewsh.decamp/notifications",
+                                         binaryMessenger: controller.binaryMessenger)
+      channel.setMethodCallHandler { [weak self] (call: FlutterMethodCall, result: @escaping FlutterResult) in
+        if call.method == "clearBadge" {
+          UIApplication.shared.applicationIconBadgeNumber = 0
+          result(nil)
+        } else {
+          result(FlutterMethodNotImplemented)
+        }
+      }
+    }
+    
     // Register for remote notifications
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self

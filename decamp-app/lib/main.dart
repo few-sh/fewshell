@@ -126,11 +126,38 @@ class DecampApp extends ConsumerWidget {
   }
 }
 
-class _HomeSelector extends ConsumerWidget {
+class _HomeSelector extends ConsumerStatefulWidget {
   const _HomeSelector();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeSelector> createState() => _HomeSelectorState();
+}
+
+class _HomeSelectorState extends ConsumerState<_HomeSelector>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground, clear the badge
+      final notificationService = ref.read(notificationServiceProvider);
+      notificationService.clearBadge();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
     return currentProject == null ? const ProjectsPage() : const ChatSession();
   }

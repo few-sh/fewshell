@@ -44,6 +44,9 @@ class NotificationService {
     // Set up platform channel method handler
     _notificationChannel.setMethodCallHandler(_handleMethodCall);
 
+    // Clear badge on app start
+    await clearBadge();
+
     // Initialize platform-specific settings
     if (Platform.isIOS) {
       await _initializeIOS();
@@ -235,6 +238,23 @@ class NotificationService {
     // TODO: Implement HTTP call to register token with decamp-agent
     // This would typically POST to an endpoint like /api/register-device
     // with the device token and user/session information
+  }
+
+  /// Clear the app badge count
+  Future<void> clearBadge() async {
+    try {
+      if (Platform.isIOS) {
+        // Use platform channel to clear badge on iOS
+        await _notificationChannel.invokeMethod('clearBadge');
+        _log.info('Badge cleared via platform channel');
+      } else {
+        // For Android, cancel all notifications
+        await _flutterLocalNotificationsPlugin.cancelAll();
+        _log.info('Badge cleared');
+      }
+    } catch (e) {
+      _log.warning('Failed to clear badge: $e');
+    }
   }
 
   void dispose() {
