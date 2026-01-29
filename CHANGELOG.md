@@ -1,3 +1,7 @@
+# App 1.0.1+23
+
+- Ability to interrupt running sessions even after re-connecting (compatible with server 0.1.19)
+
 # Server 0.1.19
 
 - Fix export compliance issue on macOS
