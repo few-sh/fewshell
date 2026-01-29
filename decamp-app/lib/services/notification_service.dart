@@ -25,7 +25,12 @@ class NotificationService {
   final _tokenController = StreamController<String?>.broadcast();
 
   /// Stream of device token updates
-  Stream<String?> get tokenStream => _tokenController.stream;
+  Stream<String?> get tokenStream async* {
+    // Emit the current token value immediately
+    yield _deviceToken;
+    // Then yield all future updates
+    yield* _tokenController.stream;
+  }
 
   /// Current device token (may be null if not yet initialized)
   String? get deviceToken => _deviceToken;
