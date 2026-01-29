@@ -151,7 +151,10 @@ $command
         commandToExecute = command;
       }
 
-      _log.info('Executing command: $commandToExecute');
+      String redactedCommand =
+          _redactSecrets(commandToExecute, secretsToRedact);
+
+      _log.info('Executing command: $redactedCommand');
 
       final session = await _backend.execute(commandToExecute);
 
