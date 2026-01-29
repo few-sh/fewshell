@@ -27,6 +27,7 @@ import 'package:decamp/components/project_setup_view.dart';
 import 'package:decamp/components/sync_indicator.dart';
 import 'package:decamp/components/user_badge.dart';
 import 'package:decamp/components/connect_to_agent_server.dart';
+import 'package:decamp/components/notification_debug_widget.dart';
 
 import 'dart:convert';
 import 'dart:io';
@@ -183,6 +184,16 @@ class DebugPage extends ConsumerWidget {
                     onPressed: () => _handleProjectDirectory(context, ref),
                   ),
                 ),
+
+                const SizedBox(height: 20),
+                const Text(
+                  'Push Notifications',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const NotificationDebugWidget(),
+
+                const SizedBox(height: 20),
 
                 // Add more as needed/possible
                 const SizedBox(height: 20),
