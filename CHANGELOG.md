@@ -1,3 +1,14 @@
+# Server 0.1.19
+
+- Fix export compliance issue on macOS
+- Security: Ensure secrets are redacted in logs (both plain and base64-encoded)
+- Security: Disable echo when passing secrets
+- Reusable sessions: Fix issue with stop button not working after reconnecting to project
+- Add sessionId tracking for better session management
+- Refactor message handling and simplify approval logic
+- Add websocket ping interval (10 seconds) for better connection stability
+- Fix interrupt handling for local shell sessions with inline bash scripts
+
 # App 1.0.1+22
 
 - Add streaming animation indicator to RichMessageContent
