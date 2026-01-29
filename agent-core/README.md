@@ -24,9 +24,13 @@ await runAgentLoop(
     // Show approval UI, return approved subset or null to cancel
     return showApprovalDialog(toolCalls);
   },
-  executeToolCall: (toolCall) async {
-    // Execute the tool and return result string
-    return executeShell(toolCall);
+  executeToolCall: (toolCalls) async {
+    // Execute the tools and return list of result strings
+    final results = <String>[];
+    for (final toolCall in toolCalls) {
+      results.add(await executeShell(toolCall));
+    }
+    return results;
   },
   onTextDelta: (delta) {
     // Handle streaming text

@@ -56,7 +56,9 @@ typedef ApprovalFunction = Future<List<PendingToolCall>?> Function(
   List<PendingToolCall> toolCalls,
 );
 
-typedef ToolExecutionFunction = Future<String> Function(ToolCall toolCall);
+typedef ToolExecutionFunction = Future<List<String>> Function(
+  List<ToolCall> toolCalls,
+);
 
 typedef TextDeltaCallback = void Function(String delta);
 

@@ -558,87 +558,93 @@ class _AgentSession {
             _approvalCompleter = completer;
             return completer.future;
           },
-          executeToolCall: (toolCall) async {
-            final argumentsJson = toolCall.function.arguments;
-            final params = argumentsJson.isNotEmpty
-                ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
-                : <String, dynamic>{};
+          executeToolCall: (toolCalls) async {
+            final results = <String>[];
+            for (final toolCall in toolCalls) {
+              final argumentsJson = toolCall.function.arguments;
+              final params = argumentsJson.isNotEmpty
+                  ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
+                  : <String, dynamic>{};
 
-            if (toolCall.function.name == kExecuteShellCommand) {
-              _streamingMessageId = projectDb!.messageDao.generateMessageId();
-              _streamingCreatedAt = DateTime.now();
+              String result;
+              if (toolCall.function.name == kExecuteShellCommand) {
+                _streamingMessageId = projectDb!.messageDao.generateMessageId();
+                _streamingCreatedAt = DateTime.now();
 
-              _asyncDbWrite(() async {
-                // Insert placeholder message for tool call start
-                final companion = MessageEntityCompanion(
-                  id: Value(_streamingMessageId!),
-                  sessionId: Value(currentSessionId),
-                  userId: const Value('user'),
-                  userName: const Value('System'),
-                  content: const Value('```bash\n'), // Initial content
-                  timestamp: Value(DateTime.now()),
-                  createdAt: Value(DateTime.now()),
-                  messageKind: const Value(MessageKind.toolResult),
-                  isStreaming: const Value(true),
+                _asyncDbWrite(() async {
+                  // Insert placeholder message for tool call start
+                  final companion = MessageEntityCompanion(
+                    id: Value(_streamingMessageId!),
+                    sessionId: Value(currentSessionId),
+                    userId: const Value('user'),
+                    userName: const Value('System'),
+                    content: const Value('```bash\n'), // Initial content
+                    timestamp: Value(DateTime.now()),
+                    createdAt: Value(DateTime.now()),
+                    messageKind: const Value(MessageKind.toolResult),
+                    isStreaming: const Value(true),
+                  );
+                  await projectDb!.messageDao.insertMessage(companion);
+                });
+
+                final command = params['command'] as String;
+                final sudoRequired = params['sudo_required'] as bool? ?? false;
+                final secrets = params['secrets'] != null
+                    ? List<String>.from(params['secrets'] as List)
+                    : null;
+                _log.info(
+                  'Executing shell command. Abort controller: $abortController',
                 );
-                await projectDb!.messageDao.insertMessage(companion);
-              });
 
-              final command = params['command'] as String;
-              final sudoRequired = params['sudo_required'] as bool? ?? false;
-              final secrets = params['secrets'] != null
-                  ? List<String>.from(params['secrets'] as List)
-                  : null;
-              _log.info(
-                'Executing shell command. Abort controller: $abortController',
-              );
-
-              final toolOutputBuffer = StringBuffer();
-              void onOutput(String data) {
-                //_log.info('Command delta: $data');
-                toolOutputBuffer.write(data);
-                if (_streamingMessageId != null) {
-                  _asyncDbWrite(() async {
-                    await projectDb!.messageDao.appendMessageContent(
-                      messageId: _streamingMessageId!,
-                      appendContent: data,
-                    );
-                  });
+                final toolOutputBuffer = StringBuffer();
+                void onOutput(String data) {
+                  //_log.info('Command delta: $data');
+                  toolOutputBuffer.write(data);
+                  if (_streamingMessageId != null) {
+                    _asyncDbWrite(() async {
+                      await projectDb!.messageDao.appendMessageContent(
+                        messageId: _streamingMessageId!,
+                        appendContent: data,
+                      );
+                    });
+                  }
                 }
-              }
 
-              final Map<String, dynamic> result;
-              if (sudoRequired) {
-                result = await _shellService.executeWithSudo(
-                  command: command,
-                  secrets: secrets,
-                  abortSignal: abortController.stream,
-                  onStdout: onOutput,
-                  onStderr: onOutput,
-                );
+                final Map<String, dynamic> shellResult;
+                if (sudoRequired) {
+                  shellResult = await _shellService.executeWithSudo(
+                    command: command,
+                    secrets: secrets,
+                    abortSignal: abortController.stream,
+                    onStdout: onOutput,
+                    onStderr: onOutput,
+                  );
+                } else {
+                  shellResult = await _shellService.executeCommand(
+                    command,
+                    secrets: secrets,
+                    abortSignal: abortController.stream,
+                    onStdout: onOutput,
+                    onStderr: onOutput,
+                  );
+                }
+                await _lastDbWrite.catchError((e) {
+                  _log.warning(
+                    'Error writing streaming message: $e',
+                  );
+                });
+                await projectDb!.sessionDao.touchSession(currentSessionId);
+                result = jsonEncode(shellResult);
+              } else if (toolCall.function.name == kFetch) {
+                final fetchResult = await FetchTool.execute(params);
+                await projectDb!.sessionDao.touchSession(currentSessionId);
+                result = jsonEncode(fetchResult['data']);
               } else {
-                result = await _shellService.executeCommand(
-                  command,
-                  secrets: secrets,
-                  abortSignal: abortController.stream,
-                  onStdout: onOutput,
-                  onStderr: onOutput,
-                );
+                result = jsonEncode({'error': 'Unknown tool'});
               }
-              await _lastDbWrite.catchError((e) {
-                _log.warning(
-                  'Error writing streaming message: $e',
-                );
-              });
-              await projectDb!.sessionDao.touchSession(currentSessionId);
-              return jsonEncode(result);
-            } else if (toolCall.function.name == kFetch) {
-              final result = await FetchTool.execute(params);
-              await projectDb!.sessionDao.touchSession(currentSessionId);
-              return jsonEncode(result['data']);
+              results.add(result);
             }
-
-            return jsonEncode({'error': 'Unknown tool'});
+            return results;
           },
           onTextDelta: (delta) {
             if (_streamingMessageId == null) {

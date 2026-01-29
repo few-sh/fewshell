@@ -19,7 +19,7 @@ final _log = Logger('AgentLoop');
 /// - [getConversation]: Optional callback to get fresh conversation each iteration
 ///   (useful when conversation is persisted to DB and needs to be reloaded)
 /// - [requestApproval]: Callback to request user approval for tool calls
-/// - [executeToolCall]: Callback to execute a single tool call
+/// - [executeToolCall]: Callback to execute approved tool calls (receives all at once)
 /// - [onTextDelta]: Optional callback for streaming text deltas
 /// - [onAssistantMessage]: Optional callback when assistant message is complete
 /// - [onToolResultMessage]: Optional callback when tool results are ready
@@ -36,7 +36,7 @@ final _log = Logger('AgentLoop');
 ///   tools: shellTools,
 ///   conversation: messages,
 ///   requestApproval: (toolCalls) => showApprovalDialog(toolCalls),
-///   executeToolCall: (tc) => shellService.execute(tc),
+///   executeToolCall: (tcs) => shellService.executeAll(tcs),
 ///   onTextDelta: (delta) => updateUI(delta),
 ///   onAssistantMessage: (msg) => db.insert(msg),
 ///   onToolResultMessage: (msg) => db.insert(msg),
@@ -146,21 +146,30 @@ Future<AgentLoopResult> runAgentLoop({
       await onAssistantMessage(assistantMessage);
     }
 
-    // Execute each approved tool call
+    // Execute all approved tool calls
+    List<String> resultStrings;
+    try {
+      resultStrings = await executeToolCall(approvedToolCalls);
+    } on AgentAbortException {
+      return const AgentLoopCancelled();
+    } catch (e) {
+      // Return error as result so LLM can reason about it
+      final errorResult = jsonEncode({
+        'error': 'Tool execution failed.',
+        'details': e.toString(),
+      });
+      resultStrings = List.filled(approvedToolCalls.length, errorResult);
+    }
+
+    // Build ToolCall results from execution
     final results = <ToolCall>[];
-    for (final toolCall in approvedToolCalls) {
-      String resultString;
-      try {
-        resultString = await executeToolCall(toolCall);
-      } on AgentAbortException {
-        return const AgentLoopCancelled();
-      } catch (e) {
-        // Return error as result so LLM can reason about it
-        resultString = jsonEncode({
-          'error': 'Tool "${toolCall.function.name}" failed to execute.',
-          'details': e.toString(),
-        });
-      }
+    for (var i = 0; i < approvedToolCalls.length; i++) {
+      final toolCall = approvedToolCalls[i];
+      final resultString = i < resultStrings.length
+          ? resultStrings[i]
+          : jsonEncode({
+              'error': 'Missing result for tool call',
+            });
       results.add(
         ToolCall(
           id: toolCall.id,
