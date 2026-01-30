@@ -1273,7 +1273,7 @@ class MessageSubscriberEntity extends DataClass
   /// Device token for push notifications
   final String deviceToken;
 
-  /// Platform type (iOS or Android)
+  /// Platform type (iOS, Android, macOS, Windows, or Linux)
   final DevicePlatform platform;
 
   /// Timestamp when the subscription was last updated

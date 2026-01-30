@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
 /// Device platform discriminator for push notifications
-enum DevicePlatform { ios, android }
+enum DevicePlatform { ios, android, macos, windows, linux }
 
 /// MessageSubscribers table definition for Drift database.
 /// Stores device subscriptions to messages for push notifications.
@@ -19,7 +19,7 @@ class MessageSubscribers extends Table {
   /// Device token for push notifications
   TextColumn get deviceToken => text()();
 
-  /// Platform type (iOS or Android)
+  /// Platform type (iOS, Android, macOS, Windows, or Linux)
   IntColumn get platform => intEnum<DevicePlatform>()();
 
   /// Timestamp when the subscription was last updated

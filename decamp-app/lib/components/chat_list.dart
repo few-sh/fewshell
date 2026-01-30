@@ -442,7 +442,7 @@ class _MessageItem extends ConsumerWidget {
           sessionId: message.sessionId,
           projectId: currentProject.id,
           deviceToken: deviceToken,
-          platform: DevicePlatform.ios, // TODO: Detect platform
+          platform: _getDevicePlatform(Theme.of(context).platform),
         );
       }
     }
@@ -483,5 +483,24 @@ class _MessageItem extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+/// Map Flutter's TargetPlatform to DevicePlatform enum
+DevicePlatform _getDevicePlatform(TargetPlatform platform) {
+  switch (platform) {
+    case TargetPlatform.iOS:
+      return DevicePlatform.ios;
+    case TargetPlatform.android:
+      return DevicePlatform.android;
+    case TargetPlatform.macOS:
+      return DevicePlatform.macos;
+    case TargetPlatform.windows:
+      return DevicePlatform.windows;
+    case TargetPlatform.linux:
+      return DevicePlatform.linux;
+    case TargetPlatform.fuchsia:
+      // Fuchsia is not supported, default to Linux
+      return DevicePlatform.linux;
   }
 }
