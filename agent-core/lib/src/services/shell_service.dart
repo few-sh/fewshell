@@ -162,7 +162,12 @@ $command
       if (abortSignal != null) {
         abortSubscription = abortSignal.listen((signal) {
           _log.info('Aborting command with signal: $signal');
-          session.kill(signal);
+          try {
+            session.kill(signal);
+          } catch (e) {
+            // Session may already be closed, ignore
+            _log.fine('Ignoring kill error (session may be closed): $e');
+          }
         });
       }
 
@@ -396,7 +401,12 @@ sudo bash -c '${_escapeForCommand(command)}'
       if (abortSignal != null) {
         abortSubscription = abortSignal.listen((signal) {
           _log.info('Aborting sudo command with signal: $signal');
-          session.kill(signal);
+          try {
+            session.kill(signal);
+          } catch (e) {
+            // Session may already be closed, ignore
+            _log.fine('Ignoring kill error (session may be closed): $e');
+          }
         });
       }
 
