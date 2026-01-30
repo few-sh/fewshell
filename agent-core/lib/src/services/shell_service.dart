@@ -395,7 +395,6 @@ sudo bash -c '${_escapeForCommand(command)}'
 
     try {
       final session = await _backend.execute(secureScript);
-      session.close();
 
       StreamSubscription<ProcessSignal>? abortSubscription;
       if (abortSignal != null) {
