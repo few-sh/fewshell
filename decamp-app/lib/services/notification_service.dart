@@ -52,6 +52,8 @@ class NotificationService {
       await _initializeIOS();
     } else if (Platform.isAndroid) {
       await _initializeAndroid();
+    } else if (Platform.isMacOS) {
+      await _initializeMacOS();
     }
 
     _initialized = true;
@@ -149,6 +151,39 @@ class NotificationService {
     _log.info('Android notifications initialized');
   }
 
+  Future<void> _initializeMacOS() async {
+    _log.info('Initializing macOS notifications');
+
+    // macOS initialization settings
+    const initializationSettingsMacOS = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initializationSettings = InitializationSettings(
+      macOS: initializationSettingsMacOS,
+    );
+
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
+
+    // Request permissions
+    final granted = await _flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          MacOSFlutterLocalNotificationsPlugin
+        >()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
+
+    if (granted == true) {
+      _log.info('macOS notification permissions granted');
+    } else {
+      _log.warning('macOS notification permissions denied');
+    }
+  }
+
   /// Get APNs device token for iOS
   /// The token will be received via platform channel when iOS provides it
   Future<void> _getAPNsToken() async {
@@ -205,6 +240,11 @@ class NotificationService {
 
     const notificationDetails = NotificationDetails(
       iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+      macOS: DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
