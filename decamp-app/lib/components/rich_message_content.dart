@@ -26,6 +26,8 @@ class RichMessageContent extends ConsumerStatefulWidget {
   highlights; // Pre-computed highlights for this message
   final int?
   currentMatchIndex; // Index of currently active match (for animation)
+  final bool isSubscribed; // Whether user is subscribed to this message
+  final VoidCallback? onSubscribeToggle; // Callback to toggle subscription
 
   const RichMessageContent({
     super.key,
@@ -34,6 +36,8 @@ class RichMessageContent extends ConsumerStatefulWidget {
     required this.isUser,
     this.highlights,
     this.currentMatchIndex,
+    this.isSubscribed = false,
+    this.onSubscribeToggle,
   });
 
   @override
@@ -148,10 +152,28 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     // Build timestamp with optional edit indicator
     final timestamp = _buildTimestamp(context);
 
-    // Build controls row (timestamp + menu)
+    // Build controls row (timestamp + bell + menu)
     final controls = Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // Notification bell on the left
+        if (widget.onSubscribeToggle != null)
+          ShadButton.ghost(
+            width: 24,
+            height: 24,
+            padding: EdgeInsets.zero,
+            onPressed: widget.onSubscribeToggle,
+            child: Icon(
+              widget.isSubscribed ? LucideIcons.bell : LucideIcons.bellOff,
+              size: 14,
+              color: widget.isSubscribed
+                  ? shadTheme.colorScheme.primary
+                  : shadTheme.colorScheme.mutedForeground,
+            ),
+          )
+        else
+          const SizedBox(width: 24),
+        const Spacer(),
         timestamp,
         const SizedBox(width: 4),
         // Show context menu (always visible)

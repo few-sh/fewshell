@@ -73,6 +73,21 @@ class MessageSubscriberDao extends DatabaseAccessor<ProjectDatabase>
         .watch();
   }
 
+  /// Get all subscriptions for a specific session and device
+  Stream<List<MessageSubscriberEntity>> watchSubscriptionsBySessionAndDevice(
+    String sessionId,
+    String deviceToken,
+  ) {
+    return (select(messageSubscribers)
+          ..where(
+            (s) =>
+                s.sessionId.equals(sessionId) &
+                s.deviceToken.equals(deviceToken) &
+                const CustomExpression<bool>('is_deleted').equals(false),
+          ))
+        .watch();
+  }
+
   /// Delete all subscriptions for a message (cleanup)
   Future<int> deleteSubscriptionsByMessage(String messageId) async {
     final result = await customUpdate(

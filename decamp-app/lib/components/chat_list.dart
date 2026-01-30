@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/rich_message_content.dart';
 import 'package:decamp/utils/search_utils.dart';
+import 'package:decamp/providers/providers.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// Simple chat message list widget
@@ -15,6 +17,8 @@ class ChatList extends StatefulWidget {
   final int? currentMatchIndex; // Index of currently active match
   final double
   searchNavigatorHeight; // Height of search navigator overlay for bottom padding
+  final List<MessageSubscriberEntity>?
+  messageSubscribers; // Message subscriptions for rebuilding
 
   const ChatList({
     super.key,
@@ -24,6 +28,7 @@ class ChatList extends StatefulWidget {
     this.searchMatches,
     this.currentMatchIndex,
     this.searchNavigatorHeight = 0,
+    this.messageSubscribers,
   });
 
   @override
@@ -322,6 +327,7 @@ class _ChatListState extends State<ChatList> {
                       showDivider: false,
                       highlights: _highlightsByMessage[message.id],
                       currentMatchIndex: widget.currentMatchIndex,
+                      messageSubscribers: widget.messageSubscribers,
                     );
                   } else if (widget.isLoading) {
                     return Padding(
@@ -370,6 +376,7 @@ class _ChatListState extends State<ChatList> {
               showDivider: index > 0,
               highlights: _highlightsByMessage[message.id],
               currentMatchIndex: widget.currentMatchIndex,
+              messageSubscribers: widget.messageSubscribers,
             );
           }, childCount: widget.messages.length),
         ),
@@ -378,12 +385,13 @@ class _ChatListState extends State<ChatList> {
   }
 }
 
-class _MessageItem extends StatelessWidget {
+class _MessageItem extends ConsumerWidget {
   final MessageEntity message;
   final bool isStreaming;
   final bool showDivider;
   final List<HighlightRange>? highlights;
   final int? currentMatchIndex;
+  final List<MessageSubscriberEntity>? messageSubscribers;
 
   const _MessageItem({
     super.key,
@@ -392,11 +400,52 @@ class _MessageItem extends StatelessWidget {
     this.showDivider = true,
     this.highlights,
     this.currentMatchIndex,
+    this.messageSubscribers,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isUser = message.userId == 'user';
+
+    // Check if this message is subscribed
+    final isSubscribed =
+        messageSubscribers?.any(
+          (subscriber) => subscriber.messageId == message.id,
+        ) ??
+        false;
+
+    // Handle subscription toggle
+    Future<void> handleSubscribeToggle() async {
+      final deviceTokenAsync = ref.read(deviceTokenProvider);
+      final deviceToken = deviceTokenAsync.valueOrNull;
+
+      if (deviceToken == null || deviceToken.isEmpty) {
+        return; // Can't subscribe without a device token
+      }
+
+      final projectDb = ref.read(projectDatabaseProvider);
+      if (projectDb == null) return;
+
+      final currentProject = ref.read(currentProjectProvider);
+      if (currentProject == null) return;
+
+      if (isSubscribed) {
+        // Unsubscribe
+        await projectDb.messageSubscriberDao.unsubscribe(
+          messageId: message.id,
+          deviceToken: deviceToken,
+        );
+      } else {
+        // Subscribe
+        await projectDb.messageSubscriberDao.subscribe(
+          messageId: message.id,
+          sessionId: message.sessionId,
+          projectId: currentProject.id,
+          deviceToken: deviceToken,
+          platform: DevicePlatform.ios, // TODO: Detect platform
+        );
+      }
+    }
 
     return Column(
       children: [
@@ -426,6 +475,8 @@ class _MessageItem extends StatelessWidget {
                 isUser: isUser,
                 highlights: highlights,
                 currentMatchIndex: currentMatchIndex,
+                isSubscribed: isSubscribed,
+                onSubscribeToggle: isUser ? null : handleSubscribeToggle,
               ),
             ),
           ),

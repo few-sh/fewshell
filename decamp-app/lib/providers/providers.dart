@@ -371,6 +371,22 @@ final currentSessionMessagesProvider = StreamProvider<List<MessageEntity>>((
   return messageDao.watchCompletedMessagesBySession(sessionId);
 });
 
+/// Stream provider for message subscribers by session and device token
+/// Takes a record (sessionId, deviceToken) as parameter
+final messageSubscribersBySessionAndDeviceProvider =
+    StreamProvider.family<
+      List<MessageSubscriberEntity>,
+      (String sessionId, String deviceToken)
+    >((ref, params) {
+      final projectDb = ref.watch(projectDatabaseProvider);
+      if (projectDb == null) {
+        return Stream.value([]);
+      }
+      final (sessionId, deviceToken) = params;
+      return projectDb.messageSubscriberDao
+          .watchSubscriptionsBySessionAndDevice(sessionId, deviceToken);
+    });
+
 // =============================================================================
 // LEVEL 9: Snippet Providers
 // =============================================================================

@@ -267,6 +267,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     );
     final messagesAsync = ref.watch(currentSessionMessagesProvider);
 
+    final deviceTokenAsync = ref.watch(deviceTokenProvider);
+    final messageSubscribersAsync = ref.watch(
+      messageSubscribersBySessionAndDeviceProvider((
+        currentSessionId ?? '',
+        deviceTokenAsync.valueOrNull ?? '',
+      )),
+    );
+
     // Refresh search results when messages change
     ref.listen(currentSessionMessagesProvider, (previous, next) {
       if (_isSearchActive && _searchQuery.isNotEmpty) {
@@ -376,6 +384,8 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                                 _isSearchActive && _searchQuery.isNotEmpty
                                 ? _searchNavigatorHeight + 16
                                 : 0,
+                            messageSubscribers:
+                                messageSubscribersAsync.valueOrNull,
                           ),
                           loading: () => Center(
                             child: CircularProgressIndicator(
