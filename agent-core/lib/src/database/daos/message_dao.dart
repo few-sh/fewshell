@@ -92,17 +92,26 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       variables: [Variable.withString(id)],
       updates: {messages},
     );
+
+    // Clean up associated message subscriptions
+    await db.messageSubscriberDao.deleteSubscriptionsByMessage(id);
+
     return result;
   }
 
   /// Delete all messages for a session
-  Future<int> deleteMessagesBySession(String sessionId) {
+  Future<int> deleteMessagesBySession(String sessionId) async {
     // Explicitly perform soft delete by setting is_deleted = 1.
-    return customUpdate(
+    final result = await customUpdate(
       'UPDATE messages SET is_deleted = 1 WHERE session_id = ?',
       variables: [Variable.withString(sessionId)],
       updates: {messages},
     );
+
+    // Clean up associated message subscriptions
+    await db.messageSubscriberDao.deleteSubscriptionsBySession(sessionId);
+
+    return result;
   }
 
   // Update message streaming status
