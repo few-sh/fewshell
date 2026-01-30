@@ -181,14 +181,16 @@ $command
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
         stdoutDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStdout),
+          _StreamingStringSink((String chunk) =>
+              onStdout(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
       ByteConversionSink? stderrDecoder;
       if (onStderr != null) {
         stderrDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStderr),
+          _StreamingStringSink((String chunk) =>
+              onStderr(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
@@ -415,14 +417,16 @@ sudo bash -c '${_escapeForCommand(command)}'
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
         stdoutDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStdout),
+          _StreamingStringSink((String chunk) =>
+              onStdout(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
       ByteConversionSink? stderrDecoder;
       if (onStderr != null) {
         stderrDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStderr),
+          _StreamingStringSink((String chunk) =>
+              onStderr(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
