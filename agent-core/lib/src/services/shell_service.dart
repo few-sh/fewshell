@@ -406,7 +406,7 @@ sudo bash -c '${_escapeForCommand(command)}'
             await session.kill(signal);
           } catch (e) {
             // Session may already be closed, ignore
-            _log.warn('Ignoring kill error (session may be closed): $e');
+            _log.warning('Ignoring kill error (session may be closed): $e');
           }
         });
       }
