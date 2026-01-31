@@ -235,6 +235,7 @@ class SyncController {
             _log.info(
                 'Creating new _AgentSession for sessionId: $capturedSessionId');
             return _AgentSession(
+              dbManager.globalDatabase,
               db,
               projectId,
               keychain,
@@ -311,6 +312,7 @@ class _AgentSession {
   /// Set of active channels for this session (supports reconnections)
   final Set<MultiplexedWebSocketChannel> _channels = {};
 
+  final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
   final String? projectId;
   final ShellService _shellService;
@@ -328,6 +330,7 @@ class _AgentSession {
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
+    this.globalDb,
     this.projectDb,
     this.projectId,
     KeychainService? keychain, {
@@ -453,6 +456,14 @@ class _AgentSession {
         'message': 'Invalid session ID format: $e',
       });
       return;
+    }
+
+    String projectName = '';
+    if (projectId != null && projectDb != null) {
+      final project = await globalDb.projectDao.getProject(projectId!);
+      if (project != null) {
+        projectName = project.name;
+      }
     }
 
     if (sessionId != null) {
@@ -761,8 +772,8 @@ class _AgentSession {
                   projectId: projectId!,
                   sessionId: currentSessionId,
                   messageId: id,
-                  title: 'Command Complete',
-                  body: 'A tool has finished executing',
+                  title: 'Tool Execution Complete',
+                  body: 'A tool has finished executing in $projectName',
                   data: {
                     'project_id': projectId!,
                     'session_id': currentSessionId,
