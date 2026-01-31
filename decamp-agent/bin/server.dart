@@ -2,12 +2,14 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:ffi';
 
+import 'package:dotenv/dotenv.dart' as dotenv;
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:fewshell_agent/router.dart';
 import 'package:fewshell_agent/services/database_manager.dart';
+import 'package:fewshell_agent/services/notification_dispatcher.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 import 'package:agent_core/agent_core.dart';
@@ -94,12 +96,16 @@ void main(List<String> args) async {
   );
 
   try {
+    // Load .env file if it exists (merges with Platform.environment)
+    final env = dotenv.DotEnv(includePlatformEnvironment: true)..load();
+    _log.info('Loaded environment variables from .env');
+
     // Initialize FFI for sqflite explicitly
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
 
     // Get port from environment or use default
-    final portEnv = Platform.environment['PORT'];
+    final portEnv = env['PORT'];
     final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
 
     // Initialize DatabaseManager
@@ -119,11 +125,17 @@ void main(List<String> args) async {
       (projectId) async => MemoryStorageImpl(),
     );
 
+    // Initialize NotificationDispatcher
+    final notificationDispatcher = NotificationDispatcher.fromEnvironment(
+      getEnv: (key) => env[key],
+    );
+
     // Initialize SyncController
     final syncController = await SyncController.create(
       dbManager,
       settingsService,
       secretsService,
+      notificationDispatcher,
     );
 
     // Configure SecurityContext for mTLS

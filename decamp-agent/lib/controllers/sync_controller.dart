@@ -11,6 +11,7 @@ import 'package:llm_dart/llm_dart.dart';
 import 'package:drift/drift.dart';
 import '../services/database_manager.dart';
 import '../services/local_shell_backend.dart';
+import '../services/notification_dispatcher.dart';
 
 class SyncController {
   static final _log = Logger('SyncController');
@@ -18,6 +19,7 @@ class SyncController {
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
   final SecretsService secretsService;
+  final NotificationDispatcher notificationDispatcher;
 
   /// Map of active agent sessions keyed by sessionId
   final Map<String, _AgentSession> _activeSessions = {};
@@ -29,14 +31,24 @@ class SyncController {
     DatabaseManager dbManager,
     CrdtSettingsService settingsService,
     SecretsService secretsService,
+    NotificationDispatcher notificationDispatcher,
   ) async {
-    final controller =
-        SyncController._(dbManager, settingsService, secretsService);
+    final controller = SyncController._(
+      dbManager,
+      settingsService,
+      secretsService,
+      notificationDispatcher,
+    );
     await controller._init();
     return controller;
   }
 
-  SyncController._(this.dbManager, this.settingsService, this.secretsService);
+  SyncController._(
+    this.dbManager,
+    this.settingsService,
+    this.secretsService,
+    this.notificationDispatcher,
+  );
 
   /// Initialize the controller by cleaning up session mutexes for all projects.
   ///
@@ -62,6 +74,20 @@ class SyncController {
 
           _log.info(
             'Cleaned up $cleanedCount session mutex(es) for project ${project.id} (${project.name})',
+          );
+
+          // Also reset any stuck streaming messages
+          final resetCount =
+              await projectDb.messageDao.resetAllStreamingMessages();
+          _log.info(
+            'Reset $resetCount streaming message(s) for project ${project.id} (${project.name})',
+          );
+
+          // Clean up all message subscriptions
+          final subscriptionCleanupCount =
+              await projectDb.messageSubscriberDao.cleanupAll();
+          _log.info(
+            'Cleaned up $subscriptionCleanupCount message subscription(s) for project ${project.id} (${project.name})',
           );
         } catch (e) {
           _log.warning(
@@ -209,9 +235,11 @@ class SyncController {
             _log.info(
                 'Creating new _AgentSession for sessionId: $capturedSessionId');
             return _AgentSession(
+              dbManager.globalDatabase,
               db,
               projectId,
               keychain,
+              notificationDispatcher: notificationDispatcher,
               onComplete: () => _cleanupSessionIfNeeded(capturedSessionId),
             );
           },
@@ -284,8 +312,11 @@ class _AgentSession {
   /// Set of active channels for this session (supports reconnections)
   final Set<MultiplexedWebSocketChannel> _channels = {};
 
+  final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
+  final String? projectId;
   final ShellService _shellService;
+  final NotificationDispatcher _notificationDispatcher;
   final void Function() onComplete;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
   List<PendingToolCall>? _currentPendingCalls;
@@ -299,11 +330,14 @@ class _AgentSession {
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
+    this.globalDb,
     this.projectDb,
-    String? projectId,
+    this.projectId,
     KeychainService? keychain, {
+    required NotificationDispatcher notificationDispatcher,
     required this.onComplete,
-  }) : _shellService = ShellService(
+  })  : _notificationDispatcher = notificationDispatcher,
+        _shellService = ShellService(
           null,
           keychain,
           projectId,
@@ -422,6 +456,14 @@ class _AgentSession {
         'message': 'Invalid session ID format: $e',
       });
       return;
+    }
+
+    String projectName = '';
+    if (projectId != null && projectDb != null) {
+      final project = await globalDb.projectDao.getProject(projectId!);
+      if (project != null) {
+        projectName = project.name;
+      }
     }
 
     if (sessionId != null) {
@@ -721,6 +763,30 @@ class _AgentSession {
               ),
             );
             await projectDb!.sessionDao.touchSession(currentSessionId);
+
+            // Send push notification to subscribers
+            if (projectId != null) {
+              unawaited(
+                _notificationDispatcher.sendNotification(
+                  projectDb: projectDb!,
+                  projectId: projectId!,
+                  sessionId: currentSessionId,
+                  messageId: id,
+                  title: 'Tool Execution Complete',
+                  body: 'A tool has finished executing in $projectName',
+                  data: {
+                    'project_id': projectId!,
+                    'session_id': currentSessionId,
+                    'message_id': id,
+                  },
+                ).catchError((e, st) {
+                  _log.severe(
+                    'Error sending push notification for message $id: $e',
+                    st,
+                  );
+                }),
+              );
+            }
           },
         );
 

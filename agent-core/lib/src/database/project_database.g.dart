@@ -1136,6 +1136,378 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
   }
 }
 
+class $MessageSubscribersTable extends MessageSubscribers
+    with TableInfo<$MessageSubscribersTable, MessageSubscriberEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessageSubscribersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _messageIdMeta =
+      const VerificationMeta('messageId');
+  @override
+  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
+      'message_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _sessionIdMeta =
+      const VerificationMeta('sessionId');
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+      'session_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _projectIdMeta =
+      const VerificationMeta('projectId');
+  @override
+  late final GeneratedColumn<String> projectId = GeneratedColumn<String>(
+      'project_id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _deviceTokenMeta =
+      const VerificationMeta('deviceToken');
+  @override
+  late final GeneratedColumn<String> deviceToken = GeneratedColumn<String>(
+      'device_token', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  @override
+  late final GeneratedColumnWithTypeConverter<DevicePlatform, int> platform =
+      GeneratedColumn<int>('platform', aliasedName, false,
+              type: DriftSqlType.int, requiredDuringInsert: true)
+          .withConverter<DevicePlatform>(
+              $MessageSubscribersTable.$converterplatform);
+  static const VerificationMeta _updatedAtMeta =
+      const VerificationMeta('updatedAt');
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+      'updated_at', aliasedName, false,
+      type: DriftSqlType.dateTime, requiredDuringInsert: true);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [messageId, sessionId, projectId, deviceToken, platform, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'message_subscribers';
+  @override
+  VerificationContext validateIntegrity(
+      Insertable<MessageSubscriberEntity> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('message_id')) {
+      context.handle(_messageIdMeta,
+          messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta));
+    } else if (isInserting) {
+      context.missing(_messageIdMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(_sessionIdMeta,
+          sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta));
+    } else if (isInserting) {
+      context.missing(_sessionIdMeta);
+    }
+    if (data.containsKey('project_id')) {
+      context.handle(_projectIdMeta,
+          projectId.isAcceptableOrUnknown(data['project_id']!, _projectIdMeta));
+    } else if (isInserting) {
+      context.missing(_projectIdMeta);
+    }
+    if (data.containsKey('device_token')) {
+      context.handle(
+          _deviceTokenMeta,
+          deviceToken.isAcceptableOrUnknown(
+              data['device_token']!, _deviceTokenMeta));
+    } else if (isInserting) {
+      context.missing(_deviceTokenMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(_updatedAtMeta,
+          updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta));
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {messageId, deviceToken};
+  @override
+  MessageSubscriberEntity map(Map<String, dynamic> data,
+      {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MessageSubscriberEntity(
+      messageId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}message_id'])!,
+      sessionId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}session_id'])!,
+      projectId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}project_id'])!,
+      deviceToken: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}device_token'])!,
+      platform: $MessageSubscribersTable.$converterplatform.fromSql(
+          attachedDatabase.typeMapping
+              .read(DriftSqlType.int, data['${effectivePrefix}platform'])!),
+      updatedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}updated_at'])!,
+    );
+  }
+
+  @override
+  $MessageSubscribersTable createAlias(String alias) {
+    return $MessageSubscribersTable(attachedDatabase, alias);
+  }
+
+  static JsonTypeConverter2<DevicePlatform, int, int> $converterplatform =
+      const EnumIndexConverter<DevicePlatform>(DevicePlatform.values);
+}
+
+class MessageSubscriberEntity extends DataClass
+    implements Insertable<MessageSubscriberEntity> {
+  /// Foreign key to the message this subscription is for
+  final String messageId;
+
+  /// Foreign key to the session (for reference)
+  final String sessionId;
+
+  /// Foreign key to the project (for reference)
+  final String projectId;
+
+  /// Device token for push notifications
+  final String deviceToken;
+
+  /// Platform type (iOS, Android, macOS, Windows, or Linux)
+  final DevicePlatform platform;
+
+  /// Timestamp when the subscription was last updated
+  final DateTime updatedAt;
+  const MessageSubscriberEntity(
+      {required this.messageId,
+      required this.sessionId,
+      required this.projectId,
+      required this.deviceToken,
+      required this.platform,
+      required this.updatedAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['message_id'] = Variable<String>(messageId);
+    map['session_id'] = Variable<String>(sessionId);
+    map['project_id'] = Variable<String>(projectId);
+    map['device_token'] = Variable<String>(deviceToken);
+    {
+      map['platform'] = Variable<int>(
+          $MessageSubscribersTable.$converterplatform.toSql(platform));
+    }
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  MessageSubscriberEntityCompanion toCompanion(bool nullToAbsent) {
+    return MessageSubscriberEntityCompanion(
+      messageId: Value(messageId),
+      sessionId: Value(sessionId),
+      projectId: Value(projectId),
+      deviceToken: Value(deviceToken),
+      platform: Value(platform),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory MessageSubscriberEntity.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MessageSubscriberEntity(
+      messageId: serializer.fromJson<String>(json['messageId']),
+      sessionId: serializer.fromJson<String>(json['sessionId']),
+      projectId: serializer.fromJson<String>(json['projectId']),
+      deviceToken: serializer.fromJson<String>(json['deviceToken']),
+      platform: $MessageSubscribersTable.$converterplatform
+          .fromJson(serializer.fromJson<int>(json['platform'])),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'messageId': serializer.toJson<String>(messageId),
+      'sessionId': serializer.toJson<String>(sessionId),
+      'projectId': serializer.toJson<String>(projectId),
+      'deviceToken': serializer.toJson<String>(deviceToken),
+      'platform': serializer.toJson<int>(
+          $MessageSubscribersTable.$converterplatform.toJson(platform)),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  MessageSubscriberEntity copyWith(
+          {String? messageId,
+          String? sessionId,
+          String? projectId,
+          String? deviceToken,
+          DevicePlatform? platform,
+          DateTime? updatedAt}) =>
+      MessageSubscriberEntity(
+        messageId: messageId ?? this.messageId,
+        sessionId: sessionId ?? this.sessionId,
+        projectId: projectId ?? this.projectId,
+        deviceToken: deviceToken ?? this.deviceToken,
+        platform: platform ?? this.platform,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  MessageSubscriberEntity copyWithCompanion(
+      MessageSubscriberEntityCompanion data) {
+    return MessageSubscriberEntity(
+      messageId: data.messageId.present ? data.messageId.value : this.messageId,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      projectId: data.projectId.present ? data.projectId.value : this.projectId,
+      deviceToken:
+          data.deviceToken.present ? data.deviceToken.value : this.deviceToken,
+      platform: data.platform.present ? data.platform.value : this.platform,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageSubscriberEntity(')
+          ..write('messageId: $messageId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('projectId: $projectId, ')
+          ..write('deviceToken: $deviceToken, ')
+          ..write('platform: $platform, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      messageId, sessionId, projectId, deviceToken, platform, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MessageSubscriberEntity &&
+          other.messageId == this.messageId &&
+          other.sessionId == this.sessionId &&
+          other.projectId == this.projectId &&
+          other.deviceToken == this.deviceToken &&
+          other.platform == this.platform &&
+          other.updatedAt == this.updatedAt);
+}
+
+class MessageSubscriberEntityCompanion
+    extends UpdateCompanion<MessageSubscriberEntity> {
+  final Value<String> messageId;
+  final Value<String> sessionId;
+  final Value<String> projectId;
+  final Value<String> deviceToken;
+  final Value<DevicePlatform> platform;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const MessageSubscriberEntityCompanion({
+    this.messageId = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.projectId = const Value.absent(),
+    this.deviceToken = const Value.absent(),
+    this.platform = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MessageSubscriberEntityCompanion.insert({
+    required String messageId,
+    required String sessionId,
+    required String projectId,
+    required String deviceToken,
+    required DevicePlatform platform,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  })  : messageId = Value(messageId),
+        sessionId = Value(sessionId),
+        projectId = Value(projectId),
+        deviceToken = Value(deviceToken),
+        platform = Value(platform),
+        updatedAt = Value(updatedAt);
+  static Insertable<MessageSubscriberEntity> custom({
+    Expression<String>? messageId,
+    Expression<String>? sessionId,
+    Expression<String>? projectId,
+    Expression<String>? deviceToken,
+    Expression<int>? platform,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (messageId != null) 'message_id': messageId,
+      if (sessionId != null) 'session_id': sessionId,
+      if (projectId != null) 'project_id': projectId,
+      if (deviceToken != null) 'device_token': deviceToken,
+      if (platform != null) 'platform': platform,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MessageSubscriberEntityCompanion copyWith(
+      {Value<String>? messageId,
+      Value<String>? sessionId,
+      Value<String>? projectId,
+      Value<String>? deviceToken,
+      Value<DevicePlatform>? platform,
+      Value<DateTime>? updatedAt,
+      Value<int>? rowid}) {
+    return MessageSubscriberEntityCompanion(
+      messageId: messageId ?? this.messageId,
+      sessionId: sessionId ?? this.sessionId,
+      projectId: projectId ?? this.projectId,
+      deviceToken: deviceToken ?? this.deviceToken,
+      platform: platform ?? this.platform,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (messageId.present) {
+      map['message_id'] = Variable<String>(messageId.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (projectId.present) {
+      map['project_id'] = Variable<String>(projectId.value);
+    }
+    if (deviceToken.present) {
+      map['device_token'] = Variable<String>(deviceToken.value);
+    }
+    if (platform.present) {
+      map['platform'] = Variable<int>(
+          $MessageSubscribersTable.$converterplatform.toSql(platform.value));
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageSubscriberEntityCompanion(')
+          ..write('messageId: $messageId, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('projectId: $projectId, ')
+          ..write('deviceToken: $deviceToken, ')
+          ..write('platform: $platform, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ProjectSnippetsTable extends ProjectSnippets
     with TableInfo<$ProjectSnippetsTable, ProjectSnippet> {
   @override
@@ -2321,6 +2693,8 @@ abstract class _$ProjectDatabase extends GeneratedDatabase {
   $ProjectDatabaseManager get managers => $ProjectDatabaseManager(this);
   late final $SessionsTable sessions = $SessionsTable(this);
   late final $MessagesTable messages = $MessagesTable(this);
+  late final $MessageSubscribersTable messageSubscribers =
+      $MessageSubscribersTable(this);
   late final $ProjectSnippetsTable projectSnippets =
       $ProjectSnippetsTable(this);
   late final $ProjectSavedPromptsTable projectSavedPrompts =
@@ -2333,6 +2707,7 @@ abstract class _$ProjectDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         sessions,
         messages,
+        messageSubscribers,
         projectSnippets,
         projectSavedPrompts,
         sessionMutexes
@@ -2862,6 +3237,200 @@ typedef $$MessagesTableProcessedTableManager = ProcessedTableManager<
       BaseReferences<_$ProjectDatabase, $MessagesTable, MessageEntity>
     ),
     MessageEntity,
+    PrefetchHooks Function()>;
+typedef $$MessageSubscribersTableCreateCompanionBuilder
+    = MessageSubscriberEntityCompanion Function({
+  required String messageId,
+  required String sessionId,
+  required String projectId,
+  required String deviceToken,
+  required DevicePlatform platform,
+  required DateTime updatedAt,
+  Value<int> rowid,
+});
+typedef $$MessageSubscribersTableUpdateCompanionBuilder
+    = MessageSubscriberEntityCompanion Function({
+  Value<String> messageId,
+  Value<String> sessionId,
+  Value<String> projectId,
+  Value<String> deviceToken,
+  Value<DevicePlatform> platform,
+  Value<DateTime> updatedAt,
+  Value<int> rowid,
+});
+
+class $$MessageSubscribersTableFilterComposer
+    extends Composer<_$ProjectDatabase, $MessageSubscribersTable> {
+  $$MessageSubscribersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get messageId => $composableBuilder(
+      column: $table.messageId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+      column: $table.sessionId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get projectId => $composableBuilder(
+      column: $table.projectId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get deviceToken => $composableBuilder(
+      column: $table.deviceToken, builder: (column) => ColumnFilters(column));
+
+  ColumnWithTypeConverterFilters<DevicePlatform, DevicePlatform, int>
+      get platform => $composableBuilder(
+          column: $table.platform,
+          builder: (column) => ColumnWithTypeConverterFilters(column));
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$MessageSubscribersTableOrderingComposer
+    extends Composer<_$ProjectDatabase, $MessageSubscribersTable> {
+  $$MessageSubscribersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get messageId => $composableBuilder(
+      column: $table.messageId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+      column: $table.sessionId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get projectId => $composableBuilder(
+      column: $table.projectId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get deviceToken => $composableBuilder(
+      column: $table.deviceToken, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get platform => $composableBuilder(
+      column: $table.platform, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+      column: $table.updatedAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$MessageSubscribersTableAnnotationComposer
+    extends Composer<_$ProjectDatabase, $MessageSubscribersTable> {
+  $$MessageSubscribersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get messageId =>
+      $composableBuilder(column: $table.messageId, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<String> get projectId =>
+      $composableBuilder(column: $table.projectId, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceToken => $composableBuilder(
+      column: $table.deviceToken, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DevicePlatform, int> get platform =>
+      $composableBuilder(column: $table.platform, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$MessageSubscribersTableTableManager extends RootTableManager<
+    _$ProjectDatabase,
+    $MessageSubscribersTable,
+    MessageSubscriberEntity,
+    $$MessageSubscribersTableFilterComposer,
+    $$MessageSubscribersTableOrderingComposer,
+    $$MessageSubscribersTableAnnotationComposer,
+    $$MessageSubscribersTableCreateCompanionBuilder,
+    $$MessageSubscribersTableUpdateCompanionBuilder,
+    (
+      MessageSubscriberEntity,
+      BaseReferences<_$ProjectDatabase, $MessageSubscribersTable,
+          MessageSubscriberEntity>
+    ),
+    MessageSubscriberEntity,
+    PrefetchHooks Function()> {
+  $$MessageSubscribersTableTableManager(
+      _$ProjectDatabase db, $MessageSubscribersTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessageSubscribersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessageSubscribersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MessageSubscribersTableAnnotationComposer(
+                  $db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> messageId = const Value.absent(),
+            Value<String> sessionId = const Value.absent(),
+            Value<String> projectId = const Value.absent(),
+            Value<String> deviceToken = const Value.absent(),
+            Value<DevicePlatform> platform = const Value.absent(),
+            Value<DateTime> updatedAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MessageSubscriberEntityCompanion(
+            messageId: messageId,
+            sessionId: sessionId,
+            projectId: projectId,
+            deviceToken: deviceToken,
+            platform: platform,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String messageId,
+            required String sessionId,
+            required String projectId,
+            required String deviceToken,
+            required DevicePlatform platform,
+            required DateTime updatedAt,
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              MessageSubscriberEntityCompanion.insert(
+            messageId: messageId,
+            sessionId: sessionId,
+            projectId: projectId,
+            deviceToken: deviceToken,
+            platform: platform,
+            updatedAt: updatedAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$MessageSubscribersTableProcessedTableManager = ProcessedTableManager<
+    _$ProjectDatabase,
+    $MessageSubscribersTable,
+    MessageSubscriberEntity,
+    $$MessageSubscribersTableFilterComposer,
+    $$MessageSubscribersTableOrderingComposer,
+    $$MessageSubscribersTableAnnotationComposer,
+    $$MessageSubscribersTableCreateCompanionBuilder,
+    $$MessageSubscribersTableUpdateCompanionBuilder,
+    (
+      MessageSubscriberEntity,
+      BaseReferences<_$ProjectDatabase, $MessageSubscribersTable,
+          MessageSubscriberEntity>
+    ),
+    MessageSubscriberEntity,
     PrefetchHooks Function()>;
 typedef $$ProjectSnippetsTableCreateCompanionBuilder = ProjectSnippetCompanion
     Function({
@@ -3476,6 +4045,8 @@ class $ProjectDatabaseManager {
       $$SessionsTableTableManager(_db, _db.sessions);
   $$MessagesTableTableManager get messages =>
       $$MessagesTableTableManager(_db, _db.messages);
+  $$MessageSubscribersTableTableManager get messageSubscribers =>
+      $$MessageSubscribersTableTableManager(_db, _db.messageSubscribers);
   $$ProjectSnippetsTableTableManager get projectSnippets =>
       $$ProjectSnippetsTableTableManager(_db, _db.projectSnippets);
   $$ProjectSavedPromptsTableTableManager get projectSavedPrompts =>

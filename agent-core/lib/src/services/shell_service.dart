@@ -186,14 +186,16 @@ $command
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
         stdoutDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStdout),
+          _StreamingStringSink((String chunk) =>
+              onStdout(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
       ByteConversionSink? stderrDecoder;
       if (onStderr != null) {
         stderrDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStderr),
+          _StreamingStringSink((String chunk) =>
+              onStderr(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
@@ -404,7 +406,7 @@ sudo bash -c '${_escapeForCommand(command)}'
             await session.kill(signal);
           } catch (e) {
             // Session may already be closed, ignore
-            _log.fine('Ignoring kill error (session may be closed): $e');
+            _log.warn('Ignoring kill error (session may be closed): $e');
           }
         });
       }
@@ -424,14 +426,16 @@ sudo bash -c '${_escapeForCommand(command)}'
       ByteConversionSink? stdoutDecoder;
       if (onStdout != null) {
         stdoutDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStdout),
+          _StreamingStringSink((String chunk) =>
+              onStdout(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 
       ByteConversionSink? stderrDecoder;
       if (onStderr != null) {
         stderrDecoder = utf8.decoder.startChunkedConversion(
-          _StreamingStringSink(onStderr),
+          _StreamingStringSink((String chunk) =>
+              onStderr(_redactSecrets(chunk, secretsToRedact))),
         );
       }
 

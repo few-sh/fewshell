@@ -6,11 +6,13 @@ import 'package:logging/logging.dart';
 
 import 'tables/sessions_table.dart';
 import 'tables/messages_table.dart';
+import 'tables/message_subscribers_table.dart';
 import 'tables/project_snippets_table.dart';
 import 'tables/project_saved_prompts_table.dart';
 import 'tables/session_mutex_table.dart';
 import 'daos/session_dao.dart';
 import 'daos/message_dao.dart';
+import 'daos/message_subscriber_dao.dart';
 import 'daos/project_snippet_dao.dart';
 import 'daos/project_saved_prompt_dao.dart';
 import 'daos/session_mutex_dao.dart';
@@ -23,6 +25,7 @@ part 'project_database.g.dart';
 @DriftDatabase(tables: [
   Sessions,
   Messages,
+  MessageSubscribers,
   ProjectSnippets,
   ProjectSavedPrompts,
   SessionMutexes
@@ -76,6 +79,8 @@ class ProjectDatabase extends _$ProjectDatabase {
   // DAOs - lazy initialized
   late final SessionDao sessionDao = SessionDao(this);
   late final MessageDao messageDao = MessageDao(this);
+  late final MessageSubscriberDao messageSubscriberDao =
+      MessageSubscriberDao(this);
   late final ProjectSnippetDao projectSnippetDao = ProjectSnippetDao(this);
   late final SessionMutexDao sessionMutexDao = SessionMutexDao(this);
   late final ProjectSavedPromptDao projectSavedPromptDao =
@@ -89,7 +94,7 @@ class ProjectDatabase extends _$ProjectDatabase {
   }
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration {
@@ -196,6 +201,12 @@ class ProjectDatabase extends _$ProjectDatabase {
     );
     await executor.runCustom(
       'CREATE INDEX IF NOT EXISTS idx_messages_session_timestamp ON messages(session_id, created_at ASC);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_message_subscribers_message_id ON message_subscribers(message_id);',
+    );
+    await executor.runCustom(
+      'CREATE INDEX IF NOT EXISTS idx_message_subscribers_device_token ON message_subscribers(device_token);',
     );
     await executor.runCustom(
       'CREATE INDEX IF NOT EXISTS idx_project_snippets_project_id ON snippets(project_id);',
