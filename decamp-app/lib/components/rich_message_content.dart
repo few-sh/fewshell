@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -156,8 +157,8 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
     final controls = Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // Notification bell on the left
-        if (widget.onSubscribeToggle != null)
+        // Notification bell on the left (iOS only)
+        if (Platform.isIOS && widget.onSubscribeToggle != null)
           ShadButton.ghost(
             width: 24,
             height: 24,
