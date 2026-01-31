@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:ffi';
 
+import 'package:dotenv/dotenv.dart' as dotenv;
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -95,12 +96,16 @@ void main(List<String> args) async {
   );
 
   try {
+    // Load .env file if it exists (merges with Platform.environment)
+    final env = dotenv.DotEnv(includePlatformEnvironment: true)..load();
+    _log.info('Loaded environment variables from .env');
+
     // Initialize FFI for sqflite explicitly
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
 
     // Get port from environment or use default
-    final portEnv = Platform.environment['PORT'];
+    final portEnv = env['PORT'];
     final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
 
     // Initialize DatabaseManager
@@ -121,7 +126,9 @@ void main(List<String> args) async {
     );
 
     // Initialize NotificationDispatcher
-    final notificationDispatcher = NotificationDispatcher.fromEnvironment();
+    final notificationDispatcher = NotificationDispatcher.fromEnvironment(
+      getEnv: (key) => env[key],
+    );
 
     // Initialize SyncController
     final syncController = await SyncController.create(

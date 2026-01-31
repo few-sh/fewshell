@@ -32,9 +32,16 @@ class NotificationDispatcher {
   /// The URL for the push notification relay service is read from the
   /// `PUSH_NOTIFICATION_URL` environment variable.
   /// The API key is read from `PUSH_NOTIFICATION_API_KEY`.
-  factory NotificationDispatcher.fromEnvironment({Dio? dio}) {
-    final url = Platform.environment['PUSH_NOTIFICATION_URL'];
-    final apiKey = Platform.environment['PUSH_NOTIFICATION_API_KEY'];
+  ///
+  /// If [getEnv] is provided, it will be used instead of
+  /// [Platform.environment] to read configuration values.
+  factory NotificationDispatcher.fromEnvironment({
+    Dio? dio,
+    String? Function(String key)? getEnv,
+  }) {
+    final env = getEnv ?? (key) => Platform.environment[key];
+    final url = env('PUSH_NOTIFICATION_URL');
+    final apiKey = env('PUSH_NOTIFICATION_API_KEY');
     if (url == null || url.isEmpty) {
       _log.warning(
         'PUSH_NOTIFICATION_URL environment variable not set. '
