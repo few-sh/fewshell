@@ -10,6 +10,7 @@ class NotificationDispatcher {
   static final _log = Logger('NotificationDispatcher');
 
   final String? _pushNotificationUrl;
+  final String? _apiKey;
   final Dio _dio;
 
   /// Maximum number of retry attempts for failed notifications.
@@ -20,16 +21,20 @@ class NotificationDispatcher {
 
   NotificationDispatcher._({
     required String? pushNotificationUrl,
+    required String? apiKey,
     Dio? dio,
   })  : _pushNotificationUrl = pushNotificationUrl,
+        _apiKey = apiKey,
         _dio = dio ?? Dio();
 
   /// Creates a NotificationDispatcher, reading configuration from environment.
   ///
   /// The URL for the push notification relay service is read from the
   /// `PUSH_NOTIFICATION_URL` environment variable.
+  /// The API key is read from `PUSH_NOTIFICATION_API_KEY`.
   factory NotificationDispatcher.fromEnvironment({Dio? dio}) {
     final url = Platform.environment['PUSH_NOTIFICATION_URL'];
+    final apiKey = Platform.environment['PUSH_NOTIFICATION_API_KEY'];
     if (url == null || url.isEmpty) {
       _log.warning(
         'PUSH_NOTIFICATION_URL environment variable not set. '
@@ -38,7 +43,17 @@ class NotificationDispatcher {
     } else {
       _log.info('NotificationDispatcher initialized with URL: $url');
     }
-    return NotificationDispatcher._(pushNotificationUrl: url, dio: dio);
+    if (apiKey == null || apiKey.isEmpty) {
+      _log.warning(
+        'PUSH_NOTIFICATION_API_KEY environment variable not set. '
+        'Push notifications will fail authentication.',
+      );
+    }
+    return NotificationDispatcher._(
+      pushNotificationUrl: url,
+      apiKey: apiKey,
+      dio: dio,
+    );
   }
 
   /// Whether the dispatcher is configured and can send notifications.
@@ -139,7 +154,10 @@ class NotificationDispatcher {
           '$_pushNotificationUrl/send',
           data: payload,
           options: Options(
-            headers: {'Content-Type': 'application/json'},
+            headers: {
+              'Content-Type': 'application/json',
+              if (_apiKey != null) 'Authorization': 'Bearer $_apiKey',
+            },
             sendTimeout: const Duration(seconds: 10),
             receiveTimeout: const Duration(seconds: 10),
           ),
