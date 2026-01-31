@@ -130,6 +130,15 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     return numWritten;
   }
 
+  /// Reset isStreaming flag to false for all streaming messages
+  Future<int> resetAllStreamingMessages() async {
+    final companion = MessageEntityCompanion(
+      isStreaming: const Value(false),
+    );
+    return (update(messages)..where((m) => m.isStreaming.equals(true)))
+        .write(companion);
+  }
+
   /// Get messages for a session
   Future<List<MessageEntity>> getMessagesBySession(String sessionId) {
     return (select(messages)

@@ -63,6 +63,13 @@ class SyncController {
           _log.info(
             'Cleaned up $cleanedCount session mutex(es) for project ${project.id} (${project.name})',
           );
+
+          // Also reset any stuck streaming messages
+          final resetCount =
+              await projectDb.messageDao.resetAllStreamingMessages();
+          _log.info(
+            'Reset $resetCount streaming message(s) for project ${project.id} (${project.name})',
+          );
         } catch (e) {
           _log.warning(
             'Failed to cleanup mutexes for project ${project.id}: $e',
