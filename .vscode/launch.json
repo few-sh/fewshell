@@ -10,7 +10,10 @@
             "request": "launch",
             "type": "dart",
             "program": "bin/server.dart",
-            "args": ["--port", "3123"]
+            "args": ["--port", "3123"],
+            "env": {
+                "PUSH_NOTIFICATION_URL": "http://localhost:8080"
+            }
         },
         {
             "name": "decamp-app",
