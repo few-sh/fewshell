@@ -491,7 +491,7 @@ class _MessageItem extends ConsumerWidget {
                 highlights: highlights,
                 currentMatchIndex: currentMatchIndex,
                 isSubscribed: isSubscribed,
-                onSubscribeToggle: isUser ? null : handleSubscribeToggle,
+                onSubscribeToggle: isStreaming ? handleSubscribeToggle : null,
               ),
             ),
           ),
