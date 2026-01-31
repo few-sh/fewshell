@@ -443,8 +443,9 @@ class _MessageItem extends ConsumerWidget {
             ShadToast(
               title: const Text('Subscribed'),
               description: const Text(
-                'You will receive notifications for updates to this message.',
+                'You will receive a notification when this finishes running.',
               ),
+              showCloseIconOnlyWhenHovered: false,
             ),
           );
         }
