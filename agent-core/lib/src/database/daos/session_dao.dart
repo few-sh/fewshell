@@ -83,6 +83,8 @@ class SessionDao extends DatabaseAccessor<ProjectDatabase>
 
   /// Delete a session by ID
   Future<int> deleteSession(String id) async {
+    // Clean up associated messages
+    await db.messageDao.deleteMessagesBySession(id);
     // Clean up associated message subscriptions
     await db.messageSubscriberDao.deleteSubscriptionsBySession(id);
 
