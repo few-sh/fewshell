@@ -8,6 +8,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:fewshell_agent/router.dart';
 import 'package:fewshell_agent/services/database_manager.dart';
+import 'package:fewshell_agent/services/notification_dispatcher.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 import 'package:agent_core/agent_core.dart';
@@ -119,11 +120,15 @@ void main(List<String> args) async {
       (projectId) async => MemoryStorageImpl(),
     );
 
+    // Initialize NotificationDispatcher
+    final notificationDispatcher = NotificationDispatcher.fromEnvironment();
+
     // Initialize SyncController
     final syncController = await SyncController.create(
       dbManager,
       settingsService,
       secretsService,
+      notificationDispatcher,
     );
 
     // Configure SecurityContext for mTLS
