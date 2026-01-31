@@ -1,3 +1,10 @@
+# Server 0.1.20
+
+- Fix crash with sudo commands
+- Asynchronous abort signal handling
+- Improved logging for kill errors
+- Fix improper session close for sudo commands
+
 # App 1.0.1+23
 
 - Ability to interrupt running sessions even after re-connecting (compatible with server 0.1.19)
