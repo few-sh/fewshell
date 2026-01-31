@@ -1,6 +1,8 @@
 use axum::{
+    body::Body,
     extract::State,
-    http::StatusCode,
+    http::{header, Request, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
@@ -8,7 +10,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::trace::TraceLayer;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 mod apns;
 use apns::ApnsClient;
@@ -16,6 +18,7 @@ use apns::ApnsClient;
 #[derive(Clone)]
 struct AppState {
     apns_client: Arc<ApnsClient>,
+    api_key: Arc<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,12 +63,18 @@ async fn main() -> anyhow::Result<()> {
     // Initialize APNs client
     let apns_client = Arc::new(ApnsClient::new().await?);
 
-    let state = AppState { apns_client };
+    // Load API key
+    let api_key = Arc::new(
+        std::env::var("API_KEY").expect("API_KEY environment variable must be set"),
+    );
+
+    let state = AppState { apns_client, api_key };
 
     // Build the router
     let app = Router::new()
         .route("/health", axum::routing::get(health_check))
         .route("/send", post(send_notification))
+        .route_layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
@@ -82,6 +91,36 @@ async fn main() -> anyhow::Result<()> {
 
 async fn health_check() -> &'static str {
     "OK"
+}
+
+async fn api_key_auth(
+    State(state): State<AppState>,
+    req: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    // Skip auth for health check
+    if req.uri().path() == "/health" {
+        return Ok(next.run(req).await);
+    }
+
+    let auth_header = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok());
+
+    match auth_header {
+        Some(auth) if auth.strip_prefix("Bearer ").map_or(false, |token| token == state.api_key.as_str()) => {
+            Ok(next.run(req).await)
+        }
+        Some(_) => {
+            warn!("Invalid API key provided");
+            Err(StatusCode::UNAUTHORIZED)
+        }
+        None => {
+            warn!("Missing Authorization header");
+            Err(StatusCode::UNAUTHORIZED)
+        }
+    }
 }
 
 async fn send_notification(
