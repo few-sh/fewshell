@@ -160,13 +160,13 @@ $command
 
       StreamSubscription<ProcessSignal>? abortSubscription;
       if (abortSignal != null) {
-        abortSubscription = abortSignal.listen((signal) {
+        abortSubscription = abortSignal.listen((signal) async {
           _log.info('Aborting command with signal: $signal');
           try {
-            session.kill(signal);
+            await session.kill(signal);
           } catch (e) {
             // Session may already be closed, ignore
-            _log.fine('Ignoring kill error (session may be closed): $e');
+            _log.warning('Ignoring kill error (session may be closed): $e');
           }
         });
       }
@@ -397,17 +397,16 @@ sudo bash -c '${_escapeForCommand(command)}'
 
     try {
       final session = await _backend.execute(secureScript);
-      session.close();
 
       StreamSubscription<ProcessSignal>? abortSubscription;
       if (abortSignal != null) {
-        abortSubscription = abortSignal.listen((signal) {
+        abortSubscription = abortSignal.listen((signal) async {
           _log.info('Aborting sudo command with signal: $signal');
           try {
-            session.kill(signal);
+            await session.kill(signal);
           } catch (e) {
             // Session may already be closed, ignore
-            _log.fine('Ignoring kill error (session may be closed): $e');
+            _log.warn('Ignoring kill error (session may be closed): $e');
           }
         });
       }
