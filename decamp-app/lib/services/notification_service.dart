@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logging/logging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:agent_core/agent_core.dart';
 
 final _log = Logger('NotificationService');
 
@@ -294,6 +296,74 @@ class NotificationService {
       }
     } catch (e) {
       _log.warning('Failed to clear badge: $e');
+    }
+  }
+
+  /// Subscribe to push notifications for a specific message
+  Future<void> subscribeToMessage({
+    required String messageId,
+    required String sessionId,
+    required String projectId,
+    required ProjectDatabase projectDb,
+  }) async {
+    if (_deviceToken == null || _deviceToken!.isEmpty) {
+      _log.warning('Cannot subscribe: no device token available');
+      return;
+    }
+
+    final platform = _getCurrentDevicePlatform();
+
+    _log.info('Subscribing to message: $messageId');
+
+    await projectDb.messageSubscriberDao.subscribe(
+      messageId: messageId,
+      sessionId: sessionId,
+      projectId: projectId,
+      deviceToken: _deviceToken!,
+      platform: platform,
+    );
+
+    _log.info('Successfully subscribed to message: $messageId');
+  }
+
+  /// Unsubscribe from push notifications for a specific message
+  Future<void> unsubscribeFromMessage({
+    required String messageId,
+    required ProjectDatabase projectDb,
+  }) async {
+    if (_deviceToken == null || _deviceToken!.isEmpty) {
+      _log.warning('Cannot unsubscribe: no device token available');
+      return;
+    }
+
+    _log.info('Unsubscribing from message: $messageId');
+
+    await projectDb.messageSubscriberDao.unsubscribe(
+      messageId: messageId,
+      deviceToken: _deviceToken!,
+    );
+
+    _log.info('Successfully unsubscribed from message: $messageId');
+  }
+
+  /// Get the current device platform
+  DevicePlatform _getCurrentDevicePlatform() {
+    if (kIsWeb) {
+      return DevicePlatform.linux; // Fallback for web
+    }
+
+    if (Platform.isIOS) {
+      return DevicePlatform.ios;
+    } else if (Platform.isAndroid) {
+      return DevicePlatform.android;
+    } else if (Platform.isMacOS) {
+      return DevicePlatform.macos;
+    } else if (Platform.isWindows) {
+      return DevicePlatform.windows;
+    } else if (Platform.isLinux) {
+      return DevicePlatform.linux;
+    } else {
+      return DevicePlatform.linux; // Fallback
     }
   }
 

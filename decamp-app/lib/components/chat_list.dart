@@ -416,33 +416,48 @@ class _MessageItem extends ConsumerWidget {
 
     // Handle subscription toggle
     Future<void> handleSubscribeToggle() async {
-      final deviceTokenAsync = ref.read(deviceTokenProvider);
-      final deviceToken = deviceTokenAsync.valueOrNull;
-
-      if (deviceToken == null || deviceToken.isEmpty) {
-        return; // Can't subscribe without a device token
-      }
-
       final projectDb = ref.read(projectDatabaseProvider);
       if (projectDb == null) return;
 
       final currentProject = ref.read(currentProjectProvider);
       if (currentProject == null) return;
 
-      if (isSubscribed) {
-        // Unsubscribe
-        await projectDb.messageSubscriberDao.unsubscribe(
-          messageId: message.id,
-          deviceToken: deviceToken,
-        );
-      } else {
-        // Subscribe
-        await projectDb.messageSubscriberDao.subscribe(
-          messageId: message.id,
-          sessionId: message.sessionId,
-          projectId: currentProject.id,
-          deviceToken: deviceToken,
-          platform: _getDevicePlatform(Theme.of(context).platform),
+      final notificationService = ref.read(notificationServiceProvider);
+
+      try {
+        if (isSubscribed) {
+          // Unsubscribe
+          await notificationService.unsubscribeFromMessage(
+            messageId: message.id,
+            projectDb: projectDb,
+          );
+        } else {
+          // Subscribe
+          await notificationService.subscribeToMessage(
+            messageId: message.id,
+            sessionId: message.sessionId,
+            projectId: currentProject.id,
+            projectDb: projectDb,
+          );
+          ShadToaster.maybeOf(context)?.show(
+            ShadToast(
+              title: const Text('Subscribed'),
+              description: const Text(
+                'You will receive notifications for updates to this message.',
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        // Handle error (could show a snackbar to the user)
+        if (!context.mounted) {
+          return;
+        }
+        ShadToaster.maybeOf(context)?.show(
+          ShadToast.destructive(
+            title: const Text('Subscription Failed'),
+            description: Text(e.toString()),
+          ),
         );
       }
     }
@@ -483,24 +498,5 @@ class _MessageItem extends ConsumerWidget {
         ),
       ],
     );
-  }
-}
-
-/// Map Flutter's TargetPlatform to DevicePlatform enum
-DevicePlatform _getDevicePlatform(TargetPlatform platform) {
-  switch (platform) {
-    case TargetPlatform.iOS:
-      return DevicePlatform.ios;
-    case TargetPlatform.android:
-      return DevicePlatform.android;
-    case TargetPlatform.macOS:
-      return DevicePlatform.macos;
-    case TargetPlatform.windows:
-      return DevicePlatform.windows;
-    case TargetPlatform.linux:
-      return DevicePlatform.linux;
-    case TargetPlatform.fuchsia:
-      // Fuchsia is not supported, default to Linux
-      return DevicePlatform.linux;
   }
 }
