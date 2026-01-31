@@ -107,4 +107,11 @@ class MessageSubscriberDao extends DatabaseAccessor<ProjectDatabase>
     );
     return result;
   }
+
+  /// Cleanup all subscriptions (soft delete)
+  /// Returns the number of subscriptions cleaned up.
+  /// Use with caution.
+  Future<int> cleanupAll() {
+    return delete(messageSubscribers).go();
+  }
 }

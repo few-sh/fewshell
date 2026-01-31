@@ -82,6 +82,13 @@ class SyncController {
           _log.info(
             'Reset $resetCount streaming message(s) for project ${project.id} (${project.name})',
           );
+
+          // Clean up all message subscriptions
+          final subscriptionCleanupCount =
+              await projectDb.messageSubscriberDao.cleanupAll();
+          _log.info(
+            'Cleaned up $subscriptionCleanupCount message subscription(s) for project ${project.id} (${project.name})',
+          );
         } catch (e) {
           _log.warning(
             'Failed to cleanup mutexes for project ${project.id}: $e',
