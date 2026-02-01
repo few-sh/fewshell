@@ -602,7 +602,6 @@ class _AgentSession {
           },
           executeToolCall: (toolCalls) async {
             final results = <String>[];
-            _streamingMessageId = projectDb!.messageDao.generateMessageId();
             _streamingCreatedAt = DateTime.now();
 
             _asyncDbWrite(() async {
@@ -618,7 +617,7 @@ class _AgentSession {
                 messageKind: const Value(MessageKind.toolResult),
                 isStreaming: const Value(true),
               );
-              await projectDb!.messageDao.insertMessage(companion);
+              await projectDb!.messageDao.updateMessage(companion);
             });
 
             for (final toolCall in toolCalls) {
@@ -721,6 +720,7 @@ class _AgentSession {
 
             String? id = _streamingMessageId ??
                 projectDb!.messageDao.generateMessageId();
+            _streamingMessageId = id;
 
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             // Determine if this is a tool use message or a text message
