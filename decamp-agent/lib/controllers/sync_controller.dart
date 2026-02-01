@@ -8,7 +8,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
-import 'package:drift/drift.dart';
 import '../services/database_manager.dart';
 import '../services/local_shell_backend.dart';
 import '../services/notification_dispatcher.dart';
@@ -323,8 +322,6 @@ class _AgentSession {
   CancelToken? _currentCancelToken;
   StreamController<ProcessSignal>? _currentAbortController;
 
-  // Streaming state
-  MessageEntity? _streamingMessage;
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
@@ -477,6 +474,7 @@ class _AgentSession {
     }
 
     try {
+      MessageEntity? streamingMessage;
       try {
         final config = data['config'] as Map<String, dynamic>;
         final triggerMessageJson =
@@ -600,16 +598,16 @@ class _AgentSession {
           },
           executeToolCall: (toolCalls) async {
             final results = <String>[];
-            if (_streamingMessage != null) {
-              _streamingMessage = _streamingMessage!.copyWith(
+            if (streamingMessage != null) {
+              streamingMessage = streamingMessage!.copyWith(
                 createdAt: DateTime.now(),
               );
             }
 
             _asyncDbWrite(() async {
-              if (_streamingMessage != null) {
+              if (streamingMessage != null) {
                 // Insert placeholder message for tool call start
-                _streamingMessage = _streamingMessage!.copyWith(
+                streamingMessage = streamingMessage!.copyWith(
                   userId: 'user',
                   userName: 'System',
                   content: '```bash\n',
@@ -619,7 +617,7 @@ class _AgentSession {
                   isStreaming: true,
                 );
                 await projectDb!.messageDao.updateMessage(
-                  _streamingMessage!.toCompanion(true),
+                  streamingMessage!.toCompanion(true),
                 );
               }
             });
@@ -645,11 +643,11 @@ class _AgentSession {
                 void onOutput(String data) {
                   //_log.info('Command delta: $data');
                   toolOutputBuffer.write(data);
-                  if (_streamingMessage != null) {
-                    _streamingMessage = _streamingMessage!.copyWith(
-                      content: _streamingMessage!.content + data,
+                  if (streamingMessage != null) {
+                    streamingMessage = streamingMessage!.copyWith(
+                      content: streamingMessage!.content + data,
                     );
-                    final id = _streamingMessage!.id;
+                    final id = streamingMessage!.id;
                     _asyncDbWrite(() async {
                       await projectDb!.messageDao.appendMessageContent(
                         messageId: id,
@@ -696,10 +694,10 @@ class _AgentSession {
             return results;
           },
           onTextDelta: (delta) {
-            if (_streamingMessage == null) {
+            if (streamingMessage == null) {
               final id = projectDb!.messageDao.generateMessageId();
               final now = DateTime.now();
-              _streamingMessage = MessageEntity(
+              streamingMessage = MessageEntity(
                 id: id,
                 sessionId: currentSessionId,
                 userId: 'ai',
@@ -712,10 +710,10 @@ class _AgentSession {
                 isVisibleToLlm: true,
               );
             }
-            _streamingMessage = _streamingMessage!.copyWith(
-              content: _streamingMessage!.content + delta,
+            streamingMessage = streamingMessage!.copyWith(
+              content: streamingMessage!.content + delta,
             );
-            final companion = _streamingMessage!.toCompanion(true);
+            final companion = streamingMessage!.toCompanion(true);
 
             _asyncDbWrite(() async {
               await projectDb!.messageDao.insertMessage(companion);
@@ -726,11 +724,11 @@ class _AgentSession {
             await _lastDbWrite;
 
             String id;
-            if (_streamingMessage != null) {
-              id = _streamingMessage!.id;
+            if (streamingMessage != null) {
+              id = streamingMessage!.id;
             } else {
               id = projectDb!.messageDao.generateMessageId();
-              _streamingMessage = MessageEntity(
+              streamingMessage = MessageEntity(
                 id: id,
                 sessionId: currentSessionId,
                 userId: 'ai',
@@ -774,12 +772,12 @@ class _AgentSession {
           }) async {
             String id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
-            if (_streamingMessage != null) {
-              id = _streamingMessage!.id;
+            if (streamingMessage != null) {
+              id = streamingMessage!.id;
             } else {
               id = projectDb!.messageDao.generateMessageId();
             }
-            _streamingMessage = null;
+            streamingMessage = null;
             await projectDb!.messageDao.insertMessage(
               message.toMessageCompanion(
                 sessionId: currentSessionId,
@@ -863,18 +861,18 @@ class _AgentSession {
           _log.warning('Error waiting for last DB write: $e');
         }
 
-        if (_streamingMessage != null && projectDb != null) {
+        if (streamingMessage != null && projectDb != null) {
           // Clean up any streaming message placeholder
           try {
             final config = data['config'] as Map<String, dynamic>?;
             final model = config?['model'] as String? ?? 'Ops Agent';
 
             await projectDb!.messageDao.insertMessageWithId(
-              id: _streamingMessage!.id,
+              id: streamingMessage!.id,
               sessionId: sessionId!,
               userId: 'ai',
               userName: model,
-              content: _streamingMessage!.content,
+              content: streamingMessage!.content,
               isStreaming: false,
               isVisibleToLlm: true,
             );
@@ -884,8 +882,6 @@ class _AgentSession {
             );
           }
         }
-        // Reset streaming state
-        _streamingMessage = null;
         _lastDbWrite = Future.value(); // Reset chain
 
         if (sessionId != null) {
