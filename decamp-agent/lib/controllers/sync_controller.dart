@@ -324,9 +324,7 @@ class _AgentSession {
   StreamController<ProcessSignal>? _currentAbortController;
 
   // Streaming state
-  String? _streamingMessageId;
-  final StringBuffer _streamingContent = StringBuffer();
-  DateTime? _streamingCreatedAt;
+  MessageEntity? _streamingMessage;
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
@@ -602,22 +600,28 @@ class _AgentSession {
           },
           executeToolCall: (toolCalls) async {
             final results = <String>[];
-            _streamingCreatedAt = DateTime.now();
+            if (_streamingMessage != null) {
+              _streamingMessage = _streamingMessage!.copyWith(
+                createdAt: DateTime.now(),
+              );
+            }
 
             _asyncDbWrite(() async {
-              // Insert placeholder message for tool call start
-              final companion = MessageEntityCompanion(
-                id: Value(_streamingMessageId!),
-                sessionId: Value(currentSessionId),
-                userId: const Value('user'),
-                userName: const Value('System'),
-                content: const Value('```bash\n'), // Initial content
-                timestamp: Value(DateTime.now()),
-                createdAt: Value(DateTime.now()),
-                messageKind: const Value(MessageKind.toolResult),
-                isStreaming: const Value(true),
-              );
-              await projectDb!.messageDao.updateMessage(companion);
+              if (_streamingMessage != null) {
+                // Insert placeholder message for tool call start
+                _streamingMessage = _streamingMessage!.copyWith(
+                  userId: 'user',
+                  userName: 'System',
+                  content: '```bash\n',
+                  timestamp: DateTime.now(),
+                  createdAt: DateTime.now(),
+                  messageKind: MessageKind.toolResult,
+                  isStreaming: true,
+                );
+                await projectDb!.messageDao.updateMessage(
+                  _streamingMessage!.toCompanion(true),
+                );
+              }
             });
 
             for (final toolCall in toolCalls) {
@@ -641,10 +645,14 @@ class _AgentSession {
                 void onOutput(String data) {
                   //_log.info('Command delta: $data');
                   toolOutputBuffer.write(data);
-                  if (_streamingMessageId != null) {
+                  if (_streamingMessage != null) {
+                    _streamingMessage = _streamingMessage!.copyWith(
+                      content: _streamingMessage!.content + data,
+                    );
+                    final id = _streamingMessage!.id;
                     _asyncDbWrite(() async {
                       await projectDb!.messageDao.appendMessageContent(
-                        messageId: _streamingMessageId!,
+                        messageId: id,
                         appendContent: data,
                       );
                     });
@@ -688,27 +696,26 @@ class _AgentSession {
             return results;
           },
           onTextDelta: (delta) {
-            if (_streamingMessageId == null) {
-              _streamingMessageId = projectDb!.messageDao.generateMessageId();
-              _streamingCreatedAt = DateTime.now();
+            if (_streamingMessage == null) {
+              final id = projectDb!.messageDao.generateMessageId();
+              final now = DateTime.now();
+              _streamingMessage = MessageEntity(
+                id: id,
+                sessionId: currentSessionId,
+                userId: 'ai',
+                userName: model,
+                content: '',
+                timestamp: now,
+                createdAt: now,
+                messageKind: MessageKind.text,
+                isStreaming: true,
+                isVisibleToLlm: true,
+              );
             }
-            _streamingContent.write(delta);
-            final content = _streamingContent.toString();
-            final id = _streamingMessageId!;
-            final createdAt = _streamingCreatedAt!;
-
-            // Capture values for the closure
-            final companion = MessageEntityCompanion(
-              id: Value(id),
-              sessionId: Value(currentSessionId),
-              userId: const Value('ai'),
-              userName: Value(model),
-              content: Value(content),
-              timestamp: Value(createdAt),
-              createdAt: Value(createdAt),
-              messageKind: const Value(MessageKind.text),
-              isStreaming: const Value(true),
+            _streamingMessage = _streamingMessage!.copyWith(
+              content: _streamingMessage!.content + delta,
             );
+            final companion = _streamingMessage!.toCompanion(true);
 
             _asyncDbWrite(() async {
               await projectDb!.messageDao.insertMessage(companion);
@@ -718,9 +725,24 @@ class _AgentSession {
             // Wait for any pending streaming writes to finish
             await _lastDbWrite;
 
-            String? id = _streamingMessageId ??
-                projectDb!.messageDao.generateMessageId();
-            _streamingMessageId = id;
+            String id;
+            if (_streamingMessage != null) {
+              id = _streamingMessage!.id;
+            } else {
+              id = projectDb!.messageDao.generateMessageId();
+              _streamingMessage = MessageEntity(
+                id: id,
+                sessionId: currentSessionId,
+                userId: 'ai',
+                userName: model,
+                content: '',
+                timestamp: DateTime.now(),
+                createdAt: DateTime.now(),
+                messageKind: MessageKind.text,
+                isStreaming: false,
+                isVisibleToLlm: true,
+              );
+            }
 
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             // Determine if this is a tool use message or a text message
@@ -750,11 +772,14 @@ class _AgentSession {
             String? messageId,
             ChatMessage? toolCallMessage,
           }) async {
-            String? id;
+            String id;
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
-            id = _streamingMessageId ??
-                projectDb!.messageDao.generateMessageId();
-            _streamingMessageId = null;
+            if (_streamingMessage != null) {
+              id = _streamingMessage!.id;
+            } else {
+              id = projectDb!.messageDao.generateMessageId();
+            }
+            _streamingMessage = null;
             await projectDb!.messageDao.insertMessage(
               message.toMessageCompanion(
                 sessionId: currentSessionId,
@@ -838,18 +863,18 @@ class _AgentSession {
           _log.warning('Error waiting for last DB write: $e');
         }
 
-        if (_streamingMessageId != null && projectDb != null) {
+        if (_streamingMessage != null && projectDb != null) {
           // Clean up any streaming message placeholder
           try {
             final config = data['config'] as Map<String, dynamic>?;
             final model = config?['model'] as String? ?? 'Ops Agent';
 
             await projectDb!.messageDao.insertMessageWithId(
-              id: _streamingMessageId!,
+              id: _streamingMessage!.id,
               sessionId: sessionId!,
               userId: 'ai',
               userName: model,
-              content: _streamingContent.toString(),
+              content: _streamingMessage!.content,
               isStreaming: false,
               isVisibleToLlm: true,
             );
@@ -860,9 +885,7 @@ class _AgentSession {
           }
         }
         // Reset streaming state
-        _streamingMessageId = null;
-        _streamingContent.clear();
-        _streamingCreatedAt = null;
+        _streamingMessage = null;
         _lastDbWrite = Future.value(); // Reset chain
 
         if (sessionId != null) {
