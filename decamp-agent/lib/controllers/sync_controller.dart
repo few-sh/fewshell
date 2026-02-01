@@ -507,7 +507,7 @@ class _AgentSession {
             await projectDb!.messageDao.getMessagesBySession(currentSessionId);
         final conversation = dbMessages
             .where((m) => !m.isStreaming && m.isVisibleToLlm)
-            .map((m) => m.toChatMessage())
+            .expand((m) => m.toChatMessage())
             .toList();
 
         // Add cache control to the last text message for Anthropic prompt caching

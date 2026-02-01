@@ -122,26 +122,24 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       // Use the extension method to convert to ChatMessage
-      final chatMessage = messageEntity.toChatMessage();
+      final chatMessages = messageEntity.toChatMessage();
 
-      _log.info(
-        '✅ Reconstructed ${chatMessage.role.name} message with kind: ${messageEntity.messageKind.name}',
-      );
+      for (final chatMessage in chatMessages) {
+        // Log tool calls and results for debugging
+        if (chatMessage.messageType is ToolUseMessage) {
+          final toolUse = chatMessage.messageType as ToolUseMessage;
+          _log.info(
+            '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
+          );
+        } else if (chatMessage.messageType is ToolResultMessage) {
+          final toolResult = chatMessage.messageType as ToolResultMessage;
+          _log.info(
+            '  📊 Tool results: ${toolResult.results.length} result(s)',
+          );
+        }
 
-      // Log tool calls and results for debugging
-      if (chatMessage.messageType is ToolUseMessage) {
-        final toolUse = chatMessage.messageType as ToolUseMessage;
-        _log.info(
-          '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
-        );
-      } else if (chatMessage.messageType is ToolResultMessage) {
-        final toolResult = chatMessage.messageType as ToolResultMessage;
-        _log.info(
-          '  📊 Tool results: ${toolResult.results.length} result(s)',
-        );
+        conversation.add(chatMessage);
       }
-
-      conversation.add(chatMessage);
     }
 
     if (conversation.isNotEmpty) {

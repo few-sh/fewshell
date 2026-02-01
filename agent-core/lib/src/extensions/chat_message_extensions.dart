@@ -72,6 +72,7 @@ extension ChatMessageToDB on ChatMessage {
       imageUrl: Value(imageUrlValue),
       toolCallsJson: Value(toolCallsValue),
       toolResultsJson: Value(toolResultsValue),
+      isVisibleToLlm: Value(true),
     );
   }
 
@@ -95,26 +96,40 @@ extension ChatMessageToDB on ChatMessage {
 /// Extensions for MessageEntity to support conversion to ChatMessage
 extension MessageEntityToChat on MessageEntity {
   /// Convert MessageEntity to ChatMessage
-  ChatMessage toChatMessage() {
+  List<ChatMessage> toChatMessage() {
     final role = _roleFromUserId(userId);
 
     return switch (messageKind) {
-      MessageKind.toolUse => ChatMessage.toolUse(
-          toolCalls: toolCallsJson ?? [],
-          content: content,
-        ),
-      MessageKind.toolResult => ChatMessage.toolResult(
-          results: toolResultsJson ?? [],
-          content: content,
-        ),
-      MessageKind.imageUrl => ChatMessage.imageUrl(
-          role: role,
-          url: imageUrl!,
-          content: content,
-        ),
+      MessageKind.toolUse => [
+          ChatMessage.toolUse(
+            toolCalls: toolCallsJson ?? [],
+            content: content,
+          ),
+          ChatMessage.toolResult(
+            results: toolResultsJson ?? [],
+            content: content,
+          )
+        ],
+      MessageKind.toolResult => [
+          ChatMessage.toolUse(
+            toolCalls: toolCallsJson ?? [],
+            content: content,
+          ),
+          ChatMessage.toolResult(
+            results: toolResultsJson ?? [],
+            content: content,
+          )
+        ],
+      MessageKind.imageUrl => [
+          ChatMessage.imageUrl(
+            role: role,
+            url: imageUrl!,
+            content: content,
+          )
+        ],
       MessageKind.text => role == ChatRole.user
-          ? ChatMessage.user(content)
-          : ChatMessage.assistant(content),
+          ? [ChatMessage.user(content)]
+          : [ChatMessage.assistant(content)],
     };
   }
 
