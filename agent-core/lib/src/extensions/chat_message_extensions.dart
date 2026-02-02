@@ -76,6 +76,79 @@ extension ChatMessageToDB on ChatMessage {
     );
   }
 
+  /// Convert ChatMessage to database entity
+  MessageEntity toMessageEntity({
+    required String sessionId,
+    String? id,
+    String? userName,
+    ChatMessage? toolCallMessage,
+    DateTime? timestamp,
+    isStreaming = false,
+  }) {
+    final now = timestamp ?? DateTime.now();
+    final messageId = id ?? IdGenerator.messageId();
+
+    // Determine message kind and type-specific data
+    final MessageKind kind;
+    final String? imageUrlValue;
+    final List<ToolCall>? toolCallsValue;
+    final List<ToolCall>? toolResultsValue;
+
+    switch (messageType) {
+      case TextMessage():
+        kind = MessageKind.text;
+        imageUrlValue = null;
+        toolCallsValue = null;
+        toolResultsValue = null;
+
+      case ImageUrlMessage(:final url):
+        kind = MessageKind.imageUrl;
+        imageUrlValue = url;
+        toolCallsValue = null;
+        toolResultsValue = null;
+
+      case ToolUseMessage(:final toolCalls):
+        kind = MessageKind.toolUse;
+        imageUrlValue = null;
+        toolCallsValue = toolCalls;
+        toolResultsValue = null;
+
+      case ToolResultMessage(:final results):
+        kind = MessageKind.toolResult;
+        imageUrlValue = null;
+        toolCallsValue = switch (toolCallMessage?.messageType) {
+          ToolUseMessage(:final toolCalls) => toolCalls,
+          _ => null,
+        };
+        toolResultsValue = results;
+
+      default:
+        // ImageMessage and FileMessage would need special handling
+        // For now, treat as text
+        kind = MessageKind.text;
+        imageUrlValue = null;
+        toolCallsValue = null;
+        toolResultsValue = null;
+    }
+
+    return MessageEntity(
+      id: messageId,
+      sessionId: sessionId,
+      userId: _userIdFromRole(role),
+      userName: userName ?? _userNameFromRole(role),
+      content: content,
+      timestamp: now,
+      createdAt: now,
+      editedAt: null,
+      isStreaming: isStreaming,
+      isVisibleToLlm: true,
+      messageKind: kind,
+      imageUrl: imageUrlValue,
+      toolCallsJson: toolCallsValue,
+      toolResultsJson: toolResultsValue,
+    );
+  }
+
   String _userIdFromRole(ChatRole role) {
     return switch (role) {
       ChatRole.user => 'user',

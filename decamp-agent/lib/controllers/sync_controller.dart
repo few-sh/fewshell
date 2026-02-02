@@ -746,13 +746,13 @@ class _AgentSession {
             // Determine if this is a tool use message or a text message
             final messageType = message.messageType;
             if (messageType is ToolUseMessage) {
-              await projectDb!.messageDao.insertMessage(
-                message.toMessageCompanion(
-                  sessionId: currentSessionId,
-                  id: id,
-                  userName: model,
-                ),
+              streamingMessage = message.toMessageEntity(
+                sessionId: currentSessionId,
+                id: id,
+                isStreaming: true,
               );
+              await projectDb!.messageDao
+                  .insertMessage(streamingMessage!.toCompanion(true));
             } else {
               await projectDb!.messageDao.insertMessageWithId(
                 id: id,
@@ -867,14 +867,12 @@ class _AgentSession {
             final config = data['config'] as Map<String, dynamic>?;
             final model = config?['model'] as String? ?? 'Ops Agent';
 
-            await projectDb!.messageDao.insertMessageWithId(
-              id: streamingMessage!.id,
-              sessionId: sessionId!,
-              userId: 'ai',
+            streamingMessage = streamingMessage!.copyWith(
               userName: model,
-              content: streamingMessage!.content,
               isStreaming: false,
-              isVisibleToLlm: true,
+            );
+            await projectDb!.messageDao.updateMessage(
+              streamingMessage!.toCompanion(true),
             );
           } catch (e) {
             _log.warning(
