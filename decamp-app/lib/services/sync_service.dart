@@ -22,7 +22,7 @@ final syncServiceProvider = Provider<SyncService>((ref) {
 });
 
 class SyncService {
-  static const defaultConnectionTimeout = Duration(seconds: 5);
+  static const defaultConnectionTimeout = Duration(seconds: 10);
 
   final Ref ref;
   CrdtSync? _globalSync;
@@ -220,8 +220,8 @@ class SyncService {
               return changeset;
             },
       );
-    } catch (e) {
-      _log.warning('Global DB not ready or error: $e');
+    } catch (e, stackTrace) {
+      _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
     }
   }
@@ -350,9 +350,9 @@ class SyncService {
         _projectChannel!,
         verbose: true,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       if (token.isCancelled) return;
-      _log.warning('Project DB not ready or error: $e');
+      _log.severe('Project DB sync connection error: $e', stackTrace);
       _scheduleReconnect();
     }
   }
@@ -507,6 +507,10 @@ class SyncService {
         ..setTrustedCertificatesBytes(utf8.encode(caCert));
 
       _log.info('SecurityContext created successfully.');
+
+      if (kDebugMode) {
+        HttpClient.enableTimelineLogging = true;
+      }
 
       final client = HttpClient(context: context);
 
