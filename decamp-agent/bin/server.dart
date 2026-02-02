@@ -180,7 +180,7 @@ void main(List<String> args) async {
     );
 
     server.listen(
-      (HttpRequest request) {
+      (HttpRequest request) async {
         try {
           final clientIp = request.connectionInfo?.remoteAddress.address;
           final cert = request.certificate;
@@ -199,14 +199,20 @@ void main(List<String> args) async {
               ..close();
             return;
           }
-        } catch (e) {
-          _log.warning('Error logging client info: $e');
-        }
 
-        shelf_io.handleRequest(request, handler);
+          await shelf_io.handleRequest(request, handler);
+        } catch (e, st) {
+          _log.severe('Error processing request: $e', e, st);
+          try {
+            request.response
+              ..statusCode = HttpStatus.internalServerError
+              ..write('Internal Server Error')
+              ..close();
+          } catch (_) {}
+        }
       },
-      onError: (e) {
-        _log.severe('HttpServer stream error', e);
+      onError: (e, st) {
+        _log.severe('HttpServer stream error', e, st);
       },
       onDone: () =>
           _log.severe('HttpServer stream closed. This is unexpected!'),
