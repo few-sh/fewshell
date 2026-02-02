@@ -193,10 +193,14 @@ void main(List<String> args) async {
             _log.warning(
               'Client connection from $clientIp - NO CERTIFICATE PRESENTED',
             );
-            request.response
-              ..statusCode = HttpStatus.unauthorized
-              ..write('Unauthized.')
-              ..close();
+            try {
+              request.response
+                ..statusCode = HttpStatus.unauthorized
+                ..write('Unauthized.');
+              await request.response.close();
+            } catch (e, st) {
+              _log.severe('Error sending unauthorized response: $e', e, st);
+            }
             return;
           }
 
@@ -206,9 +210,11 @@ void main(List<String> args) async {
           try {
             request.response
               ..statusCode = HttpStatus.internalServerError
-              ..write('Internal Server Error')
-              ..close();
-          } catch (_) {}
+              ..write('Internal Server Error');
+            await request.response.close();
+          } catch (e, st) {
+            _log.severe('Error sending error response: $e', e, st);
+          }
         }
       },
       onError: (e, st) {
