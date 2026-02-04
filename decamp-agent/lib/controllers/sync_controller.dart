@@ -500,41 +500,6 @@ class _AgentSession {
           );
         }
 
-        // Always load conversation from database (single source of truth)
-        // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
-        // Also filter out messages not visible to LLM
-        final dbMessages =
-            await projectDb!.messageDao.getMessagesBySession(currentSessionId);
-        final conversation = dbMessages
-            .where((m) => !m.isStreaming && m.isVisibleToLlm)
-            .expand((m) => m.toChatMessage())
-            .toList();
-
-        // Add cache control to the last text message for Anthropic prompt caching
-        // Search backwards to find the last TextMessage, as conversation may end with tool calls
-        // Use cache control marker pattern: Empty text block with cache_control
-        if (conversation.isNotEmpty) {
-          for (int i = conversation.length - 1; i >= 0; i--) {
-            if (conversation[i].messageType is TextMessage) {
-              // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
-              // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
-              conversation[i] = conversation[i].withExtension(
-                'anthropic',
-                {
-                  'contentBlocks': [
-                    {
-                      'type': 'text',
-                      'text': '',
-                      'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
-                    },
-                  ],
-                },
-              );
-              break; // Only cache the last text message
-            }
-          }
-        }
-
         final apiKey = config['apiKey'] as String;
         final providerTypeStr = config['provider'] as String;
         final model = config['model'] as String;
@@ -569,6 +534,9 @@ class _AgentSession {
         _currentAbortController = abortController;
 
         await runAgentLoop(
+          getConversation: () async {
+            return await _loadConversation(currentSessionId);
+          },
           llmStream: (conv, tools, {cancelToken}) {
             return provider.chatStream(
               conv,
@@ -577,7 +545,6 @@ class _AgentSession {
             );
           },
           tools: shellTools,
-          conversation: conversation,
           cancelToken: _currentCancelToken,
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
@@ -903,6 +870,44 @@ class _AgentSession {
         onComplete();
       }
     }
+  }
+
+  Future<List<ChatMessage>> _loadConversation(String sessionId) async {
+    // Always load conversation from database (single source of truth)
+    // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
+    // Also filter out messages not visible to LLM
+    final dbMessages =
+        await projectDb!.messageDao.getMessagesBySession(sessionId);
+    final conversation = dbMessages
+        .where((m) => !m.isStreaming && m.isVisibleToLlm)
+        .expand((m) => m.toChatMessage())
+        .toList();
+
+    // Add cache control to the last text message for Anthropic prompt caching
+    // Search backwards to find the last TextMessage, as conversation may end with tool calls
+    // Use cache control marker pattern: Empty text block with cache_control
+    if (conversation.isNotEmpty) {
+      for (int i = conversation.length - 1; i >= 0; i--) {
+        if (conversation[i].messageType is TextMessage) {
+          // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
+          // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
+          conversation[i] = conversation[i].withExtension(
+            'anthropic',
+            {
+              'contentBlocks': [
+                {
+                  'type': 'text',
+                  'text': '',
+                  'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
+                },
+              ],
+            },
+          );
+          break; // Only cache the last text message
+        }
+      }
+    }
+    return conversation;
   }
 
   void _asyncDbWrite(Future<void> Function() write) {
