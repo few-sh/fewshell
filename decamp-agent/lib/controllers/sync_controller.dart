@@ -647,6 +647,13 @@ class _AgentSession {
               }
               results.add(result);
             }
+
+            streamingMessage = streamingMessage.copyWith(
+                content: '${streamingMessage.content}\n```\n');
+
+            await projectDb!.messageDao
+                .insertMessage(streamingMessage.toCompanion(true));
+
             return results;
           },
           onTextDelta: (delta) async {
