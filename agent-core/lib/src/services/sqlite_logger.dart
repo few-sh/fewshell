@@ -222,8 +222,8 @@ class SqliteLogger {
         // Delete all records up to maxIdToDelete in a single operation
         _db.execute('DELETE FROM $tableName WHERE id <= ?', [maxIdToDelete]);
 
-        // Optimize the database to reclaim unused space
-        _db.execute('PRAGMA optimize;');
+        // Rebuild the database file to reclaim unused disk space
+        _db.execute('VACUUM');
       }
 
       // Log the truncation event
