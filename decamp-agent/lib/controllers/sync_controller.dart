@@ -693,7 +693,7 @@ class _AgentSession {
             }
             return results;
           },
-          onTextDelta: (delta) {
+          onTextDelta: (delta) async {
             if (streamingMessage == null) {
               final id = projectDb!.messageDao.generateMessageId();
               final now = DateTime.now();

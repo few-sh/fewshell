@@ -233,7 +233,7 @@ Future<_StreamResult> _streamFromLlm({
     switch (event) {
       case TextDeltaEvent(delta: final delta):
         buffer.write(delta);
-        onTextDelta?.call(delta);
+        await onTextDelta?.call(delta);
 
       case ToolCallDeltaEvent(toolCall: final delta):
         final id = delta.id;

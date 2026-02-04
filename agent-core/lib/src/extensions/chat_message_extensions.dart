@@ -179,7 +179,9 @@ extension MessageEntityToChat on MessageEntity {
             content: content,
           ),
           ChatMessage.toolResult(
-            results: toolResultsJson ?? [],
+            results:
+                toolCallsJson ?? // Empty results for tool use - this is not a typo!
+                    [],
             content: content,
           )
         ],
