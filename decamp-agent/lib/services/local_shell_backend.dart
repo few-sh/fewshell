@@ -85,8 +85,27 @@ class LocalShellSession implements ShellSession {
       : _shouldExit = shouldExit;
   static final _log = Logger('LocalShellSession');
 
+  Stream<Uint8List>? _stdout;
+
   @override
-  Stream<Uint8List> get stdout => _pty.data;
+  Stream<Uint8List> get stdout {
+    _stdout ??= _pty.data.transform(
+      StreamTransformer<Uint8List, Uint8List>.fromHandlers(
+        handleData: (data, sink) => sink.add(data),
+        handleError: (error, stackTrace, sink) {
+          _log.warning('Error in PTY stream', error, stackTrace);
+          _pty.close();
+          sink.addError(error, stackTrace);
+        },
+        handleDone: (sink) {
+          _pty.close();
+          _log.fine('PTY session closed');
+          sink.close();
+        },
+      ),
+    );
+    return _stdout!;
+  }
 
   @override
   Stream<Uint8List> get stderr => const Stream.empty();
