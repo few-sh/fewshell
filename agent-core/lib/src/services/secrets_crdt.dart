@@ -80,7 +80,8 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
       }
 
       if (records.isNotEmpty) {
-        await merge({'secrets': records});
+        // Use super.merge directly to avoid triggering _saveKey and notifications during load
+        await super.merge({'secrets': records});
         _log.info('Merged ${records.length} secrets into CRDT');
       }
     } catch (e) {
@@ -104,9 +105,10 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
   @override
   Future<void> merge(Map<String, List<Map<String, Object?>>> changeset) async {
     final records = changeset['secrets'] ?? [];
+    final recordsToMerge = <Map<String, Object?>>[];
     final changedKeys = <String>{};
 
-    // Identify which records are actually new/updates
+    // Filter out records that are not newer than what we have
     for (final record in records) {
       final key = record['key'] as String;
       try {
@@ -115,7 +117,9 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
             hlcVal is Hlc ? hlcVal : Hlc.parse(hlcVal.toString());
 
         final existing = getRecord('secrets', key);
+        // Only merge if we don't have it, or the incoming one is newer
         if (existing == null || incomingHlc > existing.hlc) {
+          recordsToMerge.add(record);
           changedKeys.add(key);
         }
       } catch (e) {
@@ -124,10 +128,11 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
       }
     }
 
-    await super.merge(changeset);
+    if (recordsToMerge.isNotEmpty) {
+      // Only merge the subset of records that are actually new
+      await super.merge({'secrets': recordsToMerge});
 
-    if (changedKeys.isNotEmpty) {
-      _log.info('Merging ${changedKeys.length} new/updated secrets');
+      _log.info('Merged ${recordsToMerge.length} new/updated secrets');
       for (final key in changedKeys) {
         await _saveKey(key);
       }
