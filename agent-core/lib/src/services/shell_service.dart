@@ -377,9 +377,7 @@ chmod 700 $askpassPath
 $envExports
 export SUDO_PASSWORD="\$(echo '$encodedSudoPassword' | base64 -d)"
 stty echo
-SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'
-
-
+SUDO_ASKPASS=$askpassPath sudo -A bash -c '${_escapeForCommand(command)}'; exit \$?
 rm -f $askpassPath
 ''';
     } else {
@@ -389,7 +387,7 @@ rm -f $askpassPath
       }
       secureScript = '''
 $secretsExports
-sudo bash -c '${_escapeForCommand(command)}'
+sudo bash -c '${_escapeForCommand(command)}'; exit \$?
 ''';
     }
 
