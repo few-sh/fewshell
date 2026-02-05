@@ -2,6 +2,10 @@
     "chat.useNestedAgentsMdFiles": true,
     "chat.tools.terminal.autoApprove": {
         "dart analyze": true,
+        "/^git fetch && git status$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     },
     "remote.portsAttributes": {
         "3123": {
