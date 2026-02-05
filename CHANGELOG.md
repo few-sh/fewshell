@@ -1,3 +1,11 @@
+# App 1.0.1+25
+
+- Improve connection stability and reconnect logic
+
+# Server 0.1.21
+
+- Fix sudo commands getting stuck
+
 # App 1.0.1+24
 
 - Push notification service integration
