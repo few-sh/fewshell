@@ -103,13 +103,38 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
 
   @override
   Future<void> merge(Map<String, List<Map<String, Object?>>> changeset) async {
-    await super.merge(changeset);
     final records = changeset['secrets'] ?? [];
-    _log.info('Merging ${records.length} secrets');
+    final changedKeys = <String>{};
+
+    // Identify which records are actually new/updates
     for (final record in records) {
-      await _saveKey(record['key'] as String);
+      final key = record['key'] as String;
+      try {
+        final hlcVal = record['hlc'];
+        final incomingHlc =
+            hlcVal is Hlc ? hlcVal : Hlc.parse(hlcVal.toString());
+
+        final existing = getRecord('secrets', key);
+        if (existing == null || incomingHlc > existing.hlc) {
+          changedKeys.add(key);
+        }
+      } catch (e) {
+        _log.warning('Invalid HLC in merge for key $key: ${record['hlc']}');
+        continue;
+      }
     }
-    _changeController.add(null);
+
+    await super.merge(changeset);
+
+    if (changedKeys.isNotEmpty) {
+      _log.info('Merging ${changedKeys.length} new/updated secrets');
+      for (final key in changedKeys) {
+        await _saveKey(key);
+      }
+      _changeController.add(null);
+    } else if (records.isNotEmpty) {
+      _log.fine('Ignored ${records.length} redundant secrets during merge');
+    }
   }
 
   Future<void> _saveKey(String key) async {
