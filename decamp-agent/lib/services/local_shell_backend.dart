@@ -33,24 +33,7 @@ class LocalShellBackend implements ShellBackend {
   Future<ShellSession> execute(String command) async {
     _log.info('Executing local command via PTY: $command');
 
-    // Use /bin/bash to ensure we have a standard shell environment
-    // Force bash instead of user's shell to ensure consistent behavior/syntax
-    final shellArgs = getDefaultPlatformShellArgs();
-
-    // Inherit environment variables but override TERM and ensure UTF-8 locale
-    final environment = Map<String, String>.from(Platform.environment);
-    environment['TERM'] = 'dumb';
-    environment['LANG'] = 'en_US.UTF-8';
-    environment['LC_ALL'] = 'en_US.UTF-8';
-
-    // TERM=dumb disables terminal features (bracketed paste, colors, title)
-    // that produce escape sequences in the output
-    final pty = NativePty.spawn(
-      shellArgs[0],
-      shellArgs.sublist(1),
-      environment: environment,
-      autoDecodeUtf8: false,
-    );
+    final pty = _spawnPty();
 
     // Write command and exit on separate calls
     // This ensures exit is queued but can still be interrupted cleanly
@@ -61,18 +44,28 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> createSession() async {
+    final pty = _spawnPty();
+    return LocalShellSession(pty, shouldExit: false);
+  }
+
+  /// Spawns a new PTY with the platform-appropriate shell and environment.
+  NativePty _spawnPty() {
     final shellArgs = getDefaultPlatformShellArgs();
+
+    // Inherit environment variables but override TERM and ensure UTF-8 locale
     final environment = Map<String, String>.from(Platform.environment);
     environment['TERM'] = 'dumb';
     environment['LANG'] = 'en_US.UTF-8';
     environment['LC_ALL'] = 'en_US.UTF-8';
-    final pty = NativePty.spawn(
+
+    // TERM=dumb disables terminal features (bracketed paste, colors, title)
+    // that produce escape sequences in the output
+    return NativePty.spawn(
       shellArgs[0],
       shellArgs.sublist(1),
       environment: environment,
       autoDecodeUtf8: false,
     );
-    return LocalShellSession(pty, shouldExit: false);
   }
 
   List<String> getDefaultPlatformShellArgs() {
