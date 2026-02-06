@@ -42,56 +42,71 @@ class ExpandableCodeBlock extends StatelessWidget {
         ? _buildTruncatedContent(lines, totalLines)
         : code;
 
-    return Hero(
-      tag: heroTag,
-      child: Material(
-        color: Colors.transparent,
-        child: Stack(
-          children: [
-            // Code content container
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: terminalTheme.backgroundColor,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: terminalTheme.borderColor, width: 1),
-              ),
-              child: centered
-                  ? Center(
-                      child: Padding(
+    return SelectionArea(
+      contextMenuBuilder: (context, selectableRegionState) {
+        try {
+          return AdaptiveTextSelectionToolbar.selectableRegion(
+            selectableRegionState: selectableRegionState,
+          );
+        } catch (e) {
+          // Workaround for crash when scrolling and selecting
+          return const SizedBox.shrink();
+        }
+      },
+      child: Hero(
+        tag: heroTag,
+        child: Material(
+          color: Colors.transparent,
+          child: Stack(
+            children: [
+              // Code content container
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: terminalTheme.backgroundColor,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: terminalTheme.borderColor,
+                    width: 1,
+                  ),
+                ),
+                child: centered
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: _buildHighlightedCode(displayedContent),
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.all(12),
                         child: _buildHighlightedCode(displayedContent),
                       ),
-                    )
-                  : SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.all(12),
-                      child: _buildHighlightedCode(displayedContent),
-                    ),
-            ),
-            // Expand button (only if truncated)
-            if (needsTruncation)
-              Positioned(
-                bottom: 8,
-                right: 8,
-                child: Material(
-                  color: terminalTheme.backgroundColor.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(4),
-                  child: InkWell(
-                    onTap: () => _openFullScreen(context),
+              ),
+              // Expand button (only if truncated)
+              if (needsTruncation)
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: Material(
+                    color: terminalTheme.backgroundColor.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        Icons.fullscreen,
-                        size: 18,
-                        color: terminalTheme.textColor.withValues(alpha: 0.7),
+                    child: InkWell(
+                      onTap: () => _openFullScreen(context),
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.fullscreen,
+                          size: 18,
+                          color: terminalTheme.textColor.withValues(alpha: 0.7),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
