@@ -16,4 +16,7 @@ on the main branch, it should be up to date and we should have no local modifica
 4. Deploy the macos app using the command: cd decamp-app && ./deploy_macos.sh && cd ..
 5. If everything went well, commit the changes using git message format "version: ..." that matches decamp-app/pubspec.yml version line.
 
-NOTE: When deploying both apps, build and deploy the server first.
+IMPORTANT:
+- When deploying both apps, build and deploy the server first.
+- agent-core is a shared dependency between client and server, and may contain changes to server, client or both.
+- Do not include changes that are not user-facing in the CHANGELOG, eg changes such as updates to documentation or internal scripts are irrelevant.

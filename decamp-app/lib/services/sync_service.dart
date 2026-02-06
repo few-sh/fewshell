@@ -273,6 +273,13 @@ class SyncService {
         wsChannel,
         onActivity: _handleSyncActivity,
         onDisconnect: () {
+          // If this connection attempt was cancelled/superseded, ignore disconnect
+          if (token.isCancelled) {
+            _log.info(
+              'Ignoring disconnect for cancelled connection attempt for $projectId',
+            );
+            return;
+          }
           _log.info(
             'Project sync disconnected for $projectId (current: $_currentProjectId)',
           );
@@ -289,7 +296,15 @@ class SyncService {
           return;
         }
         _updateConnectionState(SyncConnectionState.connected);
-        _reconnectAttempts = 0;
+        // Reset reconnect attempts only after a stable connection duration (5s)
+        // to prevent rapid reconnect loops if connection is flapping.
+        Future.delayed(const Duration(seconds: 5), () {
+          if (!token.isCancelled &&
+              _currentProjectId == projectId &&
+              _currentConnectionState == SyncConnectionState.connected) {
+            _reconnectAttempts = 0;
+          }
+        });
       } catch (e) {
         if (token.isCancelled) return;
         _updateConnectionState(SyncConnectionState.disconnected);
@@ -631,10 +646,21 @@ class _ActivityMonitorWebSocketChannel
           sink.add(data);
         },
         handleError: (error, stackTrace, sink) {
+          _log.warning(
+            'ActivityMonitor: Stream error detected',
+            error,
+            stackTrace,
+          );
           onDisconnect();
           sink.addError(error, stackTrace);
         },
         handleDone: (sink) {
+          _log.info('ActivityMonitor: Stream done (closed by remote or local)');
+          if (_inner.closeCode != null) {
+            _log.info(
+              'Close Code: ${_inner.closeCode}, Reason: ${_inner.closeReason}',
+            );
+          }
           onDisconnect();
           sink.close();
         },

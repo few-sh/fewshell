@@ -80,7 +80,8 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
       }
 
       if (records.isNotEmpty) {
-        await merge({'secrets': records});
+        // Use super.merge directly to avoid triggering _saveKey and notifications during load
+        await super.merge({'secrets': records});
         _log.info('Merged ${records.length} secrets into CRDT');
       }
     } catch (e) {
@@ -103,13 +104,42 @@ class SecretsCrdt extends MapCrdt implements SecretsStorage {
 
   @override
   Future<void> merge(Map<String, List<Map<String, Object?>>> changeset) async {
-    await super.merge(changeset);
     final records = changeset['secrets'] ?? [];
-    _log.info('Merging ${records.length} secrets');
+    final recordsToMerge = <Map<String, Object?>>[];
+    final changedKeys = <String>{};
+
+    // Filter out records that are not newer than what we have
     for (final record in records) {
-      await _saveKey(record['key'] as String);
+      final key = record['key'] as String;
+      try {
+        final hlcVal = record['hlc'];
+        final incomingHlc =
+            hlcVal is Hlc ? hlcVal : Hlc.parse(hlcVal.toString());
+
+        final existing = getRecord('secrets', key);
+        // Only merge if we don't have it, or the incoming one is newer
+        if (existing == null || incomingHlc > existing.hlc) {
+          recordsToMerge.add(record);
+          changedKeys.add(key);
+        }
+      } catch (e) {
+        _log.warning('Invalid HLC in merge for key $key: ${record['hlc']}');
+        continue;
+      }
     }
-    _changeController.add(null);
+
+    if (recordsToMerge.isNotEmpty) {
+      // Only merge the subset of records that are actually new
+      await super.merge({'secrets': recordsToMerge});
+
+      _log.info('Merged ${recordsToMerge.length} new/updated secrets');
+      for (final key in changedKeys) {
+        await _saveKey(key);
+      }
+      _changeController.add(null);
+    } else if (records.isNotEmpty) {
+      _log.fine('Ignored ${records.length} redundant secrets during merge');
+    }
   }
 
   Future<void> _saveKey(String key) async {
