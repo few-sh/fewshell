@@ -35,7 +35,7 @@ class LocalShellBackend implements ShellBackend {
 
     // Use /bin/bash to ensure we have a standard shell environment
     // Force bash instead of user's shell to ensure consistent behavior/syntax
-    final shell = getDefaultPlatformShell();
+    final shellArgs = getDefaultPlatformShellArgs();
 
     // Inherit environment variables but override TERM and ensure UTF-8 locale
     final environment = Map<String, String>.from(Platform.environment);
@@ -46,8 +46,8 @@ class LocalShellBackend implements ShellBackend {
     // TERM=dumb disables terminal features (bracketed paste, colors, title)
     // that produce escape sequences in the output
     final pty = NativePty.spawn(
-      shell,
-      [shell, '-i'],
+      shellArgs[0],
+      shellArgs.sublist(1),
       environment: environment,
       autoDecodeUtf8: false,
     );
@@ -61,27 +61,31 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> createSession() async {
-    final shell = getDefaultPlatformShell();
+    final shellArgs = getDefaultPlatformShellArgs();
     final environment = Map<String, String>.from(Platform.environment);
     environment['TERM'] = 'dumb';
     environment['LANG'] = 'en_US.UTF-8';
     environment['LC_ALL'] = 'en_US.UTF-8';
     final pty = NativePty.spawn(
-      shell,
-      [shell, '-i'],
+      shellArgs[0],
+      shellArgs.sublist(1),
       environment: environment,
       autoDecodeUtf8: false,
     );
     return LocalShellSession(pty, shouldExit: false);
   }
 
-  String getDefaultPlatformShell() {
+  List<String> getDefaultPlatformShellArgs() {
     if (Platform.isWindows) {
-      return 'bash';
+      return ['bash']; // Use WSL bash on Windows for better compatibility
     } else if (Platform.isMacOS) {
-      return '/bin/zsh';
+      return [
+        '/bin/zsh',
+        '-i',
+        '--nozle', // Disable zle to prevent it from trying to read input and interfering with our PTY input handling
+      ]; // Use zsh on macOS for better compatibility with modern shells
     } else {
-      return '/bin/bash';
+      return ['/bin/bash', '-i']; // Use bash on Linux
     }
   }
 }
