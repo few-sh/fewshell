@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/full_screen_code_view.dart';
@@ -9,7 +10,7 @@ import 'package:decamp/utils/highlight_injector.dart';
 /// Automatically truncates code content that exceeds [kTerminalMaxLines],
 /// showing first and last [kTerminalEllipsisHalfLines] with an ellipsis indicator.
 /// Provides an expand button to view full content in a full-screen modal.
-class ExpandableCodeBlock extends StatelessWidget {
+class ExpandableCodeBlock extends StatefulWidget {
   final String code;
   final String language;
   final String heroTag;
@@ -32,19 +33,99 @@ class ExpandableCodeBlock extends StatelessWidget {
   });
 
   @override
+  State<ExpandableCodeBlock> createState() => _ExpandableCodeBlockState();
+}
+
+class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
+  @override
+  void initState() {
+    super.initState();
+    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    super.dispose();
+  }
+
+  /// Intercepts Cmd+C / Ctrl+C to post-process the clipboard,
+  /// replacing the truncation ellipsis with the full hidden content.
+  bool _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    if (event.logicalKey != LogicalKeyboardKey.keyC) return false;
+    if (!HardwareKeyboard.instance.isMetaPressed &&
+        !HardwareKeyboard.instance.isControlPressed) {
+      return false;
+    }
+
+    final lines = widget.code.split('\n');
+    if (lines.length <= kTerminalMaxLines) return false;
+
+    // Let the default copy happen, then replace the ellipsis in clipboard
+    Future.delayed(
+      const Duration(milliseconds: 100),
+      _replaceClipboardEllipsis,
+    );
+    return false;
+  }
+
+  Future<void> _replaceClipboardEllipsis() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text == null) return;
+
+    final expanded = _expandTruncatedText(data!.text!);
+    if (expanded != data.text) {
+      await Clipboard.setData(ClipboardData(text: expanded));
+    }
+  }
+
+  /// Replaces the `... (N more lines) ...` marker with the actual hidden lines.
+  String _expandTruncatedText(String text) {
+    final codeLines = widget.code.split('\n');
+    final totalLines = codeLines.length;
+    if (totalLines <= kTerminalMaxLines) return text;
+
+    final hiddenCount = totalLines - 2 * kTerminalEllipsisHalfLines;
+    final expectedEllipsis = '... ($hiddenCount more lines) ...';
+    if (!text.contains(expectedEllipsis)) return text;
+
+    final textLines = text.split('\n');
+    final ellipsisIndex = textLines.indexOf(expectedEllipsis);
+    if (ellipsisIndex == -1) return text;
+
+    final hiddenLines = codeLines.sublist(
+      kTerminalEllipsisHalfLines,
+      totalLines - kTerminalEllipsisHalfLines,
+    );
+
+    return [
+      ...textLines.sublist(0, ellipsisIndex),
+      ...hiddenLines,
+      ...textLines.sublist(ellipsisIndex + 1),
+    ].join('\n');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final lines = code.split('\n');
+    final lines = widget.code.split('\n');
     final totalLines = lines.length;
     final needsTruncation = totalLines > kTerminalMaxLines;
 
     // Build displayed content (truncated or full)
     final displayedContent = needsTruncation
         ? _buildTruncatedContent(lines, totalLines)
-        : code;
+        : widget.code;
 
     return SelectionArea(
       contextMenuBuilder: (context, selectableRegionState) {
         try {
+          if (needsTruncation) {
+            return _buildExpandedCopyContextMenu(
+              context,
+              selectableRegionState,
+            );
+          }
           return AdaptiveTextSelectionToolbar.selectableRegion(
             selectableRegionState: selectableRegionState,
           );
@@ -54,7 +135,7 @@ class ExpandableCodeBlock extends StatelessWidget {
         }
       },
       child: Hero(
-        tag: heroTag,
+        tag: widget.heroTag,
         child: Material(
           color: Colors.transparent,
           child: Stack(
@@ -63,14 +144,14 @@ class ExpandableCodeBlock extends StatelessWidget {
               Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: terminalTheme.backgroundColor,
+                  color: widget.terminalTheme.backgroundColor,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: terminalTheme.borderColor,
+                    color: widget.terminalTheme.borderColor,
                     width: 1,
                   ),
                 ),
-                child: centered
+                child: widget.centered
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(12),
@@ -89,7 +170,9 @@ class ExpandableCodeBlock extends StatelessWidget {
                   bottom: 8,
                   right: 8,
                   child: Material(
-                    color: terminalTheme.backgroundColor.withValues(alpha: 0.9),
+                    color: widget.terminalTheme.backgroundColor.withValues(
+                      alpha: 0.9,
+                    ),
                     borderRadius: BorderRadius.circular(4),
                     child: InkWell(
                       onTap: () => _openFullScreen(context),
@@ -99,7 +182,9 @@ class ExpandableCodeBlock extends StatelessWidget {
                         child: Icon(
                           Icons.fullscreen,
                           size: 18,
-                          color: terminalTheme.textColor.withValues(alpha: 0.7),
+                          color: widget.terminalTheme.textColor.withValues(
+                            alpha: 0.7,
+                          ),
                         ),
                       ),
                     ),
@@ -127,16 +212,47 @@ class ExpandableCodeBlock extends StatelessWidget {
     ].join('\n');
   }
 
+  /// Build context menu with a Copy button that expands truncated content
+  Widget _buildExpandedCopyContextMenu(
+    BuildContext context,
+    SelectableRegionState selectableRegionState,
+  ) {
+    final buttonItems = selectableRegionState.contextMenuButtonItems;
+    final modifiedItems = buttonItems.map((item) {
+      if (item.type == ContextMenuButtonType.copy) {
+        final originalOnPressed = item.onPressed;
+        return ContextMenuButtonItem(
+          label: item.label,
+          type: item.type,
+          onPressed: () {
+            // Perform default copy, then replace the ellipsis in clipboard
+            originalOnPressed?.call();
+            Future.delayed(
+              const Duration(milliseconds: 100),
+              _replaceClipboardEllipsis,
+            );
+          },
+        );
+      }
+      return item;
+    }).toList();
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: selectableRegionState.contextMenuAnchors,
+      buttonItems: modifiedItems,
+    );
+  }
+
   /// Build code text with highlights using RichText
   Widget _buildHighlightedCode(String text) {
     final baseStyle = TextStyle(
       fontFamily: 'monospace',
       fontSize: 14,
-      color: terminalTheme.textColor,
+      color: widget.terminalTheme.textColor,
       height: 1.5,
     );
 
-    if (highlights.isEmpty) {
+    if (widget.highlights.isEmpty) {
       return Text(text, style: baseStyle);
     }
 
@@ -145,7 +261,7 @@ class ExpandableCodeBlock extends StatelessWidget {
     var lastIndex = 0;
 
     // Sort highlights by offset
-    final sortedHighlights = highlights.toList()
+    final sortedHighlights = widget.highlights.toList()
       ..sort((a, b) => a.offset.compareTo(b.offset));
 
     for (final highlight in sortedHighlights) {
@@ -165,7 +281,9 @@ class ExpandableCodeBlock extends StatelessWidget {
         TextSpan(
           text: text.substring(start, end),
           style: baseStyle.copyWith(
-            backgroundColor: highlight.isActive ? activeColor : inactiveColor,
+            backgroundColor: highlight.isActive
+                ? widget.activeColor
+                : widget.inactiveColor,
           ),
         ),
       );
@@ -191,10 +309,10 @@ class ExpandableCodeBlock extends StatelessWidget {
         barrierColor: Colors.black54,
         pageBuilder: (context, animation, secondaryAnimation) {
           return FullScreenCodeView(
-            code: code,
-            language: language,
-            heroTag: heroTag,
-            terminalTheme: terminalTheme,
+            code: widget.code,
+            language: widget.language,
+            heroTag: widget.heroTag,
+            terminalTheme: widget.terminalTheme,
           );
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
