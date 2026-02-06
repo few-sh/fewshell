@@ -35,7 +35,7 @@ class LocalShellBackend implements ShellBackend {
 
     // Use /bin/bash to ensure we have a standard shell environment
     // Force bash instead of user's shell to ensure consistent behavior/syntax
-    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
+    final shell = getDefaultPlatformShell();
 
     // Inherit environment variables but override TERM and ensure UTF-8 locale
     final environment = Map<String, String>.from(Platform.environment);
@@ -61,7 +61,7 @@ class LocalShellBackend implements ShellBackend {
 
   @override
   Future<ShellSession> createSession() async {
-    final shell = Platform.isWindows ? 'bash' : '/bin/bash';
+    final shell = getDefaultPlatformShell();
     final environment = Map<String, String>.from(Platform.environment);
     environment['TERM'] = 'dumb';
     environment['LANG'] = 'en_US.UTF-8';
@@ -73,6 +73,16 @@ class LocalShellBackend implements ShellBackend {
       autoDecodeUtf8: false,
     );
     return LocalShellSession(pty, shouldExit: false);
+  }
+
+  String getDefaultPlatformShell() {
+    if (Platform.isWindows) {
+      return 'bash';
+    } else if (Platform.isMacOS) {
+      return '/bin/zsh';
+    } else {
+      return '/bin/bash';
+    }
   }
 }
 
