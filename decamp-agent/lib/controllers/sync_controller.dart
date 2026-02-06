@@ -582,6 +582,7 @@ class _AgentSession {
             streamingMessage = streamingMessage.copyWith(
               content: '```\n',
               messageKind: MessageKind.toolResult,
+              isStreaming: true,
             );
 
             for (final toolCall in toolCalls) {
