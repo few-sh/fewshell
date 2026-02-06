@@ -55,7 +55,6 @@ class LocalShellBackend implements ShellBackend {
     // Write command and exit on separate calls
     // This ensures exit is queued but can still be interrupted cleanly
     pty.write('$command\n');
-    pty.write('exit\n');
 
     return LocalShellSession(pty, shouldExit: true);
   }

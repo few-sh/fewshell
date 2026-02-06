@@ -144,11 +144,12 @@ class ShellService {
 
         scriptToPipe = '''
 $secretsExports
-$command
+bash -c '${_escapeForCommand(command)}'; exit \$?
 ''';
         commandToExecute = scriptToPipe;
       } else {
-        commandToExecute = command;
+        commandToExecute =
+            'bash -c \'${_escapeForCommand(command)}\'; exit \$?';
       }
 
       String redactedCommand =
