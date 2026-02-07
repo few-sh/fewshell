@@ -210,7 +210,8 @@ class SyncController {
         });
       } else if (msg['type'] == 'start_chat' ||
           msg['type'] == 'approval_response' ||
-          msg['type'] == 'abort_chat') {
+          msg['type'] == 'abort_chat' ||
+          msg['type'] == 'summarize') {
         // Extract sessionId from the message to look up or create the session
         String? sessionId = msg['sessionId'] as String?;
 
@@ -368,6 +369,11 @@ class _AgentSession {
       Future.delayed(const Duration(milliseconds: 500), () {
         _startChat(msg, channel);
       });
+    } else if (msg['type'] == 'summarize') {
+      // Give CRDT sync a moment to catch up
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _handleSummarize(msg, channel);
+      });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
     } else if (msg['type'] == 'abort_chat') {
@@ -379,6 +385,77 @@ class _AgentSession {
     _log.info('🛑 Received abort request');
     _currentCancelToken?.cancel('Aborted by user');
     _currentAbortController?.add(ProcessSignal.sigterm);
+  }
+
+  Future<void> _handleSummarize(
+    Map<String, dynamic> data,
+    MultiplexedWebSocketChannel channel,
+  ) async {
+    _log.info('📝 Received summarize request');
+
+    final sessionId = data['sessionId'] as String?;
+    final hideMessages = data['hideMessages'] as bool? ?? true;
+
+    if (sessionId == null || projectDb == null) {
+      channel.safeSendCustomMessage({
+        'type': 'summarize_error',
+        'message': 'Session ID and Database required',
+      });
+      return;
+    }
+
+    try {
+      final config = data['config'] as Map<String, dynamic>;
+
+      final apiKey = config['apiKey'] as String;
+      final providerTypeStr = config['provider'] as String;
+      final model = config['model'] as String;
+      final baseUrl = config['baseUrl'] as String?;
+      final temperature = config['temperature'] as double?;
+      final maxTokens = config['maxTokens'] as int?;
+      final systemInstruction = config['systemInstruction'] as String?;
+
+      final apiType = LlmApiType.values.firstWhere(
+        (e) => e.name == providerTypeStr,
+        orElse: () =>
+            throw Exception('Unknown provider type: $providerTypeStr'),
+      );
+
+      final settings = LlmApiSettings(
+        identifier: model,
+        apiType: apiType,
+        baseUrl: baseUrl ?? apiType.defaultBaseUrl,
+        temperature: temperature,
+        maxTokens: maxTokens,
+      );
+
+      final provider = await LlmService.createProvider(
+        settings,
+        apiKey,
+        systemInstruction: systemInstruction,
+      );
+
+      final summarizer = ConversationSummarizer(
+        messageDao: projectDb!.messageDao,
+        llmStream: (conversation) => provider.chatStream(conversation),
+      );
+
+      final performed = await summarizer.forceSummarize(
+        sessionId,
+        hideMessages: hideMessages,
+      );
+
+      channel.safeSendCustomMessage({
+        'type': 'summarize_complete',
+        'performed': performed,
+      });
+    } catch (e) {
+      _log.warning('Summarization failed: $e');
+      channel.safeSendCustomMessage({
+        'type': 'summarize_error',
+        'message': e.toString(),
+      });
+    }
   }
 
   void _handleApproval(Map<String, dynamic> data) {

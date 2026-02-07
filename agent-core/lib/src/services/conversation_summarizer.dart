@@ -80,7 +80,7 @@ class ConversationSummarizerConfig {
     this.messageCountThreshold = 40,
     this.tokenThreshold = 80000,
     this.bytesPerToken = 4,
-    this.recentMessageCount = 10,
+    this.recentMessageCount = 1,
     this.summarizationPrompt = _defaultSummarizationPrompt,
     this.summaryPrefix = _defaultSummaryPrefix,
     this.summaryInputTokenBudget = 100000,
@@ -166,10 +166,6 @@ class ConversationSummarizer {
     final visible =
         messages.where((m) => m.isVisibleToLlm && !m.isStreaming).toList();
 
-    if (visible.length <= config.recentMessageCount) {
-      return false;
-    }
-
     return _summarize(sessionId, visible, hideMessages: hideMessages);
   }
 
@@ -180,6 +176,11 @@ class ConversationSummarizer {
     List<MessageEntity> visible, {
     required bool hideMessages,
   }) async {
+    // Not enough messages to leave a tail — nothing to summarize
+    if (visible.length <= config.recentMessageCount) {
+      return false;
+    }
+
     // Messages to summarize: everything except the most recent tail
     final toSummarize =
         visible.sublist(0, visible.length - config.recentMessageCount);

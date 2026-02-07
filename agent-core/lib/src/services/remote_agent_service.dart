@@ -98,3 +98,55 @@ Future<AgentLoopResult> runRemoteAgentLoop({
     channel.unregisterCustomHandler(handleMessage);
   }
 }
+
+/// Sends a `summarize` request to the server and waits for the result.
+///
+/// Returns `true` if the server performed summarization, `false` otherwise.
+Future<bool> runRemoteSummarize({
+  required MultiplexedWebSocketChannel channel,
+  required Map<String, dynamic> config,
+  required String sessionId,
+  required bool hideMessages,
+}) async {
+  _log.info('Requesting remote summarization for session $sessionId');
+
+  final completer = Completer<bool>();
+
+  Future<void> handleMessage(Map<String, dynamic> data) async {
+    try {
+      final type = data['type'] as String;
+
+      if (type == 'summarize_complete') {
+        if (!completer.isCompleted) {
+          completer.complete(data['performed'] as bool? ?? true);
+        }
+      } else if (type == 'summarize_error') {
+        if (!completer.isCompleted) {
+          completer.completeError(
+            Exception(data['message'] ?? 'Remote summarization failed'),
+          );
+        }
+      }
+    } catch (e) {
+      _log.warning('Error handling remote summarize message: $e');
+      if (!completer.isCompleted) {
+        completer.completeError(e);
+      }
+    }
+  }
+
+  channel.registerCustomHandler(handleMessage);
+
+  channel.sendCustomMessage({
+    'type': 'summarize',
+    'config': config,
+    'sessionId': sessionId,
+    'hideMessages': hideMessages,
+  });
+
+  try {
+    return await completer.future;
+  } finally {
+    channel.unregisterCustomHandler(handleMessage);
+  }
+}

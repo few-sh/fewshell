@@ -202,7 +202,11 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       final controller = ref.read(
         chatControllerProvider(currentSessionId).notifier,
       );
-      await controller.summarize(hideMessages: hideMessages);
+      final syncChannel = ref.read(syncServiceProvider).projectChannel;
+      await controller.summarize(
+        hideMessages: hideMessages,
+        syncChannel: syncChannel,
+      );
       return;
     }
 

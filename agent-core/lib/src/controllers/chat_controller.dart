@@ -37,6 +37,9 @@ class ChatController extends StateNotifier<ChatState> {
   CancelToken? _currentLlmCancelToken;
   bool _isAborted = false;
 
+  /// Whether execution happens locally (no remote server configured).
+  bool get isLocalExecution => _project?.serverUrl == null;
+
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
 
@@ -76,11 +79,50 @@ class ChatController extends StateNotifier<ChatState> {
 
   /// Force-summarize the current session's conversation.
   ///
+  /// For local projects, runs summarization directly.
+  /// For remote projects, sends a `summarize` message to the server
+  /// which performs the LLM call and DB updates.
+  ///
   /// Set [hideMessages] to `false` to keep originals visible (debug mode).
   /// Returns `true` if summarization was performed.
-  Future<bool> summarize({bool hideMessages = true}) async {
-    if (_conversationSummarizer == null || sessionId == null) {
-      _log.warning('summarize: no summarizer or session');
+  Future<bool> summarize({
+    bool hideMessages = true,
+    MultiplexedWebSocketChannel? syncChannel,
+  }) async {
+    if (sessionId == null) {
+      _log.warning('summarize: no session');
+      return false;
+    }
+
+    if (!isLocalExecution) {
+      // Remote project — delegate to the server
+      if (syncChannel == null) {
+        _log.warning('summarize: remote project but no sync channel');
+        if (mounted) {
+          state = state.copyWith(
+            error: 'Cannot summarize: not connected to server',
+          );
+        }
+        return false;
+      }
+
+      final config = await _llmService.getActiveConfigSnapshot();
+      if (config == null) {
+        _log.warning('summarize: no LLM config');
+        return false;
+      }
+
+      return runRemoteSummarize(
+        channel: syncChannel,
+        config: config,
+        sessionId: sessionId!,
+        hideMessages: hideMessages,
+      );
+    }
+
+    // Local project — run directly
+    if (_conversationSummarizer == null) {
+      _log.warning('summarize: no summarizer');
       return false;
     }
 
@@ -259,7 +301,6 @@ class ChatController extends StateNotifier<ChatState> {
 
     // For local execution (no server), acquire lock via mutex
     // For remote execution, server handles locking
-    final isLocalExecution = _project?.serverUrl == null;
     if (isLocalExecution && _sessionMutexDao != null) {
       final acquired = await _sessionMutexDao.acquireLock(sessionId);
       if (!acquired) {
