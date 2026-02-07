@@ -205,6 +205,12 @@ extension MessageEntityToChat on MessageEntity {
       MessageKind.text => role == ChatRole.user
           ? [ChatMessage.user(content)]
           : [ChatMessage.assistant(content)],
+      MessageKind.conversationSummary => [
+          ChatMessage.assistant(content),
+        ],
+      MessageKind.toolResultSummary => [
+          ChatMessage.assistant(content),
+        ],
     };
   }
 

@@ -509,6 +509,12 @@ class $MessagesTable extends Messages
               type: DriftSqlType.string, requiredDuringInsert: false)
           .withConverter<List<ToolCall>?>(
               $MessagesTable.$convertertoolResultsJson);
+  static const VerificationMeta _summaryMeta =
+      const VerificationMeta('summary');
+  @override
+  late final GeneratedColumn<String> summary = GeneratedColumn<String>(
+      'summary', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -524,7 +530,8 @@ class $MessagesTable extends Messages
         messageKind,
         imageUrl,
         toolCallsJson,
-        toolResultsJson
+        toolResultsJson,
+        summary
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -597,6 +604,10 @@ class $MessagesTable extends Messages
       context.handle(_imageUrlMeta,
           imageUrl.isAcceptableOrUnknown(data['image_url']!, _imageUrlMeta));
     }
+    if (data.containsKey('summary')) {
+      context.handle(_summaryMeta,
+          summary.isAcceptableOrUnknown(data['summary']!, _summaryMeta));
+    }
     return context;
   }
 
@@ -637,6 +648,8 @@ class $MessagesTable extends Messages
       toolResultsJson: $MessagesTable.$convertertoolResultsJson.fromSql(
           attachedDatabase.typeMapping.read(DriftSqlType.string,
               data['${effectivePrefix}tool_results_json'])),
+      summary: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}summary']),
     );
   }
 
@@ -691,6 +704,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
   final String? imageUrl;
   final List<ToolCall>? toolCallsJson;
   final List<ToolCall>? toolResultsJson;
+
+  /// Summary of the message or conversation (used by summarization)
+  final String? summary;
   const MessageEntity(
       {required this.id,
       required this.sessionId,
@@ -705,7 +721,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       required this.messageKind,
       this.imageUrl,
       this.toolCallsJson,
-      this.toolResultsJson});
+      this.toolResultsJson,
+      this.summary});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -736,6 +753,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       map['tool_results_json'] = Variable<String>(
           $MessagesTable.$convertertoolResultsJson.toSql(toolResultsJson));
     }
+    if (!nullToAbsent || summary != null) {
+      map['summary'] = Variable<String>(summary);
+    }
     return map;
   }
 
@@ -763,6 +783,9 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       toolResultsJson: toolResultsJson == null && nullToAbsent
           ? const Value.absent()
           : Value(toolResultsJson),
+      summary: summary == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summary),
     );
   }
 
@@ -787,6 +810,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           .fromJson(serializer.fromJson<Object?>(json['toolCallsJson'])),
       toolResultsJson: $MessagesTable.$convertertoolResultsJson
           .fromJson(serializer.fromJson<Object?>(json['toolResultsJson'])),
+      summary: serializer.fromJson<String?>(json['summary']),
     );
   }
   @override
@@ -810,6 +834,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           $MessagesTable.$convertertoolCallsJson.toJson(toolCallsJson)),
       'toolResultsJson': serializer.toJson<Object?>(
           $MessagesTable.$convertertoolResultsJson.toJson(toolResultsJson)),
+      'summary': serializer.toJson<String?>(summary),
     };
   }
 
@@ -827,7 +852,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           MessageKind? messageKind,
           Value<String?> imageUrl = const Value.absent(),
           Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
-          Value<List<ToolCall>?> toolResultsJson = const Value.absent()}) =>
+          Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
+          Value<String?> summary = const Value.absent()}) =>
       MessageEntity(
         id: id ?? this.id,
         sessionId: sessionId ?? this.sessionId,
@@ -846,6 +872,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
         toolResultsJson: toolResultsJson.present
             ? toolResultsJson.value
             : this.toolResultsJson,
+        summary: summary.present ? summary.value : this.summary,
       );
   MessageEntity copyWithCompanion(MessageEntityCompanion data) {
     return MessageEntity(
@@ -871,6 +898,7 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       toolResultsJson: data.toolResultsJson.present
           ? data.toolResultsJson.value
           : this.toolResultsJson,
+      summary: data.summary.present ? data.summary.value : this.summary,
     );
   }
 
@@ -890,7 +918,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           ..write('messageKind: $messageKind, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('toolCallsJson: $toolCallsJson, ')
-          ..write('toolResultsJson: $toolResultsJson')
+          ..write('toolResultsJson: $toolResultsJson, ')
+          ..write('summary: $summary')
           ..write(')'))
         .toString();
   }
@@ -910,7 +939,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
       messageKind,
       imageUrl,
       toolCallsJson,
-      toolResultsJson);
+      toolResultsJson,
+      summary);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -928,7 +958,8 @@ class MessageEntity extends DataClass implements Insertable<MessageEntity> {
           other.messageKind == this.messageKind &&
           other.imageUrl == this.imageUrl &&
           other.toolCallsJson == this.toolCallsJson &&
-          other.toolResultsJson == this.toolResultsJson);
+          other.toolResultsJson == this.toolResultsJson &&
+          other.summary == this.summary);
 }
 
 class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
@@ -946,6 +977,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
   final Value<String?> imageUrl;
   final Value<List<ToolCall>?> toolCallsJson;
   final Value<List<ToolCall>?> toolResultsJson;
+  final Value<String?> summary;
   final Value<int> rowid;
   const MessageEntityCompanion({
     this.id = const Value.absent(),
@@ -962,6 +994,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.imageUrl = const Value.absent(),
     this.toolCallsJson = const Value.absent(),
     this.toolResultsJson = const Value.absent(),
+    this.summary = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MessageEntityCompanion.insert({
@@ -979,6 +1012,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     this.imageUrl = const Value.absent(),
     this.toolCallsJson = const Value.absent(),
     this.toolResultsJson = const Value.absent(),
+    this.summary = const Value.absent(),
     this.rowid = const Value.absent(),
   })  : id = Value(id),
         sessionId = Value(sessionId),
@@ -1002,6 +1036,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
     Expression<String>? imageUrl,
     Expression<String>? toolCallsJson,
     Expression<String>? toolResultsJson,
+    Expression<String>? summary,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1019,6 +1054,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       if (imageUrl != null) 'image_url': imageUrl,
       if (toolCallsJson != null) 'tool_calls_json': toolCallsJson,
       if (toolResultsJson != null) 'tool_results_json': toolResultsJson,
+      if (summary != null) 'summary': summary,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1038,6 +1074,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       Value<String?>? imageUrl,
       Value<List<ToolCall>?>? toolCallsJson,
       Value<List<ToolCall>?>? toolResultsJson,
+      Value<String?>? summary,
       Value<int>? rowid}) {
     return MessageEntityCompanion(
       id: id ?? this.id,
@@ -1054,6 +1091,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
       imageUrl: imageUrl ?? this.imageUrl,
       toolCallsJson: toolCallsJson ?? this.toolCallsJson,
       toolResultsJson: toolResultsJson ?? this.toolResultsJson,
+      summary: summary ?? this.summary,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1107,6 +1145,9 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
           .$convertertoolResultsJson
           .toSql(toolResultsJson.value));
     }
+    if (summary.present) {
+      map['summary'] = Variable<String>(summary.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1130,6 +1171,7 @@ class MessageEntityCompanion extends UpdateCompanion<MessageEntity> {
           ..write('imageUrl: $imageUrl, ')
           ..write('toolCallsJson: $toolCallsJson, ')
           ..write('toolResultsJson: $toolResultsJson, ')
+          ..write('summary: $summary, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2933,6 +2975,7 @@ typedef $$MessagesTableCreateCompanionBuilder = MessageEntityCompanion
   Value<String?> imageUrl,
   Value<List<ToolCall>?> toolCallsJson,
   Value<List<ToolCall>?> toolResultsJson,
+  Value<String?> summary,
   Value<int> rowid,
 });
 typedef $$MessagesTableUpdateCompanionBuilder = MessageEntityCompanion
@@ -2951,6 +2994,7 @@ typedef $$MessagesTableUpdateCompanionBuilder = MessageEntityCompanion
   Value<String?> imageUrl,
   Value<List<ToolCall>?> toolCallsJson,
   Value<List<ToolCall>?> toolResultsJson,
+  Value<String?> summary,
   Value<int> rowid,
 });
 
@@ -3011,6 +3055,9 @@ class $$MessagesTableFilterComposer
       get toolResultsJson => $composableBuilder(
           column: $table.toolResultsJson,
           builder: (column) => ColumnWithTypeConverterFilters(column));
+
+  ColumnFilters<String> get summary => $composableBuilder(
+      column: $table.summary, builder: (column) => ColumnFilters(column));
 }
 
 class $$MessagesTableOrderingComposer
@@ -3066,6 +3113,9 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<String> get toolResultsJson => $composableBuilder(
       column: $table.toolResultsJson,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get summary => $composableBuilder(
+      column: $table.summary, builder: (column) => ColumnOrderings(column));
 }
 
 class $$MessagesTableAnnotationComposer
@@ -3121,6 +3171,9 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumnWithTypeConverter<List<ToolCall>?, String>
       get toolResultsJson => $composableBuilder(
           column: $table.toolResultsJson, builder: (column) => column);
+
+  GeneratedColumn<String> get summary =>
+      $composableBuilder(column: $table.summary, builder: (column) => column);
 }
 
 class $$MessagesTableTableManager extends RootTableManager<
@@ -3163,6 +3216,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<String?> imageUrl = const Value.absent(),
             Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
             Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
+            Value<String?> summary = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               MessageEntityCompanion(
@@ -3180,6 +3234,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             imageUrl: imageUrl,
             toolCallsJson: toolCallsJson,
             toolResultsJson: toolResultsJson,
+            summary: summary,
             rowid: rowid,
           ),
           createCompanionCallback: ({
@@ -3197,6 +3252,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             Value<String?> imageUrl = const Value.absent(),
             Value<List<ToolCall>?> toolCallsJson = const Value.absent(),
             Value<List<ToolCall>?> toolResultsJson = const Value.absent(),
+            Value<String?> summary = const Value.absent(),
             Value<int> rowid = const Value.absent(),
           }) =>
               MessageEntityCompanion.insert(
@@ -3214,6 +3270,7 @@ class $$MessagesTableTableManager extends RootTableManager<
             imageUrl: imageUrl,
             toolCallsJson: toolCallsJson,
             toolResultsJson: toolResultsJson,
+            summary: summary,
             rowid: rowid,
           ),
           withReferenceMapper: (p0) => p0
