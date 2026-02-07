@@ -6,7 +6,6 @@ import '../database/database.dart';
 import '../database/daos/message_dao.dart';
 import '../database/tables/messages_table.dart';
 import '../utils/id_generator.dart';
-import 'llm_service.dart';
 
 final _log = Logger('ConversationSummarizer');
 
@@ -88,6 +87,15 @@ class ConversationSummarizerConfig {
   });
 }
 
+/// Function that streams chat events from an LLM given a conversation.
+///
+/// Simpler than the agent loop's [LlmStreamFunction] — only takes a
+/// conversation (no tools or cancel token) since summarization is a
+/// single-shot call.
+typedef SummarizationStreamFunction = Stream<ChatStreamEvent> Function(
+  List<ChatMessage> conversation,
+);
+
 /// Callback invoked after summarization completes, e.g. to show a warning
 /// to the user about potential accuracy degradation in long threads.
 typedef SummarizationCallback = Future<void> Function(String sessionId);
@@ -105,7 +113,7 @@ typedef SummarizationCallback = Future<void> Function(String sessionId);
 /// 5. Marks the original messages as not visible to the LLM
 class ConversationSummarizer {
   final MessageDao _messageDao;
-  final LlmService _llmService;
+  final SummarizationStreamFunction _llmStream;
   final ConversationSummarizerConfig config;
 
   /// Optional callback fired after a successful summarization.
@@ -114,11 +122,11 @@ class ConversationSummarizer {
 
   ConversationSummarizer({
     required MessageDao messageDao,
-    required LlmService llmService,
+    required SummarizationStreamFunction llmStream,
     this.config = const ConversationSummarizerConfig(),
     this.onSummarized,
   })  : _messageDao = messageDao,
-        _llmService = llmService;
+        _llmStream = llmStream;
 
   /// Run summarization for [sessionId] if thresholds are exceeded.
   ///
@@ -260,7 +268,7 @@ class ConversationSummarizer {
     ];
 
     final buffer = StringBuffer();
-    await for (final event in _llmService.streamChat(conversation)) {
+    await for (final event in _llmStream(conversation)) {
       switch (event) {
         case TextDeltaEvent(delta: final delta):
           buffer.write(delta);

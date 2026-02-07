@@ -69,21 +69,17 @@ class MockMessageDao implements MessageDao {
       throw UnimplementedError('${invocation.memberName} not mocked');
 }
 
-/// Minimal mock for LlmService that returns a canned summary via streamChat.
-class MockLlmService implements LlmService {
+/// Helper that produces a mock [LlmStreamFunction] for testing.
+class MockLlmStream {
   String summaryToReturn = 'This is a test summary.';
   bool shouldError = false;
   String errorMessage = 'mock error';
 
-  /// Tracks conversations passed to streamChat for assertions.
+  /// Tracks conversations passed to the stream function for assertions.
   final List<List<ChatMessage>> calls = [];
 
-  @override
-  Stream<ChatStreamEvent> streamChat(
-    List<ChatMessage> conversation, {
-    List<Tool>? tools,
-    CancelToken? cancelToken,
-  }) async* {
+  /// The [LlmStreamFunction] to pass to [ConversationSummarizer].
+  Stream<ChatStreamEvent> call(List<ChatMessage> conversation) async* {
     calls.add(conversation);
     if (shouldError) {
       yield ErrorEvent(ProviderError(errorMessage));
@@ -92,10 +88,6 @@ class MockLlmService implements LlmService {
     // Emit the summary as text deltas (one chunk for simplicity)
     yield TextDeltaEvent(summaryToReturn);
   }
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) =>
-      throw UnimplementedError('${invocation.memberName} not mocked');
 }
 
 // ---------------------------------------------------------------------------
@@ -151,11 +143,11 @@ List<MessageEntity> _makeMessages(int count,
 
 void main() {
   late MockMessageDao mockDao;
-  late MockLlmService mockLlm;
+  late MockLlmStream mockLlm;
 
   setUp(() {
     mockDao = MockMessageDao();
-    mockLlm = MockLlmService();
+    mockLlm = MockLlmStream();
   });
 
   group('ConversationSummarizer - threshold logic', () {
@@ -164,7 +156,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           tokenThreshold: 999999, // high so only count matters
@@ -188,7 +180,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           recentMessageCount: 5,
@@ -207,7 +199,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           recentMessageCount: 5,
@@ -223,7 +215,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           tokenThreshold: 999999,
@@ -243,7 +235,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 999, // high so only tokens matter
           tokenThreshold: 10,
@@ -261,7 +253,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 3,
           tokenThreshold: 1,
@@ -283,7 +275,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           tokenThreshold: 999999,
@@ -326,7 +318,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           tokenThreshold: 999999,
@@ -362,7 +354,7 @@ void main() {
       const customPrefix = '[PRIOR CONTEXT]\n';
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           tokenThreshold: 999999,
@@ -387,7 +379,7 @@ void main() {
       const customPrompt = 'Summarize in bullet points only.';
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           tokenThreshold: 999999,
@@ -409,7 +401,7 @@ void main() {
       String? callbackSessionId;
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           recentMessageCount: 5,
@@ -429,7 +421,7 @@ void main() {
       var callbackFired = false;
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           recentMessageCount: 3,
@@ -452,7 +444,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           recentMessageCount: 5,
@@ -475,7 +467,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           recentMessageCount: 5,
@@ -526,7 +518,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           tokenThreshold: 999999,
@@ -556,7 +548,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           recentMessageCount: 5,
@@ -583,7 +575,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           tokenThreshold: 999999,
@@ -606,7 +598,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           recentMessageCount: 5,
         ),
@@ -625,7 +617,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 20,
           recentMessageCount: 5,
@@ -650,7 +642,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           recentMessageCount: 5,
         ),
@@ -674,7 +666,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           recentMessageCount: 5,
@@ -695,7 +687,7 @@ void main() {
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
-        llmService: mockLlm,
+        llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
           messageCountThreshold: 15,
           recentMessageCount: 5,

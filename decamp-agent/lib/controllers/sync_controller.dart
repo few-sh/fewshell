@@ -546,6 +546,18 @@ class _AgentSession {
         final abortController = StreamController<ProcessSignal>.broadcast();
         _currentAbortController = abortController;
 
+        // Run summarization before the agent loop if needed
+        final summarizer = ConversationSummarizer(
+          messageDao: projectDb!.messageDao,
+          llmStream: (conversation) => provider.chatStream(conversation),
+        );
+        try {
+          await summarizer.summarizeIfNeeded(currentSessionId);
+        } catch (e) {
+          _log.warning('Conversation summarization failed: $e');
+          // Non-fatal: continue with the full conversation
+        }
+
         await runAgentLoop(
           getConversation: () async {
             return await _loadConversation(currentSessionId);

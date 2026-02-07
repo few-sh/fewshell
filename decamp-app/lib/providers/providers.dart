@@ -582,10 +582,11 @@ final chatControllerProvider =
       final sessionMutexDao = db.projectDatabase?.sessionMutexDao;
 
       // Create conversation summarizer for local execution
+      final llmService = ref.watch(llmServiceProvider);
       final conversationSummarizer = db.projectDatabase != null
           ? ConversationSummarizer(
               messageDao: db.messageDao,
-              llmService: ref.watch(llmServiceProvider),
+              llmStream: (conversation) => llmService.streamChat(conversation),
             )
           : null;
 
