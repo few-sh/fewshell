@@ -120,10 +120,16 @@ class ConversationSummarizer {
   })  : _messageDao = messageDao,
         _llmService = llmService;
 
-  /// Run summarization for [sessionId] if needed.
+  /// Run summarization for [sessionId] if thresholds are exceeded.
+  ///
+  /// Set [hideMessages] to `false` to keep the original messages visible
+  /// (useful for debugging).
   ///
   /// Returns `true` if summarization was performed, `false` if skipped.
-  Future<bool> summarizeIfNeeded(String sessionId) async {
+  Future<bool> summarizeIfNeeded(
+    String sessionId, {
+    bool hideMessages = true,
+  }) async {
     final messages = await _messageDao.getMessagesBySession(sessionId);
 
     final visible =
@@ -133,6 +139,39 @@ class ConversationSummarizer {
       return false;
     }
 
+    return _summarize(sessionId, visible, hideMessages: hideMessages);
+  }
+
+  /// Force summarization for [sessionId] regardless of thresholds.
+  ///
+  /// Set [hideMessages] to `false` to keep the original messages visible
+  /// (useful for debugging).
+  ///
+  /// Returns `true` if summarization was performed, `false` if there were
+  /// not enough messages to leave a recent tail.
+  Future<bool> forceSummarize(
+    String sessionId, {
+    bool hideMessages = true,
+  }) async {
+    final messages = await _messageDao.getMessagesBySession(sessionId);
+
+    final visible =
+        messages.where((m) => m.isVisibleToLlm && !m.isStreaming).toList();
+
+    if (visible.length <= config.recentMessageCount) {
+      return false;
+    }
+
+    return _summarize(sessionId, visible, hideMessages: hideMessages);
+  }
+
+  /// Shared summarization logic used by both [summarizeIfNeeded] and
+  /// [forceSummarize].
+  Future<bool> _summarize(
+    String sessionId,
+    List<MessageEntity> visible, {
+    required bool hideMessages,
+  }) async {
     // Messages to summarize: everything except the most recent tail
     final toSummarize =
         visible.sublist(0, visible.length - config.recentMessageCount);
@@ -156,7 +195,9 @@ class ConversationSummarizer {
     );
 
     // Hide the original messages from the LLM
-    await _hideMessages(toSummarize);
+    if (hideMessages) {
+      await _hideMessages(toSummarize);
+    }
 
     _log.info('Summarization complete for session $sessionId');
 

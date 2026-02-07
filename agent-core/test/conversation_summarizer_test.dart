@@ -549,4 +549,95 @@ void main() {
       expect(mockDao.insertedCompanions.first.sessionId.value, 'session-a');
     });
   });
+
+  group('ConversationSummarizer - forceSummarize', () {
+    test('summarizes even when below threshold', () async {
+      // 12 messages, threshold is 20 — summarizeIfNeeded would skip
+      mockDao.storedMessages = _makeMessages(12);
+      mockLlm.summaryToReturn = 'forced summary';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 20,
+          tokenThreshold: 999999,
+          recentMessageCount: 5,
+        ),
+      );
+
+      // summarizeIfNeeded should skip
+      expect(await summarizer.summarizeIfNeeded(_testSessionId), isFalse);
+
+      // forceSummarize should proceed
+      final result = await summarizer.forceSummarize(_testSessionId);
+      expect(result, isTrue);
+      expect(mockDao.insertedCompanions, hasLength(1));
+      expect(mockDao.updatedCompanions, hasLength(7)); // 12 - 5 kept
+    });
+
+    test('returns false when not enough messages for a tail', () async {
+      mockDao.storedMessages = _makeMessages(3);
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          recentMessageCount: 5,
+        ),
+      );
+
+      final result = await summarizer.forceSummarize(_testSessionId);
+      expect(result, isFalse);
+      expect(mockLlm.calls, isEmpty);
+    });
+  });
+
+  group('ConversationSummarizer - hideMessages flag', () {
+    test('summarizeIfNeeded skips hiding when hideMessages is false', () async {
+      mockDao.storedMessages = _makeMessages(25);
+      mockLlm.summaryToReturn = 'summary without hiding';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 20,
+          recentMessageCount: 5,
+        ),
+      );
+
+      final result = await summarizer.summarizeIfNeeded(
+        _testSessionId,
+        hideMessages: false,
+      );
+      expect(result, isTrue);
+
+      // Summary should still be inserted
+      expect(mockDao.insertedCompanions, hasLength(1));
+      // But no messages should have been hidden
+      expect(mockDao.updatedCompanions, isEmpty);
+    });
+
+    test('forceSummarize skips hiding when hideMessages is false', () async {
+      mockDao.storedMessages = _makeMessages(12);
+      mockLlm.summaryToReturn = 'debug summary';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          recentMessageCount: 5,
+        ),
+      );
+
+      final result = await summarizer.forceSummarize(
+        _testSessionId,
+        hideMessages: false,
+      );
+      expect(result, isTrue);
+      expect(mockDao.insertedCompanions, hasLength(1));
+      expect(mockDao.updatedCompanions, isEmpty);
+    });
+  });
 }
