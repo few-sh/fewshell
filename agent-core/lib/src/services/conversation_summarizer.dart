@@ -184,26 +184,41 @@ class ConversationSummarizer {
       'Summarizing ${toSummarize.length} messages in session $sessionId',
     );
 
-    final summary = await _generateSummary(toSummarize);
-
-    // Insert a summary message just before the kept tail
-    await _insertSummaryMessage(
+    // Show a streaming progress message while summarizing
+    final progressId = await _messageDao.insertMessageWithId(
       sessionId: sessionId,
-      summary: summary,
-      // Place it just before the first kept message
-      timestamp: toSummarize.last.createdAt,
+      userId: 'system',
+      userName: 'System',
+      content: 'Summarizing conversation\u2026',
+      isStreaming: true,
+      isVisibleToLlm: false,
     );
 
-    // Hide the original messages from the LLM
-    if (hideMessages) {
-      await _hideMessages(toSummarize);
+    try {
+      final summary = await _generateSummary(toSummarize);
+
+      // Insert a summary message just before the kept tail
+      await _insertSummaryMessage(
+        sessionId: sessionId,
+        summary: summary,
+        // Place it just before the first kept message
+        timestamp: toSummarize.last.createdAt,
+      );
+
+      // Hide the original messages from the LLM
+      if (hideMessages) {
+        await _hideMessages(toSummarize);
+      }
+
+      _log.info('Summarization complete for session $sessionId');
+
+      await onSummarized?.call(sessionId);
+
+      return true;
+    } finally {
+      // Always remove the progress message
+      await _messageDao.deleteMessage(progressId);
     }
-
-    _log.info('Summarization complete for session $sessionId');
-
-    await onSummarized?.call(sessionId);
-
-    return true;
   }
 
   /// Build a conversation transcript from message entities and stream it

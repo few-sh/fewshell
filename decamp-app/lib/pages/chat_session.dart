@@ -193,6 +193,19 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       return;
     }
 
+    // Handle /summarize command
+    final summarizeRegex = RegExp(r'^/summarize(\s+(.*))?$');
+    final summarizeMatch = summarizeRegex.firstMatch(content.trim());
+    if (summarizeMatch != null) {
+      final arg = summarizeMatch.group(2)?.trim().toLowerCase();
+      final hideMessages = arg != 'nohide';
+      final controller = ref.read(
+        chatControllerProvider(currentSessionId).notifier,
+      );
+      await controller.summarize(hideMessages: hideMessages);
+      return;
+    }
+
     // Get the controller
     final controller = ref.read(
       chatControllerProvider(currentSessionId).notifier,

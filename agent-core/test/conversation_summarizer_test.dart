@@ -13,11 +13,15 @@ import 'package:agent_core/agent_core.dart';
 /// Only the methods used by ConversationSummarizer are implemented:
 ///   - getMessagesBySession
 ///   - insertMessage
+///   - insertMessageWithId
 ///   - updateMessage
+///   - deleteMessage
 class MockMessageDao implements MessageDao {
   List<MessageEntity> storedMessages = [];
   final List<MessageEntityCompanion> insertedCompanions = [];
   final List<MessageEntityCompanion> updatedCompanions = [];
+  final List<String> deletedIds = [];
+  int _insertCounter = 0;
 
   @override
   Future<List<MessageEntity>> getMessagesBySession(String sessionId) async {
@@ -28,6 +32,27 @@ class MockMessageDao implements MessageDao {
   @override
   Future<int> insertMessage(MessageEntityCompanion message) async {
     insertedCompanions.add(message);
+    return 1;
+  }
+
+  @override
+  Future<String> insertMessageWithId({
+    String? id,
+    required String sessionId,
+    required String userId,
+    required String userName,
+    required String content,
+    String? imageUrl,
+    bool isStreaming = false,
+    bool isVisibleToLlm = true,
+  }) async {
+    _insertCounter++;
+    return id ?? 'progress-$_insertCounter';
+  }
+
+  @override
+  Future<int> deleteMessage(String id) async {
+    deletedIds.add(id);
     return 1;
   }
 
@@ -638,6 +663,53 @@ void main() {
       expect(result, isTrue);
       expect(mockDao.insertedCompanions, hasLength(1));
       expect(mockDao.updatedCompanions, isEmpty);
+    });
+  });
+
+  group('ConversationSummarizer - progress message', () {
+    test('inserts and deletes a progress message during summarization',
+        () async {
+      mockDao.storedMessages = _makeMessages(20);
+      mockLlm.summaryToReturn = 'progress test';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 15,
+          recentMessageCount: 5,
+        ),
+      );
+
+      await summarizer.summarizeIfNeeded(_testSessionId);
+
+      // Progress message should have been deleted after completion
+      expect(mockDao.deletedIds, hasLength(1));
+      expect(mockDao.deletedIds.first, startsWith('progress-'));
+    });
+
+    test('deletes progress message even when LLM errors', () async {
+      mockDao.storedMessages = _makeMessages(20);
+      mockLlm.shouldError = true;
+      mockLlm.errorMessage = 'boom';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 15,
+          recentMessageCount: 5,
+        ),
+      );
+
+      expect(
+        () => summarizer.summarizeIfNeeded(_testSessionId),
+        throwsA(isA<Exception>()),
+      );
+
+      // Give the finally block a chance to run
+      await Future<void>.delayed(Duration.zero);
+      expect(mockDao.deletedIds, hasLength(1));
     });
   });
 }

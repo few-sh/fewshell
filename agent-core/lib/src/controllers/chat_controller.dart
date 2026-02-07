@@ -74,6 +74,22 @@ class ChatController extends StateNotifier<ChatState> {
         _conversationSummarizer = conversationSummarizer,
         super(const ChatState());
 
+  /// Force-summarize the current session's conversation.
+  ///
+  /// Set [hideMessages] to `false` to keep originals visible (debug mode).
+  /// Returns `true` if summarization was performed.
+  Future<bool> summarize({bool hideMessages = true}) async {
+    if (_conversationSummarizer == null || sessionId == null) {
+      _log.warning('summarize: no summarizer or session');
+      return false;
+    }
+
+    return _conversationSummarizer.forceSummarize(
+      sessionId!,
+      hideMessages: hideMessages,
+    );
+  }
+
   @override
   void dispose() {
     _activeMessageController.close();
