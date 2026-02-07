@@ -311,16 +311,44 @@ void main() {
 
       await summarizer.summarizeIfNeeded(_testSessionId);
 
-      // The LLM should have received a single user message with the transcript
+      // The LLM should have received two user messages:
+      //   [0] transcript, [1] summarization prompt
       final conversation = mockLlm.calls.first;
-      expect(conversation, hasLength(1));
-      expect(conversation.first.role, ChatRole.user);
-      // The transcript should contain message content from the old messages
-      final transcript = conversation.first.content;
+      expect(conversation, hasLength(2));
+      expect(conversation[0].role, ChatRole.user);
+      expect(conversation[1].role, ChatRole.user);
+
+      // First message: the transcript of old messages
+      final transcript = conversation[0].content;
       expect(transcript, contains('Message number 0'));
       expect(transcript, contains('Message number 14'));
       // Should NOT contain the kept tail messages
       expect(transcript, isNot(contains('Message number 15')));
+
+      // Last message: the default summarization prompt
+      expect(conversation[1].content, contains('CONTEXT CHECKPOINT COMPACTION'));
+    });
+
+    test('passes custom summarizationPrompt as last LLM message', () async {
+      mockDao.storedMessages = _makeMessages(20);
+      mockLlm.summaryToReturn = 'ok';
+
+      const customPrompt = 'Summarize in bullet points only.';
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 15,
+          tokenThreshold: 999999,
+          recentMessageCount: 5,
+          summarizationPrompt: customPrompt,
+        ),
+      );
+
+      await summarizer.summarizeIfNeeded(_testSessionId);
+
+      final conversation = mockLlm.calls.first;
+      expect(conversation.last.content, customPrompt);
     });
 
     test('fires onSummarized callback after completion', () async {

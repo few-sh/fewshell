@@ -195,9 +195,12 @@ class ConversationSummarizer {
       }
     }
 
-    // Call LLM via streaming (the only interface LlmService exposes)
+    // Call LLM via streaming (the only interface LlmService exposes).
+    // Transcript first, summarization instruction last — matching the Codex
+    // pattern so the LLM sees the full context before the task.
     final conversation = [
       ChatMessage.user(transcript.toString()),
+      ChatMessage.user(config.summarizationPrompt),
     ];
 
     final buffer = StringBuffer();
