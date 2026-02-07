@@ -578,11 +578,12 @@ class _AgentSession {
           },
           executeToolCall: (toolCalls) async {
             final results = <String>[];
+            final completedToolResults = <ToolCall>[];
 
             streamingMessage = streamingMessage.copyWith(
-              content: '```\n',
               messageKind: MessageKind.toolResult,
               isStreaming: true,
+              toolCallsJson: Value(toolCalls),
             );
 
             for (final toolCall in toolCalls) {
@@ -602,10 +603,27 @@ class _AgentSession {
                   'Executing shell command. Abort controller: $abortController',
                 );
 
+                final stdoutBuffer = StringBuffer();
                 void onOutput(String data) {
-                  //_log.info('Command delta: $data');
+                  stdoutBuffer.write(data);
+                  final streamingResultJson = jsonEncode({
+                    'stdout': stdoutBuffer.toString(),
+                    'stderr': '',
+                    'exitCode': 0,
+                    'isStreaming': true,
+                  });
                   streamingMessage = streamingMessage.copyWith(
-                    content: streamingMessage.content + data,
+                    toolResultsJson: Value([
+                      ...completedToolResults,
+                      ToolCall(
+                        id: toolCall.id,
+                        callType: toolCall.callType,
+                        function: FunctionCall(
+                          name: toolCall.function.name,
+                          arguments: streamingResultJson,
+                        ),
+                      ),
+                    ]),
                   );
                   _asyncDbWrite(() async {
                     await projectDb!.messageDao.insertMessage(
@@ -647,10 +665,17 @@ class _AgentSession {
                 result = jsonEncode({'error': 'Unknown tool'});
               }
               results.add(result);
+              completedToolResults.add(
+                ToolCall(
+                  id: toolCall.id,
+                  callType: toolCall.callType,
+                  function: FunctionCall(
+                    name: toolCall.function.name,
+                    arguments: result,
+                  ),
+                ),
+              );
             }
-
-            streamingMessage = streamingMessage.copyWith(
-                content: '${streamingMessage.content}\n```\n');
 
             await projectDb!.messageDao
                 .insertMessage(streamingMessage.toCompanion(true));

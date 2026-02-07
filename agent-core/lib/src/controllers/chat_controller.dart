@@ -394,16 +394,36 @@ class ChatController extends StateNotifier<ChatState> {
             },
             executeToolCall: (toolCalls) async {
               final results = <String>[];
+              final completedToolResults = <ToolCall>[];
 
               streamingMessage = streamingMessage.copyWith(
-                content: '```\n',
                 messageKind: MessageKind.toolResult,
+                isStreaming: true,
+                toolCallsJson: Value(toolCalls),
               );
+              _activeMessageController.add(streamingMessage);
               for (final toolCall in toolCalls) {
+                final stdoutBuffer = StringBuffer();
                 void onOutput(String data) {
+                  stdoutBuffer.write(data);
+                  final streamingResultJson = jsonEncode({
+                    'stdout': stdoutBuffer.toString(),
+                    'stderr': '',
+                    'exitCode': 0,
+                    'isStreaming': true,
+                  });
                   streamingMessage = streamingMessage.copyWith(
-                    content: '${streamingMessage.content}$data',
-                    messageKind: MessageKind.toolResult,
+                    toolResultsJson: Value([
+                      ...completedToolResults,
+                      ToolCall(
+                        id: toolCall.id,
+                        callType: toolCall.callType,
+                        function: FunctionCall(
+                          name: toolCall.function.name,
+                          arguments: streamingResultJson,
+                        ),
+                      ),
+                    ]),
                   );
                   _activeMessageController.add(streamingMessage);
                 }
@@ -412,6 +432,14 @@ class ChatController extends StateNotifier<ChatState> {
                 final result =
                     await _executeToolCall(toolCall, onOutput: onOutput);
                 results.add(jsonEncode(result));
+                completedToolResults.add(ToolCall(
+                  id: toolCall.id,
+                  callType: toolCall.callType,
+                  function: FunctionCall(
+                    name: toolCall.function.name,
+                    arguments: jsonEncode(result),
+                  ),
+                ));
               }
               await _sessionDao.touchSession(sessionId);
               return results;
@@ -425,6 +453,7 @@ class ChatController extends StateNotifier<ChatState> {
               if (messageType is ToolUseMessage) {
                 // Save tool use message
                 streamingMessage = message.toMessageEntity(
+                    isStreaming: true,
                     sessionId: sessionId,
                     id: streamingMessage.id,
                     userName: aiUserName);

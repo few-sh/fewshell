@@ -220,10 +220,10 @@ class ToolResultFormatter {
       buffer.writeln('```');
     }
 
-    if (success) {
-      buffer.write('✅ Done: ');
-    } else if (isStreaming) {
+    if (isStreaming) {
       buffer.write('⏳ In progress: ');
+    } else if (success) {
+      buffer.write('✅ Done: ');
     } else {
       buffer.write('❌ FAIL: ');
     }
