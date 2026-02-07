@@ -196,7 +196,7 @@ void main(List<String> args) async {
             try {
               request.response
                 ..statusCode = HttpStatus.unauthorized
-                ..write('Unauthized.');
+                ..write('Unauthorized.');
               await request.response.close();
             } catch (e, st) {
               _log.severe('Error sending unauthorized response: $e', e, st);
