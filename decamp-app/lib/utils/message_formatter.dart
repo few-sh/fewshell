@@ -28,6 +28,11 @@ class MessageFormatter {
         final toolName = toolResult.function.name;
         final resultContent = toolResult.function.arguments;
 
+        final originalToolCall =
+            message.toolCallsJson != null && i < message.toolCallsJson!.length
+            ? message.toolCallsJson![i]
+            : null;
+
         // Add separator between multiple results
         if (i > 0) {
           buffer.writeln('\n');
@@ -38,7 +43,7 @@ class MessageFormatter {
           ToolResultFormatter.format(
             toolName: toolName,
             result: resultContent,
-            originalToolCalls: message.toolCallsJson,
+            originalToolCall: originalToolCall,
             toolCallId: toolResult.id,
           ),
         );
