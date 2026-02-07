@@ -326,7 +326,33 @@ void main() {
       expect(transcript, isNot(contains('Message number 15')));
 
       // Last message: the default summarization prompt
-      expect(conversation[1].content, contains('CONTEXT CHECKPOINT COMPACTION'));
+      expect(
+          conversation[1].content, contains('CONTEXT CHECKPOINT COMPACTION'));
+    });
+
+    test('uses custom summaryPrefix in inserted message content', () async {
+      mockDao.storedMessages = _makeMessages(20);
+      mockLlm.summaryToReturn = 'The actual summary text';
+
+      const customPrefix = '[PRIOR CONTEXT]\n';
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmService: mockLlm,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 15,
+          tokenThreshold: 999999,
+          recentMessageCount: 5,
+          summaryPrefix: customPrefix,
+        ),
+      );
+
+      await summarizer.summarizeIfNeeded(_testSessionId);
+
+      final inserted = mockDao.insertedCompanions.first;
+      // content = prefix + raw summary
+      expect(inserted.content.value, '${customPrefix}The actual summary text');
+      // raw summary field is NOT prefixed
+      expect(inserted.summary.value, 'The actual summary text');
     });
 
     test('passes custom summarizationPrompt as last LLM message', () async {
