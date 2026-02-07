@@ -146,7 +146,7 @@ class ToolResultFormatter {
   static String format({
     required String toolName,
     required String result,
-    List<ToolCall>? originalToolCalls,
+    ToolCall? originalToolCall,
     String? toolCallId,
   }) {
     // Parse the result JSON
@@ -161,7 +161,7 @@ class ToolResultFormatter {
     // Route to specific formatter based on tool name
     return switch (toolName) {
       kExecuteShellCommand =>
-        _formatShellCommand(data, originalToolCalls, toolCallId),
+        _formatShellCommand(data, originalToolCall, toolCallId),
       kFetch => _formatFetchResult(data),
       _ => _formatUnknownTool(toolName, result),
     };
@@ -177,7 +177,7 @@ class ToolResultFormatter {
   /// - Standard error (if available, labeled as warnings or errors based on success)
   static String _formatShellCommand(
     Map<String, dynamic> data,
-    List<ToolCall>? originalToolCalls,
+    ToolCall? originalToolCall,
     String? toolCallId,
   ) {
     final buffer = StringBuffer();
@@ -186,12 +186,17 @@ class ToolResultFormatter {
     final stdout = (data['stdout']?.toString() ?? '').trim();
     final stderr = (data['stderr']?.toString() ?? '').trim();
     final success = data['success'] as bool? ?? (exitCode == 0);
+    final isStreaming = data['isStreaming'] as bool? ?? false;
 
-    // Header with status
-    if (success) {
-      buffer.writeln('✅ Command Executed Successfully.\n');
-    } else {
-      buffer.writeln('❌ **Command Failed**\n');
+    String? originalCommand;
+    if (originalToolCall != null) {
+      try {
+        final args = jsonDecode(originalToolCall.function.arguments)
+            as Map<String, dynamic>;
+        originalCommand = args['command'] as String? ?? '';
+      } catch (e) {
+        // Ignore parsing errors, use empty command
+      }
     }
 
     // Stdout section (if available)
@@ -200,7 +205,7 @@ class ToolResultFormatter {
       final language = _detectLanguage(stdout);
       buffer.writeln('```$language');
       buffer.writeln(stdout);
-      buffer.writeln('```\n');
+      buffer.writeln('```');
     }
 
     // Stderr section (if available)
@@ -212,13 +217,25 @@ class ToolResultFormatter {
       }
       buffer.writeln('```');
       buffer.writeln(stderr);
-      buffer.writeln('```\n');
+      buffer.writeln('```');
     }
 
-    // Exit code (show if not 0 or if command failed)
-    if (!success || exitCode != 0) {
-      buffer.writeln('**Exit Code:** `$exitCode`\n');
+    if (isStreaming) {
+      buffer.write('⏳ In progress: ');
+    } else if (success) {
+      buffer.write('✅ Done: ');
+    } else {
+      buffer.write('❌ FAIL: ');
     }
+
+    if (originalCommand != null && originalCommand.isNotEmpty) {
+      buffer.write('`${originalCommand.trim()}`');
+    }
+    if (exitCode != 0) {
+      buffer.write(' (exit code: **$exitCode**)');
+    }
+
+    buffer.writeln();
 
     // If no output at all
     if (stdout.isEmpty && stderr.isEmpty) {

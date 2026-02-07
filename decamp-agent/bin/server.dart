@@ -180,7 +180,7 @@ void main(List<String> args) async {
     );
 
     server.listen(
-      (HttpRequest request) {
+      (HttpRequest request) async {
         try {
           final clientIp = request.connectionInfo?.remoteAddress.address;
           final cert = request.certificate;
@@ -193,20 +193,32 @@ void main(List<String> args) async {
             _log.warning(
               'Client connection from $clientIp - NO CERTIFICATE PRESENTED',
             );
-            request.response
-              ..statusCode = HttpStatus.unauthorized
-              ..write('Unauthized.')
-              ..close();
+            try {
+              request.response
+                ..statusCode = HttpStatus.unauthorized
+                ..write('Unauthorized.');
+              await request.response.close();
+            } catch (e, st) {
+              _log.severe('Error sending unauthorized response: $e', e, st);
+            }
             return;
           }
-        } catch (e) {
-          _log.warning('Error logging client info: $e');
-        }
 
-        shelf_io.handleRequest(request, handler);
+          await shelf_io.handleRequest(request, handler);
+        } catch (e, st) {
+          _log.severe('Error processing request: $e', e, st);
+          try {
+            request.response
+              ..statusCode = HttpStatus.internalServerError
+              ..write('Internal Server Error');
+            await request.response.close();
+          } catch (e, st) {
+            _log.severe('Error sending error response: $e', e, st);
+          }
+        }
       },
-      onError: (e) {
-        _log.severe('HttpServer stream error', e);
+      onError: (e, st) {
+        _log.severe('HttpServer stream error', e, st);
       },
       onDone: () =>
           _log.severe('HttpServer stream closed. This is unexpected!'),

@@ -115,6 +115,17 @@ Future<AgentLoopResult> runAgentLoop({
       );
     }
 
+    // Build and save assistant message with tool use
+    final assistantMessage = ChatMessage.toolUse(
+      toolCalls: pendingCalls.map((p) => p.originalToolCall).toList(),
+      content: streamResult.text,
+    );
+    // Add to in-memory conversation (will be overwritten if using getConversation)
+    messages.add(assistantMessage);
+    if (onAssistantMessage != null) {
+      await onAssistantMessage(assistantMessage);
+    }
+
     // Request approval
     final approved = await requestApproval(pendingCalls);
 
@@ -134,17 +145,6 @@ Future<AgentLoopResult> runAgentLoop({
         ),
       );
     }).toList();
-
-    // Build and save assistant message with tool use
-    final assistantMessage = ChatMessage.toolUse(
-      toolCalls: approvedToolCalls,
-      content: streamResult.text,
-    );
-    // Add to in-memory conversation (will be overwritten if using getConversation)
-    messages.add(assistantMessage);
-    if (onAssistantMessage != null) {
-      await onAssistantMessage(assistantMessage);
-    }
 
     // Execute all approved tool calls
     List<String> resultStrings;
@@ -233,7 +233,7 @@ Future<_StreamResult> _streamFromLlm({
     switch (event) {
       case TextDeltaEvent(delta: final delta):
         buffer.write(delta);
-        onTextDelta?.call(delta);
+        await onTextDelta?.call(delta);
 
       case ToolCallDeltaEvent(toolCall: final delta):
         final id = delta.id;

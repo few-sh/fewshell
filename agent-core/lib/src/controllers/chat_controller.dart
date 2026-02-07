@@ -122,26 +122,24 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       // Use the extension method to convert to ChatMessage
-      final chatMessage = messageEntity.toChatMessage();
+      final chatMessages = messageEntity.toChatMessage();
 
-      _log.info(
-        '✅ Reconstructed ${chatMessage.role.name} message with kind: ${messageEntity.messageKind.name}',
-      );
+      for (final chatMessage in chatMessages) {
+        // Log tool calls and results for debugging
+        if (chatMessage.messageType is ToolUseMessage) {
+          final toolUse = chatMessage.messageType as ToolUseMessage;
+          _log.info(
+            '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
+          );
+        } else if (chatMessage.messageType is ToolResultMessage) {
+          final toolResult = chatMessage.messageType as ToolResultMessage;
+          _log.info(
+            '  📊 Tool results: ${toolResult.results.length} result(s)',
+          );
+        }
 
-      // Log tool calls and results for debugging
-      if (chatMessage.messageType is ToolUseMessage) {
-        final toolUse = chatMessage.messageType as ToolUseMessage;
-        _log.info(
-          '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
-        );
-      } else if (chatMessage.messageType is ToolResultMessage) {
-        final toolResult = chatMessage.messageType as ToolResultMessage;
-        _log.info(
-          '  📊 Tool results: ${toolResult.results.length} result(s)',
-        );
+        conversation.add(chatMessage);
       }
-
-      conversation.add(chatMessage);
     }
 
     if (conversation.isNotEmpty) {
@@ -269,11 +267,18 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       var aiMessageId = _messageDao.generateMessageId();
-      String? currentToolMessageId;
-      MessageEntity? currentEntity;
-
-      // Get initial entity
-      currentEntity = await _messageDao.getMessage(aiMessageId);
+      MessageEntity streamingMessage = MessageEntity(
+        id: aiMessageId,
+        sessionId: sessionId,
+        userId: _kAiUserId,
+        userName: 'System',
+        content: '',
+        timestamp: DateTime.now(),
+        createdAt: DateTime.now(),
+        messageKind: MessageKind.text,
+        isVisibleToLlm: true,
+        isStreaming: true,
+      );
 
       // Get config for remote execution
       final config = await _llmService.getActiveConfigSnapshot();
@@ -319,68 +324,6 @@ class ChatController extends StateNotifier<ChatState> {
             .toList();
       }
 
-      Future<void> handleAssistantMessage(ChatMessage message,
-          {String? messageId}) async {
-        // Use the ID provided by server, or generate one if local
-        final idToUse = messageId ?? aiMessageId;
-
-        // Determine if this is a tool use message or a text message
-        final messageType = message.messageType;
-        if (messageType is ToolUseMessage) {
-          // Save tool use message
-          final aiUserName = await _getAiUserName();
-          await _messageDao.insertMessage(
-            message.toMessageCompanion(
-              sessionId: sessionId,
-              id: idToUse,
-              userName: aiUserName,
-            ),
-          );
-          currentToolMessageId = idToUse;
-        } else {
-          // Save text message
-          final redactedContent = await _secretRedactor.redact(
-            message.content,
-          );
-          final aiUserName = await _getAiUserName();
-          await _messageDao.insertMessageWithId(
-            id: idToUse,
-            sessionId: sessionId,
-            userId: _kAiUserId,
-            userName: aiUserName,
-            content: redactedContent,
-          );
-          currentToolMessageId = null;
-        }
-
-        await _sessionDao.touchSession(sessionId);
-
-        // Update current entity for next steps
-        currentEntity = await _messageDao.getMessage(idToUse);
-
-        // Generate new ID for next message (only used if local or if server didn't provide one)
-        aiMessageId = _messageDao.generateMessageId();
-      }
-
-      Future<void> handleToolResultMessage(ChatMessage message,
-          {String? messageId, ChatMessage? toolCallMessage}) async {
-        // Use the ID provided by server, or generate one if local
-        final idToUse = messageId ?? _messageDao.generateMessageId();
-
-        await _messageDao.insertMessage(
-          message.toMessageCompanion(
-            sessionId: sessionId,
-            id: idToUse,
-            toolCallMessage: toolCallMessage,
-          ),
-        );
-
-        await _sessionDao.touchSession(sessionId);
-
-        // Update current entity
-        currentEntity = await _messageDao.getMessage(idToUse);
-      }
-
       final AgentLoopResult result;
 
       if (_project?.serverUrl != null) {
@@ -418,61 +361,136 @@ class ChatController extends StateNotifier<ChatState> {
         );
       } else {
         // Run the agent loop locally
-        // Get conversation history
-        final dbMessages = await _messageDao.getMessagesBySession(sessionId);
-        final conversation = _buildConversationHistory(dbMessages);
+
+        final aiUserName = await _getAiUserName();
 
         _currentLlmCancelToken = CancelToken();
 
         try {
           result = await runAgentLoop(
+            getConversation: () async {
+              final dbMessages =
+                  await _messageDao.getMessagesBySession(sessionId);
+              final conversation = _buildConversationHistory(dbMessages);
+              return conversation;
+            },
             llmStream: (conv, tools, {cancelToken}) => _llmService.streamChat(
               conv,
               tools: tools,
               cancelToken: cancelToken,
             ),
             tools: shellTools,
-            conversation: conversation,
             cancelToken: _currentLlmCancelToken,
-            getConversation: () async {
-              // Rebuild conversation from database each iteration (single source of truth)
-              final dbMessages =
-                  await _messageDao.getMessagesBySession(sessionId);
-              return _buildConversationHistory(dbMessages);
-            },
             requestApproval: handleRequestApproval,
+            onTextDelta: (delta) async {
+              streamingMessage = streamingMessage.copyWith(
+                content: '${streamingMessage.content}$delta',
+                messageKind: MessageKind.text,
+                userId: _kAiUserId,
+                userName: aiUserName,
+              );
+              await _messageDao
+                  .insertMessage(streamingMessage.toCompanion(true));
+            },
             executeToolCall: (toolCalls) async {
               final results = <String>[];
-              for (final toolCall in toolCalls) {
-                if (currentToolMessageId != null) {
-                  // Refresh current entity just in case
-                  currentEntity =
-                      await _messageDao.getMessage(currentToolMessageId!);
-                }
+              final completedToolResults = <ToolCall>[];
 
-                final toolOutputBuffer = StringBuffer();
+              streamingMessage = streamingMessage.copyWith(
+                messageKind: MessageKind.toolResult,
+                isStreaming: true,
+                toolCallsJson: Value(toolCalls),
+              );
+              _activeMessageController.add(streamingMessage);
+              for (final toolCall in toolCalls) {
+                final stdoutBuffer = StringBuffer();
                 void onOutput(String data) {
-                  toolOutputBuffer.write(data);
-                  if (currentEntity != null) {
-                    // Construct display content: original content + code block with output
-                    final displayContent =
-                        '${currentEntity!.content}\n\n```\n${toolOutputBuffer.toString()}\n```';
-                    _activeMessageController.add(
-                      currentEntity!.copyWith(content: displayContent),
-                    );
-                  }
+                  stdoutBuffer.write(data);
+                  final streamingResultJson = jsonEncode({
+                    'stdout': stdoutBuffer.toString(),
+                    'stderr': '',
+                    'exitCode': 0,
+                    'isStreaming': true,
+                  });
+                  streamingMessage = streamingMessage.copyWith(
+                    toolResultsJson: Value([
+                      ...completedToolResults,
+                      ToolCall(
+                        id: toolCall.id,
+                        callType: toolCall.callType,
+                        function: FunctionCall(
+                          name: toolCall.function.name,
+                          arguments: streamingResultJson,
+                        ),
+                      ),
+                    ]),
+                  );
+                  _activeMessageController.add(streamingMessage);
                 }
 
                 // Execute and return result as JSON string
                 final result =
                     await _executeToolCall(toolCall, onOutput: onOutput);
                 results.add(jsonEncode(result));
+                completedToolResults.add(ToolCall(
+                  id: toolCall.id,
+                  callType: toolCall.callType,
+                  function: FunctionCall(
+                    name: toolCall.function.name,
+                    arguments: jsonEncode(result),
+                  ),
+                ));
               }
               await _sessionDao.touchSession(sessionId);
               return results;
             },
-            onAssistantMessage: handleAssistantMessage,
-            onToolResultMessage: handleToolResultMessage,
+            onAssistantMessage: (ChatMessage message,
+                {String? messageId}) async {
+              // Use the ID provided by server, or generate one if local;
+
+              // Determine if this is a tool use message or a text message
+              final messageType = message.messageType;
+              if (messageType is ToolUseMessage) {
+                // Save tool use message
+                streamingMessage = message.toMessageEntity(
+                    isStreaming: true,
+                    sessionId: sessionId,
+                    id: streamingMessage.id,
+                    userName: aiUserName);
+
+                await _messageDao
+                    .insertMessage(streamingMessage.toCompanion(true));
+              } else {
+                // Save text message
+                streamingMessage = message.toMessageEntity(
+                    sessionId: sessionId,
+                    id: streamingMessage.id,
+                    userName: aiUserName);
+                await _messageDao
+                    .insertMessage(streamingMessage.toCompanion(true));
+              }
+
+              await _sessionDao.touchSession(sessionId);
+            },
+            onToolResultMessage: (ChatMessage message,
+                {String? messageId, ChatMessage? toolCallMessage}) async {
+              final messageEntity = message.toMessageEntity(
+                sessionId: sessionId,
+              );
+              streamingMessage = streamingMessage.copyWith(
+                  messageKind: MessageKind.toolResult,
+                  toolResultsJson: Value(messageEntity.toolResultsJson),
+                  isStreaming: false);
+              await _messageDao
+                  .insertMessage(streamingMessage.toCompanion(true));
+
+              // Generate new ID for next message (only used if local or if server didn't provide one)
+              streamingMessage = streamingMessage.copyWith(
+                id: _messageDao.generateMessageId(),
+              );
+
+              await _sessionDao.touchSession(sessionId);
+            },
           );
         } finally {
           _currentLlmCancelToken = null;
@@ -496,12 +514,11 @@ class ChatController extends StateNotifier<ChatState> {
           }
           final errorMessage = 'Sorry, I encountered an error: $errorMsg';
           final redactedError = await _secretRedactor.redact(errorMessage);
-          final aiUserName = await _getAiUserName();
           await _messageDao.insertMessageWithId(
             id: messageId,
             sessionId: sessionId,
             userId: _kAiUserId,
-            userName: aiUserName,
+            userName: 'System',
             content: redactedError,
             isVisibleToLlm: false,
           );
@@ -514,14 +531,12 @@ class ChatController extends StateNotifier<ChatState> {
         return;
       }
 
-      // TODO: Should not try to get ai usernme and use 'System' instead
       final errorMessage = 'Sorry, I encountered an error: $e';
       final redactedError = await _secretRedactor.redact(errorMessage);
-      final aiUserName = await _getAiUserName();
       await _messageDao.insertMessageWithId(
         sessionId: sessionId,
         userId: _kAiUserId,
-        userName: aiUserName,
+        userName: 'System',
         content: redactedError,
         isVisibleToLlm: false,
       );

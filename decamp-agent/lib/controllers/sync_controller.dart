@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:drift/drift.dart';
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_web_socket/shelf_web_socket.dart';
@@ -8,7 +9,6 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
-import 'package:drift/drift.dart';
 import '../services/database_manager.dart';
 import '../services/local_shell_backend.dart';
 import '../services/notification_dispatcher.dart';
@@ -323,10 +323,6 @@ class _AgentSession {
   CancelToken? _currentCancelToken;
   StreamController<ProcessSignal>? _currentAbortController;
 
-  // Streaming state
-  String? _streamingMessageId;
-  final StringBuffer _streamingContent = StringBuffer();
-  DateTime? _streamingCreatedAt;
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
@@ -479,17 +475,30 @@ class _AgentSession {
     }
 
     try {
+      if (sessionId == null || projectDb == null) {
+        throw Exception(
+          'Session ID and Database required',
+        );
+      }
+      final currentSessionId = sessionId;
+
+      MessageEntity streamingMessage = MessageEntity(
+        id: projectDb!.messageDao.generateMessageId(),
+        sessionId: sessionId,
+        userId: 'ai',
+        userName: 'System',
+        content: '',
+        timestamp: DateTime.now(),
+        createdAt: DateTime.now(),
+        messageKind: MessageKind.text,
+        isVisibleToLlm: true,
+        isStreaming: true,
+      );
+
       try {
         final config = data['config'] as Map<String, dynamic>;
         final triggerMessageJson =
             data['triggerMessage'] as Map<String, dynamic>?;
-
-        if (sessionId == null || projectDb == null) {
-          throw Exception(
-            'Session ID and Database required',
-          );
-        }
-        final currentSessionId = sessionId;
 
         // If we have a trigger message, upsert it immediately to ensure we have the latest context
         if (triggerMessageJson != null) {
@@ -502,41 +511,6 @@ class _AgentSession {
           _log.info(
             '✅ Trigger message ${triggerMessage.id} upserted!',
           );
-        }
-
-        // Always load conversation from database (single source of truth)
-        // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
-        // Also filter out messages not visible to LLM
-        final dbMessages =
-            await projectDb!.messageDao.getMessagesBySession(currentSessionId);
-        final conversation = dbMessages
-            .where((m) => !m.isStreaming && m.isVisibleToLlm)
-            .map((m) => m.toChatMessage())
-            .toList();
-
-        // Add cache control to the last text message for Anthropic prompt caching
-        // Search backwards to find the last TextMessage, as conversation may end with tool calls
-        // Use cache control marker pattern: Empty text block with cache_control
-        if (conversation.isNotEmpty) {
-          for (int i = conversation.length - 1; i >= 0; i--) {
-            if (conversation[i].messageType is TextMessage) {
-              // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
-              // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
-              conversation[i] = conversation[i].withExtension(
-                'anthropic',
-                {
-                  'contentBlocks': [
-                    {
-                      'type': 'text',
-                      'text': '',
-                      'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
-                    },
-                  ],
-                },
-              );
-              break; // Only cache the last text message
-            }
-          }
         }
 
         final apiKey = config['apiKey'] as String;
@@ -573,6 +547,9 @@ class _AgentSession {
         _currentAbortController = abortController;
 
         await runAgentLoop(
+          getConversation: () async {
+            return await _loadConversation(currentSessionId);
+          },
           llmStream: (conv, tools, {cancelToken}) {
             return provider.chatStream(
               conv,
@@ -581,7 +558,6 @@ class _AgentSession {
             );
           },
           tools: shellTools,
-          conversation: conversation,
           cancelToken: _currentCancelToken,
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
@@ -602,24 +578,13 @@ class _AgentSession {
           },
           executeToolCall: (toolCalls) async {
             final results = <String>[];
-            _streamingMessageId = projectDb!.messageDao.generateMessageId();
-            _streamingCreatedAt = DateTime.now();
+            final completedToolResults = <ToolCall>[];
 
-            _asyncDbWrite(() async {
-              // Insert placeholder message for tool call start
-              final companion = MessageEntityCompanion(
-                id: Value(_streamingMessageId!),
-                sessionId: Value(currentSessionId),
-                userId: const Value('user'),
-                userName: const Value('System'),
-                content: const Value('```bash\n'), // Initial content
-                timestamp: Value(DateTime.now()),
-                createdAt: Value(DateTime.now()),
-                messageKind: const Value(MessageKind.toolResult),
-                isStreaming: const Value(true),
-              );
-              await projectDb!.messageDao.insertMessage(companion);
-            });
+            streamingMessage = streamingMessage.copyWith(
+              messageKind: MessageKind.toolResult,
+              isStreaming: true,
+              toolCallsJson: Value(toolCalls),
+            );
 
             for (final toolCall in toolCalls) {
               final argumentsJson = toolCall.function.arguments;
@@ -638,18 +603,33 @@ class _AgentSession {
                   'Executing shell command. Abort controller: $abortController',
                 );
 
-                final toolOutputBuffer = StringBuffer();
+                final stdoutBuffer = StringBuffer();
                 void onOutput(String data) {
-                  //_log.info('Command delta: $data');
-                  toolOutputBuffer.write(data);
-                  if (_streamingMessageId != null) {
-                    _asyncDbWrite(() async {
-                      await projectDb!.messageDao.appendMessageContent(
-                        messageId: _streamingMessageId!,
-                        appendContent: data,
-                      );
-                    });
-                  }
+                  stdoutBuffer.write(data);
+                  final streamingResultJson = jsonEncode({
+                    'stdout': stdoutBuffer.toString(),
+                    'stderr': '',
+                    'exitCode': 0,
+                    'isStreaming': true,
+                  });
+                  streamingMessage = streamingMessage.copyWith(
+                    toolResultsJson: Value([
+                      ...completedToolResults,
+                      ToolCall(
+                        id: toolCall.id,
+                        callType: toolCall.callType,
+                        function: FunctionCall(
+                          name: toolCall.function.name,
+                          arguments: streamingResultJson,
+                        ),
+                      ),
+                    ]),
+                  );
+                  _asyncDbWrite(() async {
+                    await projectDb!.messageDao.insertMessage(
+                      streamingMessage.toCompanion(true),
+                    );
+                  });
                 }
 
                 final Map<String, dynamic> shellResult;
@@ -685,63 +665,58 @@ class _AgentSession {
                 result = jsonEncode({'error': 'Unknown tool'});
               }
               results.add(result);
+              completedToolResults.add(
+                ToolCall(
+                  id: toolCall.id,
+                  callType: toolCall.callType,
+                  function: FunctionCall(
+                    name: toolCall.function.name,
+                    arguments: result,
+                  ),
+                ),
+              );
             }
+
+            await projectDb!.messageDao
+                .insertMessage(streamingMessage.toCompanion(true));
+
             return results;
           },
-          onTextDelta: (delta) {
-            if (_streamingMessageId == null) {
-              _streamingMessageId = projectDb!.messageDao.generateMessageId();
-              _streamingCreatedAt = DateTime.now();
-            }
-            _streamingContent.write(delta);
-            final content = _streamingContent.toString();
-            final id = _streamingMessageId!;
-            final createdAt = _streamingCreatedAt!;
-
-            // Capture values for the closure
-            final companion = MessageEntityCompanion(
-              id: Value(id),
-              sessionId: Value(currentSessionId),
-              userId: const Value('ai'),
-              userName: Value(model),
-              content: Value(content),
-              timestamp: Value(createdAt),
-              createdAt: Value(createdAt),
-              messageKind: const Value(MessageKind.text),
-              isStreaming: const Value(true),
+          onTextDelta: (delta) async {
+            streamingMessage = streamingMessage.copyWith(
+              content: '${streamingMessage.content}$delta',
+              messageKind: MessageKind.text,
+              userId: 'ai',
+              userName: model,
+              isStreaming: true,
             );
-
-            _asyncDbWrite(() async {
-              await projectDb!.messageDao.insertMessage(companion);
-            });
+            await projectDb!.messageDao
+                .insertMessage(streamingMessage.toCompanion(true));
           },
           onAssistantMessage: (message, {String? messageId}) async {
             // Wait for any pending streaming writes to finish
             await _lastDbWrite;
 
-            String? id = _streamingMessageId ??
-                projectDb!.messageDao.generateMessageId();
-
             // db and sessionId are guaranteed to be non-null here due to checks at start of method
             // Determine if this is a tool use message or a text message
             final messageType = message.messageType;
             if (messageType is ToolUseMessage) {
-              await projectDb!.messageDao.insertMessage(
-                message.toMessageCompanion(
-                  sessionId: currentSessionId,
-                  id: id,
-                  userName: model,
-                ),
-              );
-            } else {
-              await projectDb!.messageDao.insertMessageWithId(
-                id: id,
+              streamingMessage = message.toMessageEntity(
                 sessionId: currentSessionId,
-                userId: 'ai',
+                id: streamingMessage.id,
                 userName: model,
-                content: message.content,
-                isStreaming: false,
               );
+              await projectDb!.messageDao
+                  .insertMessage(streamingMessage.toCompanion(true));
+            } else {
+              // Save text message
+              streamingMessage = message.toMessageEntity(
+                sessionId: currentSessionId,
+                id: streamingMessage.id,
+                userName: model,
+              );
+              await projectDb!.messageDao
+                  .insertMessage(streamingMessage.toCompanion(true));
             }
             await projectDb!.sessionDao.touchSession(currentSessionId);
           },
@@ -750,18 +725,25 @@ class _AgentSession {
             String? messageId,
             ChatMessage? toolCallMessage,
           }) async {
-            String? id;
-            // db and sessionId are guaranteed to be non-null here due to checks at start of method
-            id = _streamingMessageId ??
-                projectDb!.messageDao.generateMessageId();
-            _streamingMessageId = null;
-            await projectDb!.messageDao.insertMessage(
-              message.toMessageCompanion(
-                sessionId: currentSessionId,
-                id: id,
-                toolCallMessage: toolCallMessage,
-              ),
+            final String id = streamingMessage.id;
+
+            final messageEntity = message.toMessageEntity(
+              sessionId: sessionId!,
             );
+            streamingMessage = streamingMessage.copyWith(
+              messageKind: MessageKind.toolResult,
+              toolResultsJson: Value(messageEntity.toolResultsJson),
+              isStreaming: false,
+            );
+
+            await projectDb!.messageDao
+                .insertMessage(streamingMessage.toCompanion(true));
+
+            // Generate new ID for next message (only used if local or if server didn't provide one)
+            streamingMessage = streamingMessage.copyWith(
+              id: projectDb!.messageDao.generateMessageId(),
+            );
+
             await projectDb!.sessionDao.touchSession(currentSessionId);
 
             // Send push notification to subscribers
@@ -801,7 +783,7 @@ class _AgentSession {
           final messageId = projectDb!.messageDao.generateMessageId();
 
           // Try to insert error message if we have session ID and DB
-          if (sessionId != null && projectDb != null) {
+          if (projectDb != null) {
             try {
               final config = data['config'] as Map<String, dynamic>?;
               final model = config?['model'] as String? ?? 'Ops Agent';
@@ -838,20 +820,18 @@ class _AgentSession {
           _log.warning('Error waiting for last DB write: $e');
         }
 
-        if (_streamingMessageId != null && projectDb != null) {
+        if (projectDb != null) {
           // Clean up any streaming message placeholder
           try {
             final config = data['config'] as Map<String, dynamic>?;
             final model = config?['model'] as String? ?? 'Ops Agent';
 
-            await projectDb!.messageDao.insertMessageWithId(
-              id: _streamingMessageId!,
-              sessionId: sessionId!,
-              userId: 'ai',
+            streamingMessage = streamingMessage.copyWith(
               userName: model,
-              content: _streamingContent.toString(),
               isStreaming: false,
-              isVisibleToLlm: true,
+            );
+            await projectDb!.messageDao.updateMessage(
+              streamingMessage.toCompanion(true),
             );
           } catch (e) {
             _log.warning(
@@ -859,17 +839,11 @@ class _AgentSession {
             );
           }
         }
-        // Reset streaming state
-        _streamingMessageId = null;
-        _streamingContent.clear();
-        _streamingCreatedAt = null;
         _lastDbWrite = Future.value(); // Reset chain
 
-        if (sessionId != null) {
-          await _unlockSession(sessionId);
-          // Trigger cleanup check after unlocking
-          onComplete();
-        }
+        await _unlockSession(sessionId);
+        // Trigger cleanup check after unlocking
+        onComplete();
       }
     } catch (e) {
       _log.severe('Error starting chat', e);
@@ -886,6 +860,44 @@ class _AgentSession {
         onComplete();
       }
     }
+  }
+
+  Future<List<ChatMessage>> _loadConversation(String sessionId) async {
+    // Always load conversation from database (single source of truth)
+    // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
+    // Also filter out messages not visible to LLM
+    final dbMessages =
+        await projectDb!.messageDao.getMessagesBySession(sessionId);
+    final conversation = dbMessages
+        .where((m) => !m.isStreaming && m.isVisibleToLlm)
+        .expand((m) => m.toChatMessage())
+        .toList();
+
+    // Add cache control to the last text message for Anthropic prompt caching
+    // Search backwards to find the last TextMessage, as conversation may end with tool calls
+    // Use cache control marker pattern: Empty text block with cache_control
+    if (conversation.isNotEmpty) {
+      for (int i = conversation.length - 1; i >= 0; i--) {
+        if (conversation[i].messageType is TextMessage) {
+          // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
+          // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
+          conversation[i] = conversation[i].withExtension(
+            'anthropic',
+            {
+              'contentBlocks': [
+                {
+                  'type': 'text',
+                  'text': '',
+                  'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
+                },
+              ],
+            },
+          );
+          break; // Only cache the last text message
+        }
+      }
+    }
+    return conversation;
   }
 
   void _asyncDbWrite(Future<void> Function() write) {

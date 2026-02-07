@@ -60,7 +60,7 @@ typedef ToolExecutionFunction = Future<List<String>> Function(
   List<ToolCall> toolCalls,
 );
 
-typedef TextDeltaCallback = void Function(String delta);
+typedef TextDeltaCallback = Future<void> Function(String delta);
 
 typedef MessageCallback = Future<void> Function(ChatMessage message,
     {String? messageId});
