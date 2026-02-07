@@ -581,6 +581,14 @@ final chatControllerProvider =
       // Get sessionMutexDao for local execution locking (may be null if no project)
       final sessionMutexDao = db.projectDatabase?.sessionMutexDao;
 
+      // Create conversation summarizer for local execution
+      final conversationSummarizer = db.projectDatabase != null
+          ? ConversationSummarizer(
+              messageDao: db.messageDao,
+              llmService: ref.watch(llmServiceProvider),
+            )
+          : null;
+
       return ChatController(
         messageDao: db.messageDao,
         sessionDao: db.sessionDao,
@@ -590,6 +598,7 @@ final chatControllerProvider =
         secretRedactor: secretRedactor,
         sshSettings: sshSettings,
         project: currentProject,
+        conversationSummarizer: conversationSummarizer,
         sessionId: sessionId,
       );
     });

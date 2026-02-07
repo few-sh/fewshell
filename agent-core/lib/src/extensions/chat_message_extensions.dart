@@ -206,10 +206,12 @@ extension MessageEntityToChat on MessageEntity {
           ? [ChatMessage.user(content)]
           : [ChatMessage.assistant(content)],
       MessageKind.conversationSummary => [
-          ChatMessage.assistant(content),
+          // Summaries are injected as user messages so the LLM treats them
+          // as context it should build upon (handoff from previous model).
+          ChatMessage.user(content),
         ],
       MessageKind.toolResultSummary => [
-          ChatMessage.assistant(content),
+          ChatMessage.user(content),
         ],
     };
   }

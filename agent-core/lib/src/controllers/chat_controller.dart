@@ -29,6 +29,7 @@ class ChatController extends StateNotifier<ChatState> {
   final SecretRedactor _secretRedactor;
   final SshSettings? _sshSettings;
   final ProjectEntity? _project;
+  final ConversationSummarizer? _conversationSummarizer;
   final String? sessionId;
 
   final _activeMessageController = StreamController<MessageEntity>.broadcast();
@@ -60,6 +61,7 @@ class ChatController extends StateNotifier<ChatState> {
     required SecretRedactor secretRedactor,
     SshSettings? sshSettings,
     ProjectEntity? project,
+    ConversationSummarizer? conversationSummarizer,
     this.sessionId,
   })  : _messageDao = messageDao,
         _sessionDao = sessionDao,
@@ -69,6 +71,7 @@ class ChatController extends StateNotifier<ChatState> {
         _secretRedactor = secretRedactor,
         _sshSettings = sshSettings,
         _project = project,
+        _conversationSummarizer = conversationSummarizer,
         super(const ChatState());
 
   @override
@@ -361,6 +364,16 @@ class ChatController extends StateNotifier<ChatState> {
         );
       } else {
         // Run the agent loop locally
+
+        // Run summarization before the agent loop if needed
+        if (_conversationSummarizer != null) {
+          try {
+            await _conversationSummarizer.summarizeIfNeeded(sessionId);
+          } catch (e) {
+            _log.warning('Conversation summarization failed: $e');
+            // Non-fatal: continue with the full conversation
+          }
+        }
 
         final aiUserName = await _getAiUserName();
 

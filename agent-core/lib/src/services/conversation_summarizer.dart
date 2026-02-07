@@ -1,18 +1,33 @@
+import 'package:drift/drift.dart';
+import 'package:llm_dart/llm_dart.dart';
 import 'package:logging/logging.dart';
 
 import '../database/database.dart';
 import '../database/daos/message_dao.dart';
 import '../database/tables/messages_table.dart';
+import '../utils/id_generator.dart';
 import 'llm_service.dart';
 
 final _log = Logger('ConversationSummarizer');
 
 const _defaultSummarizationPrompt =
-    'You are a conversation summarizer. Condense the following conversation '
-    'into a concise summary that preserves all important context, decisions, '
-    'findings, and action items. The summary will replace the original messages '
-    'in the context window, so it must retain enough detail for the assistant '
-    'to continue the conversation without losing track of what happened.';
+    'You are performing a CONTEXT CHECKPOINT COMPACTION. Create a handoff '
+    'summary for another LLM that will resume the task.\n\n'
+    'Include:\n'
+    '- Current progress and key decisions made\n'
+    '- Important context, constraints, or user preferences\n'
+    '- What remains to be done (clear next steps)\n'
+    '- Any critical data, examples, or references needed to continue\n\n'
+    'Be concise, structured, and focused on helping the next LLM seamlessly '
+    'continue the work.';
+
+const _defaultSummaryPrefix =
+    'Another language model started to solve this problem and produced a '
+    'summary of its thinking process. You also have access to the state of the '
+    'tools that were used by that language model. Use this to build on the work '
+    'that has already been done and avoid duplicating work. Here is the summary '
+    'produced by the other language model, use the information in this summary '
+    'to assist with your own analysis:\n\n';
 
 /// Configuration for [ConversationSummarizer].
 class ConversationSummarizerConfig {
@@ -48,14 +63,34 @@ class ConversationSummarizerConfig {
   /// in the context window.
   final String summarizationPrompt;
 
+  /// Prefix prepended to the summary when it is injected back into the
+  /// conversation as a [MessageKind.conversationSummary] message.
+  ///
+  /// Frames the summary as a handoff from a previous LLM, helping the
+  /// receiving model understand the context.
+  final String summaryPrefix;
+
+  /// Maximum estimated token count for the messages sent to the LLM
+  /// as input for the summarization call itself.
+  ///
+  /// Older messages are dropped (oldest first) if the input exceeds this
+  /// budget so the summarization request doesn't blow the context window.
+  final int summaryInputTokenBudget;
+
   const ConversationSummarizerConfig({
     this.messageCountThreshold = 40,
     this.tokenThreshold = 80000,
     this.bytesPerToken = 4,
     this.recentMessageCount = 10,
     this.summarizationPrompt = _defaultSummarizationPrompt,
+    this.summaryPrefix = _defaultSummaryPrefix,
+    this.summaryInputTokenBudget = 100000,
   });
 }
+
+/// Callback invoked after summarization completes, e.g. to show a warning
+/// to the user about potential accuracy degradation in long threads.
+typedef SummarizationCallback = Future<void> Function(String sessionId);
 
 /// Summarizes older conversation messages to keep the context window manageable.
 ///
@@ -73,10 +108,15 @@ class ConversationSummarizer {
   final LlmService _llmService;
   final ConversationSummarizerConfig config;
 
+  /// Optional callback fired after a successful summarization.
+  /// Can be used to insert a user-facing warning about accuracy degradation.
+  final SummarizationCallback? onSummarized;
+
   ConversationSummarizer({
     required MessageDao messageDao,
     required LlmService llmService,
     this.config = const ConversationSummarizerConfig(),
+    this.onSummarized,
   })  : _messageDao = messageDao,
         _llmService = llmService;
 
@@ -119,30 +159,122 @@ class ConversationSummarizer {
     await _hideMessages(toSummarize);
 
     _log.info('Summarization complete for session $sessionId');
+
+    await onSummarized?.call(sessionId);
+
     return true;
   }
 
-  /// Call the LLM to produce a summary of the given messages.
+  /// Build a conversation transcript from message entities and stream it
+  /// to the LLM with the summarization prompt to produce a summary.
   Future<String> _generateSummary(List<MessageEntity> messages) async {
-    // TODO: Build a prompt from messages and call _llmService
-    // For now, return a placeholder.
-    throw UnimplementedError('_generateSummary not yet implemented');
+    // Build a flat transcript of the messages for the summarizer
+    final transcript = StringBuffer();
+    for (final m in messages) {
+      final role = switch (m.userId) {
+        'user' => 'User',
+        'ai' || 'assistant' => 'Assistant',
+        'system' => 'System',
+        _ => m.userName,
+      };
+
+      transcript.writeln('[$role]: ${m.content}');
+
+      // Include tool call/result info when present
+      if (m.messageKind == MessageKind.toolUse && m.toolCallsJson != null) {
+        for (final tc in m.toolCallsJson!) {
+          transcript.writeln('  [Tool Call] ${tc.function.name}');
+        }
+      }
+      if (m.messageKind == MessageKind.toolResult &&
+          m.toolResultsJson != null) {
+        for (final tr in m.toolResultsJson!) {
+          transcript.writeln('  [Tool Result] ${tr.function.name}: '
+              '${tr.function.arguments}');
+        }
+      }
+    }
+
+    // Call LLM via streaming (the only interface LlmService exposes)
+    final conversation = [
+      ChatMessage.user(transcript.toString()),
+    ];
+
+    final buffer = StringBuffer();
+    await for (final event in _llmService.streamChat(conversation)) {
+      switch (event) {
+        case TextDeltaEvent(delta: final delta):
+          buffer.write(delta);
+        case ErrorEvent(error: final error):
+          throw Exception('Summarization LLM call failed: ${error.message}');
+        default:
+          break;
+      }
+    }
+
+    final summary = buffer.toString();
+    if (summary.isEmpty) {
+      throw Exception('LLM returned empty summary');
+    }
+
+    _log.info(
+      'Generated summary: ${summary.length} chars '
+      '(~${summary.length ~/ config.bytesPerToken} tokens)',
+    );
+
+    return summary;
   }
 
   /// Insert a [MessageKind.conversationSummary] message into the database.
+  ///
+  /// The summary text is stored in the [MessageEntity.summary] field.
+  /// The [MessageEntity.content] field contains the prefixed summary that
+  /// will be seen by the LLM when the conversation is rebuilt.
   Future<void> _insertSummaryMessage({
     required String sessionId,
     required String summary,
     required DateTime timestamp,
   }) async {
-    // TODO: insert via _messageDao
-    throw UnimplementedError('_insertSummaryMessage not yet implemented');
+    final prefixedContent = '${config.summaryPrefix}$summary';
+
+    final companion = MessageEntityCompanion(
+      id: Value(IdGenerator.messageId()),
+      sessionId: Value(sessionId),
+      userId: const Value('system'),
+      userName: const Value('System'),
+      content: Value(prefixedContent),
+      summary: Value(summary),
+      timestamp: Value(timestamp),
+      createdAt: Value(timestamp),
+      messageKind: const Value(MessageKind.conversationSummary),
+      isVisibleToLlm: const Value(true),
+      isStreaming: const Value(false),
+    );
+
+    await _messageDao.insertMessage(companion);
   }
 
   /// Set `isVisibleToLlm = false` on each summarized message.
   Future<void> _hideMessages(List<MessageEntity> messages) async {
-    // TODO: batch update via _messageDao
-    throw UnimplementedError('_hideMessages not yet implemented');
+    for (final m in messages) {
+      final companion = MessageEntityCompanion(
+        id: Value(m.id),
+        sessionId: Value(m.sessionId),
+        userId: Value(m.userId),
+        userName: Value(m.userName),
+        content: Value(m.content),
+        timestamp: Value(m.timestamp),
+        createdAt: Value(m.createdAt),
+        editedAt: Value(m.editedAt),
+        messageKind: Value(m.messageKind),
+        imageUrl: Value(m.imageUrl),
+        toolCallsJson: Value(m.toolCallsJson),
+        toolResultsJson: Value(m.toolResultsJson),
+        isVisibleToLlm: const Value(false),
+        summary: Value(m.summary),
+      );
+      await _messageDao.updateMessage(companion);
+    }
   }
 
   /// Check whether summarization should be triggered.
