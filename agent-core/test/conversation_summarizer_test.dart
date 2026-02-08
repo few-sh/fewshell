@@ -78,8 +78,11 @@ class MockLlmStream {
   /// Tracks conversations passed to the stream function for assertions.
   final List<List<ChatMessage>> calls = [];
 
-  /// The [LlmStreamFunction] to pass to [ConversationSummarizer].
-  Stream<ChatStreamEvent> call(List<ChatMessage> conversation) async* {
+  /// The [SummarizationStreamFunction] to pass to [ConversationSummarizer].
+  Stream<ChatStreamEvent> call(
+    List<ChatMessage> conversation, {
+    CancelToken? cancelToken,
+  }) async* {
     calls.add(conversation);
     if (shouldError) {
       yield ErrorEvent(ProviderError(errorMessage));

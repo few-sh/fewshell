@@ -93,8 +93,9 @@ class ConversationSummarizerConfig {
 /// conversation (no tools or cancel token) since summarization is a
 /// single-shot call.
 typedef SummarizationStreamFunction = Stream<ChatStreamEvent> Function(
-  List<ChatMessage> conversation,
-);
+  List<ChatMessage> conversation, {
+  CancelToken? cancelToken,
+});
 
 /// Callback invoked after summarization completes, e.g. to show a warning
 /// to the user about potential accuracy degradation in long threads.
@@ -137,6 +138,7 @@ class ConversationSummarizer {
   Future<bool> summarizeIfNeeded(
     String sessionId, {
     bool hideMessages = true,
+    CancelToken? cancelToken,
   }) async {
     final messages = await _messageDao.getMessagesBySession(sessionId);
 
@@ -147,7 +149,8 @@ class ConversationSummarizer {
       return false;
     }
 
-    return _summarize(sessionId, visible, hideMessages: hideMessages);
+    return _summarize(sessionId, visible,
+        hideMessages: hideMessages, cancelToken: cancelToken);
   }
 
   /// Force summarization for [sessionId] regardless of thresholds.
@@ -160,13 +163,15 @@ class ConversationSummarizer {
   Future<bool> forceSummarize(
     String sessionId, {
     bool hideMessages = true,
+    CancelToken? cancelToken,
   }) async {
     final messages = await _messageDao.getMessagesBySession(sessionId);
 
     final visible =
         messages.where((m) => m.isVisibleToLlm && !m.isStreaming).toList();
 
-    return _summarize(sessionId, visible, hideMessages: hideMessages);
+    return _summarize(sessionId, visible,
+        hideMessages: hideMessages, cancelToken: cancelToken);
   }
 
   /// Shared summarization logic used by both [summarizeIfNeeded] and
@@ -175,6 +180,7 @@ class ConversationSummarizer {
     String sessionId,
     List<MessageEntity> visible, {
     required bool hideMessages,
+    CancelToken? cancelToken,
   }) async {
     // Not enough messages to leave a tail — nothing to summarize
     if (visible.length <= config.recentMessageCount) {
@@ -204,7 +210,8 @@ class ConversationSummarizer {
     );
 
     try {
-      final summary = await _generateSummary(toSummarize);
+      final summary =
+          await _generateSummary(toSummarize, cancelToken: cancelToken);
 
       // Insert a summary message just before the kept tail
       await _insertSummaryMessage(
@@ -232,7 +239,10 @@ class ConversationSummarizer {
 
   /// Build a conversation transcript from message entities and stream it
   /// to the LLM with the summarization prompt to produce a summary.
-  Future<String> _generateSummary(List<MessageEntity> messages) async {
+  Future<String> _generateSummary(
+    List<MessageEntity> messages, {
+    CancelToken? cancelToken,
+  }) async {
     // Build a flat transcript of the messages for the summarizer
     final transcript = StringBuffer();
     for (final m in messages) {
@@ -269,7 +279,8 @@ class ConversationSummarizer {
     ];
 
     final buffer = StringBuffer();
-    await for (final event in _llmStream(conversation)) {
+    await for (final event
+        in _llmStream(conversation, cancelToken: cancelToken)) {
       switch (event) {
         case TextDeltaEvent(delta: final delta):
           buffer.write(delta);

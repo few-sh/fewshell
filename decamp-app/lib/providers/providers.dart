@@ -586,7 +586,8 @@ final chatControllerProvider =
       final conversationSummarizer = db.projectDatabase != null
           ? ConversationSummarizer(
               messageDao: db.messageDao,
-              llmStream: (conversation) => llmService.streamChat(conversation),
+              llmStream: (conversation, {cancelToken}) =>
+                  llmService.streamChat(conversation, cancelToken: cancelToken),
             )
           : null;
 

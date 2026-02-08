@@ -404,6 +404,8 @@ class _AgentSession {
       return;
     }
 
+    var lockAckquired = false;
+
     try {
       final config = data['config'] as Map<String, dynamic>;
 
@@ -435,14 +437,30 @@ class _AgentSession {
         systemInstruction: systemInstruction,
       );
 
+      _currentCancelToken = CancelToken();
+
       final summarizer = ConversationSummarizer(
         messageDao: projectDb!.messageDao,
-        llmStream: (conversation) => provider.chatStream(conversation),
+        llmStream: (conversation, {cancelToken}) =>
+            provider.chatStream(conversation, cancelToken: cancelToken),
       );
+
+      lockAckquired = await _lockSession(sessionId);
+
+      if (!lockAckquired) {
+        _log.warning('Chat already in progress for session $sessionId');
+        channel.safeSendCustomMessage({
+          'type': 'summarize_error',
+          'message':
+              'Session is currently busy with another operation. Please try again in a few...',
+        });
+        return;
+      }
 
       final performed = await summarizer.forceSummarize(
         sessionId,
         hideMessages: hideMessages,
+        cancelToken: _currentCancelToken,
       );
 
       channel.safeSendCustomMessage({
@@ -455,6 +473,17 @@ class _AgentSession {
         'type': 'summarize_error',
         'message': e.toString(),
       });
+    } finally {
+      _currentCancelToken = null;
+      if (lockAckquired) {
+        await _unlockSession(sessionId).catchError((e, st) {
+          _log.severe(
+            'Error releasing session lock for session $sessionId',
+            e,
+            st,
+          );
+        });
+      }
     }
   }
 
@@ -626,10 +655,14 @@ class _AgentSession {
         // Run summarization before the agent loop if needed
         final summarizer = ConversationSummarizer(
           messageDao: projectDb!.messageDao,
-          llmStream: (conversation) => provider.chatStream(conversation),
+          llmStream: (conversation, {cancelToken}) =>
+              provider.chatStream(conversation, cancelToken: cancelToken),
         );
         try {
-          await summarizer.summarizeIfNeeded(currentSessionId);
+          await summarizer.summarizeIfNeeded(
+            currentSessionId,
+            cancelToken: _currentCancelToken,
+          );
         } catch (e) {
           _log.warning('Conversation summarization failed: $e');
           // Non-fatal: continue with the full conversation

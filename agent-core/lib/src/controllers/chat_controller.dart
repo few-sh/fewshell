@@ -126,10 +126,33 @@ class ChatController extends StateNotifier<ChatState> {
       return false;
     }
 
-    return _conversationSummarizer.forceSummarize(
-      sessionId!,
-      hideMessages: hideMessages,
-    );
+    _currentLlmCancelToken = CancelToken();
+    var lockAckquired = false;
+    try {
+      if (isLocalExecution && _sessionMutexDao != null) {
+        lockAckquired = await _sessionMutexDao.acquireLock(sessionId!);
+        if (!lockAckquired) {
+          _log.warning('Could not acquire lock for session $sessionId');
+          if (mounted) {
+            state = state.copyWith(error: 'Session is busy');
+          }
+          return false;
+        }
+      }
+      return await _conversationSummarizer.forceSummarize(
+        sessionId!,
+        hideMessages: hideMessages,
+        cancelToken: _currentLlmCancelToken,
+      );
+    } finally {
+      _currentLlmCancelToken = null;
+      if (lockAckquired && _sessionMutexDao != null) {
+        await _sessionMutexDao.unlock(sessionId!).catchError((e, st) {
+          _log.severe(
+              'Error releasing session lock for session $sessionId', e, st);
+        });
+      }
+    }
   }
 
   @override
