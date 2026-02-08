@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/rich_message_content.dart';
+import 'package:decamp/components/summary_message_card.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -405,6 +406,26 @@ class _MessageItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Render summary messages as a collapsed card
+    if (message.messageKind == MessageKind.conversationSummary) {
+      return Column(
+        children: [
+          if (showDivider)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: ShadSeparator.horizontal(
+                color: ShadTheme.of(context).colorScheme.border,
+                thickness: 0.5,
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4.0),
+            child: SummaryMessageCard(message: message),
+          ),
+        ],
+      );
+    }
+
     final isUser = message.userId == 'user';
 
     // Check if this message is subscribed
