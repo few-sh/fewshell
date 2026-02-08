@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:logging/logging.dart';
@@ -182,14 +184,17 @@ class ConversationSummarizer {
     required bool hideMessages,
     CancelToken? cancelToken,
   }) async {
-    // Not enough messages to leave a tail — nothing to summarize
-    if (visible.length <= config.recentMessageCount) {
+    // Need at least 2 messages: 1 to summarize + 1 to keep as tail
+    if (visible.length < 2) {
       return false;
     }
 
+    // Keep up to recentMessageCount, but shrink the tail if there aren't
+    // enough messages (e.g. few huge messages exceeding the token limit).
+    final tailCount = min(config.recentMessageCount, visible.length - 1);
+
     // Messages to summarize: everything except the most recent tail
-    final toSummarize =
-        visible.sublist(0, visible.length - config.recentMessageCount);
+    final toSummarize = visible.sublist(0, visible.length - tailCount);
 
     if (toSummarize.isEmpty) {
       return false;
@@ -362,7 +367,7 @@ class ConversationSummarizer {
   /// exceeds the configured thresholds, and there are enough messages
   /// to leave a tail of [ConversationSummarizerConfig.recentMessageCount].
   bool _shouldSummarize(List<MessageEntity> visible) {
-    if (visible.length <= config.recentMessageCount) return false;
+    if (visible.length < 2) return false;
 
     final overMessageLimit = visible.length >= config.messageCountThreshold;
     final estimatedTokens = _estimateTokens(visible);

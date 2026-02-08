@@ -251,14 +251,14 @@ void main() {
       expect(result, isTrue);
     });
 
-    test('does not trigger when visible count <= recentMessageCount', () async {
-      mockDao.storedMessages = _makeMessages(5);
+    test('does not trigger when only one message exists', () async {
+      mockDao.storedMessages = _makeMessages(1);
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
         llmStream: mockLlm.call,
         config: const ConversationSummarizerConfig(
-          messageCountThreshold: 3,
+          messageCountThreshold: 1,
           tokenThreshold: 1,
           recentMessageCount: 5,
         ),
@@ -266,6 +266,30 @@ void main() {
 
       final result = await summarizer.summarizeIfNeeded(_testSessionId);
       expect(result, isFalse);
+    });
+
+    test(
+        'triggers over token limit even with fewer messages than recentMessageCount',
+        () async {
+      // 5 messages, recentMessageCount is 10, but token threshold is very low.
+      // Should still summarize (keep 4, summarize 1) instead of being stuck.
+      mockDao.storedMessages = _makeMessages(5);
+      mockLlm.summaryToReturn = 'emergency summary';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmStream: mockLlm.call,
+        config: const ConversationSummarizerConfig(
+          messageCountThreshold: 999,
+          tokenThreshold: 1, // very low — always over limit
+          recentMessageCount: 10,
+        ),
+      );
+
+      final result = await summarizer.summarizeIfNeeded(_testSessionId);
+      expect(result, isTrue);
+      // Should keep 4 (min(10, 5-1)) and summarize 1
+      expect(mockDao.updatedCompanions, hasLength(1));
     });
   });
 
@@ -596,8 +620,8 @@ void main() {
       expect(mockDao.updatedCompanions, hasLength(7)); // 12 - 5 kept
     });
 
-    test('returns false when not enough messages for a tail', () async {
-      mockDao.storedMessages = _makeMessages(3);
+    test('returns false when only one message exists', () async {
+      mockDao.storedMessages = _makeMessages(1);
 
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
@@ -610,6 +634,27 @@ void main() {
       final result = await summarizer.forceSummarize(_testSessionId);
       expect(result, isFalse);
       expect(mockLlm.calls, isEmpty);
+    });
+
+    test(
+        'summarizes with reduced tail when fewer messages than recentMessageCount',
+        () async {
+      // 3 messages, recentMessageCount=5 — should keep 2, summarize 1
+      mockDao.storedMessages = _makeMessages(3);
+      mockLlm.summaryToReturn = 'small session summary';
+
+      final summarizer = ConversationSummarizer(
+        messageDao: mockDao,
+        llmStream: mockLlm.call,
+        config: const ConversationSummarizerConfig(
+          recentMessageCount: 5,
+        ),
+      );
+
+      final result = await summarizer.forceSummarize(_testSessionId);
+      expect(result, isTrue);
+      expect(mockDao.updatedCompanions, hasLength(1)); // 3 - 2 kept = 1 hidden
+      expect(mockDao.insertedCompanions, hasLength(1)); // 1 summary
     });
   });
 
