@@ -43,7 +43,7 @@ class FullScreenSummaryView extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Conversation Summary',
+                        'Session Summary',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

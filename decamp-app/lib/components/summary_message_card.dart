@@ -35,7 +35,7 @@ class SummaryMessageCard extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Conversation summary',
+                'Session Summary',
                 style: TextStyle(
                   fontSize: 13,
                   color: colorScheme.mutedForeground,

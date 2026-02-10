@@ -400,6 +400,13 @@ class ConversationSummarizer {
   int _estimateTokens(List<MessageEntity> messages) {
     var totalBytes = 0;
     for (final m in messages) {
+      if (m.summary != null) {
+        // For tool-result summaries, use the summary length instead of the
+        // original content + tool calls/results since the summary is what the
+        // LLM sees and should be a more accurate reflection of the token count.
+        totalBytes += m.summary!.length;
+        continue;
+      }
       totalBytes += m.content.length;
       if (m.toolCallsJson != null) {
         for (final tc in m.toolCallsJson!) {
