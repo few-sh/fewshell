@@ -7,6 +7,7 @@ import 'package:logging/logging.dart';
 import '../database/database.dart';
 import '../database/daos/message_dao.dart';
 import '../database/tables/messages_table.dart';
+import '../extensions/chat_message_extensions.dart';
 import '../utils/id_generator.dart';
 
 final _log = Logger('ConversationSummarizer');
@@ -396,28 +397,26 @@ class ConversationSummarizer {
     return overMessageLimit || overTokenLimit;
   }
 
-  /// Rough token estimate: sum of content + tool JSON byte lengths / bytesPerToken.
+  /// Rough token estimate based on the serialized form of ChatMessages.
+  ///
+  /// Uses [MessageEntity.toChatMessage] to mirror what the LLM actually sees,
+  /// then sums content + serialized tool call lengths.
   int _estimateTokens(List<MessageEntity> messages) {
     var totalBytes = 0;
     for (final m in messages) {
-      if (m.summary != null) {
-        // For tool-result summaries, use the summary length instead of the
-        // original content + tool calls/results since the summary is what the
-        // LLM sees and should be a more accurate reflection of the token count.
-        totalBytes += m.summary!.length;
-        continue;
-      }
-      totalBytes += m.content.length;
-      if (m.toolCallsJson != null) {
-        for (final tc in m.toolCallsJson!) {
-          totalBytes += tc.function.name.length;
-          totalBytes += tc.function.arguments.length;
-        }
-      }
-      if (m.toolResultsJson != null) {
-        for (final tr in m.toolResultsJson!) {
-          totalBytes += tr.function.name.length;
-          totalBytes += tr.function.arguments.length;
+      for (final chatMsg in m.toChatMessage()) {
+        totalBytes += chatMsg.content.length;
+        switch (chatMsg.messageType) {
+          case ToolUseMessage(:final toolCalls):
+            for (final tc in toolCalls) {
+              totalBytes += tc.toString().length;
+            }
+          case ToolResultMessage(:final results):
+            for (final tr in results) {
+              totalBytes += tr.toString().length;
+            }
+          default:
+            break;
         }
       }
     }
