@@ -208,7 +208,8 @@ extension MessageEntityToChat on MessageEntity {
       MessageKind.conversationSummary => [
           // Summaries are injected as user messages so the LLM treats them
           // as context it should build upon (handoff from previous model).
-          ChatMessage.user(content),
+          ChatMessage.user(
+              summary ?? '[Unexpected Error: No summary available]'),
         ],
       MessageKind.toolResultSummary => [
           ChatMessage.user(content),
