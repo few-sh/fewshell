@@ -32,6 +32,26 @@ class MockMessageDao implements MessageDao {
   @override
   Future<int> insertMessage(MessageEntityCompanion message) async {
     insertedCompanions.add(message);
+    // Persist into storedMessages so subsequent reads see the insert.
+    storedMessages.add(MessageEntity(
+      id: message.id.value,
+      sessionId: message.sessionId.value,
+      userId: message.userId.value,
+      userName: message.userName.value,
+      content: message.content.value,
+      timestamp: message.timestamp.value,
+      createdAt: message.createdAt.value,
+      editedAt: message.editedAt.present ? message.editedAt.value : null,
+      isStreaming: message.isStreaming.value,
+      isVisibleToLlm: message.isVisibleToLlm.value,
+      messageKind: message.messageKind.value,
+      imageUrl: message.imageUrl.present ? message.imageUrl.value : null,
+      toolCallsJson:
+          message.toolCallsJson.present ? message.toolCallsJson.value : null,
+      toolResultsJson:
+          message.toolResultsJson.present ? message.toolResultsJson.value : null,
+      summary: message.summary.present ? message.summary.value : null,
+    ));
     return 1;
   }
 
@@ -60,6 +80,28 @@ class MockMessageDao implements MessageDao {
   @override
   Future<bool> updateMessage(MessageEntityCompanion message) async {
     updatedCompanions.add(message);
+    // Apply update to storedMessages so subsequent reads see it.
+    final idx = storedMessages.indexWhere((m) => m.id == message.id.value);
+    if (idx >= 0) {
+      final old = storedMessages[idx];
+      storedMessages[idx] = MessageEntity(
+        id: old.id,
+        sessionId: message.sessionId.present ? message.sessionId.value : old.sessionId,
+        userId: message.userId.present ? message.userId.value : old.userId,
+        userName: message.userName.present ? message.userName.value : old.userName,
+        content: message.content.present ? message.content.value : old.content,
+        timestamp: message.timestamp.present ? message.timestamp.value : old.timestamp,
+        createdAt: message.createdAt.present ? message.createdAt.value : old.createdAt,
+        editedAt: message.editedAt.present ? message.editedAt.value : old.editedAt,
+        isStreaming: message.isStreaming.present ? message.isStreaming.value : old.isStreaming,
+        isVisibleToLlm: message.isVisibleToLlm.present ? message.isVisibleToLlm.value : old.isVisibleToLlm,
+        messageKind: message.messageKind.present ? message.messageKind.value : old.messageKind,
+        imageUrl: message.imageUrl.present ? message.imageUrl.value : old.imageUrl,
+        toolCallsJson: message.toolCallsJson.present ? message.toolCallsJson.value : old.toolCallsJson,
+        toolResultsJson: message.toolResultsJson.present ? message.toolResultsJson.value : old.toolResultsJson,
+        summary: message.summary.present ? message.summary.value : old.summary,
+      );
+    }
     return true;
   }
 
