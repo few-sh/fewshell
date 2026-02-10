@@ -18,6 +18,7 @@ const _defaultSummarizationPrompt =
     '- Current progress and key decisions made\n'
     '- Important context, constraints, or user preferences\n'
     '- What remains to be done (clear next steps)\n'
+    '- List of every tools/commands you used and whether they succeeded/failed\n'
     '- Any critical data, examples, or references needed to continue\n\n'
     'Be concise, structured, and focused on helping the next LLM seamlessly '
     'continue the work.';
@@ -260,17 +261,36 @@ class ConversationSummarizer {
 
       transcript.writeln('[$role]: ${m.content}');
 
-      // Include tool call/result info when present
-      if (m.messageKind == MessageKind.toolUse && m.toolCallsJson != null) {
-        for (final tc in m.toolCallsJson!) {
-          transcript.writeln('  [Tool Call] ${tc.function.name}');
+      // A toolResult entity holds both toolCallsJson (the requests) and
+      // toolResultsJson (the responses). Interleave each call with its
+      // corresponding result so the summarizer sees them paired.
+      // A toolUse entity (no results yet) only has toolCallsJson.
+      if (m.messageKind == MessageKind.toolResult) {
+        if (m.summary != null) {
+          // Future tool-result summarization: prefer the pre-computed summary.
+          transcript.writeln('  [Tool Result Summary] ${m.summary}');
+        } else {
+          final calls = m.toolCallsJson ?? [];
+          final results = m.toolResultsJson ?? [];
+          for (var i = 0; i < calls.length; i++) {
+            transcript.writeln(
+              '  [Tool Call] ${calls[i].function.name}'
+              '(${calls[i].function.arguments})',
+            );
+            if (i < results.length) {
+              transcript.writeln(
+                '  [Tool Result] ${results[i].function.name}: '
+                '${results[i].function.arguments}',
+              );
+            }
+          }
         }
-      }
-      if (m.messageKind == MessageKind.toolResult &&
-          m.toolResultsJson != null) {
-        for (final tr in m.toolResultsJson!) {
-          transcript.writeln('  [Tool Result] ${tr.function.name}: '
-              '${tr.function.arguments}');
+      } else if (m.messageKind == MessageKind.toolUse &&
+          m.toolCallsJson != null) {
+        for (final tc in m.toolCallsJson!) {
+          transcript.writeln(
+            '  [Tool Call Skipped] ${tc.function.name}(${tc.function.arguments})',
+          );
         }
       }
     }
@@ -376,11 +396,23 @@ class ConversationSummarizer {
     return overMessageLimit || overTokenLimit;
   }
 
-  /// Rough token estimate: sum of content byte lengths / bytesPerToken.
+  /// Rough token estimate: sum of content + tool JSON byte lengths / bytesPerToken.
   int _estimateTokens(List<MessageEntity> messages) {
     var totalBytes = 0;
     for (final m in messages) {
       totalBytes += m.content.length;
+      if (m.toolCallsJson != null) {
+        for (final tc in m.toolCallsJson!) {
+          totalBytes += tc.function.name.length;
+          totalBytes += tc.function.arguments.length;
+        }
+      }
+      if (m.toolResultsJson != null) {
+        for (final tr in m.toolResultsJson!) {
+          totalBytes += tr.function.name.length;
+          totalBytes += tr.function.arguments.length;
+        }
+      }
     }
     return totalBytes ~/ config.bytesPerToken;
   }
