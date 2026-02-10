@@ -186,10 +186,15 @@ extension MessageEntityToChat on MessageEntity {
           )
         ],
       MessageKind.toolResult => [
-          ChatMessage.toolUse(
-            toolCalls: toolCallsJson ?? [],
-            content: content,
-          ),
+          if (summary != null && summary!.isNotEmpty)
+            ChatMessage.user(
+              summary!,
+            )
+          else
+            ChatMessage.toolUse(
+              toolCalls: toolCallsJson ?? [],
+              content: content,
+            ),
           ChatMessage.toolResult(
             results: toolResultsJson ?? [],
             content: content,
