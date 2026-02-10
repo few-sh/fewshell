@@ -360,27 +360,35 @@ class ConversationSummarizer {
     await _messageDao.insertMessage(companion);
   }
 
-  /// Set `isVisibleToLlm = false` on all messages before the last summary.
+  /// Ensures correct `isVisibleToLlm` state for all messages in a session.
   ///
-  /// Finds the last [MessageKind.conversationSummary] message in the session
-  /// and hides every message that precedes it. Idempotent — safe to call
-  /// multiple times; already-hidden messages are skipped.
+  /// Finds the last [MessageKind.conversationSummary] message and:
+  /// - Hides all messages before it (sets `isVisibleToLlm = false`)
+  /// - Unhides all messages after it (sets `isVisibleToLlm = true`)
+  ///
+  /// If no summary exists, ensures all messages are visible.
+  ///
+  /// Fully idempotent — safe to call multiple times; only updates messages
+  /// whose visibility is incorrect.
   Future<void> hideMessagesBeforeSummary(String sessionId) async {
     final messages = await _messageDao.getMessagesBySession(sessionId);
 
-    // Find the last summary message
+    // Find the last summary message; -1 means no summary exists,
+    // so all messages should be visible.
     final lastSummaryIndex = messages.lastIndexWhere(
       (m) => m.messageKind == MessageKind.conversationSummary,
     );
 
-    if (lastSummaryIndex < 0) return;
+    for (var i = 0; i < messages.length; i++) {
+      if (i == lastSummaryIndex) continue; // skip the summary itself
 
-    for (var i = 0; i < lastSummaryIndex; i++) {
       final m = messages[i];
-      if (!m.isVisibleToLlm) continue; // already hidden
+      final shouldBeVisible = i > lastSummaryIndex;
+
+      if (m.isVisibleToLlm == shouldBeVisible) continue; // already correct
 
       final companion = m.toCompanion(true).copyWith(
-            isVisibleToLlm: const Value(false),
+            isVisibleToLlm: Value(shouldBeVisible),
           );
       await _messageDao.updateMessage(companion);
     }
