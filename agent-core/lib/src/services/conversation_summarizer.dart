@@ -230,7 +230,7 @@ class ConversationSummarizer {
 
       // Hide the original messages from the LLM
       if (hideMessages) {
-        await _hideMessages(toSummarize);
+        await hideMessagesBeforeSummary(sessionId);
       }
 
       _log.info('Summarization complete for session $sessionId');
@@ -359,25 +359,28 @@ class ConversationSummarizer {
     await _messageDao.insertMessage(companion);
   }
 
-  /// Set `isVisibleToLlm = false` on each summarized message.
-  Future<void> _hideMessages(List<MessageEntity> messages) async {
-    for (final m in messages) {
-      final companion = MessageEntityCompanion(
-        id: Value(m.id),
-        sessionId: Value(m.sessionId),
-        userId: Value(m.userId),
-        userName: Value(m.userName),
-        content: Value(m.content),
-        timestamp: Value(m.timestamp),
-        createdAt: Value(m.createdAt),
-        editedAt: Value(m.editedAt),
-        messageKind: Value(m.messageKind),
-        imageUrl: Value(m.imageUrl),
-        toolCallsJson: Value(m.toolCallsJson),
-        toolResultsJson: Value(m.toolResultsJson),
-        isVisibleToLlm: const Value(false),
-        summary: Value(m.summary),
-      );
+  /// Set `isVisibleToLlm = false` on all messages before the last summary.
+  ///
+  /// Finds the last [MessageKind.conversationSummary] message in the session
+  /// and hides every message that precedes it. Idempotent — safe to call
+  /// multiple times; already-hidden messages are skipped.
+  Future<void> hideMessagesBeforeSummary(String sessionId) async {
+    final messages = await _messageDao.getMessagesBySession(sessionId);
+
+    // Find the last summary message
+    final lastSummaryIndex = messages.lastIndexWhere(
+      (m) => m.messageKind == MessageKind.conversationSummary,
+    );
+
+    if (lastSummaryIndex < 0) return;
+
+    for (var i = 0; i < lastSummaryIndex; i++) {
+      final m = messages[i];
+      if (!m.isVisibleToLlm) continue; // already hidden
+
+      final companion = m.toCompanion(true).copyWith(
+            isVisibleToLlm: const Value(false),
+          );
       await _messageDao.updateMessage(companion);
     }
   }
