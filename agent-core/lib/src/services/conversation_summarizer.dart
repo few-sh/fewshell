@@ -214,6 +214,7 @@ class ConversationSummarizer {
       content: 'Summarizing conversation\u2026',
       isStreaming: true,
       isVisibleToLlm: false,
+      messageKind: MessageKind.notification,
     );
 
     try {

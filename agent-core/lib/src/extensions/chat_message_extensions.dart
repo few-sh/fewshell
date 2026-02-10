@@ -219,6 +219,7 @@ extension MessageEntityToChat on MessageEntity {
       MessageKind.toolResultSummary => [
           ChatMessage.user(content),
         ],
+      MessageKind.notification => [],
     };
   }
 

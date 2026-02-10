@@ -43,6 +43,7 @@ class MockMessageDao implements MessageDao {
     required String userName,
     required String content,
     String? imageUrl,
+    MessageKind? messageKind,
     bool isStreaming = false,
     bool isVisibleToLlm = true,
   }) async {

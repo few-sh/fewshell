@@ -194,6 +194,7 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
     required String userName,
     required String content,
     String? imageUrl,
+    MessageKind? messageKind,
     bool isStreaming = false,
     bool isVisibleToLlm = true,
   }) async {
@@ -209,7 +210,8 @@ class MessageDao extends DatabaseAccessor<ProjectDatabase>
       timestamp: Value(now),
       createdAt: Value(now),
       messageKind: Value(
-        imageUrl != null ? MessageKind.imageUrl : MessageKind.text,
+        messageKind ??
+            (imageUrl != null ? MessageKind.imageUrl : MessageKind.text),
       ),
       imageUrl: Value(imageUrl),
       toolCallsJson: const Value(null),

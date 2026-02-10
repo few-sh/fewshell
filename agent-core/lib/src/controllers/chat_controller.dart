@@ -205,6 +205,11 @@ class ChatController extends StateNotifier<ChatState> {
         continue;
       }
 
+      // Skip notification messages (errors, system notifications)
+      if (messageEntity.messageKind == MessageKind.notification) {
+        continue;
+      }
+
       // Use the extension method to convert to ChatMessage
       final chatMessages = messageEntity.toChatMessage();
 
@@ -613,6 +618,7 @@ class ChatController extends StateNotifier<ChatState> {
             userId: _kAiUserId,
             userName: 'System',
             content: redactedError,
+            messageKind: MessageKind.notification,
             isVisibleToLlm: false,
           );
           await _sessionDao.touchSession(sessionId);
@@ -631,6 +637,7 @@ class ChatController extends StateNotifier<ChatState> {
         userId: _kAiUserId,
         userName: 'System',
         content: redactedError,
+        messageKind: MessageKind.notification,
         isVisibleToLlm: false,
       );
       await _sessionDao.touchSession(sessionId);

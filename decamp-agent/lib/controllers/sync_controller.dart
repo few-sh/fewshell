@@ -916,6 +916,7 @@ class _AgentSession {
                 userId: 'ai',
                 userName: model,
                 content: 'Sorry, I encountered an error: $e',
+                messageKind: MessageKind.notification,
                 isVisibleToLlm: false,
               );
               await projectDb!.sessionDao.touchSession(sessionId);
@@ -991,7 +992,10 @@ class _AgentSession {
     final dbMessages =
         await projectDb!.messageDao.getMessagesBySession(sessionId);
     final conversation = dbMessages
-        .where((m) => !m.isStreaming && m.isVisibleToLlm)
+        .where((m) =>
+            !m.isStreaming &&
+            m.isVisibleToLlm &&
+            m.messageKind != MessageKind.notification)
         .expand((m) => m.toChatMessage())
         .toList();
 
