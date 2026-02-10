@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:decamp/providers/providers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:agent_core/agent_core.dart';
 
 import 'package:decamp/services/sync_service.dart';
 import 'package:decamp/components/multi_command_approval_overlay.dart';
+import 'package:decamp/components/full_screen_raw_message_view.dart';
 import 'package:decamp/components/new_snippet_card.dart';
 import 'package:decamp/components/saved_prompt_dialog.dart';
 
@@ -204,6 +206,19 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           onPressed: _handleBranch,
           child: const Text('Branch Session'),
         ),
+        if (kDebugMode)
+          ShadContextMenuItem(
+            leading: const Icon(LucideIcons.braces),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      FullScreenRawMessageView(message: widget.message),
+                ),
+              );
+            },
+            child: const Text('View Raw JSON'),
+          ),
         ShadContextMenuItem(
           leading: Icon(
             LucideIcons.trash2,
