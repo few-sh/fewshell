@@ -30,6 +30,9 @@ class Snippets extends Table {
   BoolColumn get isVisibleToLlm =>
       boolean().withDefault(const Constant(true))();
 
+  /// Whether commands from this snippet should be auto-approved without user confirmation
+  BoolColumn get autoApprove => boolean().withDefault(const Constant(false))();
+
   /// Timestamp when the snippet was created
   DateTimeColumn get createdAt => dateTime()();
 
