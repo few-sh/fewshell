@@ -43,6 +43,7 @@ export 'src/services/settings_crdt.dart';
 export 'src/services/secrets_crdt.dart';
 export 'src/services/secrets_service.dart';
 export 'src/services/conversation_summarizer.dart';
+export 'src/services/tool_summarizer.dart';
 
 // Database
 export 'src/database/database.dart';
