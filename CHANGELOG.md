@@ -1,3 +1,11 @@
+# App 1.0.1+26
+
+- Add conversation summarization features
+
+# Server 0.1.22
+
+- Backend support for conversation summarization
+
 # App 1.0.1+25
 
 - Improve connection stability and reconnect logic
