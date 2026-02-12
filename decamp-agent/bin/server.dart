@@ -28,6 +28,17 @@ typedef SignalDart = Pointer<NativeFunction<SignalFunc>> Function(
   Pointer<NativeFunction<SignalFunc>>,
 );
 
+// FFI signature for umask(mode_t) -> mode_t
+typedef UmaskC = Uint32 Function(Uint32);
+typedef UmaskDart = int Function(int);
+
+/// Sets the process umask, returns the previous value.
+int _umask(int mask) {
+  final dylib = DynamicLibrary.process();
+  final umask = dylib.lookupFunction<UmaskC, UmaskDart>('umask');
+  return umask(mask);
+}
+
 // Keep listener alive
 NativeCallable<SignalFunc>? _sigPipeListener;
 
@@ -197,11 +208,12 @@ Future<void> _startServer(
         ? listenUri.substring('unix://'.length)
         : '${Platform.environment['HOME']}/.fewshell/agent.sock';
 
-    // Ensure parent directory exists
+    // Ensure parent directory exists with owner-only permissions
     final socketDir = Directory(File(socketPath).parent.path);
     if (!socketDir.existsSync()) {
       socketDir.createSync(recursive: true);
     }
+    Process.runSync('chmod', ['700', socketDir.path]);
 
     // Remove stale socket file
     final socketFile = File(socketPath);
@@ -211,7 +223,14 @@ Future<void> _startServer(
 
     _log.info('Starting server on unix://$socketPath...');
     final address = InternetAddress(socketPath, type: InternetAddressType.unix);
-    server = await HttpServer.bind(address, 0);
+
+    // Set restrictive umask so the socket is created with 0600 (owner-only)
+    final previousUmask = _umask(0x3F); // 0077
+    try {
+      server = await HttpServer.bind(address, 0);
+    } finally {
+      _umask(previousUmask);
+    }
   }
 
   server.listen(
