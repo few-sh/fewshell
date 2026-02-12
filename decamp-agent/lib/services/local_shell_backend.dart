@@ -80,7 +80,7 @@ class LocalShellBackend implements ShellBackend {
       return [
         '/bin/bash',
         '-i',
-      ]; // Use zsh on macOS for better compatibility with modern shells
+      ];
     } else {
       return ['/bin/bash', '-i']; // Use bash on Linux
     }
