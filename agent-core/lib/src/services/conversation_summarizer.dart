@@ -80,11 +80,11 @@ class ConversationSummarizerConfig {
 
   const ConversationSummarizerConfig({
     this.messageCountThreshold = 40,
-    this.tokenThreshold = 80000,
+    this.tokenThreshold = 128000,
     this.bytesPerToken = 4,
-    this.recentMessageCount = 1,
+    this.recentMessageCount = 3,
     this.summarizationPrompt = _defaultSummarizationPrompt,
-    this.summaryInputTokenBudget = 100000,
+    this.summaryInputTokenBudget = 134000,
   });
 }
 
