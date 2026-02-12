@@ -387,6 +387,37 @@ class _AgentSession {
     _currentAbortController?.add(ProcessSignal.sigterm);
   }
 
+  Future<ChatCapability> _createProviderFromConfig(
+    Map<String, dynamic> config,
+  ) async {
+    final apiKey = config['apiKey'] as String;
+    final providerTypeStr = config['provider'] as String;
+    final model = config['model'] as String;
+    final baseUrl = config['baseUrl'] as String?;
+    final temperature = config['temperature'] as double?;
+    final maxTokens = config['maxTokens'] as int?;
+    final systemInstruction = config['systemInstruction'] as String?;
+
+    final apiType = LlmApiType.values.firstWhere(
+      (e) => e.name == providerTypeStr,
+      orElse: () => throw Exception('Unknown provider type: $providerTypeStr'),
+    );
+
+    final settings = LlmApiSettings(
+      identifier: model,
+      apiType: apiType,
+      baseUrl: baseUrl ?? apiType.defaultBaseUrl,
+      temperature: temperature,
+      maxTokens: maxTokens,
+    );
+
+    return LlmService.createProvider(
+      settings,
+      apiKey,
+      systemInstruction: systemInstruction,
+    );
+  }
+
   Future<void> _handleSummarize(
     Map<String, dynamic> data,
     MultiplexedWebSocketChannel channel,
@@ -408,34 +439,7 @@ class _AgentSession {
 
     try {
       final config = data['config'] as Map<String, dynamic>;
-
-      final apiKey = config['apiKey'] as String;
-      final providerTypeStr = config['provider'] as String;
-      final model = config['model'] as String;
-      final baseUrl = config['baseUrl'] as String?;
-      final temperature = config['temperature'] as double?;
-      final maxTokens = config['maxTokens'] as int?;
-      final systemInstruction = config['systemInstruction'] as String?;
-
-      final apiType = LlmApiType.values.firstWhere(
-        (e) => e.name == providerTypeStr,
-        orElse: () =>
-            throw Exception('Unknown provider type: $providerTypeStr'),
-      );
-
-      final settings = LlmApiSettings(
-        identifier: model,
-        apiType: apiType,
-        baseUrl: baseUrl ?? apiType.defaultBaseUrl,
-        temperature: temperature,
-        maxTokens: maxTokens,
-      );
-
-      final provider = await LlmService.createProvider(
-        settings,
-        apiKey,
-        systemInstruction: systemInstruction,
-      );
+      final provider = await _createProviderFromConfig(config);
 
       _currentCancelToken = CancelToken();
 
@@ -619,33 +623,8 @@ class _AgentSession {
           );
         }
 
-        final apiKey = config['apiKey'] as String;
-        final providerTypeStr = config['provider'] as String;
+        final provider = await _createProviderFromConfig(config);
         final model = config['model'] as String;
-        final baseUrl = config['baseUrl'] as String?;
-        final temperature = config['temperature'] as double?;
-        final maxTokens = config['maxTokens'] as int?;
-        final systemInstruction = config['systemInstruction'] as String?;
-
-        final apiType = LlmApiType.values.firstWhere(
-          (e) => e.name == providerTypeStr,
-          orElse: () =>
-              throw Exception('Unknown provider type: $providerTypeStr'),
-        );
-
-        final settings = LlmApiSettings(
-          identifier: model,
-          apiType: apiType,
-          baseUrl: baseUrl ?? apiType.defaultBaseUrl,
-          temperature: temperature,
-          maxTokens: maxTokens,
-        );
-
-        final provider = await LlmService.createProvider(
-          settings,
-          apiKey,
-          systemInstruction: systemInstruction,
-        );
 
         _currentCancelToken = CancelToken();
         // ignore: close_sinks
