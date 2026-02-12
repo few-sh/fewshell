@@ -29,12 +29,16 @@ class ChatController extends StateNotifier<ChatState> {
   final SecretRedactor _secretRedactor;
   final SshSettings? _sshSettings;
   final ProjectEntity? _project;
+  final ConversationSummarizer? _conversationSummarizer;
   final String? sessionId;
 
   final _activeMessageController = StreamController<MessageEntity>.broadcast();
   StreamController<ProcessSignal>? _currentAbortController;
   CancelToken? _currentLlmCancelToken;
   bool _isAborted = false;
+
+  /// Whether execution happens locally (no remote server configured).
+  bool get isLocalExecution => _project?.serverUrl == null;
 
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
@@ -60,6 +64,7 @@ class ChatController extends StateNotifier<ChatState> {
     required SecretRedactor secretRedactor,
     SshSettings? sshSettings,
     ProjectEntity? project,
+    ConversationSummarizer? conversationSummarizer,
     this.sessionId,
   })  : _messageDao = messageDao,
         _sessionDao = sessionDao,
@@ -69,7 +74,86 @@ class ChatController extends StateNotifier<ChatState> {
         _secretRedactor = secretRedactor,
         _sshSettings = sshSettings,
         _project = project,
+        _conversationSummarizer = conversationSummarizer,
         super(const ChatState());
+
+  /// Force-summarize the current session's conversation.
+  ///
+  /// For local projects, runs summarization directly.
+  /// For remote projects, sends a `summarize` message to the server
+  /// which performs the LLM call and DB updates.
+  ///
+  /// Set [hideMessages] to `false` to keep originals visible (debug mode).
+  /// Returns `true` if summarization was performed.
+  Future<bool> summarize({
+    bool hideMessages = true,
+    MultiplexedWebSocketChannel? syncChannel,
+  }) async {
+    if (sessionId == null) {
+      _log.warning('summarize: no session');
+      return false;
+    }
+
+    if (!isLocalExecution) {
+      // Remote project — delegate to the server
+      if (syncChannel == null) {
+        _log.warning('summarize: remote project but no sync channel');
+        if (mounted) {
+          state = state.copyWith(
+            error: 'Cannot summarize: not connected to server',
+          );
+        }
+        return false;
+      }
+
+      final config = await _llmService.getActiveConfigSnapshot();
+      if (config == null) {
+        _log.warning('summarize: no LLM config');
+        return false;
+      }
+
+      return runRemoteSummarize(
+        channel: syncChannel,
+        config: config,
+        sessionId: sessionId!,
+        hideMessages: hideMessages,
+      );
+    }
+
+    // Local project — run directly
+    if (_conversationSummarizer == null) {
+      _log.warning('summarize: no summarizer');
+      return false;
+    }
+
+    _currentLlmCancelToken = CancelToken();
+    var lockAckquired = false;
+    try {
+      if (isLocalExecution && _sessionMutexDao != null) {
+        lockAckquired = await _sessionMutexDao.acquireLock(sessionId!);
+        if (!lockAckquired) {
+          _log.warning('Could not acquire lock for session $sessionId');
+          if (mounted) {
+            state = state.copyWith(error: 'Session is busy');
+          }
+          return false;
+        }
+      }
+      return await _conversationSummarizer.forceSummarize(
+        sessionId!,
+        hideMessages: hideMessages,
+        cancelToken: _currentLlmCancelToken,
+      );
+    } finally {
+      _currentLlmCancelToken = null;
+      if (lockAckquired && _sessionMutexDao != null) {
+        await _sessionMutexDao.unlock(sessionId!).catchError((e, st) {
+          _log.severe(
+              'Error releasing session lock for session $sessionId', e, st);
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -121,10 +205,25 @@ class ChatController extends StateNotifier<ChatState> {
         continue;
       }
 
+      // Skip notification messages (errors, system notifications)
+      if (messageEntity.messageKind == MessageKind.notification) {
+        continue;
+      }
+
       // Use the extension method to convert to ChatMessage
       final chatMessages = messageEntity.toChatMessage();
 
       for (final chatMessage in chatMessages) {
+        // Prepend the summary prefix for conversation summary messages
+        // so the LLM understands it's a handoff from a prior model.
+        // The prefix is NOT stored in the DB to avoid nesting on re-summarization.
+        final messageToAdd =
+            messageEntity.messageKind == MessageKind.conversationSummary &&
+                    chatMessage.role == ChatRole.user
+                ? ChatMessage.user(
+                    '$conversationSummaryPrefix${chatMessage.content}')
+                : chatMessage;
+
         // Log tool calls and results for debugging
         if (chatMessage.messageType is ToolUseMessage) {
           final toolUse = chatMessage.messageType as ToolUseMessage;
@@ -138,7 +237,7 @@ class ChatController extends StateNotifier<ChatState> {
           );
         }
 
-        conversation.add(chatMessage);
+        conversation.add(messageToAdd);
       }
     }
 
@@ -240,7 +339,6 @@ class ChatController extends StateNotifier<ChatState> {
 
     // For local execution (no server), acquire lock via mutex
     // For remote execution, server handles locking
-    final isLocalExecution = _project?.serverUrl == null;
     if (isLocalExecution && _sessionMutexDao != null) {
       final acquired = await _sessionMutexDao.acquireLock(sessionId);
       if (!acquired) {
@@ -361,6 +459,16 @@ class ChatController extends StateNotifier<ChatState> {
         );
       } else {
         // Run the agent loop locally
+
+        // Run summarization before the agent loop if needed
+        if (_conversationSummarizer != null) {
+          try {
+            await _conversationSummarizer.summarizeIfNeeded(sessionId);
+          } catch (e) {
+            _log.warning('Conversation summarization failed: $e');
+            // Non-fatal: continue with the full conversation
+          }
+        }
 
         final aiUserName = await _getAiUserName();
 
@@ -520,6 +628,7 @@ class ChatController extends StateNotifier<ChatState> {
             userId: _kAiUserId,
             userName: 'System',
             content: redactedError,
+            messageKind: MessageKind.notification,
             isVisibleToLlm: false,
           );
           await _sessionDao.touchSession(sessionId);
@@ -538,6 +647,7 @@ class ChatController extends StateNotifier<ChatState> {
         userId: _kAiUserId,
         userName: 'System',
         content: redactedError,
+        messageKind: MessageKind.notification,
         isVisibleToLlm: false,
       );
       await _sessionDao.touchSession(sessionId);
@@ -704,6 +814,9 @@ class ChatController extends StateNotifier<ChatState> {
       '🗑️ Deleted $deletedCount messages after target, now resending',
     );
 
+    // Ensure that any hidden messages due to summarization are visible again, so the full conversation context is available for the resend
+    await _conversationSummarizer?.hideMessagesBeforeSummary(sessionId);
+
     // Resend - conversation will include the message we're resending from
     await sendMessage(
       content: null, // Use existing conversation
@@ -738,6 +851,9 @@ class ChatController extends StateNotifier<ChatState> {
     _log.info(
       '✅ Created new session: $newSessionId',
     );
+
+    // Reset the visibility messages in the new session
+    await _conversationSummarizer?.hideMessagesBeforeSummary(newSessionId);
 
     return newSessionId;
   }

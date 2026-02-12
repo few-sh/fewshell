@@ -188,7 +188,25 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
         userId: 'system',
         userName: 'System',
         content: 'Sent ping: $message',
+        messageKind: MessageKind.notification,
         isVisibleToLlm: false,
+      );
+      return;
+    }
+
+    // Handle /summarize command
+    final summarizeRegex = RegExp(r'^/summarize(\s+(.*))?$');
+    final summarizeMatch = summarizeRegex.firstMatch(content.trim());
+    if (summarizeMatch != null) {
+      final arg = summarizeMatch.group(2)?.trim().toLowerCase();
+      final hideMessages = arg != 'nohide';
+      final controller = ref.read(
+        chatControllerProvider(currentSessionId).notifier,
+      );
+      final syncChannel = ref.read(syncServiceProvider).projectChannel;
+      await controller.summarize(
+        hideMessages: hideMessages,
+        syncChannel: syncChannel,
       );
       return;
     }

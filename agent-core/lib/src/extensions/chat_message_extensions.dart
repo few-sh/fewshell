@@ -186,10 +186,15 @@ extension MessageEntityToChat on MessageEntity {
           )
         ],
       MessageKind.toolResult => [
-          ChatMessage.toolUse(
-            toolCalls: toolCallsJson ?? [],
-            content: content,
-          ),
+          if (summary != null && summary!.isNotEmpty)
+            ChatMessage.user(
+              summary!,
+            )
+          else
+            ChatMessage.toolUse(
+              toolCalls: toolCallsJson ?? [],
+              content: content,
+            ),
           ChatMessage.toolResult(
             results: toolResultsJson ?? [],
             content: content,
@@ -205,6 +210,16 @@ extension MessageEntityToChat on MessageEntity {
       MessageKind.text => role == ChatRole.user
           ? [ChatMessage.user(content)]
           : [ChatMessage.assistant(content)],
+      MessageKind.conversationSummary => [
+          // Summaries are injected as user messages so the LLM treats them
+          // as context it should build upon (handoff from previous model).
+          ChatMessage.user(
+              summary ?? '[Unexpected Error: No summary available]'),
+        ],
+      MessageKind.toolResultSummary => [
+          ChatMessage.user(content),
+        ],
+      MessageKind.notification => [],
     };
   }
 

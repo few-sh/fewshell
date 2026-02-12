@@ -58,11 +58,16 @@ class LocalShellBackend implements ShellBackend {
     environment['LANG'] = 'en_US.UTF-8';
     environment['LC_ALL'] = 'en_US.UTF-8';
 
+    if (Platform.isMacOS) {
+      environment['BASH_SILENCE_DEPRECATION_WARNING'] =
+          '1'; // Suppress macOS bash deprecation warning
+    }
+
     // TERM=dumb disables terminal features (bracketed paste, colors, title)
     // that produce escape sequences in the output
     return NativePty.spawn(
       shellArgs[0],
-      shellArgs.sublist(1),
+      shellArgs,
       environment: environment,
       autoDecodeUtf8: false,
     );
@@ -73,10 +78,9 @@ class LocalShellBackend implements ShellBackend {
       return ['bash']; // Use WSL bash on Windows for better compatibility
     } else if (Platform.isMacOS) {
       return [
-        '/bin/zsh',
+        '/bin/bash',
         '-i',
-        '--nozle', // Disable zle to prevent it from trying to read input and interfering with our PTY input handling
-      ]; // Use zsh on macOS for better compatibility with modern shells
+      ];
     } else {
       return ['/bin/bash', '-i']; // Use bash on Linux
     }
