@@ -804,6 +804,9 @@ class ChatController extends StateNotifier<ChatState> {
       '🗑️ Deleted $deletedCount messages after target, now resending',
     );
 
+    // Ensure that any hidden messages due to summarization are visible again, so the full conversation context is available for the resend
+    await _conversationSummarizer?.hideMessagesBeforeSummary(sessionId);
+
     // Resend - conversation will include the message we're resending from
     await sendMessage(
       content: null, // Use existing conversation
@@ -838,6 +841,9 @@ class ChatController extends StateNotifier<ChatState> {
     _log.info(
       '✅ Created new session: $newSessionId',
     );
+
+    // Reset the visibility messages in the new session
+    await _conversationSummarizer?.hideMessagesBeforeSummary(newSessionId);
 
     return newSessionId;
   }
