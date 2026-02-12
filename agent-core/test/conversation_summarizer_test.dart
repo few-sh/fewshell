@@ -385,12 +385,8 @@ void main() {
       expect(inserted.userId.value, 'system');
       // summary field should have the raw summary
       expect(inserted.summary.value, 'Summary of first 15 messages');
-      // content should have prefix + summary
-      expect(inserted.content.value, contains('Summary of first 15 messages'));
-      expect(
-        inserted.content.value,
-        startsWith('Another language model'),
-      );
+      // content should have the raw summary (no prefix — prefix is applied by controllers)
+      expect(inserted.content.value, 'Summary of first 15 messages');
 
       // Should have hidden total - keep = 15 messages
       expect(mockDao.updatedCompanions, hasLength(total - keep));
@@ -434,11 +430,10 @@ void main() {
           conversation[1].content, contains('CONTEXT CHECKPOINT COMPACTION'));
     });
 
-    test('uses custom summaryPrefix in inserted message content', () async {
+    test('stores raw summary without prefix in content field', () async {
       mockDao.storedMessages = _makeMessages(20);
       mockLlm.summaryToReturn = 'The actual summary text';
 
-      const customPrefix = '[PRIOR CONTEXT]\n';
       final summarizer = ConversationSummarizer(
         messageDao: mockDao,
         llmStream: mockLlm.call,
@@ -446,16 +441,15 @@ void main() {
           messageCountThreshold: 15,
           tokenThreshold: 999999,
           recentMessageCount: 5,
-          summaryPrefix: customPrefix,
         ),
       );
 
       await summarizer.summarizeIfNeeded(_testSessionId);
 
       final inserted = mockDao.insertedCompanions.first;
-      // content = prefix + raw summary
-      expect(inserted.content.value, '${customPrefix}The actual summary text');
-      // raw summary field is NOT prefixed
+      // content = raw summary (no prefix)
+      expect(inserted.content.value, 'The actual summary text');
+      // summary field matches content
       expect(inserted.summary.value, 'The actual summary text');
     });
 

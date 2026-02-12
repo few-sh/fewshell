@@ -996,8 +996,22 @@ class _AgentSession {
             !m.isStreaming &&
             m.isVisibleToLlm &&
             m.messageKind != MessageKind.notification)
-        .expand((m) => m.toChatMessage())
-        .toList();
+        .expand((m) {
+      final chatMessages = m.toChatMessage();
+      // Prepend the summary prefix for conversation summary messages
+      // so the LLM understands it's a handoff from a prior model.
+      // The prefix is NOT stored in the DB to avoid nesting on re-summarization.
+      if (m.messageKind == MessageKind.conversationSummary) {
+        return chatMessages.map(
+          (cm) => cm.role == ChatRole.user
+              ? ChatMessage.user(
+                  '$conversationSummaryPrefix${cm.content}',
+                )
+              : cm,
+        );
+      }
+      return chatMessages;
+    }).toList();
 
     // Add cache control to the last text message for Anthropic prompt caching
     // Search backwards to find the last TextMessage, as conversation may end with tool calls

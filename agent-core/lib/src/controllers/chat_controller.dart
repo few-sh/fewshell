@@ -214,6 +214,16 @@ class ChatController extends StateNotifier<ChatState> {
       final chatMessages = messageEntity.toChatMessage();
 
       for (final chatMessage in chatMessages) {
+        // Prepend the summary prefix for conversation summary messages
+        // so the LLM understands it's a handoff from a prior model.
+        // The prefix is NOT stored in the DB to avoid nesting on re-summarization.
+        final messageToAdd =
+            messageEntity.messageKind == MessageKind.conversationSummary &&
+                    chatMessage.role == ChatRole.user
+                ? ChatMessage.user(
+                    '$conversationSummaryPrefix${chatMessage.content}')
+                : chatMessage;
+
         // Log tool calls and results for debugging
         if (chatMessage.messageType is ToolUseMessage) {
           final toolUse = chatMessage.messageType as ToolUseMessage;
@@ -227,7 +237,7 @@ class ChatController extends StateNotifier<ChatState> {
           );
         }
 
-        conversation.add(chatMessage);
+        conversation.add(messageToAdd);
       }
     }
 

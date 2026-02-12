@@ -24,7 +24,12 @@ const _defaultSummarizationPrompt =
     'Be concise, structured, and focused on helping the next LLM seamlessly '
     'continue the work.';
 
-const _defaultSummaryPrefix =
+/// Prefix prepended to conversation summaries when building LLM conversation
+/// history. Frames the summary as a handoff from a previous model.
+///
+/// Not stored in the database — applied at conversation-build time by
+/// controllers so that nested summarization does not accumulate prefixes.
+const conversationSummaryPrefix =
     'Another language model started to solve this problem and produced a '
     'summary of its thinking process. You also have access to the state of the '
     'tools that were used by that language model. Use this to build on the work '
@@ -66,13 +71,6 @@ class ConversationSummarizerConfig {
   /// in the context window.
   final String summarizationPrompt;
 
-  /// Prefix prepended to the summary when it is injected back into the
-  /// conversation as a [MessageKind.conversationSummary] message.
-  ///
-  /// Frames the summary as a handoff from a previous LLM, helping the
-  /// receiving model understand the context.
-  final String summaryPrefix;
-
   /// Maximum estimated token count for the messages sent to the LLM
   /// as input for the summarization call itself.
   ///
@@ -86,7 +84,6 @@ class ConversationSummarizerConfig {
     this.bytesPerToken = 4,
     this.recentMessageCount = 1,
     this.summarizationPrompt = _defaultSummarizationPrompt,
-    this.summaryPrefix = _defaultSummaryPrefix,
     this.summaryInputTokenBudget = 100000,
   });
 }
@@ -333,22 +330,20 @@ class ConversationSummarizer {
 
   /// Insert a [MessageKind.conversationSummary] message into the database.
   ///
-  /// The summary text is stored in the [MessageEntity.summary] field.
-  /// The [MessageEntity.content] field contains the prefixed summary that
-  /// will be seen by the LLM when the conversation is rebuilt.
+  /// The summary text is stored in both the [MessageEntity.content] and
+  /// [MessageEntity.summary] fields (without prefix). The prefix is prepended
+  /// by controllers when building conversation history for the LLM.
   Future<void> _insertSummaryMessage({
     required String sessionId,
     required String summary,
     required DateTime timestamp,
   }) async {
-    final prefixedContent = '${config.summaryPrefix}$summary';
-
     final companion = MessageEntityCompanion(
       id: Value(IdGenerator.messageId()),
       sessionId: Value(sessionId),
       userId: const Value('system'),
       userName: const Value('System'),
-      content: Value(prefixedContent),
+      content: Value(summary),
       summary: Value(summary),
       timestamp: Value(timestamp),
       createdAt: Value(timestamp),
