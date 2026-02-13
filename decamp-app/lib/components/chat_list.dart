@@ -324,7 +324,7 @@ class _ChatListState extends State<ChatList> {
                     return _MessageItem(
                       key: _messageKeys[message.id],
                       message: message,
-                      isStreaming: true,
+                      isStreaming: message.isStreaming,
                       showDivider: false,
                       highlights: _highlightsByMessage[message.id],
                       currentMatchIndex: widget.currentMatchIndex,
@@ -373,7 +373,7 @@ class _ChatListState extends State<ChatList> {
               // Use GlobalKey if available (for search scrolling), otherwise ValueKey (for diffing)
               key: _messageKeys[message.id] ?? ValueKey(message.id),
               message: message,
-              isStreaming: false,
+              isStreaming: message.isStreaming,
               showDivider: index > 0,
               highlights: _highlightsByMessage[message.id],
               currentMatchIndex: widget.currentMatchIndex,
