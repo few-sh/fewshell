@@ -10,10 +10,10 @@
             "request": "launch",
             "type": "dart",
             "program": "bin/server.dart",
-            "args": ["--port", "3123"],
             "env": {
+                "LISTEN": "tcp://0.0.0.0:3123",
                 "PUSH_NOTIFICATION_URL": "http://localhost:8080",
-                "PUSH_NOTIFICATION_API_KEY": "test-api-key",
+                "PUSH_NOTIFICATION_API_KEY": "test-api-key"
             }
         },
         {
@@ -50,10 +50,10 @@
             "request": "launch",
             "type": "dart",
             "program": "bin/server.dart",
-            "args": ["--port", "3123"],
             "env": {
+                "LISTEN": "tcp://0.0.0.0:3123",
                 "PUSH_NOTIFICATION_URL": "https://fewshell-relay-734417761966.us-central1.run.app/",
-                "PUSH_NOTIFICATION_API_KEY": "ArdmtfC0UM5fdAZEyNrtG4Ws41GfPnIxKSKfSAiOdPM=",
+                "PUSH_NOTIFICATION_API_KEY": "ArdmtfC0UM5fdAZEyNrtG4Ws41GfPnIxKSKfSAiOdPM="
             }
         }
     ],
