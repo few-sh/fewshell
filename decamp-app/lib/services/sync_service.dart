@@ -13,6 +13,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:decamp/certs.dart';
 import 'package:decamp/providers/providers.dart';
+import 'package:decamp/providers/ssh_tunnel_provider.dart';
 
 final _log = Logger('SyncService');
 
@@ -169,18 +170,11 @@ class SyncService {
 
       _log.info('Connecting to global sync at $cleanUrl');
       // Use a shorter timeout for manual connections (when rethrowErrors is true)
-      final sshParsed = parseSshUrl(cleanUrl);
+      final tunnelId = parseTunnelId(cleanUrl);
       final WebSocketChannel channel;
-      if (sshParsed != null) {
-        final password = await _getSshTunnelPassword(
-          sshParsed.username,
-          sshParsed.host,
-        );
-        final (wsChannel, tunnel) = await _connectSshWebSocket(
-          sshHost: sshParsed.host,
-          sshPort: sshParsed.port,
-          sshUsername: sshParsed.username,
-          sshPassword: password,
+      if (tunnelId != null) {
+        final (wsChannel, tunnel) = await _connectViaTunnel(
+          tunnelId: tunnelId,
           wsPath: '/sync/global',
           timeout: defaultConnectionTimeout,
         );
@@ -291,18 +285,11 @@ class SyncService {
       _updateConnectionState(SyncConnectionState.connecting);
 
       final WebSocketChannel wsChannel;
-      final sshParsed = parseSshUrl(serverUrl);
-      if (sshParsed != null) {
-        final password = await _getSshTunnelPassword(
-          sshParsed.username,
-          sshParsed.host,
-        );
+      final tunnelId = parseTunnelId(serverUrl);
+      if (tunnelId != null) {
         if (token.isCancelled) return;
-        final (ch, tunnel) = await _connectSshWebSocket(
-          sshHost: sshParsed.host,
-          sshPort: sshParsed.port,
-          sshUsername: sshParsed.username,
-          sshPassword: password,
+        final (ch, tunnel) = await _connectViaTunnel(
+          tunnelId: tunnelId,
           wsPath: '/sync/project/$projectId',
         );
         wsChannel = ch;
@@ -556,23 +543,29 @@ class SyncService {
     }
   }
 
-  /// Parse an `ssh:username@host` URL into its components.
-  /// Returns null if the URL is not an SSH tunnel URL.
-  static ({String username, String host, int port})? parseSshUrl(String url) {
-    if (!url.startsWith('ssh:')) return null;
-    final rest = url.substring(4); // strip 'ssh:'
-    final atIndex = rest.indexOf('@');
-    if (atIndex < 0) return null;
-    final username = rest.substring(0, atIndex);
-    final hostPart = rest.substring(atIndex + 1);
-    // Support optional port: ssh:user@host:2222
-    final colonIndex = hostPart.indexOf(':');
-    if (colonIndex >= 0) {
-      final host = hostPart.substring(0, colonIndex);
-      final port = int.tryParse(hostPart.substring(colonIndex + 1)) ?? 22;
-      return (username: username, host: host, port: port);
+  /// Looks up a tunnel config from [SshTunnelStorage] and connects via SSH.
+  Future<(WebSocketChannel, _SshTunnel)> _connectViaTunnel({
+    required String tunnelId,
+    required String wsPath,
+    Duration? timeout,
+  }) async {
+    final storage = ref.read(sshTunnelStorageProvider);
+    final settings = await storage.get(tunnelId);
+    if (settings == null) {
+      throw Exception('Tunnel config not found for id: $tunnelId');
     }
-    return (username: username, host: hostPart, port: 22);
+    final privateKey = await storage.getPrivateKey(tunnelId);
+    final passphrase = await storage.getPassphrase(tunnelId);
+
+    return _connectSshWebSocket(
+      sshHost: settings.host,
+      sshPort: settings.port,
+      sshUsername: settings.username,
+      sshPrivateKey: privateKey,
+      sshPassphrase: passphrase,
+      wsPath: wsPath,
+      timeout: timeout,
+    );
   }
 
   /// Create a WebSocket channel tunneled through SSH to a remote Unix socket.
@@ -588,7 +581,8 @@ class SyncService {
     required String sshHost,
     required int sshPort,
     required String sshUsername,
-    required String? sshPassword,
+    String? sshPrivateKey,
+    String? sshPassphrase,
     required String wsPath,
     Duration? timeout,
   }) async {
@@ -600,10 +594,15 @@ class SyncService {
       timeout: const Duration(seconds: 30),
     );
 
+    List<SSHKeyPair>? identities;
+    if (sshPrivateKey != null && sshPrivateKey.isNotEmpty) {
+      identities = SSHKeyPair.fromPem(sshPrivateKey, sshPassphrase);
+    }
+
     final client = SSHClient(
       sshSocket,
       username: sshUsername,
-      onPasswordRequest: () => sshPassword ?? '',
+      identities: identities,
     );
 
     await client.authenticated;
@@ -651,14 +650,6 @@ class SyncService {
 
     final tunnel = _SshTunnel(client, serverSocket);
     return (wsChannel as WebSocketChannel, tunnel);
-  }
-
-  /// Resolve the SSH tunnel password from global (user-level) secrets.
-  /// The secret is keyed by `ssh-tunnel:username@host` so each target has its
-  /// own credential.
-  Future<String?> _getSshTunnelPassword(String username, String host) async {
-    final keychain = ref.read(keychainServiceProvider);
-    return await keychain.getGlobalSecret('ssh-tunnel:$username@$host');
   }
 
   WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {

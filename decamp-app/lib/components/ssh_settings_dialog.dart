@@ -1,4 +1,5 @@
 import 'package:decamp/providers/providers.dart';
+import 'package:decamp/providers/ssh_tunnel_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,12 +83,68 @@ class SshSettingsDialog {
       ),
     );
   }
+
+  /// Show dialog for configuring an SSH tunnel (client-only storage).
+  ///
+  /// If [existingTunnelId] is provided, loads the existing config for editing.
+  /// [onSaved] is called with the tunnel ID after a successful save.
+  static Future<void> showTunnel(
+    BuildContext context,
+    WidgetRef ref, {
+    String? existingTunnelId,
+    required void Function(String tunnelId) onSaved,
+  }) async {
+    // Load existing tunnel config if editing
+    String? initialHost;
+    int? initialPort;
+    String? initialUsername;
+    SshAuthMethod? initialAuthMethod;
+    String? initialPrivateKey;
+    String? initialPassphrase;
+
+    if (existingTunnelId != null) {
+      final storage = ref.read(sshTunnelStorageProvider);
+      final settings = await storage.get(existingTunnelId);
+      if (settings != null) {
+        initialHost = settings.host;
+        initialPort = settings.port;
+        initialUsername = settings.username;
+        initialAuthMethod = settings.authMethod;
+      }
+      initialPrivateKey = await storage.getPrivateKey(existingTunnelId);
+      initialPassphrase = await storage.getPassphrase(existingTunnelId);
+    }
+
+    if (!context.mounted) return;
+
+    await showShadDialog(
+      context: context,
+      builder: (context) => _SshSettingsDialogForm(
+        title: existingTunnelId != null
+            ? 'Edit SSH Tunnel'
+            : 'Configure SSH Tunnel',
+        projectId: '', // Not used in tunnel mode
+        tunnelMode: true,
+        existingTunnelId: existingTunnelId,
+        onSaveTunnel: onSaved,
+        initialHost: initialHost,
+        initialPort: initialPort,
+        initialUsername: initialUsername,
+        initialAuthMethod: initialAuthMethod ?? SshAuthMethod.privateKey,
+        initialPrivateKey: initialPrivateKey,
+        initialPassphrase: initialPassphrase,
+      ),
+    );
+  }
 }
 
 /// Internal form widget for the SSH settings dialog
 class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   final String title;
   final String projectId;
+  final bool tunnelMode;
+  final String? existingTunnelId;
+  final void Function(String tunnelId)? onSaveTunnel;
   final String? initialHost;
   final int? initialPort;
   final String? initialUsername;
@@ -101,6 +158,9 @@ class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   const _SshSettingsDialogForm({
     required this.title,
     required this.projectId,
+    this.tunnelMode = false,
+    this.existingTunnelId,
+    this.onSaveTunnel,
     this.initialHost,
     this.initialPort,
     this.initialUsername,
@@ -342,75 +402,77 @@ class _SshSettingsDialogFormState
                 ),
                 const SizedBox(height: 16),
 
-                // Authentication method selector
-                Text(
-                  'Authentication Method',
-                  style: theme.textTheme.small.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
+                // Authentication method selector (hidden in tunnel mode)
+                if (!widget.tunnelMode) ...[
+                  Text(
+                    'Authentication Method',
+                    style: theme.textTheme.small.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildAuthMethodCard(
-                        title: 'Password',
-                        icon: LucideIcons.lock,
-                        method: SshAuthMethod.password,
-                        isSelected: _authMethod == SshAuthMethod.password,
-                        onTap: () {
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildAuthMethodCard(
+                          title: 'Password',
+                          icon: LucideIcons.lock,
+                          method: SshAuthMethod.password,
+                          isSelected: _authMethod == SshAuthMethod.password,
+                          onTap: () {
+                            setState(() {
+                              _authMethod = SshAuthMethod.password;
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildAuthMethodCard(
+                          title: 'Private Key',
+                          icon: LucideIcons.key,
+                          method: SshAuthMethod.privateKey,
+                          isSelected: _authMethod == SshAuthMethod.privateKey,
+                          onTap: () {
+                            setState(() {
+                              _authMethod = SshAuthMethod.privateKey;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (_authMethod == SshAuthMethod.password)
+                    _buildLabeledInput(
+                      label: 'Password',
+                      controller: _passwordController,
+                      placeholder: _isEditMode
+                          ? 'Leave blank to keep current password'
+                          : 'Enter your password',
+                      obscureText: _obscurePassword,
+                      trailing: ShadButton.ghost(
+                        width: 24,
+                        height: 24,
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
                           setState(() {
-                            _authMethod = SshAuthMethod.password;
+                            _obscurePassword = !_obscurePassword;
                           });
                         },
+                        child: Icon(
+                          _obscurePassword
+                              ? LucideIcons.eye
+                              : LucideIcons.eyeOff,
+                          size: 16,
+                        ),
                       ),
+                      errorKey: 'password',
+                      maxLines: null,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildAuthMethodCard(
-                        title: 'Private Key',
-                        icon: LucideIcons.key,
-                        method: SshAuthMethod.privateKey,
-                        isSelected: _authMethod == SshAuthMethod.privateKey,
-                        onTap: () {
-                          setState(() {
-                            _authMethod = SshAuthMethod.privateKey;
-                          });
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Conditional fields based on auth method
-                if (_authMethod == SshAuthMethod.password) ...[
-                  _buildLabeledInput(
-                    label: 'Password',
-                    controller: _passwordController,
-                    placeholder: _isEditMode
-                        ? 'Leave blank to keep current password'
-                        : 'Enter your password',
-                    obscureText: _obscurePassword,
-                    trailing: ShadButton.ghost(
-                      width: 24,
-                      height: 24,
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                      child: Icon(
-                        _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
-                        size: 16,
-                      ),
-                    ),
-                    errorKey: 'password',
-                    maxLines: null,
-                  ),
-                ] else ...[
+                ],
+                if (_authMethod == SshAuthMethod.privateKey) ...[
                   _buildLabeledInput(
                     label: 'Private Key',
                     controller: _privateKeyController,
@@ -465,35 +527,37 @@ class _SshSettingsDialogFormState
                   ),
                 ],
 
-                // Sudo password field (applies to all auth methods)
-                const SizedBox(height: 12),
-                _buildLabeledInput(
-                  label: 'Sudo Password (Optional)',
-                  controller: _sudoPasswordController,
-                  placeholder: _isEditMode
-                      ? 'Leave blank to keep current sudo password'
-                      : 'Enter password for sudo commands',
-                  description:
-                      'Required for commands needing elevated privileges',
-                  obscureText: _obscureSudoPassword,
-                  maxLines: null,
-                  trailing: ShadButton.ghost(
-                    width: 24,
-                    height: 24,
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      setState(() {
-                        _obscureSudoPassword = !_obscureSudoPassword;
-                      });
-                    },
-                    child: Icon(
-                      _obscureSudoPassword
-                          ? LucideIcons.eye
-                          : LucideIcons.eyeOff,
-                      size: 16,
+                // Sudo password field (hidden in tunnel mode)
+                if (!widget.tunnelMode) ...[
+                  const SizedBox(height: 12),
+                  _buildLabeledInput(
+                    label: 'Sudo Password (Optional)',
+                    controller: _sudoPasswordController,
+                    placeholder: _isEditMode
+                        ? 'Leave blank to keep current sudo password'
+                        : 'Enter password for sudo commands',
+                    description:
+                        'Required for commands needing elevated privileges',
+                    obscureText: _obscureSudoPassword,
+                    maxLines: null,
+                    trailing: ShadButton.ghost(
+                      width: 24,
+                      height: 24,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() {
+                          _obscureSudoPassword = !_obscureSudoPassword;
+                        });
+                      },
+                      child: Icon(
+                        _obscureSudoPassword
+                            ? LucideIcons.eye
+                            : LucideIcons.eyeOff,
+                        size: 16,
+                      ),
                     ),
                   ),
-                ),
+                ],
 
                 if (_isEditMode) ...[
                   const SizedBox(height: 12),
@@ -783,50 +847,95 @@ class _SshSettingsDialogFormState
     final sudoPassword = _sudoPasswordController.text.isNotEmpty
         ? _sudoPasswordController.text
         : null;
-    final enabled = _isEditMode ? _enabled : null;
 
     try {
-      final notifier = ref.read(
-        projectSshSettingsProvider(widget.projectId).notifier,
-      );
+      if (widget.tunnelMode) {
+        // Tunnel mode: save to SshTunnelStorage via provider
+        final notifier = ref.read(sshTunnelConfigsProvider.notifier);
+        final existingId = widget.existingTunnelId;
 
-      if (_isEditMode) {
-        await notifier.updateSshSettings(
-          host: host,
-          port: port,
-          username: username,
-          authMethod: authMethod,
-          password: password,
-          privateKey: privateKey,
-          passphrase: passphrase,
-          sudoPassword: sudoPassword,
-          enabled: enabled,
-        );
-      } else {
-        await notifier.createSshSettings(
-          host: host,
-          port: port,
-          username: username,
-          authMethod: authMethod,
-          password: password,
-          privateKey: privateKey,
-          passphrase: passphrase,
-          sudoPassword: sudoPassword,
-        );
-      }
+        String tunnelId;
+        if (existingId != null) {
+          await notifier.updateTunnel(
+            id: existingId,
+            host: host,
+            port: port,
+            username: username,
+            authMethod: authMethod,
+            privateKey: privateKey,
+            passphrase: passphrase,
+          );
+          tunnelId = existingId;
+        } else {
+          tunnelId = await notifier.create(
+            host: host,
+            port: port,
+            username: username,
+            authMethod: authMethod,
+            privateKey: privateKey,
+            passphrase: passphrase,
+          );
+        }
 
-      if (mounted) {
-        ShadToaster.of(context).show(
-          ShadToast(
-            title: const Text('Success'),
-            description: Text(
-              _isEditMode
-                  ? 'Remote shell configuration updated'
-                  : 'Remote shell configured successfully',
+        if (mounted) {
+          ShadToaster.of(context).show(
+            ShadToast(
+              title: const Text('Success'),
+              description: Text(
+                existingId != null
+                    ? 'SSH tunnel configuration updated'
+                    : 'SSH tunnel configured successfully',
+              ),
             ),
-          ),
+          );
+          Navigator.of(context).pop();
+          widget.onSaveTunnel?.call(tunnelId);
+        }
+      } else {
+        // Remote shell mode: save via ProjectSshSettingsNotifier
+        final enabled = _isEditMode ? _enabled : null;
+        final notifier = ref.read(
+          projectSshSettingsProvider(widget.projectId).notifier,
         );
-        Navigator.of(context).pop();
+
+        if (_isEditMode) {
+          await notifier.updateSshSettings(
+            host: host,
+            port: port,
+            username: username,
+            authMethod: authMethod,
+            password: password,
+            privateKey: privateKey,
+            passphrase: passphrase,
+            sudoPassword: sudoPassword,
+            enabled: enabled,
+          );
+        } else {
+          await notifier.createSshSettings(
+            host: host,
+            port: port,
+            username: username,
+            authMethod: authMethod,
+            password: password,
+            privateKey: privateKey,
+            passphrase: passphrase,
+            sudoPassword: sudoPassword,
+          );
+        }
+
+        if (mounted) {
+          ShadToaster.of(context).show(
+            ShadToast(
+              title: const Text('Success'),
+              description: Text(
+                _isEditMode
+                    ? 'Remote shell configuration updated'
+                    : 'Remote shell configured successfully',
+              ),
+            ),
+          );
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       if (mounted) {

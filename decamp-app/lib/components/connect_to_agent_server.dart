@@ -1,12 +1,15 @@
 import 'package:decamp/providers/providers.dart';
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/services/sync_service.dart';
 
-import '../utils/ui_utils.dart';
+import 'ssh_settings_dialog.dart';
 
+/// Dialog that opens the SSH tunnel configuration, then connects
+/// to the remote agent and sets up the session.
 class ConnectToAgentServerDialog extends ConsumerStatefulWidget {
   const ConnectToAgentServerDialog({super.key});
 
@@ -17,6 +20,24 @@ class ConnectToAgentServerDialog extends ConsumerStatefulWidget {
     );
   }
 
+  /// Opens the SSH tunnel dialog first, then on save triggers the
+  /// connection flow in a progress dialog.
+  static void showWithTunnel(BuildContext context, WidgetRef ref) {
+    SshSettingsDialog.showTunnel(
+      context,
+      ref,
+      onSaved: (tunnelId) {
+        // After tunnel is saved, show the connection progress dialog
+        if (!context.mounted) return;
+        showShadDialog(
+          context: context,
+          builder: (context) =>
+              _TunnelConnectProgressDialog(tunnelId: tunnelId),
+        );
+      },
+    );
+  }
+
   @override
   ConsumerState<ConnectToAgentServerDialog> createState() =>
       _ConnectToAgentServerDialogState();
@@ -24,185 +45,190 @@ class ConnectToAgentServerDialog extends ConsumerStatefulWidget {
 
 class _ConnectToAgentServerDialogState
     extends ConsumerState<ConnectToAgentServerDialog> {
-  final _controller = TextEditingController();
-  bool _isLoading = false;
-  String? _errorMessage;
-  String? _statusMessage;
-
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    // Immediately open the tunnel dialog
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close this empty dialog
+      ConnectToAgentServerDialog.showWithTunnel(context, ref);
+    });
   }
 
-  Future<void> _connectAndSetupSession(String url) async {
-    final syncService = ref.read(syncServiceProvider);
-    await syncService.connectGlobal(url);
+  @override
+  Widget build(BuildContext context) {
+    // Placeholder — immediately replaced by showWithTunnel
+    return const SizedBox.shrink();
+  }
+}
 
-    if (!mounted) return;
-    setState(() => _statusMessage = 'Waiting for global sync...');
-    await syncService.waitForGlobalSync();
+/// Progress dialog shown after tunnel config is saved.
+/// Connects via SSH tunnel, waits for sync, finds/switches to a project.
+class _TunnelConnectProgressDialog extends ConsumerStatefulWidget {
+  final String tunnelId;
 
-    if (!mounted) return;
-    setState(() => _statusMessage = 'Checking projects...');
-    final globalDb = ref.read(globalDatabaseProvider);
+  const _TunnelConnectProgressDialog({required this.tunnelId});
 
-    // Filter projects by URL
-    final cleanUrl = url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  @override
+  ConsumerState<_TunnelConnectProgressDialog> createState() =>
+      _TunnelConnectProgressDialogState();
+}
 
-    List<ProjectEntity> matchingProjects = [];
-    // Poll for projects for up to 10 seconds (20 attempts * 500ms)
-    for (int i = 0; i < 20; i++) {
-      if (!mounted) return;
+class _TunnelConnectProgressDialogState
+    extends ConsumerState<_TunnelConnectProgressDialog> {
+  bool _isLoading = true;
+  String? _errorMessage;
+  String _statusMessage = 'Connecting via SSH tunnel...';
 
-      final projects = await globalDb.projectDao.getAllProjects();
+  @override
+  void initState() {
+    super.initState();
+    _connect();
+  }
 
-      matchingProjects = projects.where((p) {
-        final pUrl = p.serverUrl;
-        if (pUrl == null) return false;
-        final cleanPUrl = pUrl.endsWith('/')
-            ? pUrl.substring(0, pUrl.length - 1)
-            : pUrl;
-        return cleanPUrl == cleanUrl;
-      }).toList();
+  Future<void> _connect() async {
+    try {
+      final tunnelUrl = 'tunnelId:${widget.tunnelId}';
 
-      if (matchingProjects.isNotEmpty) break;
-
-      setState(
-        () => _statusMessage = 'Waiting for projects to sync... (${i + 1}/20)',
-      );
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-
-    if (matchingProjects.isEmpty) {
-      throw Exception('No projects found matching $url');
-    }
-
-    if (matchingProjects.isNotEmpty) {
+      // Ensure current project has this tunnel assigned
       final currentProject = ref.read(currentProjectProvider);
-      bool shouldSwitch = false;
-
-      if (currentProject == null) {
-        shouldSwitch = true;
-      } else {
-        final currentUrl = currentProject.serverUrl;
-        if (currentUrl == null) {
-          shouldSwitch = true;
-        } else {
-          final cleanCurrentUrl = currentUrl.endsWith('/')
-              ? currentUrl.substring(0, currentUrl.length - 1)
-              : currentUrl;
-          if (cleanCurrentUrl != cleanUrl) {
-            shouldSwitch = true;
-          }
-        }
+      if (currentProject != null) {
+        await ref
+            .read(projectControllerProvider)
+            .updateProject(id: currentProject.id, serverUrl: Value(tunnelUrl));
       }
 
-      if (shouldSwitch) {
-        // Pick latest project (already ordered by lastSessionDate desc in getAllProjects)
-        final targetProject = matchingProjects.first;
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Establishing SSH tunnel...');
+
+      final syncService = ref.read(syncServiceProvider);
+      await syncService.connectGlobal(tunnelUrl);
+
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Waiting for global sync...');
+      await syncService.waitForGlobalSync();
+
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Checking projects...');
+      final globalDb = ref.read(globalDatabaseProvider);
+
+      List<ProjectEntity> matchingProjects = [];
+      // Poll for projects for up to 10 seconds
+      for (int i = 0; i < 20; i++) {
         if (!mounted) return;
+
+        final projects = await globalDb.projectDao.getAllProjects();
+        matchingProjects = projects.where((p) {
+          return p.serverUrl == tunnelUrl;
+        }).toList();
+
+        if (matchingProjects.isNotEmpty) break;
+
         setState(
           () =>
-              _statusMessage = 'Switching to project ${targetProject.name}...',
+              _statusMessage = 'Waiting for projects to sync... (${i + 1}/20)',
         );
-        await ref
-            .read(currentProjectIdProvider.notifier)
-            .select(targetProject.id);
-
-        // Wait for project sync
-        if (!mounted) return;
-        setState(() => _statusMessage = 'Waiting for project sync...');
-        // Allow time for the sync service to react to the project change
-        await Future.delayed(const Duration(milliseconds: 200));
-        await syncService.waitForProjectSync();
+        await Future.delayed(const Duration(milliseconds: 500));
       }
+
+      if (matchingProjects.isEmpty) {
+        throw Exception(
+          'No projects found for this tunnel. '
+          'Make sure the remote agent has a project configured.',
+        );
+      }
+
+      // Switch to the matching project
+      final targetProject = matchingProjects.first;
+      if (!mounted) return;
+      setState(
+        () => _statusMessage = 'Switching to project ${targetProject.name}...',
+      );
+      await ref
+          .read(currentProjectIdProvider.notifier)
+          .select(targetProject.id);
+
+      if (!mounted) return;
+      setState(() => _statusMessage = 'Waiting for project sync...');
+      await Future.delayed(const Duration(milliseconds: 200));
+      await syncService.waitForProjectSync();
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Connection Failed: $e';
+        _isLoading = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = ShadTheme.of(context);
+
     return ShadDialog(
-      title: const Text('Connect to Agent Server'),
+      title: const Text('Connecting to Agent'),
       actions: [
-        ShadButton.outline(
-          enabled: !_isLoading,
-          child: const Text('Cancel'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        ShadButton(
-          enabled: !_isLoading,
-          onPressed: _isLoading
-              ? null
-              : () async {
-                  final url = _controller.text.trim();
-                  if (url.isEmpty) return;
-
-                  setState(() {
-                    _isLoading = true;
-                    _errorMessage = null;
-                    _statusMessage = 'Connecting...';
-                  });
-
-                  try {
-                    await _connectAndSetupSession(url);
-                    if (!context.mounted) return;
-                    Navigator.of(context).pop();
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    setState(() {
-                      _errorMessage = 'Connection Failed: $e';
-                      _statusMessage = null;
-                    });
-                  } finally {
-                    if (mounted) {
-                      setState(() => _isLoading = false);
-                    }
-                  }
-                },
-          child: _isLoading
-              ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(
-                      ShadTheme.of(context).colorScheme.primaryForeground,
-                    ),
-                  ),
-                )
-              : const Text('Connect'),
-        ),
+        if (_errorMessage != null) ...[
+          ShadButton.outline(
+            child: const Text('Close'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          ShadButton(
+            child: const Text('Retry'),
+            onPressed: () {
+              setState(() {
+                _isLoading = true;
+                _errorMessage = null;
+                _statusMessage = 'Connecting via SSH tunnel...';
+              });
+              _connect();
+            },
+          ),
+        ] else
+          ShadButton.outline(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
       ],
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Enter the remote URL for global sync:'),
-          const SizedBox(height: 10),
-          ShadInput(
-            contextMenuBuilder: adaptiveContextMenuBuilder,
-            controller: _controller,
-            placeholder: const Text('wss://...'),
-            autocorrect: false,
-            enabled: !_isLoading,
-          ),
-          if (_statusMessage != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _statusMessage!,
-              style: TextStyle(
-                color: ShadTheme.of(context).colorScheme.mutedForeground,
-                fontSize: 14,
-              ),
+          if (_isLoading)
+            Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(
+                      theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _statusMessage,
+                    style: TextStyle(
+                      color: theme.colorScheme.mutedForeground,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
           if (_errorMessage != null) ...[
             const SizedBox(height: 10),
             Text(
               _errorMessage!,
               style: TextStyle(
-                color: ShadTheme.of(context).colorScheme.destructive,
+                color: theme.colorScheme.destructive,
                 fontSize: 14,
               ),
             ),
