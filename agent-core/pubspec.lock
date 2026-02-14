@@ -220,10 +220,9 @@ packages:
   dartssh2:
     dependency: "direct main"
     description:
-      name: dartssh2
-      sha256: bb242396c1d90f05c261b5eb8338cc67167e803c0948b0207029339cc568a66c
-      url: "https://pub.dev"
-    source: hosted
+      path: "../dartssh2"
+      relative: true
+    source: path
     version: "2.13.0"
   dev_build:
     dependency: transitive

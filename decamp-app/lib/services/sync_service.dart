@@ -10,6 +10,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:dartssh2/dartssh2.dart';
 import 'package:decamp/certs.dart';
 import 'package:decamp/providers/providers.dart';
 
@@ -35,6 +36,9 @@ class SyncService {
   MultiplexedWebSocketChannel? _projectChannel;
   StreamSubscription? _projectSubscription;
   String? _currentGlobalUrl;
+
+  _SshTunnel? _globalSshTunnel;
+  _SshTunnel? _projectSshTunnel;
 
   // Adapters for waiting on sync idle
   CrdtFlowAdapter? _globalAdapter;
@@ -162,11 +166,30 @@ class SyncService {
       final cleanUrl = serverUrl.endsWith('/')
           ? serverUrl.substring(0, serverUrl.length - 1)
           : serverUrl;
-      final uri = Uri.parse('$cleanUrl/sync/global');
 
-      _log.info('Connecting to global sync at $uri');
+      _log.info('Connecting to global sync at $cleanUrl');
       // Use a shorter timeout for manual connections (when rethrowErrors is true)
-      final channel = _connectWebSocket(uri, timeout: defaultConnectionTimeout);
+      final sshParsed = parseSshUrl(cleanUrl);
+      final WebSocketChannel channel;
+      if (sshParsed != null) {
+        final password = await _getSshTunnelPassword(
+          sshParsed.username,
+          sshParsed.host,
+        );
+        final (wsChannel, tunnel) = await _connectSshWebSocket(
+          sshHost: sshParsed.host,
+          sshPort: sshParsed.port,
+          sshUsername: sshParsed.username,
+          sshPassword: password,
+          wsPath: '/sync/global',
+          timeout: defaultConnectionTimeout,
+        );
+        channel = wsChannel;
+        _globalSshTunnel = tunnel;
+      } else {
+        final uri = Uri.parse('$cleanUrl/sync/global');
+        channel = _connectWebSocket(uri, timeout: defaultConnectionTimeout);
+      }
       await channel.ready;
 
       _globalChannel = MultiplexedWebSocketChannel(
@@ -263,12 +286,31 @@ class SyncService {
 
       final crdt = db.crdt;
       _projectAdapter = CrdtFlowAdapter(crdt);
-      final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
-      _log.info('Connecting to project sync at $uri');
+      _log.info('Connecting to project sync for $projectId');
       _updateConnectionState(SyncConnectionState.connecting);
 
-      final wsChannel = _connectWebSocket(uri);
+      final WebSocketChannel wsChannel;
+      final sshParsed = parseSshUrl(serverUrl);
+      if (sshParsed != null) {
+        final password = await _getSshTunnelPassword(
+          sshParsed.username,
+          sshParsed.host,
+        );
+        if (token.isCancelled) return;
+        final (ch, tunnel) = await _connectSshWebSocket(
+          sshHost: sshParsed.host,
+          sshPort: sshParsed.port,
+          sshUsername: sshParsed.username,
+          sshPassword: password,
+          wsPath: '/sync/project/$projectId',
+        );
+        wsChannel = ch;
+        _projectSshTunnel = tunnel;
+      } else {
+        final uri = Uri.parse('$serverUrl/sync/project/$projectId');
+        wsChannel = _connectWebSocket(uri);
+      }
       final monitoredChannel = _ActivityMonitorWebSocketChannel(
         wsChannel,
         onActivity: _handleSyncActivity,
@@ -379,6 +421,8 @@ class SyncService {
     _globalSubscription?.cancel();
     _globalSubscription = null;
     _currentGlobalUrl = null;
+    _globalSshTunnel?.close();
+    _globalSshTunnel = null;
   }
 
   void _scheduleReconnect() {
@@ -430,6 +474,8 @@ class SyncService {
     _projectChannel = null;
     _projectSubscription?.cancel();
     _projectSubscription = null;
+    _projectSshTunnel?.close();
+    _projectSshTunnel = null;
     _updateConnectionState(SyncConnectionState.disconnected);
   }
 
@@ -508,6 +554,111 @@ class SyncService {
     } else {
       _log.warning('Cannot send ping, no project connection');
     }
+  }
+
+  /// Parse an `ssh:username@host` URL into its components.
+  /// Returns null if the URL is not an SSH tunnel URL.
+  static ({String username, String host, int port})? parseSshUrl(String url) {
+    if (!url.startsWith('ssh:')) return null;
+    final rest = url.substring(4); // strip 'ssh:'
+    final atIndex = rest.indexOf('@');
+    if (atIndex < 0) return null;
+    final username = rest.substring(0, atIndex);
+    final hostPart = rest.substring(atIndex + 1);
+    // Support optional port: ssh:user@host:2222
+    final colonIndex = hostPart.indexOf(':');
+    if (colonIndex >= 0) {
+      final host = hostPart.substring(0, colonIndex);
+      final port = int.tryParse(hostPart.substring(colonIndex + 1)) ?? 22;
+      return (username: username, host: host, port: port);
+    }
+    return (username: username, host: hostPart, port: 22);
+  }
+
+  /// Create a WebSocket channel tunneled through SSH to a remote Unix socket.
+  ///
+  /// 1. Connect SSH to [sshHost] as [sshUsername]
+  /// 2. Discover remote home directory via `echo \$HOME`
+  /// 3. Open a `direct-streamlocal` channel to `$HOME/.fewshell/agent.sock`
+  /// 4. Bind a local TCP proxy that pipes to the SSH forward
+  /// 5. Connect a WebSocket through the local proxy
+  ///
+  /// The [wsPath] (e.g. `/sync/global`) is appended to the WebSocket URL.
+  Future<(WebSocketChannel, _SshTunnel)> _connectSshWebSocket({
+    required String sshHost,
+    required int sshPort,
+    required String sshUsername,
+    required String? sshPassword,
+    required String wsPath,
+    Duration? timeout,
+  }) async {
+    _log.info('SSH tunnel: connecting to $sshUsername@$sshHost:$sshPort');
+
+    final sshSocket = await SSHSocket.connect(
+      sshHost,
+      sshPort,
+      timeout: const Duration(seconds: 30),
+    );
+
+    final client = SSHClient(
+      sshSocket,
+      username: sshUsername,
+      onPasswordRequest: () => sshPassword ?? '',
+    );
+
+    await client.authenticated;
+    _log.info('SSH tunnel: authenticated');
+
+    // Discover remote home directory
+    final homeSession = await client.execute('echo \$HOME');
+    final homeOutput = StringBuffer();
+    await for (final data in homeSession.stdout) {
+      homeOutput.write(utf8.decode(data));
+    }
+    await homeSession.done;
+    final remoteHome = homeOutput.toString().trim();
+    if (remoteHome.isEmpty) {
+      client.close();
+      throw Exception('SSH tunnel: failed to discover remote home directory');
+    }
+    final socketPath = '$remoteHome/.fewshell/agent.sock';
+    _log.info('SSH tunnel: forwarding to $socketPath');
+
+    // Bind local TCP proxy
+    final serverSocket = await ServerSocket.bind('localhost', 0);
+    final localPort = serverSocket.port;
+
+    serverSocket.listen((tcpSocket) async {
+      try {
+        final forward = await client.forwardLocalUnix(socketPath);
+        forward.stream.cast<List<int>>().pipe(tcpSocket);
+        tcpSocket.cast<List<int>>().pipe(forward.sink);
+      } catch (e) {
+        _log.warning('SSH tunnel: proxy connection failed: $e');
+        tcpSocket.destroy();
+      }
+    });
+
+    _log.info('SSH tunnel: local proxy on localhost:$localPort');
+
+    // Connect WebSocket through the proxy
+    final wsUri = Uri.parse('ws://localhost:$localPort$wsPath');
+    final wsChannel = IOWebSocketChannel.connect(
+      wsUri,
+      connectTimeout: timeout,
+      pingInterval: const Duration(seconds: 10),
+    );
+
+    final tunnel = _SshTunnel(client, serverSocket);
+    return (wsChannel as WebSocketChannel, tunnel);
+  }
+
+  /// Resolve the SSH tunnel password from global (user-level) secrets.
+  /// The secret is keyed by `ssh-tunnel:username@host` so each target has its
+  /// own credential.
+  Future<String?> _getSshTunnelPassword(String username, String host) async {
+    final keychain = ref.read(keychainServiceProvider);
+    return await keychain.getGlobalSecret('ssh-tunnel:$username@$host');
   }
 
   WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {
@@ -718,4 +869,17 @@ class _CancellationToken {
   bool _isCancelled = false;
   bool get isCancelled => _isCancelled;
   void cancel() => _isCancelled = true;
+}
+
+/// Holds the resources for an SSH tunnel so they can be cleaned up together.
+class _SshTunnel {
+  final SSHClient client;
+  final ServerSocket serverSocket;
+
+  _SshTunnel(this.client, this.serverSocket);
+
+  void close() {
+    serverSocket.close();
+    client.close();
+  }
 }
