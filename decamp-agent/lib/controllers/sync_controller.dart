@@ -704,11 +704,11 @@ class _AgentSession {
                   'Executing shell command. Abort controller: $abortController',
                 );
 
-                final stdoutBuffer = StringBuffer();
+                final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
-                  stdoutBuffer.write(data);
+                  terminalBuffer.write(data);
                   final streamingResultJson = jsonEncode({
-                    'stdout': stdoutBuffer.toString(),
+                    'stdout': terminalBuffer.toString(),
                     'stderr': '',
                     'exitCode': 0,
                     'isStreaming': true,
@@ -757,6 +757,7 @@ class _AgentSession {
                   );
                 });
                 await projectDb!.sessionDao.touchSession(currentSessionId);
+                shellResult['stdout'] = terminalBuffer.toString();
                 result = jsonEncode(shellResult);
               } else if (toolCall.function.name == kFetch) {
                 final fetchResult = await FetchTool.execute(params);
