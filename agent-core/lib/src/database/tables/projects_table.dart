@@ -17,6 +17,12 @@ class Projects extends Table {
   /// If null, the project is local-only
   TextColumn get serverUrl => text().nullable()();
 
+  /// Server's CRDT node ID (e.g. `srv_<uuid>`)
+  /// Set by the server, replicated to all clients via CRDT.
+  /// Used for sync filtering and server identity.
+  /// If null, the project has not yet been assigned to a server.
+  TextColumn get nodeId => text().nullable()();
+
   /// Timestamp of the last session activity
   DateTimeColumn get lastSessionDate => dateTime()();
 
