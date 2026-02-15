@@ -12,6 +12,7 @@ import 'package:llm_dart/llm_dart.dart';
 import '../services/database_manager.dart';
 import '../services/local_shell_backend.dart';
 import '../services/notification_dispatcher.dart';
+import '../utils/websocket_upgrade.dart';
 
 class SyncController {
   static final _log = Logger('SyncController');
@@ -107,23 +108,7 @@ class SyncController {
       final path = request.url.path;
 
       if (path == 'global') {
-        return webSocketHandler((WebSocketChannel channel, String? protocol) {
-          _log.info('Starting CrdtSync for global');
-          final sync = CrdtSync.server(
-            dbManager.globalDatabase.crdt,
-            channel,
-            verbose: true,
-          );
-
-          unawaited(
-            channel.sink.done.then((_) {
-              _log.info(
-                'Channel closed for global',
-              );
-              sync.close();
-            }),
-          );
-        })(request);
+        return _handleGlobalSync(request);
       } else if (path.startsWith('project/')) {
         final segments = path.split('/');
         if (segments.length >= 2) {
@@ -190,6 +175,33 @@ class SyncController {
 
       return Response.notFound('Not found');
     };
+  }
+
+  /// Handles the global sync WebSocket connection.
+  ///
+  /// This uses a manual WebSocket upgrade (instead of [webSocketHandler]) so
+  /// we can inject the [kNodeIdHeader] header into the HTTP 101 response.
+  /// Clients read this header to discover the server's CRDT identity.
+  Response _handleGlobalSync(Request request) {
+    return upgradeWebSocket(
+      request,
+      headers: {kNodeIdHeader: dbManager.nodeId},
+      onConnection: (WebSocketChannel channel) {
+        _log.info('Starting CrdtSync for global');
+        final sync = CrdtSync.server(
+          dbManager.globalDatabase.crdt,
+          channel,
+          verbose: true,
+        );
+
+        unawaited(
+          channel.sink.done.then((_) {
+            _log.info('Channel closed for global');
+            sync.close();
+          }),
+        );
+      },
+    );
   }
 
   void _setupCustomMessageHandling(
