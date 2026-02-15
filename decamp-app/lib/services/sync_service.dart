@@ -201,7 +201,8 @@ class SyncService {
       }
 
       // Read the server's CRDT node ID from the upgrade response header.
-      final headerNodeId = responseHeaders[kNodeIdHeader];
+      // Headers are stored lowercased for case-insensitive lookup.
+      final headerNodeId = responseHeaders[kNodeIdHeader.toLowerCase()];
       if (headerNodeId == null) {
         throw Exception(
           'Server did not send $kNodeIdHeader header on WebSocket upgrade',
@@ -852,10 +853,10 @@ class SyncService {
         );
       }
 
-      // Collect response headers.
+      // Collect response headers (lowercased keys for case-insensitive lookup).
       final responseHeaders = <String, String>{};
       response.headers.forEach((name, values) {
-        responseHeaders[name] = values.join(', ');
+        responseHeaders[name.toLowerCase()] = values.join(', ');
       });
 
       // Detach the raw socket and wrap it as a WebSocket.
