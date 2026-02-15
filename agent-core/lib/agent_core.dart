@@ -27,6 +27,9 @@ export 'src/utils/tool_result_formatter.dart';
 export 'src/utils/multiplexed_websocket_channel.dart';
 export 'src/utils/crdt_flow_adapter.dart';
 export 'src/utils/terminal_buffer.dart';
+export 'src/utils/node_id_migration.dart';
+export 'src/utils/server_node_id.dart';
+export 'src/utils/toml_node_id_migration.dart';
 
 // Secrets Storage
 export 'src/secrets_storage/secure_storage.dart';

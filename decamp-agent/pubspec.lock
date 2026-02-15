@@ -179,10 +179,9 @@ packages:
   dartssh2:
     dependency: transitive
     description:
-      name: dartssh2
-      sha256: bb242396c1d90f05c261b5eb8338cc67167e803c0948b0207029339cc568a66c
-      url: "https://pub.dev"
-    source: hosted
+      path: "../dartssh2"
+      relative: true
+    source: path
     version: "2.13.0"
   dev_build:
     dependency: transitive
@@ -668,10 +667,10 @@ packages:
     dependency: transitive
     description:
       name: sqflite_common_ffi_web
-      sha256: "33495e9172c958d907c48fd43fbea0b9c0a2ec2e36a548ebd07672fde61b6497"
+      sha256: "45aeed3b367c06f3daf9ba6cdb4bfda1732673263fc9491e40166d2cb5353731"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.1+1"
+    version: "1.0.2"
   sqflite_darwin:
     dependency: transitive
     description:
@@ -705,13 +704,13 @@ packages:
     source: hosted
     version: "2.9.4"
   sqlite_crdt:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: sqlite_crdt
-      sha256: d424ad71651896c652fd051ce5f28c7b5562c7a5b5ac1737b313f78b27489043
+      sha256: "11ce9f5b583a7c3c09f806223e2a6b1733daab45214a2b8f7ab250887382987e"
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.3"
+    version: "3.0.4"
   sqlparser:
     dependency: transitive
     description:

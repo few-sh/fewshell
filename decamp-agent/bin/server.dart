@@ -7,12 +7,12 @@ import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:fewshell_agent/router.dart';
 import 'package:fewshell_agent/services/database_manager.dart';
 import 'package:fewshell_agent/services/notification_dispatcher.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
-import 'package:agent_core/agent_core.dart';
 import 'package:fewshell_agent/version.dart';
 
 final _log = Logger('FewshellAgent');
@@ -122,14 +122,18 @@ void main(List<String> args) async {
     final bool useTcp = listenUri.startsWith('tcp://');
 
     // Initialize DatabaseManager
-    final dbManager = DatabaseManager('${Directory.current.path}/data');
+    final dataPath = '${Directory.current.path}/data';
+    final dbManager = DatabaseManager(dataPath);
     await dbManager.init();
+
+    // Migrate CRDT settings TOML files from legacy 'server' node ID.
+    // Must run before CrdtSettingsService loads them.
+    await migrateAllSettingsToml(dataPath, 'server', dbManager.nodeId);
 
     // Initialize CrdtSettingsService
     final settingsService = CrdtSettingsService(
-      () async => Directory('${Directory.current.path}/data'),
-      (projectId) async =>
-          Directory('${Directory.current.path}/data/projects/$projectId'),
+      () async => Directory(dataPath),
+      (projectId) async => Directory('$dataPath/projects/$projectId'),
     );
     await settingsService.init();
 
