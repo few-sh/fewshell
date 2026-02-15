@@ -77,17 +77,18 @@ class DatabaseManager {
     }
   }
 
-  /// Sets the `node_id` column on every project record that doesn't already
-  /// have the current [nodeId]. This is a normal CRDT write so it replicates.
+  /// Sets the `server_node_id` column on every project record that doesn't
+  /// already have the current [nodeId]. This is a normal CRDT write so it
+  /// replicates.
   Future<void> _setNodeIdOnProjects() async {
     final projects = await globalDatabase.projectDao.getAllProjects();
     for (final project in projects) {
-      if (project.nodeId != nodeId) {
-        _log.info('Setting node_id=$nodeId on project ${project.id}');
+      if (project.serverNodeId != nodeId) {
+        _log.info('Setting server_node_id=$nodeId on project ${project.id}');
         await globalDatabase.projectDao.updateProject(
           ProjectEntityCompanion(
             id: Value(project.id),
-            nodeId: Value(nodeId),
+            serverNodeId: Value(nodeId),
           ),
         );
       }

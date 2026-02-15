@@ -21,7 +21,10 @@ class Projects extends Table {
   /// Set by the server, replicated to all clients via CRDT.
   /// Used for sync filtering and server identity.
   /// If null, the project has not yet been assigned to a server.
-  TextColumn get nodeId => text().nullable()();
+  ///
+  /// Named `serverNodeId` (not `nodeId`) to avoid colliding with the CRDT
+  /// metadata column `node_id` that SqliteCrdt adds to every table.
+  TextColumn get serverNodeId => text().nullable()();
 
   /// Timestamp of the last session activity
   DateTimeColumn get lastSessionDate => dateTime()();

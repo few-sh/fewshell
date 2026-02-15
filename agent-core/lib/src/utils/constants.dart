@@ -11,7 +11,7 @@ const String kDefaultSessionDescription = 'New conversation';
 
 /// HTTP header name used to communicate the server's CRDT node ID during
 /// the global sync WebSocket upgrade. Only sent on the `/sync/global` endpoint.
-const String kNodeIdHeader = 'X-Fewshell-Node-Id';
+const String kNodeIdHeader = 'X-Fewshell-Server-Node-Id';
 
 // ============================================================================
 // Terminal Display Constants
