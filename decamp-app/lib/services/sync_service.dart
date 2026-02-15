@@ -42,6 +42,14 @@ class SyncService {
   _SshTunnel? _globalSshTunnel;
   _SshTunnel? _projectSshTunnel;
 
+  /// The server's CRDT node ID discovered from the `X-Fewshell-Server-Node-Id`
+  /// header during the most recent global sync WebSocket upgrade.
+  String? _currentServerNodeId;
+
+  /// The server's node ID from the last successful global sync connection.
+  /// Accessible to other services for connection mapping / project matching.
+  String? get currentServerNodeId => _currentServerNodeId;
+
   // Adapters for waiting on sync idle
   CrdtFlowAdapter? _globalAdapter;
   CrdtFlowAdapter? _projectAdapter;
@@ -170,22 +178,42 @@ class SyncService {
           : serverUrl;
 
       _log.info('Connecting to global sync at $cleanUrl');
-      // Use a shorter timeout for manual connections (when rethrowErrors is true)
       final tunnelId = parseTunnelId(cleanUrl);
       final WebSocketChannel channel;
+      Map<String, String> responseHeaders = {};
       if (tunnelId != null) {
-        final (wsChannel, tunnel) = await _connectViaTunnel(
+        final (wsChannel, tunnel, headers) = await _connectViaTunnel(
           tunnelId: tunnelId,
           wsPath: '/sync/global',
           timeout: defaultConnectionTimeout,
         );
         channel = wsChannel;
+        responseHeaders = headers;
         _globalSshTunnel = tunnel;
       } else {
         final uri = Uri.parse('$cleanUrl/sync/global');
-        channel = _connectWebSocket(uri, timeout: defaultConnectionTimeout);
+        final (wsChannel, headers) = await _connectWebSocketWithHeaders(
+          uri,
+          timeout: defaultConnectionTimeout,
+        );
+        channel = wsChannel;
+        responseHeaders = headers;
       }
-      await channel.ready;
+
+      // Read the server's CRDT node ID from the upgrade response header.
+      final headerNodeId = responseHeaders[kNodeIdHeader];
+      if (headerNodeId == null) {
+        throw Exception(
+          'Server did not send $kNodeIdHeader header on WebSocket upgrade',
+        );
+      }
+      if (!isValidNodeId(headerNodeId)) {
+        throw Exception(
+          'Server returned invalid $kNodeIdHeader: $headerNodeId',
+        );
+      }
+      _currentServerNodeId = headerNodeId;
+      _log.info('Discovered server node ID: $headerNodeId');
 
       _globalChannel = MultiplexedWebSocketChannel(
         channel,
@@ -195,14 +223,25 @@ class SyncService {
         _log.fine('Global sync received custom message: $msg');
       });
 
+      // Capture for closure — the server node ID at connection time.
+      final serverNodeId = _currentServerNodeId;
+
       _globalSync = CrdtSync.client(
         _globalAdapter!,
         _globalChannel!,
         verbose: true,
         validateRecord: (table, record) {
           if (table == 'projects') {
+            final remoteNodeId = record['server_node_id'] as String?;
+            // Primary check: valid server_node_id
+            if (remoteNodeId != null) {
+              return isValidNodeId(remoteNodeId);
+            }
+            // Transitional fallback: accept records with a server_url
+            // if server_node_id is not yet set (pre-migration server).
             final remoteUrl = record['server_url'] as String?;
-            if (remoteUrl == null || remoteUrl.isEmpty) return false;
+            if (remoteUrl != null && remoteUrl.isNotEmpty) return true;
+            return false;
           }
           return true;
         },
@@ -225,6 +264,12 @@ class SyncService {
               if (changeset.containsKey('projects')) {
                 final records = changeset['projects']!;
                 final filteredRecords = records.where((record) {
+                  // Primary filter: match by server_node_id
+                  if (serverNodeId != null) {
+                    final recordNodeId = record['server_node_id'] as String?;
+                    if (recordNodeId == serverNodeId) return true;
+                  }
+                  // Transitional fallback: match by server_url
                   final recordUrl = record['server_url'] as String?;
                   return recordUrl != null && recordUrl == serverUrl;
                 }).toList();
@@ -289,7 +334,7 @@ class SyncService {
       final tunnelId = parseTunnelId(serverUrl);
       if (tunnelId != null) {
         if (token.isCancelled) return;
-        final (ch, tunnel) = await _connectViaTunnel(
+        final (ch, tunnel, _) = await _connectViaTunnel(
           tunnelId: tunnelId,
           wsPath: '/sync/project/$projectId',
         );
@@ -409,6 +454,7 @@ class SyncService {
     _globalSubscription?.cancel();
     _globalSubscription = null;
     _currentGlobalUrl = null;
+    _currentServerNodeId = null;
     _globalSshTunnel?.close();
     _globalSshTunnel = null;
   }
@@ -545,7 +591,10 @@ class SyncService {
   }
 
   /// Looks up a tunnel config from [SshTunnelStorage] and connects via SSH.
-  Future<(WebSocketChannel, _SshTunnel)> _connectViaTunnel({
+  /// Connects a WebSocket tunneled through SSH, returning the channel,
+  /// tunnel handle, and the HTTP upgrade response headers.
+  Future<(WebSocketChannel, _SshTunnel, Map<String, String>)>
+  _connectViaTunnel({
     required String tunnelId,
     required String wsPath,
     Duration? timeout,
@@ -578,7 +627,8 @@ class SyncService {
   /// 5. Connect a WebSocket through the local proxy
   ///
   /// The [wsPath] (e.g. `/sync/global`) is appended to the WebSocket URL.
-  Future<(WebSocketChannel, _SshTunnel)> _connectSshWebSocket({
+  Future<(WebSocketChannel, _SshTunnel, Map<String, String>)>
+  _connectSshWebSocket({
     required String sshHost,
     required int sshPort,
     required String sshUsername,
@@ -641,16 +691,17 @@ class SyncService {
 
     _log.info('SSH tunnel: local proxy on localhost:$localPort');
 
-    // Connect WebSocket through the proxy
+    // Connect WebSocket through the proxy — use manual upgrade to capture
+    // response headers (e.g. X-Fewshell-Server-Node-Id).
     final wsUri = Uri.parse('ws://localhost:$localPort$wsPath');
-    final wsChannel = IOWebSocketChannel.connect(
+    final (wsChannel, headers) = await _connectWebSocketWithHeaders(
       wsUri,
-      connectTimeout: timeout,
-      pingInterval: const Duration(seconds: 10),
+      timeout: timeout,
+      useMtls: false,
     );
 
     final tunnel = _SshTunnel(client, serverSocket);
-    return (wsChannel as WebSocketChannel, tunnel);
+    return (wsChannel, tunnel, headers);
   }
 
   /// Creates an [HttpClient] configured with mTLS using embedded certificates.
