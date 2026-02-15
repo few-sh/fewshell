@@ -105,10 +105,8 @@ class SyncService {
 
     ref.listen(projectDatabaseProvider, (previous, next) {
       if (next != null) {
-        final projectId = ref.read(currentProjectIdProvider);
-        if (projectId != null) {
-          _connectProject(next, projectId);
-        }
+        // Project DB changed — connect project if global is already up.
+        _connectProjectIfReady();
       } else {
         _resetProjectSync();
       }
@@ -116,34 +114,18 @@ class SyncService {
 
     // Watch for project settings changes (specifically serverUrl)
     ref.listen<ProjectEntity?>(currentProjectProvider, (previous, next) {
-      // Handle Project Sync update
-      if (next != null &&
-          previous?.id == next.id &&
-          previous?.serverUrl != next.serverUrl) {
-        final projectDb = ref.read(projectDatabaseProvider);
-        if (projectDb != null) {
-          _connectProject(projectDb, next.id);
-        }
-      }
-
-      // Handle Global Sync update
+      // Handle Global Sync update (project sync follows automatically)
       if (previous?.id != next?.id || previous?.serverUrl != next?.serverUrl) {
         _connectGlobal(ref.read(globalDatabaseProvider), next?.serverUrl);
       }
     });
 
-    // Initial connection
+    // Initial connection — only start global; project follows on success.
     final nodeId = ref.read(nodeIdProvider);
     _log.info('Initializing with nodeId: $nodeId');
 
     final project = ref.read(currentProjectProvider);
     _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
-
-    final projectDb = ref.read(projectDatabaseProvider);
-    final projectId = ref.read(currentProjectIdProvider);
-    if (projectDb != null && projectId != null) {
-      _connectProject(projectDb, projectId);
-    }
   }
 
   Future<void> connectGlobal(String url) async {
@@ -284,13 +266,34 @@ class SyncService {
               return changeset;
             },
       );
+
+      // Global sync connected — now connect project sync.
+      _connectProjectIfReady();
     } catch (e, stackTrace) {
       _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
     }
   }
 
+  /// Connects project sync if global sync is up and a project DB is available.
+  void _connectProjectIfReady() {
+    if (_globalSync == null) return;
+    final projectDb = ref.read(projectDatabaseProvider);
+    final projectId = ref.read(currentProjectIdProvider);
+    if (projectDb != null && projectId != null) {
+      _connectProject(projectDb, projectId);
+    }
+  }
+
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
+    // Project sync requires global sync to be connected first.
+    if (_globalSync == null) {
+      _log.info(
+        'Skipping project sync for $projectId — global sync not connected.',
+      );
+      return;
+    }
+
     _reconnectTimer?.cancel();
     _connectionToken?.cancel();
     final token = _CancellationToken();
@@ -543,18 +546,14 @@ class SyncService {
   }
 
   void _reconnectAll() {
-    // Force reconnect global sync if we have a server URL
+    // Force reconnect global sync — project sync follows automatically
+    // via _connectProjectIfReady() at the end of a successful _connectGlobal.
     if (_currentGlobalUrl != null) {
       _disconnectGlobal();
-      final project = ref.read(currentProjectProvider);
-      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
-    }
-
-    // Force reconnect project sync if we have an active project
-    if (_currentProjectId != null && _currentProjectDb != null) {
       _closeProjectConnection();
       _reconnectAttempts = 0;
-      _connectProject(_currentProjectDb!, _currentProjectId!);
+      final project = ref.read(currentProjectProvider);
+      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
     }
   }
 
