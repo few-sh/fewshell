@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
 import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -652,103 +653,90 @@ class SyncService {
     return (wsChannel as WebSocketChannel, tunnel);
   }
 
+  /// Creates an [HttpClient] configured with mTLS using embedded certificates.
+  HttpClient _createMtlsClient() {
+    final context = SecurityContext(withTrustedRoots: false)
+      ..useCertificateChainBytes(utf8.encode(clientCert))
+      ..usePrivateKeyBytes(utf8.encode(clientKey))
+      ..setTrustedCertificatesBytes(utf8.encode(caCert));
+
+    if (kDebugMode) {
+      HttpClient.enableTimelineLogging = true;
+    }
+
+    final client = HttpClient(context: context);
+    client.badCertificateCallback = _verifyCertificate;
+    return client;
+  }
+
+  /// Certificate verification callback for mTLS connections.
+  ///
+  /// SecurityContext validates the chain; this callback logs details and
+  /// pins by subject/issuer + DER comparison.
+  bool _verifyCertificate(X509Certificate cert, String host, int port) {
+    _log.warning('Certificate verification failed for $host:$port');
+    _log.warning('Subject: ${cert.subject}');
+    _log.warning('Issuer: ${cert.issuer}');
+
+    final isServerCert =
+        cert.subject.contains('localhost') && cert.issuer.contains('Decamp CA');
+
+    final isCaCert =
+        cert.subject.contains('Decamp CA') && cert.issuer.contains('Decamp CA');
+
+    if (!isServerCert && !isCaCert) {
+      _log.severe(
+        'Certificate validation FAILED: Unknown certificate subject/issuer.',
+      );
+      _log.severe('Subject: ${cert.subject}');
+      _log.severe('Issuer: ${cert.issuer}');
+      return false;
+    }
+
+    try {
+      String pemToCompare;
+      if (isServerCert) {
+        final endMarker = '-----END CERTIFICATE-----';
+        final endIndex = serverCert.indexOf(endMarker);
+        if (endIndex == -1) {
+          throw FormatException('Invalid serverCert format');
+        }
+        pemToCompare = serverCert.substring(0, endIndex + endMarker.length);
+      } else {
+        pemToCompare = caCert;
+      }
+
+      final cleanPem = pemToCompare
+          .replaceAll(RegExp(r'-----.*-----'), '')
+          .replaceAll(RegExp(r'\s+'), '');
+
+      final pinnedBytes = base64.decode(cleanPem);
+      final receivedBytes = cert.der;
+
+      if (listEquals(pinnedBytes, receivedBytes)) {
+        _log.info(
+          'Certificate pinning successful: Trusted certificate encountered (${isServerCert ? "Server" : "CA"}). Allowing connection.',
+        );
+        return true;
+      } else {
+        _log.severe(
+          'Certificate pinning FAILED: Certificate bytes do not match pinned certificate.',
+        );
+        _log.severe('Certificate type: ${isServerCert ? "Server" : "CA"}');
+        return false;
+      }
+    } catch (e) {
+      _log.severe('Error during certificate pinning check', e);
+      return false;
+    }
+  }
+
   WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {
     _log.info('_connectWebSocket called for $uri with timeout: $timeout');
 
     try {
       _log.info('Configuring mTLS with embedded certificates');
-
-      final context = SecurityContext(withTrustedRoots: false)
-        ..useCertificateChainBytes(utf8.encode(clientCert))
-        ..usePrivateKeyBytes(utf8.encode(clientKey))
-        ..setTrustedCertificatesBytes(utf8.encode(caCert));
-
-      _log.info('SecurityContext created successfully.');
-
-      if (kDebugMode) {
-        HttpClient.enableTimelineLogging = true;
-      }
-
-      final client = HttpClient(context: context);
-
-      // We rely on SecurityContext for validation, but use this callback
-      // to log detailed errors if validation fails.
-      client.badCertificateCallback = (cert, host, port) {
-        _log.warning('Certificate verification failed for $host:$port');
-        _log.warning('Subject: ${cert.subject}');
-        _log.warning('Issuer: ${cert.issuer}');
-
-        // Strict byte-for-byte pinning is fragile because Dart/BoringSSL may normalize
-        // the certificate (e.g. re-encoding ASN.1), resulting in different bytes
-        // than the file on disk.
-        //
-        // Instead, we validate the Certificate Subject and Issuer to ensure
-        // it is the correct certificate issued by our CA.
-        //
-        // Note: SecurityContext has already validated the signature against the CA
-        // (unless the error is related to the CA itself).
-
-        // We might get a callback for the CA certificate (self-signed error)
-        // or the Server certificate (hostname mismatch error).
-        // We validate that the certificate is either our Server Cert or our CA Cert
-        // by comparing the DER bytes.
-
-        final isServerCert =
-            cert.subject.contains('localhost') &&
-            cert.issuer.contains('Decamp CA');
-
-        final isCaCert =
-            cert.subject.contains('Decamp CA') &&
-            cert.issuer.contains('Decamp CA');
-
-        if (!isServerCert && !isCaCert) {
-          _log.severe(
-            'Certificate validation FAILED: Unknown certificate subject/issuer.',
-          );
-          _log.severe('Subject: ${cert.subject}');
-          _log.severe('Issuer: ${cert.issuer}');
-          return false;
-        }
-
-        try {
-          String pemToCompare;
-          if (isServerCert) {
-            // serverCert contains the chain, we only want the first cert (the server cert)
-            final endMarker = '-----END CERTIFICATE-----';
-            final endIndex = serverCert.indexOf(endMarker);
-            if (endIndex == -1) {
-              throw FormatException('Invalid serverCert format');
-            }
-            pemToCompare = serverCert.substring(0, endIndex + endMarker.length);
-          } else {
-            // caCert contains only the CA cert
-            pemToCompare = caCert;
-          }
-
-          final cleanPem = pemToCompare
-              .replaceAll(RegExp(r'-----.*-----'), '')
-              .replaceAll(RegExp(r'\s+'), '');
-
-          final pinnedBytes = base64.decode(cleanPem);
-          final receivedBytes = cert.der;
-
-          if (listEquals(pinnedBytes, receivedBytes)) {
-            _log.info(
-              'Certificate pinning successful: Trusted certificate encountered (${isServerCert ? "Server" : "CA"}). Allowing connection.',
-            );
-            return true;
-          } else {
-            _log.severe(
-              'Certificate pinning FAILED: Certificate bytes do not match pinned certificate.',
-            );
-            _log.severe('Certificate type: ${isServerCert ? "Server" : "CA"}');
-            return false;
-          }
-        } catch (e) {
-          _log.severe('Error during certificate pinning check', e);
-          return false;
-        }
-      };
+      final client = _createMtlsClient();
 
       _log.info('Connecting with mTLS to $uri');
       return IOWebSocketChannel.connect(
@@ -759,6 +747,81 @@ class SyncService {
       );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
+      rethrow;
+    }
+  }
+
+  /// Connects a WebSocket with a manual HTTP upgrade, returning both the
+  /// channel and the server's response headers.
+  ///
+  /// Used for global sync connections where we need to read the
+  /// `X-Fewshell-Server-Node-Id` header from the upgrade response.
+  /// When [useMtls] is false (e.g. tunnel connections through a local proxy),
+  /// a plain [HttpClient] is used instead.
+  Future<(WebSocketChannel, Map<String, String>)> _connectWebSocketWithHeaders(
+    Uri uri, {
+    Duration? timeout,
+    bool useMtls = true,
+  }) async {
+    _log.info(
+      '_connectWebSocketWithHeaders called for $uri '
+      '(mTLS: $useMtls, timeout: $timeout)',
+    );
+
+    final httpClient = useMtls ? _createMtlsClient() : HttpClient();
+    if (timeout != null) {
+      httpClient.connectionTimeout = timeout;
+    }
+
+    try {
+      // Convert ws/wss scheme to http/https for the upgrade request.
+      final httpUri = uri.replace(
+        scheme: uri.scheme == 'wss' ? 'https' : 'http',
+      );
+
+      final request = await httpClient.openUrl('GET', httpUri);
+
+      // Standard WebSocket upgrade headers (RFC 6455 §4.1).
+      final nonce = base64.encode(
+        List<int>.generate(16, (_) => Random.secure().nextInt(256)),
+      );
+      request.headers
+        ..set('Connection', 'Upgrade')
+        ..set('Upgrade', 'websocket')
+        ..set('Sec-WebSocket-Version', '13')
+        ..set('Sec-WebSocket-Key', nonce);
+
+      final response = await request.close();
+
+      if (response.statusCode != HttpStatus.switchingProtocols) {
+        // Drain the response body to free resources.
+        await response.drain<void>();
+        throw WebSocketException(
+          'WebSocket upgrade failed with status ${response.statusCode}',
+        );
+      }
+
+      // Collect response headers.
+      final responseHeaders = <String, String>{};
+      response.headers.forEach((name, values) {
+        responseHeaders[name] = values.join(', ');
+      });
+
+      // Detach the raw socket and wrap it as a WebSocket.
+      final socket = await response.detachSocket();
+      final ws = WebSocket.fromUpgradedSocket(socket, serverSide: false);
+      ws.pingInterval = const Duration(seconds: 10);
+      final channel = IOWebSocketChannel(ws);
+
+      _log.info(
+        'WebSocket connected with headers: '
+        '${responseHeaders.keys.join(', ')}',
+      );
+
+      return (channel as WebSocketChannel, responseHeaders);
+    } catch (e, st) {
+      httpClient.close();
+      _log.severe('Error in _connectWebSocketWithHeaders', e, st);
       rethrow;
     }
   }
