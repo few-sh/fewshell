@@ -37,10 +37,17 @@ class SyncService {
   CrdtSync? _projectSync;
   MultiplexedWebSocketChannel? _projectChannel;
   StreamSubscription? _projectSubscription;
-  String? _currentGlobalUrl;
 
   _SshTunnel? _globalSshTunnel;
   _SshTunnel? _projectSshTunnel;
+
+  /// A dedup key for the current global sync connection.
+  /// Prevents redundant reconnections when the connection details haven't changed.
+  String? _currentGlobalConnectionKey;
+
+  /// The connection info used for the current global sync session.
+  /// Stored so we can auto-map new projects to the same connection.
+  Map<String, dynamic>? _currentGlobalConnectionInfo;
 
   /// The server's CRDT node ID discovered from the `X-Fewshell-Server-Node-Id`
   /// header during the most recent global sync WebSocket upgrade.
@@ -138,13 +145,27 @@ class SyncService {
     String? serverUrl, {
     bool rethrowErrors = false,
   }) async {
-    if (serverUrl == _currentGlobalUrl && _globalSync != null) return;
+    final currentProjectId = ref.read(currentProjectIdProvider);
+    final resolved = await _resolveConnectionSettings(
+      projectId: currentProjectId,
+      serverUrlFallback: serverUrl,
+    );
+
+    // Build dedup key from resolved connection details.
+    final connectionKey = resolved.tunnelId != null
+        ? 'tunnel:${resolved.tunnelId}'
+        : 'url:${resolved.directUrl}';
+
+    if (connectionKey == _currentGlobalConnectionKey && _globalSync != null) {
+      return;
+    }
 
     _disconnectGlobal();
-    _currentGlobalUrl = serverUrl;
+    _currentGlobalConnectionKey = connectionKey;
+    _currentGlobalConnectionInfo = resolved.connectionInfo;
 
-    if (serverUrl == null || serverUrl.isEmpty) {
-      _log.info('No server URL for global sync.');
+    if (resolved.tunnelId == null && resolved.directUrl == null) {
+      _log.info('No connection details for global sync.');
       return;
     }
 
@@ -154,18 +175,15 @@ class SyncService {
 
       final crdt = db.crdt;
       _globalAdapter = CrdtFlowAdapter(crdt);
-      // Remove trailing slash if present
-      final cleanUrl = serverUrl.endsWith('/')
-          ? serverUrl.substring(0, serverUrl.length - 1)
-          : serverUrl;
 
-      _log.info('Connecting to global sync at $cleanUrl');
-      final tunnelId = parseTunnelId(cleanUrl);
+      _log.info(
+        'Connecting to global sync via ${resolved.tunnelId != null ? "tunnel:${resolved.tunnelId}" : resolved.directUrl}',
+      );
       final WebSocketChannel channel;
       Map<String, String> responseHeaders = {};
-      if (tunnelId != null) {
+      if (resolved.tunnelId != null) {
         final (wsChannel, tunnel, headers) = await _connectViaTunnel(
-          tunnelId: tunnelId,
+          tunnelId: resolved.tunnelId!,
           wsPath: '/sync/global',
           timeout: defaultConnectionTimeout,
         );
@@ -173,7 +191,7 @@ class SyncService {
         responseHeaders = headers;
         _globalSshTunnel = tunnel;
       } else {
-        final uri = Uri.parse('$cleanUrl/sync/global');
+        final uri = Uri.parse('${resolved.directUrl}/sync/global');
         final (wsChannel, headers) = await _connectWebSocketWithHeaders(
           uri,
           timeout: defaultConnectionTimeout,
@@ -206,8 +224,10 @@ class SyncService {
         _log.fine('Global sync received custom message: $msg');
       });
 
-      // Capture for closure — the server node ID at connection time.
+      // Capture for closure — the connection details at connection time.
       final serverNodeId = _currentServerNodeId;
+      final connInfo = _currentGlobalConnectionInfo;
+      final mappingStorage = ref.read(connectionMappingStorageProvider);
 
       _globalSync = CrdtSync.client(
         _globalAdapter!,
@@ -216,10 +236,7 @@ class SyncService {
         validateRecord: (table, record) {
           if (table == 'projects') {
             final remoteNodeId = record['server_node_id'] as String?;
-            // Primary check: valid server_node_id
-            if (remoteNodeId != null) {
-              return isValidNodeId(remoteNodeId);
-            }
+            if (remoteNodeId != null) return isValidNodeId(remoteNodeId);
             // Transitional fallback: accept records with a server_url
             // if server_node_id is not yet set (pre-migration server).
             final remoteUrl = record['server_url'] as String?;
@@ -227,6 +244,20 @@ class SyncService {
             return false;
           }
           return true;
+        },
+        mapIncomingChangeset: (table, record) {
+          // Auto-map: when we receive a project belonging to our server,
+          // ensure a connection mapping exists. Fire-and-forget, idempotent.
+          if (table == 'projects' && connInfo != null) {
+            final remoteNodeId = record['server_node_id'] as String?;
+            if (remoteNodeId == serverNodeId) {
+              final projectId = record['id'] as String?;
+              if (projectId != null) {
+                mappingStorage.save(projectId, connInfo);
+              }
+            }
+          }
+          return record;
         },
         changesetBuilder:
             ({
@@ -285,6 +316,43 @@ class SyncService {
     }
   }
 
+  /// Resolves connection details for a project: checks the connection mapping
+  /// first, then falls back to [serverUrlFallback] as a direct URL.
+  Future<_ResolvedConnection> _resolveConnectionSettings({
+    required String? projectId,
+    required String? serverUrlFallback,
+  }) async {
+    if (projectId != null) {
+      final mappingStorage = ref.read(connectionMappingStorageProvider);
+      final mapping = await mappingStorage.get(projectId);
+      if (mapping != null) {
+        if (mapping['type'] == 'tunnel') {
+          return _ResolvedConnection(
+            tunnelId: mapping['tunnelId'] as String?,
+            connectionInfo: mapping,
+          );
+        } else if (mapping['type'] == 'url') {
+          return _ResolvedConnection(
+            directUrl: mapping['url'] as String?,
+            connectionInfo: mapping,
+          );
+        }
+      }
+    }
+
+    if (serverUrlFallback != null) {
+      final cleanUrl = serverUrlFallback.endsWith('/')
+          ? serverUrlFallback.substring(0, serverUrlFallback.length - 1)
+          : serverUrlFallback;
+      return _ResolvedConnection(
+        directUrl: cleanUrl,
+        connectionInfo: {'type': 'url', 'url': cleanUrl},
+      );
+    }
+
+    return const _ResolvedConnection();
+  }
+
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
     // Project sync requires global sync to be connected first.
     if (_globalSync == null) {
@@ -311,19 +379,33 @@ class SyncService {
 
       if (token.isCancelled) return;
 
-      // Get project settings to check for server URL
-      final project = await ref
-          .read(databaseProvider)
-          .projectDao
-          .getProject(projectId);
+      final resolved = await _resolveConnectionSettings(
+        projectId: projectId,
+        serverUrlFallback: null,
+      );
 
-      if (token.isCancelled) return;
+      // For project sync, also try serverUrl from the project record.
+      String? tunnelId = resolved.tunnelId;
+      String? directUrl = resolved.directUrl;
+      if (tunnelId == null && directUrl == null) {
+        final project = await ref
+            .read(databaseProvider)
+            .projectDao
+            .getProject(projectId);
 
-      final serverUrl = project?.serverUrl;
+        if (token.isCancelled) return;
 
-      if (serverUrl == null) {
+        final serverUrl = project?.serverUrl;
+        if (serverUrl != null) {
+          directUrl = serverUrl.endsWith('/')
+              ? serverUrl.substring(0, serverUrl.length - 1)
+              : serverUrl;
+        }
+      }
+
+      if (tunnelId == null && directUrl == null) {
         _log.info(
-          'No server URL configured for project $projectId. Skipping sync.',
+          'No connection details for project $projectId. Skipping sync.',
         );
         return;
       }
@@ -331,11 +413,13 @@ class SyncService {
       final crdt = db.crdt;
       _projectAdapter = CrdtFlowAdapter(crdt);
 
-      _log.info('Connecting to project sync for $projectId');
+      _log.info(
+        'Connecting to project sync for $projectId via '
+        '${tunnelId != null ? "tunnel:$tunnelId" : directUrl}',
+      );
       _updateConnectionState(SyncConnectionState.connecting);
 
       final WebSocketChannel wsChannel;
-      final tunnelId = parseTunnelId(serverUrl);
       if (tunnelId != null) {
         if (token.isCancelled) return;
         final (ch, tunnel, _) = await _connectViaTunnel(
@@ -345,7 +429,7 @@ class SyncService {
         wsChannel = ch;
         _projectSshTunnel = tunnel;
       } else {
-        final uri = Uri.parse('$serverUrl/sync/project/$projectId');
+        final uri = Uri.parse('$directUrl/sync/project/$projectId');
         wsChannel = _connectWebSocket(uri);
       }
       final monitoredChannel = _ActivityMonitorWebSocketChannel(
@@ -457,7 +541,8 @@ class SyncService {
     _globalChannel = null;
     _globalSubscription?.cancel();
     _globalSubscription = null;
-    _currentGlobalUrl = null;
+    _currentGlobalConnectionKey = null;
+    _currentGlobalConnectionInfo = null;
     _currentServerNodeId = null;
     _globalSshTunnel?.close();
     _globalSshTunnel = null;
@@ -548,7 +633,7 @@ class SyncService {
   void _reconnectAll() {
     // Force reconnect global sync — project sync follows automatically
     // via _connectProjectIfReady() at the end of a successful _connectGlobal.
-    if (_currentGlobalUrl != null) {
+    if (_currentGlobalConnectionKey != null) {
       _disconnectGlobal();
       _closeProjectConnection();
       _reconnectAttempts = 0;
@@ -974,6 +1059,19 @@ class _CancellationToken {
   bool _isCancelled = false;
   bool get isCancelled => _isCancelled;
   void cancel() => _isCancelled = true;
+}
+
+/// Result of [SyncService._resolveConnectionSettings].
+class _ResolvedConnection {
+  final String? tunnelId;
+  final String? directUrl;
+  final Map<String, dynamic>? connectionInfo;
+
+  const _ResolvedConnection({
+    this.tunnelId,
+    this.directUrl,
+    this.connectionInfo,
+  });
 }
 
 /// Holds the resources for an SSH tunnel so they can be cleaned up together.

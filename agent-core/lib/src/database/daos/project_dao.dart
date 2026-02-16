@@ -87,6 +87,19 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
     );
   }
 
+  /// Get all projects assigned to a specific server node ID.
+  Future<List<ProjectEntity>> getProjectsByServerNodeId(
+    String serverNodeId,
+  ) {
+    return (select(projects)
+          ..where(
+            (p) =>
+                p.serverNodeId.equals(serverNodeId) &
+                const CustomExpression<bool>('is_deleted').equals(false),
+          ))
+        .get();
+  }
+
   /// Search projects by name
   Future<List<ProjectEntity>> searchProjectsByName(String query) {
     return (select(projects)

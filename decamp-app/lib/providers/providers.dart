@@ -34,6 +34,7 @@ import 'llm_settings_provider.dart'
     show GlobalLlmSettingsNotifier, ProjectLlmSettingsNotifier, LlmApiSettings;
 import 'ssh_settings_provider.dart'
     show ProjectSshSettingsNotifier, SshSettings;
+import '../services/connection_mapping_storage.dart';
 import '../services/storage/flutter_secure_storage_impl.dart';
 
 export 'notification_provider.dart';
@@ -224,6 +225,13 @@ final projectSecretProvider =
       final keychain = ref.watch(keychainServiceProvider);
       return keychain.getProjectSecret(params.projectId, params.secretName);
     });
+
+/// Singleton provider for [ConnectionMappingStorage].
+final connectionMappingStorageProvider = Provider<ConnectionMappingStorage>((
+  ref,
+) {
+  return ConnectionMappingStorage(FlutterSecureStorageImpl());
+});
 
 // =============================================================================
 // LEVEL 5: User & Theme Providers
