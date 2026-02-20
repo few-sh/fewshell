@@ -236,7 +236,11 @@ class SyncService {
         validateRecord: (table, record) {
           if (table == 'projects') {
             final remoteNodeId = record['server_node_id'] as String?;
-            if (remoteNodeId != null) return isValidNodeId(remoteNodeId);
+            if (remoteNodeId != null) {
+              // Reject if invalid format or belongs to a different server.
+              return isValidNodeId(remoteNodeId) &&
+                  remoteNodeId == serverNodeId;
+            }
             // Transitional fallback: accept records with a server_url
             // if server_node_id is not yet set (pre-migration server).
             final remoteUrl = record['server_url'] as String?;
