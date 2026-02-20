@@ -192,6 +192,14 @@ class SyncController {
           dbManager.globalDatabase.crdt,
           channel,
           verbose: true,
+          validateRecord: (table, record) {
+            if (table == 'projects') {
+              // Filter out any projects that don't belong to this server node.
+              final serverNodeId = record['server_node_id'] as String?;
+              return serverNodeId != null && serverNodeId == dbManager.nodeId;
+            }
+            return true;
+          },
         );
 
         unawaited(
