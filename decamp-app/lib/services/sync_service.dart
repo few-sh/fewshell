@@ -140,16 +140,44 @@ class SyncService {
     await _connectGlobal(db, url, rethrowErrors: true);
   }
 
+  /// Forces a global sync reconnect.
+  ///
+  /// When [connectionInfo] is provided (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`),
+  /// it is used directly for the connection — no saved mapping is required.
+  /// This is the bootstrap path used by the connect dialog before any
+  /// mappings exist. The `mapIncomingChangeset` callback will auto-save
+  /// mappings for discovered projects after sync.
+  Future<void> reconnectGlobal({Map<String, dynamic>? connectionInfo}) async {
+    _disconnectGlobal();
+    _closeProjectConnection();
+    final db = ref.read(globalDatabaseProvider);
+    final project = ref.read(currentProjectProvider);
+    await _connectGlobal(
+      db,
+      project?.serverUrl,
+      rethrowErrors: true,
+      bootstrapConnectionInfo: connectionInfo,
+    );
+  }
+
   Future<void> _connectGlobal(
     GlobalDatabase db,
     String? serverUrl, {
     bool rethrowErrors = false,
+    Map<String, dynamic>? bootstrapConnectionInfo,
   }) async {
-    final currentProjectId = ref.read(currentProjectIdProvider);
-    final resolved = await _resolveConnectionSettings(
-      projectId: currentProjectId,
-      serverUrlFallback: serverUrl,
-    );
+    final _ResolvedConnection resolved;
+    if (bootstrapConnectionInfo != null) {
+      // Bootstrap mode: use provided connection info directly (no saved
+      // mapping needed). Used by the connect dialog for first-time setup.
+      resolved = _resolvedConnectionFromInfo(bootstrapConnectionInfo);
+    } else {
+      final currentProjectId = ref.read(currentProjectIdProvider);
+      resolved = await _resolveConnectionSettings(
+        projectId: currentProjectId,
+        serverUrlFallback: serverUrl,
+      );
+    }
 
     // Build dedup key from resolved connection details.
     final connectionKey = resolved.tunnelId != null
@@ -330,17 +358,7 @@ class SyncService {
       final mappingStorage = ref.read(connectionMappingStorageProvider);
       final mapping = await mappingStorage.get(projectId);
       if (mapping != null) {
-        if (mapping['type'] == 'tunnel') {
-          return _ResolvedConnection(
-            tunnelId: mapping['tunnelId'] as String?,
-            connectionInfo: mapping,
-          );
-        } else if (mapping['type'] == 'url') {
-          return _ResolvedConnection(
-            directUrl: mapping['url'] as String?,
-            connectionInfo: mapping,
-          );
-        }
+        return _resolvedConnectionFromInfo(mapping);
       }
     }
 
@@ -355,6 +373,23 @@ class SyncService {
     }
 
     return const _ResolvedConnection();
+  }
+
+  /// Converts a connection info map (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`)
+  /// to a [_ResolvedConnection].
+  _ResolvedConnection _resolvedConnectionFromInfo(Map<String, dynamic> info) {
+    if (info['type'] == 'tunnel') {
+      return _ResolvedConnection(
+        tunnelId: info['tunnelId'] as String?,
+        connectionInfo: info,
+      );
+    } else if (info['type'] == 'url') {
+      return _ResolvedConnection(
+        directUrl: info['url'] as String?,
+        connectionInfo: info,
+      );
+    }
+    return _ResolvedConnection(connectionInfo: info);
   }
 
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {

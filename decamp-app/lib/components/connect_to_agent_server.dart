@@ -1,5 +1,4 @@
 import 'package:decamp/providers/providers.dart';
-import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -89,21 +88,17 @@ class _TunnelConnectProgressDialogState
 
   Future<void> _connect() async {
     try {
-      final tunnelUrl = 'tunnelId:${widget.tunnelId}';
-
-      // Ensure current project has this tunnel assigned
-      final currentProject = ref.read(currentProjectProvider);
-      if (currentProject != null) {
-        await ref
-            .read(projectControllerProvider)
-            .updateProject(id: currentProject.id, serverUrl: Value(tunnelUrl));
-      }
-
+      // TODO: Most of this function should probably live in the SyncService
       if (!mounted) return;
       setState(() => _statusMessage = 'Establishing SSH tunnel...');
 
+      // Bootstrap: pass connection info directly so _connectGlobal can use it
+      // without a saved mapping. The mapIncomingChangeset callback will
+      // auto-save mappings for all discovered projects after sync.
       final syncService = ref.read(syncServiceProvider);
-      await syncService.connectGlobal(tunnelUrl);
+      await syncService.reconnectGlobal(
+        connectionInfo: {'type': 'tunnel', 'tunnelId': widget.tunnelId},
+      );
 
       if (!mounted) return;
       setState(() => _statusMessage = 'Waiting for global sync...');
@@ -111,17 +106,22 @@ class _TunnelConnectProgressDialogState
 
       if (!mounted) return;
       setState(() => _statusMessage = 'Checking projects...');
-      final globalDb = ref.read(globalDatabaseProvider);
 
+      // The server node ID is now known from the WebSocket upgrade header.
+      final serverNodeId = syncService.currentServerNodeId;
+      if (serverNodeId == null) {
+        throw Exception('Server did not provide a node ID.');
+      }
+
+      final globalDb = ref.read(globalDatabaseProvider);
       List<ProjectEntity> matchingProjects = [];
       // Poll for projects for up to 10 seconds
       for (int i = 0; i < 20; i++) {
         if (!mounted) return;
 
-        final projects = await globalDb.projectDao.getAllProjects();
-        matchingProjects = projects.where((p) {
-          return p.serverUrl == tunnelUrl;
-        }).toList();
+        matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
+          serverNodeId,
+        );
 
         if (matchingProjects.isNotEmpty) break;
 
