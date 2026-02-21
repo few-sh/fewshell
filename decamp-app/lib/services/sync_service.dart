@@ -140,6 +140,59 @@ class SyncService {
     await _connectGlobal(db, url, rethrowErrors: true);
   }
 
+  /// Connects to a remote agent via SSH tunnel, syncs, discovers projects,
+  /// and switches to the first matching project.
+  ///
+  /// [onStatus] is called with progress messages for UI display.
+  /// Throws on failure.
+  Future<void> connectViaTunnel(
+    String tunnelId, {
+    void Function(String message)? onStatus,
+  }) async {
+    onStatus?.call('Establishing SSH tunnel...');
+    await reconnectGlobal(
+      connectionInfo: {'type': 'tunnel', 'tunnelId': tunnelId},
+    );
+
+    onStatus?.call('Waiting for global sync...');
+    await waitForGlobalSync();
+
+    onStatus?.call('Checking projects...');
+    final serverNodeId = _currentServerNodeId;
+    if (serverNodeId == null) {
+      throw Exception('Server did not provide a node ID.');
+    }
+
+    final globalDb = ref.read(globalDatabaseProvider);
+    List<ProjectEntity> matchingProjects = [];
+
+    // Poll for projects for up to 10 seconds.
+    for (int i = 0; i < 20; i++) {
+      matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
+        serverNodeId,
+      );
+      if (matchingProjects.isNotEmpty) break;
+      onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (matchingProjects.isEmpty) {
+      throw Exception(
+        'No projects found for this tunnel. '
+        'Make sure the remote agent has a project configured.',
+      );
+    }
+
+    // Switch to the first matching project.
+    final targetProject = matchingProjects.first;
+    onStatus?.call('Switching to project ${targetProject.name}...');
+    await ref.read(currentProjectIdProvider.notifier).select(targetProject.id);
+
+    onStatus?.call('Waiting for project sync...');
+    await Future.delayed(const Duration(milliseconds: 200));
+    await waitForProjectSync();
+  }
+
   /// Forces a global sync reconnect.
   ///
   /// When [connectionInfo] is provided (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`),
@@ -193,7 +246,7 @@ class SyncService {
     _currentGlobalConnectionInfo = resolved.connectionInfo;
 
     if (resolved.tunnelId == null && resolved.directUrl == null) {
-      _log.info('No connection details for global sync.');
+      _log.warning('No connection details for global sync.');
       return;
     }
 

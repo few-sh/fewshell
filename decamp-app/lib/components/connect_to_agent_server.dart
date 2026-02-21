@@ -1,9 +1,7 @@
-import 'package:decamp/providers/providers.dart';
+import 'package:decamp/services/sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
-import 'package:agent_core/agent_core.dart';
-import 'package:decamp/services/sync_service.dart';
 
 import 'ssh_settings_dialog.dart';
 
@@ -88,71 +86,13 @@ class _TunnelConnectProgressDialogState
 
   Future<void> _connect() async {
     try {
-      // TODO: Most of this function should probably live in the SyncService
-      if (!mounted) return;
-      setState(() => _statusMessage = 'Establishing SSH tunnel...');
-
-      // Bootstrap: pass connection info directly so _connectGlobal can use it
-      // without a saved mapping. The mapIncomingChangeset callback will
-      // auto-save mappings for all discovered projects after sync.
       final syncService = ref.read(syncServiceProvider);
-      await syncService.reconnectGlobal(
-        connectionInfo: {'type': 'tunnel', 'tunnelId': widget.tunnelId},
+      await syncService.connectViaTunnel(
+        widget.tunnelId,
+        onStatus: (message) {
+          if (mounted) setState(() => _statusMessage = message);
+        },
       );
-
-      if (!mounted) return;
-      setState(() => _statusMessage = 'Waiting for global sync...');
-      await syncService.waitForGlobalSync();
-
-      if (!mounted) return;
-      setState(() => _statusMessage = 'Checking projects...');
-
-      // The server node ID is now known from the WebSocket upgrade header.
-      final serverNodeId = syncService.currentServerNodeId;
-      if (serverNodeId == null) {
-        throw Exception('Server did not provide a node ID.');
-      }
-
-      final globalDb = ref.read(globalDatabaseProvider);
-      List<ProjectEntity> matchingProjects = [];
-      // Poll for projects for up to 10 seconds
-      for (int i = 0; i < 20; i++) {
-        if (!mounted) return;
-
-        matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
-          serverNodeId,
-        );
-
-        if (matchingProjects.isNotEmpty) break;
-
-        setState(
-          () =>
-              _statusMessage = 'Waiting for projects to sync... (${i + 1}/20)',
-        );
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      if (matchingProjects.isEmpty) {
-        throw Exception(
-          'No projects found for this tunnel. '
-          'Make sure the remote agent has a project configured.',
-        );
-      }
-
-      // Switch to the matching project
-      final targetProject = matchingProjects.first;
-      if (!mounted) return;
-      setState(
-        () => _statusMessage = 'Switching to project ${targetProject.name}...',
-      );
-      await ref
-          .read(currentProjectIdProvider.notifier)
-          .select(targetProject.id);
-
-      if (!mounted) return;
-      setState(() => _statusMessage = 'Waiting for project sync...');
-      await Future.delayed(const Duration(milliseconds: 200));
-      await syncService.waitForProjectSync();
 
       if (!mounted) return;
       Navigator.of(context).pop();
