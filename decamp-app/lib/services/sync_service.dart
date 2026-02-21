@@ -119,10 +119,14 @@ class SyncService {
       }
     });
 
-    // Watch for project settings changes (specifically serverUrl)
+    // Watch for project changes that affect sync connections.
     ref.listen<ProjectEntity?>(currentProjectProvider, (previous, next) {
-      // Handle Global Sync update (project sync follows automatically)
-      if (previous?.id != next?.id || previous?.serverUrl != next?.serverUrl) {
+      // Reconnect global sync when the project changes, or when identity/
+      // connection fields change (serverNodeId arriving via CRDT replication,
+      // or serverUrl as transitional fallback).
+      if (previous?.id != next?.id ||
+          previous?.serverNodeId != next?.serverNodeId ||
+          previous?.serverUrl != next?.serverUrl) {
         _connectGlobal(ref.read(globalDatabaseProvider), next?.serverUrl);
       }
     });
