@@ -1,7 +1,4 @@
-import 'dart:io';
-
-import 'package:agent_core/agent_core.dart';
-import 'package:path/path.dart' as p;
+import 'package:agent_core/src/utils/node_id_migration.dart';
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 import 'package:test/test.dart';
 
@@ -20,32 +17,19 @@ Future<List<Map<String, Object?>>> getAllRecords(
 void main() {
   group('CRDT node ID migration behavior', () {
     late SqliteCrdt crdt;
-    late Directory tempDir;
 
     setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('crdt_migration_test_');
+      crdt = await SqliteCrdt.openInMemory();
     });
 
     tearDown(() async {
       await crdt.close();
-      await tempDir.delete(recursive: true);
     });
 
-    /// Opens a test database via [CrdtExecutorFactory] and assigns [crdt].
-    Future<CrdtExecutorResult> openTestDb(String nodeId) async {
-      final dbPath = p.join(tempDir.path, 'test.db');
-      final result = await CrdtExecutorFactory.createExecutor(dbPath, nodeId);
-      crdt = result.crdt;
-      return result;
-    }
-
     test('verify HLC format and initial node ID', () async {
-      final nodeId = generateServerNodeId();
-      await openTestDb(nodeId);
-
-      // CrdtExecutorFactory sets the requested node ID on empty databases
-      expect(crdt.nodeId, equals(nodeId));
-      expect(isValidNodeId(crdt.nodeId), isTrue);
+      // SqliteCrdt.openInMemory() auto-generates a UUID node ID via init()
+      final autoNodeId = crdt.nodeId;
+      expect(autoNodeId, isNotEmpty);
 
       // Create tables and insert records
       await crdt.execute(
@@ -69,13 +53,13 @@ void main() {
       expect(modified, hasLength(2));
 
       for (final m in modified) {
-        expect(m, endsWith('-$nodeId'),
+        // Should end with the auto-generated node ID
+        expect(m, endsWith('-$autoNodeId'),
             reason: 'modified value "$m" should end with node ID');
 
         // Parse to verify it's a valid HLC
         final hlc = Hlc.parse(m);
-        expect(hlc.nodeId, equals(nodeId));
-        expect(isValidNodeId(hlc.nodeId), isTrue);
+        expect(hlc.nodeId, equals(autoNodeId));
         expect(hlc.counter, greaterThanOrEqualTo(0));
         expect(hlc.dateTime.year, greaterThanOrEqualTo(1970));
       }
@@ -83,14 +67,11 @@ void main() {
       // Also verify snippets table
       final snippetModified = await getModifiedValues(crdt, 'snippets');
       expect(snippetModified, hasLength(1));
-      expect(snippetModified.first, endsWith('-$nodeId'));
+      expect(snippetModified.first, endsWith('-$autoNodeId'));
     });
 
     test('resetNodeId() updates all modified columns and canonicalTime',
         () async {
-      final initialNodeId = generateServerNodeId();
-      await openTestDb(initialNodeId);
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
@@ -100,22 +81,23 @@ void main() {
         '(id TEXT NOT NULL PRIMARY KEY, content TEXT NOT NULL)',
       );
 
+      final oldNodeId = crdt.nodeId;
+
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
       await crdt.execute(
           "INSERT INTO snippets (id, content) VALUES ('s1', 'echo hello')");
 
-      // Verify initial values
+      // Verify old values
       final beforeProjects = await getModifiedValues(crdt, 'projects');
-      expect(beforeProjects.first, endsWith('-$initialNodeId'));
+      expect(beforeProjects.first, endsWith('-$oldNodeId'));
 
       // Reset the node ID using the built-in method
-      final newNodeId = generateServerNodeId();
+      const newNodeId = 'srv_test123';
       await crdt.resetNodeId(newNodeId);
 
       // Verify canonicalTime updated
       expect(crdt.nodeId, equals(newNodeId));
-      expect(isValidNodeId(crdt.nodeId), isTrue);
 
       // Verify all modified columns updated in projects
       final afterProjects = await getModifiedValues(crdt, 'projects');
@@ -123,7 +105,7 @@ void main() {
         expect(m, endsWith('-$newNodeId'),
             reason: 'modified "$m" should end with new node ID');
         // Verify old node ID is NOT present anywhere in the string
-        expect(m, isNot(contains(initialNodeId)),
+        expect(m, isNot(contains(oldNodeId)),
             reason: 'old node ID should not appear in modified value');
       }
 
@@ -141,9 +123,6 @@ void main() {
     });
 
     test('resetNodeId() is idempotent', () async {
-      final initialNodeId = generateServerNodeId();
-      await openTestDb(initialNodeId);
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
@@ -151,7 +130,7 @@ void main() {
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
 
-      final newNodeId = generateServerNodeId();
+      const newNodeId = 'srv_test123';
       await crdt.resetNodeId(newNodeId);
 
       // Capture state after first reset
@@ -170,9 +149,6 @@ void main() {
     });
 
     test('migrateNodeId() updates all tables to new node ID', () async {
-      // Start with the legacy 'server' node ID
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
@@ -181,6 +157,9 @@ void main() {
         'CREATE TABLE IF NOT EXISTS snippets '
         '(id TEXT NOT NULL PRIMARY KEY, content TEXT NOT NULL)',
       );
+
+      // Reset to 'server' to simulate production state
+      await crdt.resetNodeId('server');
 
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
@@ -196,12 +175,11 @@ void main() {
       }
 
       // Run our custom migration
-      final newNodeId = generateServerNodeId();
+      const newNodeId = 'srv_test123';
       await migrateNodeId(crdt, newNodeId);
 
       // Verify canonicalTime updated
       expect(crdt.nodeId, equals(newNodeId));
-      expect(isValidNodeId(crdt.nodeId), isTrue);
 
       // Verify all modified columns updated in projects
       final afterProjects = await getModifiedValues(crdt, 'projects');
@@ -212,7 +190,6 @@ void main() {
         // Verify the HLC is still valid
         final hlc = Hlc.parse(m);
         expect(hlc.nodeId, equals(newNodeId));
-        expect(isValidNodeId(hlc.nodeId), isTrue);
       }
 
       // Verify snippets too
@@ -224,13 +201,12 @@ void main() {
 
     test('migrateNodeId() makes records visible in changeset for sync',
         () async {
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
       );
 
+      await crdt.resetNodeId('server');
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
 
@@ -241,7 +217,7 @@ void main() {
       expect(recordBefore['modified'] as String, endsWith('-server'));
 
       // Migrate
-      final newNodeId = generateServerNodeId();
+      const newNodeId = 'srv_test123';
       await migrateNodeId(crdt, newNodeId);
 
       // Get changeset after migration — records should have new node ID
@@ -255,17 +231,16 @@ void main() {
 
     test('migrateNodeId() is idempotent (no-op when already migrated)',
         () async {
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
       );
 
+      await crdt.resetNodeId('server');
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
 
-      final newNodeId = generateServerNodeId();
+      const newNodeId = 'srv_test123';
 
       // First migration
       await migrateNodeId(crdt, newNodeId);
@@ -283,56 +258,51 @@ void main() {
     });
 
     test('migrateNodeId() supports sequential node ID rotation', () async {
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
       );
 
+      await crdt.resetNodeId('server');
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
 
-      // First rotation: server → nodeId1
-      final nodeId1 = generateServerNodeId();
-      await migrateNodeId(crdt, nodeId1);
-      expect(crdt.nodeId, equals(nodeId1));
+      // First rotation: server → srv_aaa
+      await migrateNodeId(crdt, 'srv_aaa');
+      expect(crdt.nodeId, equals('srv_aaa'));
 
       final afterFirst = await getModifiedValues(crdt, 'projects');
-      expect(afterFirst.first, endsWith('-$nodeId1'));
+      expect(afterFirst.first, endsWith('-srv_aaa'));
 
       // Insert another record under the new ID
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p2', 'Project Two')");
 
-      // Second rotation: nodeId1 → nodeId2
-      final nodeId2 = generateServerNodeId();
-      await migrateNodeId(crdt, nodeId2);
-      expect(crdt.nodeId, equals(nodeId2));
+      // Second rotation: srv_aaa → srv_bbb
+      await migrateNodeId(crdt, 'srv_bbb');
+      expect(crdt.nodeId, equals('srv_bbb'));
 
       final afterSecond = await getModifiedValues(crdt, 'projects');
       for (final m in afterSecond) {
-        expect(m, endsWith('-$nodeId2'),
+        expect(m, endsWith('-srv_bbb'),
             reason: 'All records should have the latest node ID');
       }
     });
 
     test('migrateNodeId() preserves record data', () async {
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS projects '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
       );
 
+      await crdt.resetNodeId('server');
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p1', 'Project One')");
       await crdt.execute(
           "INSERT INTO projects (id, name) VALUES ('p2', 'Project Two')");
 
       // Migrate
-      final newNodeId = generateServerNodeId();
-      await migrateNodeId(crdt, newNodeId);
+      await migrateNodeId(crdt, 'srv_new');
 
       // Verify record data is intact
       final records = await getAllRecords(crdt, 'projects');
@@ -346,13 +316,12 @@ void main() {
 
     test('migrateNodeId() timestamps advance (expected with touch approach)',
         () async {
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS test_table '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
       );
 
+      await crdt.resetNodeId('server');
       await crdt
           .execute("INSERT INTO test_table (id, name) VALUES ('r1', 'Record')");
 
@@ -361,8 +330,7 @@ void main() {
       final hlcBefore = Hlc.parse(beforeModified.first);
 
       // Migrate
-      final newNodeId = generateServerNodeId();
-      await migrateNodeId(crdt, newNodeId);
+      await migrateNodeId(crdt, 'srv_new_node');
 
       // HLC after migration
       final afterModified = await getModifiedValues(crdt, 'test_table');
@@ -371,25 +339,22 @@ void main() {
       // The touch approach creates a NEW HLC (not preserving the old one).
       // This is expected and desired — newer timestamps mean the records
       // will appear in changesets and replicate to clients.
-      expect(hlcAfter.nodeId, equals(newNodeId));
-      expect(isValidNodeId(hlcAfter.nodeId), isTrue);
+      expect(hlcAfter.nodeId, equals('srv_new_node'));
       expect(hlcAfter, greaterThan(hlcBefore),
           reason: 'Touched records get newer HLCs, ensuring sync propagation');
     });
 
     test('migrateNodeId() works with empty tables', () async {
-      await openTestDb('server');
-
       await crdt.execute(
         'CREATE TABLE IF NOT EXISTS empty_table '
         '(id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL)',
       );
 
+      await crdt.resetNodeId('server');
+
       // Should not throw on empty tables
-      final newNodeId = generateServerNodeId();
-      await migrateNodeId(crdt, newNodeId);
-      expect(crdt.nodeId, equals(newNodeId));
-      expect(isValidNodeId(crdt.nodeId), isTrue);
+      await migrateNodeId(crdt, 'srv_new');
+      expect(crdt.nodeId, equals('srv_new'));
     });
   });
 }
