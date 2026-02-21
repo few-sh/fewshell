@@ -38,7 +38,7 @@ class ChatController extends StateNotifier<ChatState> {
   bool _isAborted = false;
 
   /// Whether execution happens locally (no remote server configured).
-  bool get isLocalExecution => _project?.serverUrl == null;
+  bool get isLocalExecution => _project?.serverNodeId == null;
 
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
@@ -424,7 +424,7 @@ class ChatController extends StateNotifier<ChatState> {
 
       final AgentLoopResult result;
 
-      if (_project?.serverUrl != null) {
+      if (_project?.serverNodeId != null) {
         if (syncChannel == null) {
           if (mounted) {
             state = state.copyWith(

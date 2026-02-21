@@ -108,28 +108,20 @@ class SshTunnelConfigsNotifier extends AsyncNotifier<Map<String, SshSettings>> {
   }
 }
 
-/// Derives the tunnel config assigned to a project by parsing its `serverUrl`.
+/// Derives the tunnel config assigned to a project from its connection mapping.
 ///
-/// Returns null if the project has no tunnel assigned or it doesn't start
-/// with the `tunnelId:` prefix.
+/// Returns null if the project has no connection mapping or the mapping
+/// is not of type `tunnel`.
 final projectTunnelProvider = FutureProvider.family<SshSettings?, String>((
   ref,
   projectId,
 ) async {
-  final project = ref.watch(currentProjectProvider);
-  if (project == null) return null;
+  final connInfo = await ref.watch(projectConnectionInfoProvider(projectId).future);
+  if (connInfo == null || connInfo['type'] != 'tunnel') return null;
 
-  final serverUrl = project.serverUrl;
-  if (serverUrl == null || !serverUrl.startsWith('tunnelId:')) return null;
+  final tunnelId = connInfo['tunnelId'] as String?;
+  if (tunnelId == null) return null;
 
-  final tunnelId = serverUrl.substring('tunnelId:'.length);
   final storage = ref.watch(sshTunnelStorageProvider);
   return storage.get(tunnelId);
 });
-
-/// Helper to parse a tunnelId from a serverUrl string.
-/// Returns null if the URL doesn't use the tunnelId: prefix.
-String? parseTunnelId(String? serverUrl) {
-  if (serverUrl == null || !serverUrl.startsWith('tunnelId:')) return null;
-  return serverUrl.substring('tunnelId:'.length);
-}
