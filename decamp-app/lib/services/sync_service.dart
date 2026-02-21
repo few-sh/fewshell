@@ -167,6 +167,15 @@ class SyncService {
       throw Exception('Server did not provide a node ID.');
     }
 
+    // If the current project already belongs to this server, skip discovery.
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
+      onStatus?.call('Syncing project data...');
+      await Future.delayed(const Duration(milliseconds: 200));
+      await waitForProjectSync();
+      return;
+    }
+
     final globalDb = ref.read(globalDatabaseProvider);
     List<ProjectEntity> matchingProjects = [];
 

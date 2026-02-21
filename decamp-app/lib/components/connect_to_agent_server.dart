@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
+import 'connection_progress_dialog.dart';
 import 'ssh_settings_dialog.dart';
 
 /// Dialog that opens the SSH tunnel configuration, then connects
@@ -24,12 +25,14 @@ class ConnectToAgentServerDialog extends ConsumerStatefulWidget {
       context,
       ref,
       onSaved: (tunnelId) {
-        // After tunnel is saved, show the connection progress dialog
         if (!context.mounted) return;
-        showShadDialog(
-          context: context,
-          builder: (context) =>
-              _TunnelConnectProgressDialog(tunnelId: tunnelId),
+        ConnectionProgressDialog.show(
+          context,
+          initialStatus: 'Connecting via SSH tunnel...',
+          connect: (onStatus) async {
+            final syncService = ref.read(syncServiceProvider);
+            await syncService.connectViaTunnel(tunnelId, onStatus: onStatus);
+          },
         );
       },
     );
@@ -57,124 +60,5 @@ class _ConnectToAgentServerDialogState
   Widget build(BuildContext context) {
     // Placeholder — immediately replaced by showWithTunnel
     return const SizedBox.shrink();
-  }
-}
-
-/// Progress dialog shown after tunnel config is saved.
-/// Connects via SSH tunnel, waits for sync, finds/switches to a project.
-class _TunnelConnectProgressDialog extends ConsumerStatefulWidget {
-  final String tunnelId;
-
-  const _TunnelConnectProgressDialog({required this.tunnelId});
-
-  @override
-  ConsumerState<_TunnelConnectProgressDialog> createState() =>
-      _TunnelConnectProgressDialogState();
-}
-
-class _TunnelConnectProgressDialogState
-    extends ConsumerState<_TunnelConnectProgressDialog> {
-  bool _isLoading = true;
-  String? _errorMessage;
-  String _statusMessage = 'Connecting via SSH tunnel...';
-
-  @override
-  void initState() {
-    super.initState();
-    _connect();
-  }
-
-  Future<void> _connect() async {
-    try {
-      final syncService = ref.read(syncServiceProvider);
-      await syncService.connectViaTunnel(
-        widget.tunnelId,
-        onStatus: (message) {
-          if (mounted) setState(() => _statusMessage = message);
-        },
-      );
-
-      if (!mounted) return;
-      Navigator.of(context).pop();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Connection Failed: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = ShadTheme.of(context);
-
-    return ShadDialog(
-      title: const Text('Connecting to Agent'),
-      actions: [
-        if (_errorMessage != null) ...[
-          ShadButton.outline(
-            child: const Text('Close'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          ShadButton(
-            child: const Text('Retry'),
-            onPressed: () {
-              setState(() {
-                _isLoading = true;
-                _errorMessage = null;
-                _statusMessage = 'Connecting via SSH tunnel...';
-              });
-              _connect();
-            },
-          ),
-        ] else
-          ShadButton.outline(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-      ],
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_isLoading)
-            Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(
-                      theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    _statusMessage,
-                    style: TextStyle(
-                      color: theme.colorScheme.mutedForeground,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _errorMessage!,
-              style: TextStyle(
-                color: theme.colorScheme.destructive,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }

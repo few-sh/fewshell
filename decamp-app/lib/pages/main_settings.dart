@@ -7,10 +7,12 @@ import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
 import '../services/project_importer.dart';
+import '../services/sync_service.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
 
 import '../components/ai_model_dialog.dart';
+import '../components/connection_progress_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
@@ -1221,7 +1223,15 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           'tunnelId': tunnelId,
         });
         ref.invalidate(projectConnectionInfoProvider(project.id));
-        if (mounted) _showSnack('SSH tunnel configured');
+        if (!mounted) return;
+        ConnectionProgressDialog.show(
+          context,
+          initialStatus: 'Establishing SSH tunnel...',
+          connect: (onStatus) async {
+            final syncService = ref.read(syncServiceProvider);
+            await syncService.connectViaTunnel(tunnelId, onStatus: onStatus);
+          },
+        );
       },
     );
   }
