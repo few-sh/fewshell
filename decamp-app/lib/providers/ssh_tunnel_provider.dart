@@ -116,7 +116,9 @@ final projectTunnelProvider = FutureProvider.family<SshSettings?, String>((
   ref,
   projectId,
 ) async {
-  final connInfo = await ref.watch(projectConnectionInfoProvider(projectId).future);
+  final connInfo = await ref.watch(
+    projectConnectionInfoProvider(projectId).future,
+  );
   if (connInfo == null || connInfo['type'] != 'tunnel') return null;
 
   final tunnelId = connInfo['tunnelId'] as String?;

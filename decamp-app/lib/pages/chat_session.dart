@@ -344,7 +344,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
             child: AppBar(
               title: ProjectTitleBar(
                 title: currentProjectName,
-                leading: (currentProject?.serverUrl != null)
+                leading: (currentProject?.serverNodeId != null)
                     ? const SyncIndicator()
                     : null,
               ),
