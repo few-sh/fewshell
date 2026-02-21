@@ -233,6 +233,16 @@ final connectionMappingStorageProvider = Provider<ConnectionMappingStorage>((
   return ConnectionMappingStorage(FlutterSecureStorageImpl());
 });
 
+/// Looks up the connection mapping for a given project ID.
+///
+/// Returns the connection info map (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`)
+/// or `null` if no mapping exists.
+final projectConnectionInfoProvider =
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, projectId) {
+      final storage = ref.watch(connectionMappingStorageProvider);
+      return storage.get(projectId);
+    });
+
 // =============================================================================
 // LEVEL 5: User & Theme Providers
 // =============================================================================

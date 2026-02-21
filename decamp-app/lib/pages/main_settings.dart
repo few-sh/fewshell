@@ -3,7 +3,6 @@ import 'package:decamp/providers/providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' hide Column;
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
@@ -1027,7 +1026,17 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildServerUrlSection(ProjectEntity project) {
     final theme = ShadTheme.of(context);
-    final tunnelId = parseTunnelId(project.serverUrl);
+    final connectionInfoAsync = ref.watch(
+      projectConnectionInfoProvider(project.id),
+    );
+    final tunnelId = connectionInfoAsync.whenOrNull(
+      data: (info) {
+        if (info != null && info['type'] == 'tunnel') {
+          return info['tunnelId'] as String?;
+        }
+        return null;
+      },
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1050,6 +1059,13 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
               ),
           ],
         ),
+        if (project.serverNodeId != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Server: ${project.serverNodeId}',
+            style: theme.textTheme.muted.copyWith(fontSize: 11),
+          ),
+        ],
         const SizedBox(height: 16),
         _buildTunnelCard(project, tunnelId),
       ],
@@ -1199,21 +1215,21 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       ref,
       existingTunnelId: existingTunnelId,
       onSaved: (tunnelId) async {
-        await ref
-            .read(projectControllerProvider)
-            .updateProject(
-              id: project.id,
-              serverUrl: Value('tunnelId:$tunnelId'),
-            );
+        final mappingStorage = ref.read(connectionMappingStorageProvider);
+        await mappingStorage.save(project.id, {
+          'type': 'tunnel',
+          'tunnelId': tunnelId,
+        });
+        ref.invalidate(projectConnectionInfoProvider(project.id));
         if (mounted) _showSnack('SSH tunnel configured');
       },
     );
   }
 
   Future<void> _removeTunnel(ProjectEntity project) async {
-    await ref
-        .read(projectControllerProvider)
-        .updateProject(id: project.id, serverUrl: const Value(null));
+    final mappingStorage = ref.read(connectionMappingStorageProvider);
+    await mappingStorage.delete(project.id);
+    ref.invalidate(projectConnectionInfoProvider(project.id));
     if (mounted) _showSnack('SSH tunnel removed');
   }
 
