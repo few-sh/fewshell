@@ -8,6 +8,31 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
 import 'ssh_prompt_dialog.dart';
 
+/// A [TextEditingController] that visually obscures text with bullet characters
+/// when [obscure] is true, while preserving the actual text (including newlines).
+/// Unlike Flutter's built-in [obscureText], this doesn't force maxLines=1.
+class _ObscurableTextController extends TextEditingController {
+  bool obscure;
+
+  _ObscurableTextController({super.text}) : obscure = true;
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    if (obscure && text.isNotEmpty) {
+      return TextSpan(text: '\u2022' * text.length, style: style);
+    }
+    return super.buildTextSpan(
+      context: context,
+      style: style,
+      withComposing: withComposing,
+    );
+  }
+}
+
 /// Reusable dialog for configuring SSH/Remote Shell settings
 class SshSettingsDialog {
   /// Show dialog to configure SSH settings
@@ -157,7 +182,7 @@ class _SshSettingsDialogFormState
   late final TextEditingController _portController;
   late final TextEditingController _usernameController;
   late final TextEditingController _passwordController;
-  late final TextEditingController _privateKeyController;
+  late final _ObscurableTextController _privateKeyController;
   late final TextEditingController _passphraseController;
   late final TextEditingController _sudoPasswordController;
 
@@ -166,7 +191,6 @@ class _SshSettingsDialogFormState
   final Map<String, String?> _errors = {};
 
   bool _obscurePassword = true;
-  bool _obscurePrivateKey = true;
   bool _obscurePassphrase = true;
   bool _obscureSudoPassword = true;
   bool _isTestingConnection = false;
@@ -197,7 +221,7 @@ class _SshSettingsDialogFormState
     );
     _usernameController = TextEditingController(text: widget.initialUsername);
     _passwordController = TextEditingController(text: widget.initialPassword);
-    _privateKeyController = TextEditingController(
+    _privateKeyController = _ObscurableTextController(
       text: widget.initialPrivateKey,
     );
     _passphraseController = TextEditingController(
@@ -246,6 +270,7 @@ class _SshSettingsDialogFormState
       if (mounted) {
         _privateKeyController.text = privateKey ?? '';
         _passphraseController.text = passphrase ?? '';
+        _privateKeyController.obscure = true;
       }
     } finally {
       if (mounted) setState(() => _isLoadingTunnel = false);
@@ -262,6 +287,7 @@ class _SshSettingsDialogFormState
     _passphraseController.clear();
     _sudoPasswordController.clear();
     _authMethod = SshAuthMethod.privateKey;
+    _privateKeyController.obscure = true;
     _testResultMessage = null;
     _testResultSuccess = null;
     _errors.clear();
@@ -576,8 +602,7 @@ class _SshSettingsDialogFormState
                           : 'Paste your private key',
                       description:
                           'Paste the contents of your private key file',
-                      obscureText: _obscurePrivateKey,
-                      minLines: _obscurePrivateKey ? 1 : 3,
+                      minLines: _privateKeyController.obscure ? 1 : 3,
                       maxLines: null,
                       trailing: ShadButton.ghost(
                         width: 24,
@@ -585,11 +610,12 @@ class _SshSettingsDialogFormState
                         padding: EdgeInsets.zero,
                         onPressed: () {
                           setState(() {
-                            _obscurePrivateKey = !_obscurePrivateKey;
+                            _privateKeyController.obscure =
+                                !_privateKeyController.obscure;
                           });
                         },
                         child: Icon(
-                          _obscurePrivateKey
+                          _privateKeyController.obscure
                               ? LucideIcons.eye
                               : LucideIcons.eyeOff,
                           size: 16,
