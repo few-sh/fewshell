@@ -463,6 +463,7 @@ class _SshSettingsDialogFormState
     final theme = ShadTheme.of(context);
 
     return ShadDialog(
+      constraints: const BoxConstraints(maxWidth: 700),
       title: Text(widget.title),
       actions: [
         ShadButton.outline(
@@ -473,9 +474,7 @@ class _SshSettingsDialogFormState
       ],
       child: GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
+        child: SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             controller: _scrollController,
             child: Column(
@@ -787,7 +786,6 @@ class _SshSettingsDialogFormState
             ),
           ),
         ),
-      ),
     );
   }
 
