@@ -113,8 +113,10 @@ class SyncService {
     ref.listen(projectDatabaseProvider, (previous, next) {
       if (next != null) {
         // Project DB changed — connect project if global is already up.
+        _log.info('Project DB changed, connecting project if ready.');
         _connectProjectIfReady();
       } else {
+        _log.info('Project DB cleared, resetting project sync.');
         _resetProjectSync();
       }
     });
@@ -127,7 +129,16 @@ class SyncService {
       if (previous?.id != next?.id ||
           previous?.serverNodeId != next?.serverNodeId ||
           previous?.serverUrl != next?.serverUrl) {
+        _log.info(
+          'Project changed (id: ${previous?.id} -> ${next?.id}, '
+          'serverNodeId: ${previous?.serverNodeId} -> ${next?.serverNodeId}), '
+          'reconnecting global sync.',
+        );
         _connectGlobal(ref.read(globalDatabaseProvider), next?.serverUrl);
+      } else {
+        _log.fine(
+          'Project provider changed but no relevant fields differ, skipping reconnect.',
+        );
       }
     });
 
@@ -170,10 +181,18 @@ class SyncService {
     // If the current project already belongs to this server, skip discovery.
     final currentProject = ref.read(currentProjectProvider);
     if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
+      _log.info(
+        'Current project ${currentProject.id} already belongs to server $serverNodeId, skipping discovery.',
+      );
       onStatus?.call('Syncing project data...');
       await Future.delayed(const Duration(milliseconds: 200));
       await waitForProjectSync();
       return;
+    } else {
+      _log.info(
+        'No current project matches server $serverNodeId '
+        '(current: ${currentProject?.serverNodeId}), proceeding with discovery.',
+      );
     }
 
     final globalDb = ref.read(globalDatabaseProvider);
@@ -184,7 +203,13 @@ class SyncService {
       matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
         serverNodeId,
       );
-      if (matchingProjects.isNotEmpty) break;
+      if (matchingProjects.isNotEmpty) {
+        _log.info(
+          'Found ${matchingProjects.length} project(s) for server $serverNodeId after ${i + 1} poll(s).',
+        );
+        break;
+      }
+      _log.fine('No projects for $serverNodeId yet, poll ${i + 1}/20...');
       onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
       await Future.delayed(const Duration(milliseconds: 500));
     }
@@ -236,6 +261,7 @@ class SyncService {
     if (bootstrapConnectionInfo != null) {
       // Bootstrap mode: use provided connection info directly (no saved
       // mapping needed). Used by the connect dialog for first-time setup.
+      _log.info('Using bootstrap connection info: $bootstrapConnectionInfo');
       resolved = _resolvedConnectionFromInfo(bootstrapConnectionInfo);
     } else {
       final currentProjectId = ref.read(currentProjectIdProvider);
@@ -251,6 +277,9 @@ class SyncService {
         : 'url:${resolved.directUrl}';
 
     if (connectionKey == _currentGlobalConnectionKey && _globalSync != null) {
+      _log.fine(
+        'Global sync already connected with key $connectionKey, skipping.',
+      );
       return;
     }
 
@@ -332,13 +361,28 @@ class SyncService {
             final remoteNodeId = record['server_node_id'] as String?;
             if (remoteNodeId != null) {
               // Reject if invalid format or belongs to a different server.
-              return isValidNodeId(remoteNodeId) &&
-                  remoteNodeId == serverNodeId;
+              final valid =
+                  isValidNodeId(remoteNodeId) && remoteNodeId == serverNodeId;
+              if (!valid) {
+                _log.fine(
+                  'validateRecord: rejecting project record — '
+                  'server_node_id $remoteNodeId != expected $serverNodeId.',
+                );
+              }
+              return valid;
             }
             // Transitional fallback: accept records with a server_url
             // if server_node_id is not yet set (pre-migration server).
             final remoteUrl = record['server_url'] as String?;
-            if (remoteUrl != null && remoteUrl.isNotEmpty) return true;
+            if (remoteUrl != null && remoteUrl.isNotEmpty) {
+              _log.fine(
+                'validateRecord: accepting project record via transitional server_url fallback ($remoteUrl).',
+              );
+              return true;
+            }
+            _log.fine(
+              'validateRecord: rejecting project record — no server_node_id or server_url.',
+            );
             return false;
           }
           return true;
@@ -351,8 +395,19 @@ class SyncService {
             if (remoteNodeId == serverNodeId) {
               final projectId = record['id'] as String?;
               if (projectId != null) {
+                _log.fine(
+                  'mapIncomingChangeset: auto-saving connection mapping for project $projectId.',
+                );
                 mappingStorage.save(projectId, connInfo);
+              } else {
+                _log.fine(
+                  'mapIncomingChangeset: project record for $serverNodeId has no id, skipping auto-map.',
+                );
               }
+            } else {
+              _log.fine(
+                'mapIncomingChangeset: project record server_node_id ($remoteNodeId) does not match server ($serverNodeId), skipping auto-map.',
+              );
             }
           }
           return record;
@@ -387,8 +442,14 @@ class SyncService {
                 }).toList();
 
                 if (filteredRecords.isEmpty) {
+                  _log.fine(
+                    'changesetBuilder: filtered out all ${records.length} project record(s) — none match server $serverNodeId.',
+                  );
                   changeset.remove('projects');
                 } else {
+                  _log.fine(
+                    'changesetBuilder: keeping ${filteredRecords.length}/${records.length} project record(s) for server $serverNodeId.',
+                  );
                   changeset['projects'] = filteredRecords;
                 }
               }
@@ -424,20 +485,35 @@ class SyncService {
       final mappingStorage = ref.read(connectionMappingStorageProvider);
       final mapping = await mappingStorage.get(projectId);
       if (mapping != null) {
+        _log.fine(
+          '_resolveConnectionSettings: found saved mapping for project $projectId: $mapping',
+        );
         return _resolvedConnectionFromInfo(mapping);
+      } else {
+        _log.fine(
+          '_resolveConnectionSettings: no saved mapping for project $projectId.',
+        );
       }
+    } else {
+      _log.fine(
+        '_resolveConnectionSettings: no projectId, skipping mapping lookup.',
+      );
     }
 
     if (serverUrlFallback != null) {
       final cleanUrl = serverUrlFallback.endsWith('/')
           ? serverUrlFallback.substring(0, serverUrlFallback.length - 1)
           : serverUrlFallback;
+      _log.fine(
+        '_resolveConnectionSettings: using serverUrl fallback: $cleanUrl',
+      );
       return _ResolvedConnection(
         directUrl: cleanUrl,
         connectionInfo: {'type': 'url', 'url': cleanUrl},
       );
     }
 
+    _log.fine('_resolveConnectionSettings: no connection details resolved.');
     return const _ResolvedConnection();
   }
 
@@ -445,16 +521,21 @@ class SyncService {
   /// to a [_ResolvedConnection].
   _ResolvedConnection _resolvedConnectionFromInfo(Map<String, dynamic> info) {
     if (info['type'] == 'tunnel') {
+      _log.fine('_resolvedConnectionFromInfo: tunnel id=${info['tunnelId']}');
       return _ResolvedConnection(
         tunnelId: info['tunnelId'] as String?,
         connectionInfo: info,
       );
     } else if (info['type'] == 'url') {
+      _log.fine('_resolvedConnectionFromInfo: direct url=${info['url']}');
       return _ResolvedConnection(
         directUrl: info['url'] as String?,
         connectionInfo: info,
       );
     }
+    _log.warning(
+      '_resolvedConnectionFromInfo: unrecognised connection type "${info['type']}", returning empty resolution.',
+    );
     return _ResolvedConnection(connectionInfo: info);
   }
 
@@ -498,13 +579,23 @@ class SyncService {
             .projectDao
             .getProject(projectId);
 
-        if (token.isCancelled) return;
+        if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled after project lookup for $projectId.',
+          );
+          return;
+        }
 
         final serverUrl = project?.serverUrl;
         if (serverUrl != null) {
           directUrl = serverUrl.endsWith('/')
               ? serverUrl.substring(0, serverUrl.length - 1)
               : serverUrl;
+          _log.fine('_connectProject: using serverUrl fallback: $directUrl');
+        } else {
+          _log.fine(
+            '_connectProject: no serverUrl on project record for $projectId.',
+          );
         }
       }
 
@@ -526,7 +617,15 @@ class SyncService {
 
       final WebSocketChannel wsChannel;
       if (tunnelId != null) {
-        if (token.isCancelled) return;
+        if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled before tunnel connect for $projectId.',
+          );
+          return;
+        }
+        _log.info(
+          '_connectProject: connecting via SSH tunnel $tunnelId for $projectId.',
+        );
         final (ch, tunnel, _) = await _connectViaTunnel(
           tunnelId: tunnelId,
           wsPath: '/sync/project/$projectId',
@@ -534,6 +633,9 @@ class SyncService {
         wsChannel = ch;
         _projectSshTunnel = tunnel;
       } else {
+        _log.info(
+          '_connectProject: connecting via direct WebSocket to $directUrl for $projectId.',
+        );
         final uri = Uri.parse('$directUrl/sync/project/$projectId');
         wsChannel = _connectWebSocket(uri);
       }
@@ -560,6 +662,9 @@ class SyncService {
       try {
         await monitoredChannel.ready;
         if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled after channel ready for $projectId, closing.',
+          );
           monitoredChannel.sink.close();
           return;
         }
@@ -570,11 +675,26 @@ class SyncService {
           if (!token.isCancelled &&
               _currentProjectId == projectId &&
               _currentConnectionState == SyncConnectionState.connected) {
+            _log.fine(
+              '_connectProject: connection stable for 5s, resetting reconnect attempts.',
+            );
             _reconnectAttempts = 0;
+          } else {
+            _log.fine(
+              '_connectProject: stability check skipped '
+              '(cancelled=${token.isCancelled}, '
+              'currentProject=$_currentProjectId, '
+              'state=$_currentConnectionState).',
+            );
           }
         });
       } catch (e) {
-        if (token.isCancelled) return;
+        if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled after connection failure for $projectId.',
+          );
+          return;
+        }
         _updateConnectionState(SyncConnectionState.disconnected);
         _log.warning('Connection failed: $e');
         _scheduleReconnect();
@@ -654,8 +774,14 @@ class SyncService {
   }
 
   void _scheduleReconnect() {
-    if (_reconnectTimer?.isActive ?? false) return;
-    if (_currentProjectId == null || _currentProjectDb == null) return;
+    if (_reconnectTimer?.isActive ?? false) {
+      _log.fine('_scheduleReconnect: timer already active, skipping.');
+      return;
+    }
+    if (_currentProjectId == null || _currentProjectDb == null) {
+      _log.fine('_scheduleReconnect: no active project, skipping.');
+      return;
+    }
 
     final delaySeconds = _getFibonacciDelay(_reconnectAttempts);
     _log.info(
@@ -730,6 +856,11 @@ class SyncService {
         _lastLifecycleState == AppLifecycleState.paused) {
       _log.info('App resumed from paused state, reconnecting');
       _reconnectAll();
+    } else {
+      _log.fine(
+        'App lifecycle transition $state does not require reconnect '
+        '(previous: $_lastLifecycleState).',
+      );
     }
 
     _lastLifecycleState = state;
@@ -739,11 +870,18 @@ class SyncService {
     // Force reconnect global sync — project sync follows automatically
     // via _connectProjectIfReady() at the end of a successful _connectGlobal.
     if (_currentGlobalConnectionKey != null) {
+      _log.info(
+        '_reconnectAll: forcing reconnect for key $_currentGlobalConnectionKey.',
+      );
       _disconnectGlobal();
       _closeProjectConnection();
       _reconnectAttempts = 0;
       final project = ref.read(currentProjectProvider);
       _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
+    } else {
+      _log.fine(
+        '_reconnectAll: no active global connection key, nothing to reconnect.',
+      );
     }
   }
 
@@ -837,7 +975,12 @@ class SyncService {
 
     List<SSHKeyPair>? identities;
     if (sshPrivateKey != null && sshPrivateKey.isNotEmpty) {
+      _log.fine('SSH tunnel: loading private key for authentication.');
       identities = SSHKeyPair.fromPem(sshPrivateKey, sshPassphrase);
+    } else {
+      _log.fine(
+        'SSH tunnel: no private key provided, relying on agent/default auth.',
+      );
     }
 
     final client = SSHClient(
@@ -869,6 +1012,9 @@ class SyncService {
     final localPort = serverSocket.port;
 
     serverSocket.listen((tcpSocket) async {
+      _log.fine(
+        'SSH tunnel: new TCP proxy connection from ${tcpSocket.remoteAddress.address}:${tcpSocket.remotePort}.',
+      );
       try {
         final forward = await client.forwardLocalUnix(socketPath);
         forward.stream.cast<List<int>>().pipe(tcpSocket);
