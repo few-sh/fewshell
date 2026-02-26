@@ -48,6 +48,7 @@ export 'src/services/secrets_crdt.dart';
 export 'src/services/secrets_service.dart';
 export 'src/services/conversation_summarizer.dart';
 export 'src/services/tool_summarizer.dart';
+export 'src/services/ssh_keygen_service.dart';
 
 // Database
 export 'src/database/database.dart';
