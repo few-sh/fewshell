@@ -14,9 +14,9 @@ class ConnectToAgentServerDialog {
     SshSettingsDialog.showTunnel(
       context,
       ref,
-      onSaved: (tunnelId) {
+      onSaved: (tunnelId) async {
         if (!context.mounted) return;
-        ConnectionProgressDialog.show(
+        final success = await ConnectionProgressDialog.show(
           context,
           initialStatus: 'Connecting via SSH tunnel...',
           connect: (onStatus) async {
@@ -24,6 +24,10 @@ class ConnectToAgentServerDialog {
             await syncService.connectViaTunnel(tunnelId, onStatus: onStatus);
           },
         );
+
+        if (success == true && context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
       },
     );
   }

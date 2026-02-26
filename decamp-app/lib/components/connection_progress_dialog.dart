@@ -16,13 +16,13 @@ class ConnectionProgressDialog extends StatefulWidget {
   });
 
   /// Shows the dialog and runs the connect function.
-  static void show(
+  static Future<bool?> show(
     BuildContext context, {
     String title = 'Connecting to Agent',
     String initialStatus = 'Connecting...',
     required Future<void> Function(void Function(String) onStatus) connect,
   }) {
-    showShadDialog(
+    return showShadDialog<bool>(
       context: context,
       builder: (context) => ConnectionProgressDialog(
         title: title,
@@ -55,7 +55,7 @@ class _ConnectionProgressDialogState extends State<ConnectionProgressDialog> {
         if (mounted) setState(() => _statusMessage = message);
       });
       if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       setState(() {

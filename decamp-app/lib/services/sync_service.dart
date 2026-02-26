@@ -264,7 +264,14 @@ class SyncService {
       _log.info('Using bootstrap connection info: $bootstrapConnectionInfo');
       resolved = _resolvedConnectionFromInfo(bootstrapConnectionInfo);
     } else {
-      final currentProjectId = ref.read(currentProjectIdProvider);
+      final project = ref.read(currentProjectProvider);
+      if (project == null) {
+        _log.info(
+          'No current project, skipping connection resolution and global sync.',
+        );
+        return;
+      }
+      final currentProjectId = project.id;
       resolved = await _resolveConnectionSettings(
         projectId: currentProjectId,
         serverUrlFallback: serverUrl,

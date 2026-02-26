@@ -11,7 +11,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:uuid/uuid.dart';
 import 'package:crdt/crdt.dart';
 import 'package:logging/logging.dart';
 
@@ -59,15 +58,11 @@ final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
 // LEVEL 2: Database Providers
 // =============================================================================
 
-/// Provider for unique node ID
+/// Provider for the client's unique node ID.
+/// Always overridden at startup (see main.dart) with the value read from
+/// <appDocDir>/node_id so that deleting the local data resets the identity.
 final nodeIdProvider = Provider<String>((ref) {
-  final prefs = ref.watch(sharedPreferencesProvider);
-  var nodeId = prefs.getString('node_id');
-  if (nodeId == null) {
-    nodeId = const Uuid().v4();
-    prefs.setString('node_id', nodeId);
-  }
-  return nodeId;
+  throw UnimplementedError('nodeIdProvider must be overridden in main()');
 });
 
 /// Provider for the GlobalDatabase instance (decamp.db).
