@@ -1,13 +1,12 @@
 use axum::{
     body::Body,
-    extract::{Query, State},
+    extract::State,
     http::{header, Request, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
 };
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,14 +17,13 @@ use tracing::{error, info, warn};
 mod apns;
 use apns::ApnsClient;
 
-/// How long a pubkey entry lives before automatic removal (in seconds).
-const PUBKEY_TTL_SECS: u64 = 30;
+mod pubkey;
+use pubkey::PubkeyStore;
 
 #[derive(Clone)]
 struct AppState {
     apns_client: Arc<ApnsClient>,
     api_key: Arc<String>,
-    pubkey_store: Arc<RwLock<HashMap<String, String>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -54,31 +52,6 @@ struct FailedNotification {
     error: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct PostPubkeyRequest {
-    public_key: String,
-}
-
-#[derive(Debug, Serialize)]
-struct PostPubkeyResponse {
-    id: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct GetPubkeyParams {
-    id: String,
-}
-
-#[derive(Debug, Serialize)]
-struct GetPubkeyResponse {
-    public_key: String,
-}
-
-#[derive(Debug, Serialize)]
-struct ErrorResponse {
-    error: String,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Load .env file if present
@@ -100,17 +73,23 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("API_KEY").expect("API_KEY environment variable must be set"),
     );
 
-    let pubkey_store = Arc::new(RwLock::new(HashMap::new()));
+    let pubkey_store: PubkeyStore = Arc::new(RwLock::new(HashMap::new()));
 
-    let state = AppState { apns_client, api_key, pubkey_store };
+    let state = AppState { apns_client, api_key };
+
+    // Pubkey routes get their own state (just the store) so they
+    // don't depend on the full AppState.
+    let pubkey_router = Router::new()
+        .route(
+            "/pubkey",
+            axum::routing::get(pubkey::get_pubkey).post(pubkey::post_pubkey),
+        )
+        .with_state(pubkey_store);
 
     // Build the router
     let app = Router::new()
         .route("/health", axum::routing::get(health_check))
-        .route(
-            "/pubkey",
-            axum::routing::get(get_pubkey).post(post_pubkey),
-        )
+        .merge(pubkey_router)
         .route("/send", post(send_notification))
         .route_layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
         .layer(TraceLayer::new_for_http())
@@ -202,87 +181,6 @@ async fn send_notification(
     }
 
     Ok(Json(NotificationResponse { success, failed }))
-}
-
-// ----- Pubkey handlers -----
-
-/// Validates that the input is a well-formed SSH ed25519 public key.
-///
-/// Expected format: `ssh-ed25519 <68-char-base64> [optional comment]`
-fn is_valid_ed25519_pubkey(key: &str) -> bool {
-    let parts: Vec<&str> = key.split_whitespace().collect();
-    if parts.len() < 2 || parts.len() > 3 {
-        return false;
-    }
-    if parts[0] != "ssh-ed25519" {
-        return false;
-    }
-    let b64 = parts[1];
-    if b64.len() != 68 {
-        return false;
-    }
-    b64.chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/')
-}
-
-async fn post_pubkey(
-    State(state): State<AppState>,
-    Json(payload): Json<PostPubkeyRequest>,
-) -> Response {
-    if !is_valid_ed25519_pubkey(&payload.public_key) {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(ErrorResponse {
-                error: "Invalid ed25519 public key format".to_string(),
-            }),
-        )
-            .into_response();
-    }
-
-    let id = {
-        let mut store = state.pubkey_store.write().await;
-        let mut rng = rand::thread_rng();
-        let id = loop {
-            let candidate = rng.gen_range(100_000u32..1_000_000);
-            let candidate_str = candidate.to_string();
-            if !store.contains_key(&candidate_str) {
-                break candidate_str;
-            }
-        };
-        store.insert(id.clone(), payload.public_key);
-        id
-    };
-
-    // Schedule automatic removal after TTL
-    let store = state.pubkey_store.clone();
-    let id_clone = id.clone();
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(PUBKEY_TTL_SECS)).await;
-        store.write().await.remove(&id_clone);
-    });
-
-    info!("Stored pubkey with id {} (expires in {}s)", id, PUBKEY_TTL_SECS);
-    Json(PostPubkeyResponse { id }).into_response()
-}
-
-async fn get_pubkey(
-    State(state): State<AppState>,
-    Query(params): Query<GetPubkeyParams>,
-) -> Response {
-    let store = state.pubkey_store.read().await;
-    match store.get(&params.id) {
-        Some(key) => Json(GetPubkeyResponse {
-            public_key: key.clone(),
-        })
-        .into_response(),
-        None => (
-            StatusCode::NOT_FOUND,
-            Json(ErrorResponse {
-                error: "Key not found or expired".to_string(),
-            }),
-        )
-            .into_response(),
-    }
 }
 
 // ----- Error handling -----
