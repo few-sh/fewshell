@@ -104,10 +104,10 @@ pub async fn get_pubkey(
     State(store): State<PubkeyStore>,
     Query(params): Query<GetPubkeyParams>,
 ) -> Response {
-    let map = store.read().await;
-    match map.get(&params.id) {
+    let mut map = store.write().await;
+    match map.remove(&params.id) {
         Some(key) => Json(GetPubkeyResponse {
-            public_key: key.clone(),
+            public_key: key,
         })
         .into_response(),
         None => (
