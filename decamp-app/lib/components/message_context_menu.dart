@@ -123,10 +123,9 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
     final theme = ShadTheme.of(context);
 
     final isUser = widget.message.userId == 'user';
-    final isToolCall = widget.message.messageKind == MessageKind.toolUse;
     final List<SnippetDraft> shellCommands = [];
 
-    if (isToolCall && widget.message.toolCallsJson != null) {
+    if (widget.message.toolCallsJson != null) {
       for (final toolCall in widget.message.toolCallsJson!) {
         if (toolCall.function.name == 'execute_shell_command') {
           try {
