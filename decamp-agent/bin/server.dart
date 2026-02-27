@@ -73,6 +73,17 @@ void _setupSigPipeHandler() {
 }
 
 void main(List<String> args) async {
+  if (args.contains('-v') || args.contains('--version')) {
+    if (args.contains('--porcelain')) {
+      // Print just the version number for machine parsing.
+      print(packageVersion);
+      exit(0);
+    }
+    print('Fewshell Server v$packageVersion');
+    print('Copyright (c) 2026 Fewshot Corp. All Rights Reserved.');
+    exit(0);
+  }
+
   // Configure logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
