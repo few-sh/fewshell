@@ -523,19 +523,35 @@ class SyncService {
     }
 
     final globalDb = ref.read(globalDatabaseProvider);
-    final projects = await globalDb.projectDao.getProjectsByServerNodeId(
-      serverNodeId,
-    );
 
+    // Poll briefly — the CRDT changeset with project data may not have been
+    // merged yet when onIdle fires. Give sync up to 5 seconds.
+    // HACK - Ideally onIdly really should work for us.
+    List<ProjectEntity> projects = [];
+    for (int i = 0; i < 10; i++) {
+      projects = await globalDb.projectDao.getProjectsByServerNodeId(
+        serverNodeId,
+      );
+      if (projects.isNotEmpty) {
+        _log.fine(
+          '_checkProjectsForServer: found ${projects.length} project(s) '
+          'for server $serverNodeId after ${i + 1} poll(s).',
+        );
+        return;
+      }
+      // Re-check that we're still relevant before sleeping.
+      if (_currentServerNodeId != serverNodeId) return;
+      _log.fine('_checkProjectsForServer: no projects yet, poll ${i + 1}/10…');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // Still empty after polling — emit event so the UI can prompt.
     if (projects.isEmpty) {
       _log.info(
-        '_checkProjectsForServer: no projects for server $serverNodeId, emitting event.',
+        '_checkProjectsForServer: no projects for server $serverNodeId '
+        'after polling, emitting event.',
       );
       _appEventBus.emit(NoProjectsForServer(serverNodeId));
-    } else {
-      _log.fine(
-        '_checkProjectsForServer: found ${projects.length} project(s) for server $serverNodeId.',
-      );
     }
   }
 
