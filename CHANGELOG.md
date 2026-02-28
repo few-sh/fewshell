@@ -1,3 +1,13 @@
+# Server 0.1.23
+
+- SSH tunnel support
+- Domain socket support with secure default permissions
+- SSH key generation service
+- Server node ID for project-server mapping
+- Add --version command line flag
+- Terminal buffer for handling control characters
+- System flag for secrets
+
 # App 1.0.1+26
 
 - Add conversation summarization features
