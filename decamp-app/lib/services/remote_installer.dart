@@ -97,11 +97,16 @@ class RemoteInstaller {
       'curl -LsSf $_installerScriptUrl | bash',
     );
 
+    final outputBuffer = StringBuffer();
     final stdoutSub = session.stdout.listen((data) {
-      _emit(utf8.decode(data));
+      final text = utf8.decode(data);
+      outputBuffer.write(text);
+      _emit(text);
     });
     final stderrSub = session.stderr.listen((data) {
-      _emit(utf8.decode(data));
+      final text = utf8.decode(data);
+      outputBuffer.write(text);
+      _emit(text);
     });
 
     await session.done;
@@ -110,6 +115,9 @@ class RemoteInstaller {
 
     final code = session.exitCode;
     if (code != null && code != 0) {
+      _log.warning(
+        'Installation failed (exit code $code). Output:\n$outputBuffer',
+      );
       throw Exception('Installation failed with exit code $code');
     }
 
