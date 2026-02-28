@@ -57,6 +57,11 @@ class _AppEventListenerState extends ConsumerState<AppEventListener> {
     _dialogShowing = true;
 
     try {
+      // Defer to next frame to avoid showing the dialog while the navigator
+      // is locked (e.g. ConnectionProgressDialog is mid-pop).
+      await Future.delayed(Duration.zero);
+      if (!mounted) return;
+
       final name = await showCreateProjectDialog(
         context,
         serverNodeId: serverNodeId,

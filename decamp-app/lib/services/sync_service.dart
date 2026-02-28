@@ -87,6 +87,10 @@ class SyncService {
   AppLifecycleListener? _lifecycleListener;
   AppLifecycleState? _lastLifecycleState;
 
+  /// When true, [_checkProjectsForServer] is suppressed because
+  /// [connectViaTunnel] is running its own polling + emission logic.
+  bool _tunnelConnectInProgress = false;
+
   late final AppEventBus _appEventBus;
 
   SyncService(this.ref) {
@@ -172,73 +176,81 @@ class SyncService {
     String tunnelId, {
     void Function(String message)? onStatus,
   }) async {
-    onStatus?.call('Establishing SSH tunnel...');
-    await reconnectGlobal(
-      connectionInfo: {'type': 'tunnel', 'tunnelId': tunnelId},
-    );
-
-    onStatus?.call('Waiting for global sync...');
-    await waitForGlobalSync();
-
-    onStatus?.call('Checking projects...');
-    final serverNodeId = _currentServerNodeId;
-    if (serverNodeId == null) {
-      throw Exception('Server did not provide a node ID.');
-    }
-
-    // If the current project already belongs to this server, skip discovery.
-    final currentProject = ref.read(currentProjectProvider);
-    if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
-      _log.info(
-        'Current project ${currentProject.id} already belongs to server $serverNodeId, skipping discovery.',
+    _tunnelConnectInProgress = true;
+    try {
+      onStatus?.call('Establishing SSH tunnel...');
+      await reconnectGlobal(
+        connectionInfo: {'type': 'tunnel', 'tunnelId': tunnelId},
       );
-      onStatus?.call('Syncing project data...');
+
+      onStatus?.call('Waiting for global sync...');
+      await waitForGlobalSync();
+
+      onStatus?.call('Checking projects...');
+      final serverNodeId = _currentServerNodeId;
+      if (serverNodeId == null) {
+        throw Exception('Server did not provide a node ID.');
+      }
+
+      // If the current project already belongs to this server, skip discovery.
+      final currentProject = ref.read(currentProjectProvider);
+      if (currentProject != null &&
+          currentProject.serverNodeId == serverNodeId) {
+        _log.info(
+          'Current project ${currentProject.id} already belongs to server $serverNodeId, skipping discovery.',
+        );
+        onStatus?.call('Syncing project data...');
+        await Future.delayed(const Duration(milliseconds: 200));
+        await waitForProjectSync();
+        return;
+      } else {
+        _log.info(
+          'No current project matches server $serverNodeId '
+          '(current: ${currentProject?.serverNodeId}), proceeding with discovery.',
+        );
+      }
+
+      final globalDb = ref.read(globalDatabaseProvider);
+      List<ProjectEntity> matchingProjects = [];
+
+      // Poll for projects for up to 10 seconds.
+      for (int i = 0; i < 20; i++) {
+        matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
+          serverNodeId,
+        );
+        if (matchingProjects.isNotEmpty) {
+          _log.info(
+            'Found ${matchingProjects.length} project(s) for server $serverNodeId after ${i + 1} poll(s).',
+          );
+          break;
+        }
+        _log.fine('No projects for $serverNodeId yet, poll ${i + 1}/20...');
+        onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (matchingProjects.isEmpty) {
+        _log.info(
+          'No projects found for server $serverNodeId after polling, '
+          'emitting NoProjectsForServer event.',
+        );
+        _appEventBus.emit(NoProjectsForServer(serverNodeId));
+        return;
+      }
+
+      // Switch to the first matching project.
+      final targetProject = matchingProjects.first;
+      onStatus?.call('Switching to project ${targetProject.name}...');
+      await ref
+          .read(currentProjectIdProvider.notifier)
+          .select(targetProject.id);
+
+      onStatus?.call('Waiting for project sync...');
       await Future.delayed(const Duration(milliseconds: 200));
       await waitForProjectSync();
-      return;
-    } else {
-      _log.info(
-        'No current project matches server $serverNodeId '
-        '(current: ${currentProject?.serverNodeId}), proceeding with discovery.',
-      );
+    } finally {
+      _tunnelConnectInProgress = false;
     }
-
-    final globalDb = ref.read(globalDatabaseProvider);
-    List<ProjectEntity> matchingProjects = [];
-
-    // Poll for projects for up to 10 seconds.
-    for (int i = 0; i < 20; i++) {
-      matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
-        serverNodeId,
-      );
-      if (matchingProjects.isNotEmpty) {
-        _log.info(
-          'Found ${matchingProjects.length} project(s) for server $serverNodeId after ${i + 1} poll(s).',
-        );
-        break;
-      }
-      _log.fine('No projects for $serverNodeId yet, poll ${i + 1}/20...');
-      onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-
-    if (matchingProjects.isEmpty) {
-      _log.info(
-        'No projects found for server $serverNodeId after polling, '
-        'emitting NoProjectsForServer event.',
-      );
-      _appEventBus.emit(NoProjectsForServer(serverNodeId));
-      return;
-    }
-
-    // Switch to the first matching project.
-    final targetProject = matchingProjects.first;
-    onStatus?.call('Switching to project ${targetProject.name}...');
-    await ref.read(currentProjectIdProvider.notifier).select(targetProject.id);
-
-    onStatus?.call('Waiting for project sync...');
-    await Future.delayed(const Duration(milliseconds: 200));
-    await waitForProjectSync();
   }
 
   /// Forces a global sync reconnect.
@@ -513,11 +525,19 @@ class SyncService {
     final serverNodeId = _currentServerNodeId;
     if (serverNodeId == null) return;
 
-    // Skip if the user already has a project for this server selected.
-    final currentProject = ref.read(currentProjectProvider);
-    if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
+    // Skip when connectViaTunnel is running — it has its own polling logic.
+    if (_tunnelConnectInProgress) {
       _log.fine(
-        '_checkProjectsForServer: current project already matches $serverNodeId, skipping.',
+        '_checkProjectsForServer: skipping, tunnel connect in progress.',
+      );
+      return;
+    }
+
+    // Skip if the user already has a project selected.
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject != null) {
+      _log.fine(
+        '_checkProjectsForServer: project ${currentProject.id} already selected, skipping.',
       );
       return;
     }
