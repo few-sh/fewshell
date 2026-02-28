@@ -15,6 +15,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:decamp/certs.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/providers/ssh_tunnel_provider.dart';
+import 'package:decamp/services/remote_installer.dart';
 
 final _log = Logger('SyncService');
 
@@ -998,6 +999,14 @@ class SyncService {
 
     await client.authenticated;
     _log.info('SSH tunnel: authenticated');
+
+    // Ensure the fewshell server is installed and running.
+    final installer = RemoteInstaller(client);
+    try {
+      await installer.ensureServerRunning();
+    } finally {
+      installer.dispose();
+    }
 
     // Discover remote home directory
     final homeSession = await client.execute('echo \$HOME');
