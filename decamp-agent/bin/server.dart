@@ -7,12 +7,12 @@ import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:fewshell_agent/router.dart';
 import 'package:fewshell_agent/services/database_manager.dart';
 import 'package:fewshell_agent/services/notification_dispatcher.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
-import 'package:agent_core/agent_core.dart';
 import 'package:fewshell_agent/version.dart';
 
 final _log = Logger('FewshellAgent');
@@ -27,6 +27,17 @@ typedef SignalDart = Pointer<NativeFunction<SignalFunc>> Function(
   int,
   Pointer<NativeFunction<SignalFunc>>,
 );
+
+// FFI signature for umask(mode_t) -> mode_t
+typedef UmaskC = Uint32 Function(Uint32);
+typedef UmaskDart = int Function(int);
+
+/// Sets the process umask, returns the previous value.
+int _umask(int mask) {
+  final dylib = DynamicLibrary.process();
+  final umask = dylib.lookupFunction<UmaskC, UmaskDart>('umask');
+  return umask(mask);
+}
 
 // Keep listener alive
 NativeCallable<SignalFunc>? _sigPipeListener;
@@ -62,6 +73,17 @@ void _setupSigPipeHandler() {
 }
 
 void main(List<String> args) async {
+  if (args.contains('-v') || args.contains('--version')) {
+    if (args.contains('--porcelain')) {
+      // Print just the version number for machine parsing.
+      print(packageVersion);
+      exit(0);
+    }
+    print('Fewshell Server v$packageVersion');
+    print('Copyright (c) 2026 Fewshot Corp. All Rights Reserved.');
+    exit(0);
+  }
+
   // Configure logging
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -104,19 +126,25 @@ void main(List<String> args) async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
 
-    // Get port from environment or use default
-    final portEnv = env['PORT'];
-    final port = portEnv != null ? int.tryParse(portEnv) ?? 3123 : 3123;
+    // Parse LISTEN env var to determine socket type
+    // Format: unix:///path/to/socket or tcp://host:port
+    // Default: unix://$HOME/.fewshell/agent.sock
+    final listenUri = env['LISTEN'] ?? '';
+    final bool useTcp = listenUri.startsWith('tcp://');
 
     // Initialize DatabaseManager
-    final dbManager = DatabaseManager('${Directory.current.path}/data');
+    final dataPath = '${Directory.current.path}/data';
+    final dbManager = DatabaseManager(dataPath);
     await dbManager.init();
+
+    // Migrate CRDT settings TOML files from legacy 'server' node ID.
+    // Must run before CrdtSettingsService loads them.
+    await migrateAllSettingsToml(dataPath, 'server', dbManager.nodeId);
 
     // Initialize CrdtSettingsService
     final settingsService = CrdtSettingsService(
-      () async => Directory('${Directory.current.path}/data'),
-      (projectId) async =>
-          Directory('${Directory.current.path}/data/projects/$projectId'),
+      () async => Directory(dataPath),
+      (projectId) async => Directory('$dataPath/projects/$projectId'),
     );
     await settingsService.init();
 
@@ -138,19 +166,7 @@ void main(List<String> args) async {
       notificationDispatcher,
     );
 
-    // Configure SecurityContext for mTLS
-    _log.info('Initializing mTLS with embedded certificates');
-
-    final securityContext = SecurityContext(withTrustedRoots: false)
-      ..useCertificateChainBytes(utf8.encode(serverCert))
-      ..usePrivateKeyBytes(utf8.encode(serverKey))
-      ..setClientAuthoritiesBytes(utf8.encode(caCert))
-      ..setTrustedCertificatesBytes(utf8.encode(caCert));
-    _log.info(
-      'SecurityContext initialized successfully ${securityContext.toString()}',
-    );
-
-    // Add middleware for logging and CORS
+    // Build the request handler pipeline
     final handler = const shelf.Pipeline()
         .addMiddleware(
           shelf.logRequests(
@@ -167,21 +183,75 @@ void main(List<String> args) async {
         .addHandler(createRouter(syncController).call);
 
     // Start the server
-    _log.info('Starting server on port $port...');
+    await _startServer(listenUri, useTcp, handler);
+  } catch (e, st) {
+    _log.severe('CRITICAL FAILURE', e, st);
+    exit(1);
+  }
+}
 
-    // Use anyIPv6 with v6Only=false to listen on both IPv4 and IPv6
-    // This ensures localhost works regardless of whether it resolves to 127.0.0.1 or ::1
-    final server = await HttpServer.bindSecure(
+/// Binds and starts the HTTP server in either Unix socket or TCP (mTLS) mode.
+Future<void> _startServer(
+  String listenUri,
+  bool useTcp,
+  shelf.Handler handler,
+) async {
+  final HttpServer server;
+
+  if (useTcp) {
+    final tcpUri = Uri.parse(listenUri);
+    final host = tcpUri.host.isEmpty ? '0.0.0.0' : tcpUri.host;
+    final port = tcpUri.port > 0 ? tcpUri.port : 3123;
+
+    _log.info('Initializing mTLS with embedded certificates');
+    final securityContext = SecurityContext(withTrustedRoots: false)
+      ..useCertificateChainBytes(utf8.encode(serverCert))
+      ..usePrivateKeyBytes(utf8.encode(serverKey))
+      ..setClientAuthoritiesBytes(utf8.encode(caCert))
+      ..setTrustedCertificatesBytes(utf8.encode(caCert));
+
+    _log.info('Starting server on tcp://$host:$port (mTLS)...');
+    server = await HttpServer.bindSecure(
       InternetAddress.anyIPv6,
       port,
       securityContext,
       requestClientCertificate: true,
       v6Only: false,
     );
+  } else {
+    final socketPath = listenUri.startsWith('unix://')
+        ? listenUri.substring('unix://'.length)
+        : '${Platform.environment['HOME']}/.fewshell/agent.sock';
 
-    server.listen(
-      (HttpRequest request) async {
-        try {
+    // Ensure parent directory exists with owner-only permissions
+    final socketDir = Directory(File(socketPath).parent.path);
+    if (!socketDir.existsSync()) {
+      socketDir.createSync(recursive: true);
+    }
+    Process.runSync('chmod', ['700', socketDir.path]);
+
+    // Remove stale socket file
+    final socketFile = File(socketPath);
+    if (socketFile.existsSync()) {
+      socketFile.deleteSync();
+    }
+
+    _log.info('Starting server on unix://$socketPath...');
+    final address = InternetAddress(socketPath, type: InternetAddressType.unix);
+
+    // Set restrictive umask so the socket is created with 0600 (owner-only)
+    final previousUmask = _umask(0x3F); // 0077
+    try {
+      server = await HttpServer.bind(address, 0);
+    } finally {
+      _umask(previousUmask);
+    }
+  }
+
+  server.listen(
+    (HttpRequest request) async {
+      try {
+        if (useTcp) {
           final clientIp = request.connectionInfo?.remoteAddress.address;
           final cert = request.certificate;
 
@@ -203,36 +273,37 @@ void main(List<String> args) async {
             }
             return;
           }
-
-          await shelf_io.handleRequest(request, handler);
-        } catch (e, st) {
-          _log.severe('Error processing request: $e', e, st);
-          try {
-            request.response
-              ..statusCode = HttpStatus.internalServerError
-              ..write('Internal Server Error');
-            await request.response.close();
-          } catch (e, st) {
-            _log.severe('Error sending error response: $e', e, st);
-          }
         }
-      },
-      onError: (e, st) {
-        _log.severe('HttpServer stream error', e, st);
-      },
-      onDone: () =>
-          _log.severe('HttpServer stream closed. This is unexpected!'),
-    );
 
-    final scheme = 'https';
+        await shelf_io.handleRequest(request, handler);
+      } catch (e, st) {
+        _log.severe('Error processing request: $e', e, st);
+        try {
+          request.response
+            ..statusCode = HttpStatus.internalServerError
+            ..write('Internal Server Error');
+          await request.response.close();
+        } catch (e, st) {
+          _log.severe('Error sending error response: $e', e, st);
+        }
+      }
+    },
+    onError: (e, st) {
+      _log.severe('HttpServer stream error', e, st);
+    },
+    onDone: () => _log.severe('HttpServer stream closed. This is unexpected!'),
+  );
+
+  if (useTcp) {
     _log.info(
-      '🚀 Decamp Agent server running on $scheme://${server.address.host}:${server.port}',
+      '🚀 Decamp Agent server running on https://${server.address.host}:${server.port}',
     );
-    _log.info('Server serving...');
-  } catch (e, st) {
-    _log.severe('CRITICAL FAILURE', e, st);
-    exit(1);
+  } else {
+    _log.info(
+      '🚀 Decamp Agent server running on unix://${server.address.address}',
+    );
   }
+  _log.info('Server serving...');
 }
 
 /// CORS middleware for cross-origin requests

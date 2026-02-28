@@ -4,6 +4,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/components/selectable_list_view.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../providers/ssh_tunnel_provider.dart';
 import '../utils/ui_utils.dart';
 import 'project_setup_page.dart';
 
@@ -126,24 +127,9 @@ class _ProjectListItemState extends ConsumerState<_ProjectListItem> {
                               : FontWeight.w500,
                         ),
                       ),
-                      if (widget.project.serverUrl != null) ...[
+                      if (widget.project.serverNodeId != null) ...[
                         const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Icon(
-                              LucideIcons.cloud,
-                              size: 12,
-                              color: theme.colorScheme.mutedForeground,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              widget.project.serverUrl!,
-                              style: theme.textTheme.muted.copyWith(
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
+                        _buildServerInfo(theme),
                       ],
                       const SizedBox(height: 4),
                       Row(
@@ -190,6 +176,32 @@ class _ProjectListItemState extends ConsumerState<_ProjectListItem> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildServerInfo(ShadThemeData theme) {
+    final tunnelAsync = ref.watch(projectTunnelProvider(widget.project.id));
+    final label =
+        tunnelAsync.whenOrNull(
+          data: (settings) {
+            if (settings != null) {
+              return '${settings.username}@${settings.host}:${settings.port}';
+            }
+            return null;
+          },
+        ) ??
+        'Remote';
+
+    return Row(
+      children: [
+        Icon(
+          LucideIcons.cloud,
+          size: 12,
+          color: theme.colorScheme.mutedForeground,
+        ),
+        const SizedBox(width: 4),
+        Text(label, style: theme.textTheme.muted.copyWith(fontSize: 11)),
+      ],
     );
   }
 

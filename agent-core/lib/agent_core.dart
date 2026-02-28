@@ -26,6 +26,10 @@ export 'src/utils/template_processor.dart';
 export 'src/utils/tool_result_formatter.dart';
 export 'src/utils/multiplexed_websocket_channel.dart';
 export 'src/utils/crdt_flow_adapter.dart';
+export 'src/utils/terminal_buffer.dart';
+export 'src/utils/node_id_migration.dart';
+export 'src/utils/server_node_id.dart';
+export 'src/utils/toml_node_id_migration.dart';
 
 // Secrets Storage
 export 'src/secrets_storage/secure_storage.dart';
@@ -44,6 +48,7 @@ export 'src/services/secrets_crdt.dart';
 export 'src/services/secrets_service.dart';
 export 'src/services/conversation_summarizer.dart';
 export 'src/services/tool_summarizer.dart';
+export 'src/services/ssh_keygen_service.dart';
 
 // Database
 export 'src/database/database.dart';

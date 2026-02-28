@@ -5,7 +5,9 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:uuid/uuid.dart';
 import 'package:agent_core/agent_core.dart';
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
@@ -38,8 +40,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   _log.info('WidgetsFlutterBinding initialized');
 
+  final appDocDir = await getApplicationDocumentsDirectory();
+
   try {
-    final appDocDir = await getApplicationDocumentsDirectory();
     final packageInfo = await PackageInfo.fromPlatform();
 
     // Initialize SqliteLogger
@@ -59,11 +62,33 @@ void main() async {
   final sharedPreferences = await SharedPreferences.getInstance();
   _log.info('SharedPreferences initialized');
 
+  // Read or create the client node ID from the data directory.
+  // Storing it alongside the database means deleting the local data
+  // (decamp.db, projects/, client_node_id) resets the client identity, which
+  // ensures the server's exceptNodeId filter no longer applies and
+  // project records flow down on the next sync.
+  //
+  // Migration: if no file exists yet, check SharedPreferences for a
+  // legacy node ID and migrate it to the file so existing installs keep
+  // their identity.
+  final nodeIdFile = File(p.join(appDocDir.path, 'client_node_id'));
+  final String clientNodeId;
+  if (await nodeIdFile.exists()) {
+    clientNodeId = (await nodeIdFile.readAsString()).trim();
+    _log.info('Loaded client node ID from file: $clientNodeId');
+  } else {
+    clientNodeId = const Uuid().v4();
+    _log.info('Generated new client node ID: $clientNodeId');
+    await nodeIdFile.writeAsString(clientNodeId);
+  }
+
   runApp(
     ProviderScope(
       overrides: [
         // Override the sharedPreferencesProvider with the actual instance
         sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+        // Override nodeIdProvider with the file-backed client node ID
+        nodeIdProvider.overrideWithValue(clientNodeId),
       ],
       child: const DecampApp(),
     ),

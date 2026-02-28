@@ -85,12 +85,12 @@ build_arch() {
         "
 
     # Copy binary to release artifact name (e.g. fewshell-agent-linux-amd64)
-    local ZIP_NAME="fewshell-agent-linux-$ARCH.zip"
-    local ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
+    local TGZ_NAME="fewshell-agent-linux-$ARCH.tar.gz"
+    local TGZ_PATH="$BUILD_DIR/$TGZ_NAME"
     
-    echo "🤐 Zipping binary and library..."
-    # CD into build/bin so the zip structure is flat
-    (cd "$PROJECT_ROOT/build/bin" && zip -r "$ZIP_PATH" .)
+    echo "📦 Creating tarball..."
+    # CD into build/bin so the archive structure is flat
+    (cd "$PROJECT_ROOT/build/bin" && tar czf "$TGZ_PATH" .)
     
     # Also keep the raw binary for reference (or if user wants just that)
     cp "$PROJECT_ROOT/build/bin/fewshell-server" "$OUTPUT_PATH"
@@ -129,11 +129,11 @@ if [[ "$(uname)" == "Darwin" ]]; then
         mv build/macos_cli_out/bundle/bin/server "$MACOS_OUTPUT_PATH"
     )
     
-    # Zip it (no need to bundle sqlite on macOS, it uses system framework)
-    echo "🤐 Zipping macOS binary..."
-    ZIP_NAME="fewshell-agent-macos-$MACOS_ARCH.zip"
-    ZIP_PATH="$BUILD_DIR/$ZIP_NAME"
-    (cd "$BUILD_DIR" && zip -r "$ZIP_PATH" "$MACOS_OUTPUT_NAME")
+    # Tar it (no need to bundle sqlite on macOS, it uses system framework)
+    echo "📦 Creating macOS tarball..."
+    TGZ_NAME="fewshell-agent-macos-$MACOS_ARCH.tar.gz"
+    TGZ_PATH="$BUILD_DIR/$TGZ_NAME"
+    (cd "$BUILD_DIR" && tar czf "$TGZ_PATH" "$MACOS_OUTPUT_NAME")
     
     # Keep raw binary executable
     chmod +x "$MACOS_OUTPUT_PATH"

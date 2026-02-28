@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:math';
 import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -10,8 +11,11 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
+import 'package:dartssh2/dartssh2.dart';
 import 'package:decamp/certs.dart';
 import 'package:decamp/providers/providers.dart';
+import 'package:decamp/providers/ssh_tunnel_provider.dart';
+import 'package:decamp/services/remote_installer.dart';
 
 final _log = Logger('SyncService');
 
@@ -34,7 +38,25 @@ class SyncService {
   CrdtSync? _projectSync;
   MultiplexedWebSocketChannel? _projectChannel;
   StreamSubscription? _projectSubscription;
-  String? _currentGlobalUrl;
+
+  _SshTunnel? _globalSshTunnel;
+  _SshTunnel? _projectSshTunnel;
+
+  /// A dedup key for the current global sync connection.
+  /// Prevents redundant reconnections when the connection details haven't changed.
+  String? _currentGlobalConnectionKey;
+
+  /// The connection info used for the current global sync session.
+  /// Stored so we can auto-map new projects to the same connection.
+  Map<String, dynamic>? _currentGlobalConnectionInfo;
+
+  /// The server's CRDT node ID discovered from the `X-Fewshell-Server-Node-Id`
+  /// header during the most recent global sync WebSocket upgrade.
+  String? _currentServerNodeId;
+
+  /// The server's node ID from the last successful global sync connection.
+  /// Accessible to other services for connection mapping / project matching.
+  String? get currentServerNodeId => _currentServerNodeId;
 
   // Adapters for waiting on sync idle
   CrdtFlowAdapter? _globalAdapter;
@@ -91,45 +113,42 @@ class SyncService {
 
     ref.listen(projectDatabaseProvider, (previous, next) {
       if (next != null) {
-        final projectId = ref.read(currentProjectIdProvider);
-        if (projectId != null) {
-          _connectProject(next, projectId);
-        }
+        // Project DB changed — connect project if global is already up.
+        _log.info('Project DB changed, connecting project if ready.');
+        _connectProjectIfReady();
       } else {
+        _log.info('Project DB cleared, resetting project sync.');
         _resetProjectSync();
       }
     });
 
-    // Watch for project settings changes (specifically serverUrl)
+    // Watch for project changes that affect sync connections.
     ref.listen<ProjectEntity?>(currentProjectProvider, (previous, next) {
-      // Handle Project Sync update
-      if (next != null &&
-          previous?.id == next.id &&
-          previous?.serverUrl != next.serverUrl) {
-        final projectDb = ref.read(projectDatabaseProvider);
-        if (projectDb != null) {
-          _connectProject(projectDb, next.id);
-        }
-      }
-
-      // Handle Global Sync update
-      if (previous?.id != next?.id || previous?.serverUrl != next?.serverUrl) {
+      // Reconnect global sync when the project changes, or when identity/
+      // connection fields change (serverNodeId arriving via CRDT replication,
+      // or serverUrl as transitional fallback).
+      if (previous?.id != next?.id ||
+          previous?.serverNodeId != next?.serverNodeId ||
+          previous?.serverUrl != next?.serverUrl) {
+        _log.info(
+          'Project changed (id: ${previous?.id} -> ${next?.id}, '
+          'serverNodeId: ${previous?.serverNodeId} -> ${next?.serverNodeId}), '
+          'reconnecting global sync.',
+        );
         _connectGlobal(ref.read(globalDatabaseProvider), next?.serverUrl);
+      } else {
+        _log.fine(
+          'Project provider changed but no relevant fields differ, skipping reconnect.',
+        );
       }
     });
 
-    // Initial connection
+    // Initial connection — only start global; project follows on success.
     final nodeId = ref.read(nodeIdProvider);
     _log.info('Initializing with nodeId: $nodeId');
 
     final project = ref.read(currentProjectProvider);
     _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
-
-    final projectDb = ref.read(projectDatabaseProvider);
-    final projectId = ref.read(currentProjectIdProvider);
-    if (projectDb != null && projectId != null) {
-      _connectProject(projectDb, projectId);
-    }
   }
 
   Future<void> connectGlobal(String url) async {
@@ -137,18 +156,147 @@ class SyncService {
     await _connectGlobal(db, url, rethrowErrors: true);
   }
 
+  /// Connects to a remote agent via SSH tunnel, syncs, discovers projects,
+  /// and switches to the first matching project.
+  ///
+  /// [onStatus] is called with progress messages for UI display.
+  /// Throws on failure.
+  Future<void> connectViaTunnel(
+    String tunnelId, {
+    void Function(String message)? onStatus,
+  }) async {
+    onStatus?.call('Establishing SSH tunnel...');
+    await reconnectGlobal(
+      connectionInfo: {'type': 'tunnel', 'tunnelId': tunnelId},
+    );
+
+    onStatus?.call('Waiting for global sync...');
+    await waitForGlobalSync();
+
+    onStatus?.call('Checking projects...');
+    final serverNodeId = _currentServerNodeId;
+    if (serverNodeId == null) {
+      throw Exception('Server did not provide a node ID.');
+    }
+
+    // If the current project already belongs to this server, skip discovery.
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
+      _log.info(
+        'Current project ${currentProject.id} already belongs to server $serverNodeId, skipping discovery.',
+      );
+      onStatus?.call('Syncing project data...');
+      await Future.delayed(const Duration(milliseconds: 200));
+      await waitForProjectSync();
+      return;
+    } else {
+      _log.info(
+        'No current project matches server $serverNodeId '
+        '(current: ${currentProject?.serverNodeId}), proceeding with discovery.',
+      );
+    }
+
+    final globalDb = ref.read(globalDatabaseProvider);
+    List<ProjectEntity> matchingProjects = [];
+
+    // Poll for projects for up to 10 seconds.
+    for (int i = 0; i < 20; i++) {
+      matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
+        serverNodeId,
+      );
+      if (matchingProjects.isNotEmpty) {
+        _log.info(
+          'Found ${matchingProjects.length} project(s) for server $serverNodeId after ${i + 1} poll(s).',
+        );
+        break;
+      }
+      _log.fine('No projects for $serverNodeId yet, poll ${i + 1}/20...');
+      onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (matchingProjects.isEmpty) {
+      throw Exception(
+        'No projects found for this tunnel. '
+        'Make sure the remote agent has a project configured.',
+      );
+    }
+
+    // Switch to the first matching project.
+    final targetProject = matchingProjects.first;
+    onStatus?.call('Switching to project ${targetProject.name}...');
+    await ref.read(currentProjectIdProvider.notifier).select(targetProject.id);
+
+    onStatus?.call('Waiting for project sync...');
+    await Future.delayed(const Duration(milliseconds: 200));
+    await waitForProjectSync();
+  }
+
+  /// Forces a global sync reconnect.
+  ///
+  /// When [connectionInfo] is provided (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`),
+  /// it is used directly for the connection — no saved mapping is required.
+  /// This is the bootstrap path used by the connect dialog before any
+  /// mappings exist. The `mapIncomingChangeset` callback will auto-save
+  /// mappings for discovered projects after sync.
+  Future<void> reconnectGlobal({Map<String, dynamic>? connectionInfo}) async {
+    _disconnectGlobal();
+    _closeProjectConnection();
+    final db = ref.read(globalDatabaseProvider);
+    final project = ref.read(currentProjectProvider);
+    await _connectGlobal(
+      db,
+      project?.serverUrl,
+      rethrowErrors: true,
+      bootstrapConnectionInfo: connectionInfo,
+    );
+  }
+
   Future<void> _connectGlobal(
     GlobalDatabase db,
     String? serverUrl, {
     bool rethrowErrors = false,
+    Map<String, dynamic>? bootstrapConnectionInfo,
   }) async {
-    if (serverUrl == _currentGlobalUrl && _globalSync != null) return;
+    final _ResolvedConnection resolved;
+    if (bootstrapConnectionInfo != null) {
+      // Bootstrap mode: use provided connection info directly (no saved
+      // mapping needed). Used by the connect dialog for first-time setup.
+      _log.info('Using bootstrap connection info: $bootstrapConnectionInfo');
+      resolved = _resolvedConnectionFromInfo(bootstrapConnectionInfo);
+    } else {
+      final project = ref.read(currentProjectProvider);
+      if (project == null) {
+        _log.info(
+          'No current project, skipping connection resolution and global sync.',
+        );
+        return;
+      }
+      final currentProjectId = project.id;
+      resolved = await _resolveConnectionSettings(
+        projectId: currentProjectId,
+        serverUrlFallback: serverUrl,
+      );
+    }
+
+    // Build dedup key from resolved connection details.
+    final connectionKey = resolved.tunnelId != null
+        ? 'tunnel:${resolved.tunnelId}'
+        : 'url:${resolved.directUrl}';
+
+    if (connectionKey == _currentGlobalConnectionKey && _globalSync != null) {
+      _log.fine(
+        'Global sync already connected with key $connectionKey, skipping.',
+      );
+      return;
+    }
 
     _disconnectGlobal();
-    _currentGlobalUrl = serverUrl;
+    _currentGlobalConnectionKey = connectionKey;
+    _currentGlobalConnectionInfo = resolved.connectionInfo;
 
-    if (serverUrl == null || serverUrl.isEmpty) {
-      _log.info('No server URL for global sync.');
+    if (resolved.tunnelId == null && resolved.directUrl == null) {
+      _log.warning('No connection details for global sync.');
       return;
     }
 
@@ -158,16 +306,46 @@ class SyncService {
 
       final crdt = db.crdt;
       _globalAdapter = CrdtFlowAdapter(crdt);
-      // Remove trailing slash if present
-      final cleanUrl = serverUrl.endsWith('/')
-          ? serverUrl.substring(0, serverUrl.length - 1)
-          : serverUrl;
-      final uri = Uri.parse('$cleanUrl/sync/global');
 
-      _log.info('Connecting to global sync at $uri');
-      // Use a shorter timeout for manual connections (when rethrowErrors is true)
-      final channel = _connectWebSocket(uri, timeout: defaultConnectionTimeout);
-      await channel.ready;
+      _log.info(
+        'Connecting to global sync via ${resolved.tunnelId != null ? "tunnel:${resolved.tunnelId}" : resolved.directUrl}',
+      );
+      final WebSocketChannel channel;
+      Map<String, String> responseHeaders = {};
+      if (resolved.tunnelId != null) {
+        final (wsChannel, tunnel, headers) = await _connectViaTunnel(
+          tunnelId: resolved.tunnelId!,
+          wsPath: '/sync/global',
+          timeout: defaultConnectionTimeout,
+        );
+        channel = wsChannel;
+        responseHeaders = headers;
+        _globalSshTunnel = tunnel;
+      } else {
+        final uri = Uri.parse('${resolved.directUrl}/sync/global');
+        final (wsChannel, headers) = await _connectWebSocketWithHeaders(
+          uri,
+          timeout: defaultConnectionTimeout,
+        );
+        channel = wsChannel;
+        responseHeaders = headers;
+      }
+
+      // Read the server's CRDT node ID from the upgrade response header.
+      // Headers are stored lowercased for case-insensitive lookup.
+      final headerNodeId = responseHeaders[kNodeIdHeader.toLowerCase()];
+      if (headerNodeId == null) {
+        throw Exception(
+          'Server did not send $kNodeIdHeader header on WebSocket upgrade',
+        );
+      }
+      if (!isValidNodeId(headerNodeId)) {
+        throw Exception(
+          'Server returned invalid $kNodeIdHeader: $headerNodeId',
+        );
+      }
+      _currentServerNodeId = headerNodeId;
+      _log.info('Discovered server node ID: $headerNodeId');
 
       _globalChannel = MultiplexedWebSocketChannel(
         channel,
@@ -177,16 +355,70 @@ class SyncService {
         _log.fine('Global sync received custom message: $msg');
       });
 
+      // Capture for closure — the connection details at connection time.
+      final serverNodeId = _currentServerNodeId;
+      final connInfo = _currentGlobalConnectionInfo;
+      final mappingStorage = ref.read(connectionMappingStorageProvider);
+
       _globalSync = CrdtSync.client(
         _globalAdapter!,
         _globalChannel!,
         verbose: true,
         validateRecord: (table, record) {
           if (table == 'projects') {
+            final remoteNodeId = record['server_node_id'] as String?;
+            if (remoteNodeId != null) {
+              // Reject if invalid format or belongs to a different server.
+              final valid =
+                  isValidNodeId(remoteNodeId) && remoteNodeId == serverNodeId;
+              if (!valid) {
+                _log.fine(
+                  'validateRecord: rejecting project record — '
+                  'server_node_id $remoteNodeId != expected $serverNodeId.',
+                );
+              }
+              return valid;
+            }
+            // Transitional fallback: accept records with a server_url
+            // if server_node_id is not yet set (pre-migration server).
             final remoteUrl = record['server_url'] as String?;
-            if (remoteUrl == null || remoteUrl.isEmpty) return false;
+            if (remoteUrl != null && remoteUrl.isNotEmpty) {
+              _log.fine(
+                'validateRecord: accepting project record via transitional server_url fallback ($remoteUrl).',
+              );
+              return true;
+            }
+            _log.fine(
+              'validateRecord: rejecting project record — no server_node_id or server_url.',
+            );
+            return false;
           }
           return true;
+        },
+        mapIncomingChangeset: (table, record) {
+          // Auto-map: when we receive a project belonging to our server,
+          // ensure a connection mapping exists. Fire-and-forget, idempotent.
+          if (table == 'projects' && connInfo != null) {
+            final remoteNodeId = record['server_node_id'] as String?;
+            if (remoteNodeId == serverNodeId) {
+              final projectId = record['id'] as String?;
+              if (projectId != null) {
+                _log.fine(
+                  'mapIncomingChangeset: auto-saving connection mapping for project $projectId.',
+                );
+                mappingStorage.save(projectId, connInfo);
+              } else {
+                _log.fine(
+                  'mapIncomingChangeset: project record for $serverNodeId has no id, skipping auto-map.',
+                );
+              }
+            } else {
+              _log.fine(
+                'mapIncomingChangeset: project record server_node_id ($remoteNodeId) does not match server ($serverNodeId), skipping auto-map.',
+              );
+            }
+          }
+          return record;
         },
         changesetBuilder:
             ({
@@ -207,26 +439,123 @@ class SyncService {
               if (changeset.containsKey('projects')) {
                 final records = changeset['projects']!;
                 final filteredRecords = records.where((record) {
+                  // Primary filter: match by server_node_id
+                  if (serverNodeId != null) {
+                    final recordNodeId = record['server_node_id'] as String?;
+                    if (recordNodeId == serverNodeId) return true;
+                  }
+                  // Transitional fallback: match by server_url
                   final recordUrl = record['server_url'] as String?;
                   return recordUrl != null && recordUrl == serverUrl;
                 }).toList();
 
                 if (filteredRecords.isEmpty) {
+                  _log.fine(
+                    'changesetBuilder: filtered out all ${records.length} project record(s) — none match server $serverNodeId.',
+                  );
                   changeset.remove('projects');
                 } else {
+                  _log.fine(
+                    'changesetBuilder: keeping ${filteredRecords.length}/${records.length} project record(s) for server $serverNodeId.',
+                  );
                   changeset['projects'] = filteredRecords;
                 }
               }
               return changeset;
             },
       );
+
+      // Global sync connected — now connect project sync.
+      _connectProjectIfReady();
     } catch (e, stackTrace) {
       _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
     }
   }
 
+  /// Connects project sync if global sync is up and a project DB is available.
+  void _connectProjectIfReady() {
+    if (_globalSync == null) return;
+    final projectDb = ref.read(projectDatabaseProvider);
+    final projectId = ref.read(currentProjectIdProvider);
+    if (projectDb != null && projectId != null) {
+      _connectProject(projectDb, projectId);
+    }
+  }
+
+  /// Resolves connection details for a project: checks the connection mapping
+  /// first, then falls back to [serverUrlFallback] as a direct URL.
+  Future<_ResolvedConnection> _resolveConnectionSettings({
+    required String? projectId,
+    required String? serverUrlFallback,
+  }) async {
+    if (projectId != null) {
+      final mappingStorage = ref.read(connectionMappingStorageProvider);
+      final mapping = await mappingStorage.get(projectId);
+      if (mapping != null) {
+        _log.fine(
+          '_resolveConnectionSettings: found saved mapping for project $projectId: $mapping',
+        );
+        return _resolvedConnectionFromInfo(mapping);
+      } else {
+        _log.fine(
+          '_resolveConnectionSettings: no saved mapping for project $projectId.',
+        );
+      }
+    } else {
+      _log.fine(
+        '_resolveConnectionSettings: no projectId, skipping mapping lookup.',
+      );
+    }
+
+    if (serverUrlFallback != null) {
+      final cleanUrl = serverUrlFallback.endsWith('/')
+          ? serverUrlFallback.substring(0, serverUrlFallback.length - 1)
+          : serverUrlFallback;
+      _log.fine(
+        '_resolveConnectionSettings: using serverUrl fallback: $cleanUrl',
+      );
+      return _ResolvedConnection(
+        directUrl: cleanUrl,
+        connectionInfo: {'type': 'url', 'url': cleanUrl},
+      );
+    }
+
+    _log.fine('_resolveConnectionSettings: no connection details resolved.');
+    return const _ResolvedConnection();
+  }
+
+  /// Converts a connection info map (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`)
+  /// to a [_ResolvedConnection].
+  _ResolvedConnection _resolvedConnectionFromInfo(Map<String, dynamic> info) {
+    if (info['type'] == 'tunnel') {
+      _log.fine('_resolvedConnectionFromInfo: tunnel id=${info['tunnelId']}');
+      return _ResolvedConnection(
+        tunnelId: info['tunnelId'] as String?,
+        connectionInfo: info,
+      );
+    } else if (info['type'] == 'url') {
+      _log.fine('_resolvedConnectionFromInfo: direct url=${info['url']}');
+      return _ResolvedConnection(
+        directUrl: info['url'] as String?,
+        connectionInfo: info,
+      );
+    }
+    _log.warning(
+      '_resolvedConnectionFromInfo: unrecognised connection type "${info['type']}", returning empty resolution.',
+    );
+    return _ResolvedConnection(connectionInfo: info);
+  }
+
   Future<void> _connectProject(ProjectDatabase db, String projectId) async {
+    // Project sync requires global sync to be connected first.
+    if (_globalSync == null) {
+      _log.info(
+        'Skipping project sync for $projectId — global sync not connected.',
+      );
+      return;
+    }
+
     _reconnectTimer?.cancel();
     _connectionToken?.cancel();
     final token = _CancellationToken();
@@ -244,31 +573,80 @@ class SyncService {
 
       if (token.isCancelled) return;
 
-      // Get project settings to check for server URL
-      final project = await ref
-          .read(databaseProvider)
-          .projectDao
-          .getProject(projectId);
+      final resolved = await _resolveConnectionSettings(
+        projectId: projectId,
+        serverUrlFallback: null,
+      );
 
-      if (token.isCancelled) return;
+      // For project sync, also try serverUrl from the project record.
+      String? tunnelId = resolved.tunnelId;
+      String? directUrl = resolved.directUrl;
+      if (tunnelId == null && directUrl == null) {
+        final project = await ref
+            .read(databaseProvider)
+            .projectDao
+            .getProject(projectId);
 
-      final serverUrl = project?.serverUrl;
+        if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled after project lookup for $projectId.',
+          );
+          return;
+        }
 
-      if (serverUrl == null) {
+        final serverUrl = project?.serverUrl;
+        if (serverUrl != null) {
+          directUrl = serverUrl.endsWith('/')
+              ? serverUrl.substring(0, serverUrl.length - 1)
+              : serverUrl;
+          _log.fine('_connectProject: using serverUrl fallback: $directUrl');
+        } else {
+          _log.fine(
+            '_connectProject: no serverUrl on project record for $projectId.',
+          );
+        }
+      }
+
+      if (tunnelId == null && directUrl == null) {
         _log.info(
-          'No server URL configured for project $projectId. Skipping sync.',
+          'No connection details for project $projectId. Skipping sync.',
         );
         return;
       }
 
       final crdt = db.crdt;
       _projectAdapter = CrdtFlowAdapter(crdt);
-      final uri = Uri.parse('$serverUrl/sync/project/$projectId');
 
-      _log.info('Connecting to project sync at $uri');
+      _log.info(
+        'Connecting to project sync for $projectId via '
+        '${tunnelId != null ? "tunnel:$tunnelId" : directUrl}',
+      );
       _updateConnectionState(SyncConnectionState.connecting);
 
-      final wsChannel = _connectWebSocket(uri);
+      final WebSocketChannel wsChannel;
+      if (tunnelId != null) {
+        if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled before tunnel connect for $projectId.',
+          );
+          return;
+        }
+        _log.info(
+          '_connectProject: connecting via SSH tunnel $tunnelId for $projectId.',
+        );
+        final (ch, tunnel, _) = await _connectViaTunnel(
+          tunnelId: tunnelId,
+          wsPath: '/sync/project/$projectId',
+        );
+        wsChannel = ch;
+        _projectSshTunnel = tunnel;
+      } else {
+        _log.info(
+          '_connectProject: connecting via direct WebSocket to $directUrl for $projectId.',
+        );
+        final uri = Uri.parse('$directUrl/sync/project/$projectId');
+        wsChannel = _connectWebSocket(uri);
+      }
       final monitoredChannel = _ActivityMonitorWebSocketChannel(
         wsChannel,
         onActivity: _handleSyncActivity,
@@ -292,6 +670,9 @@ class SyncService {
       try {
         await monitoredChannel.ready;
         if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled after channel ready for $projectId, closing.',
+          );
           monitoredChannel.sink.close();
           return;
         }
@@ -302,11 +683,26 @@ class SyncService {
           if (!token.isCancelled &&
               _currentProjectId == projectId &&
               _currentConnectionState == SyncConnectionState.connected) {
+            _log.fine(
+              '_connectProject: connection stable for 5s, resetting reconnect attempts.',
+            );
             _reconnectAttempts = 0;
+          } else {
+            _log.fine(
+              '_connectProject: stability check skipped '
+              '(cancelled=${token.isCancelled}, '
+              'currentProject=$_currentProjectId, '
+              'state=$_currentConnectionState).',
+            );
           }
         });
       } catch (e) {
-        if (token.isCancelled) return;
+        if (token.isCancelled) {
+          _log.fine(
+            '_connectProject: cancelled after connection failure for $projectId.',
+          );
+          return;
+        }
         _updateConnectionState(SyncConnectionState.disconnected);
         _log.warning('Connection failed: $e');
         _scheduleReconnect();
@@ -378,12 +774,22 @@ class SyncService {
     _globalChannel = null;
     _globalSubscription?.cancel();
     _globalSubscription = null;
-    _currentGlobalUrl = null;
+    _currentGlobalConnectionKey = null;
+    _currentGlobalConnectionInfo = null;
+    _currentServerNodeId = null;
+    _globalSshTunnel?.close();
+    _globalSshTunnel = null;
   }
 
   void _scheduleReconnect() {
-    if (_reconnectTimer?.isActive ?? false) return;
-    if (_currentProjectId == null || _currentProjectDb == null) return;
+    if (_reconnectTimer?.isActive ?? false) {
+      _log.fine('_scheduleReconnect: timer already active, skipping.');
+      return;
+    }
+    if (_currentProjectId == null || _currentProjectDb == null) {
+      _log.fine('_scheduleReconnect: no active project, skipping.');
+      return;
+    }
 
     final delaySeconds = _getFibonacciDelay(_reconnectAttempts);
     _log.info(
@@ -430,6 +836,8 @@ class SyncService {
     _projectChannel = null;
     _projectSubscription?.cancel();
     _projectSubscription = null;
+    _projectSshTunnel?.close();
+    _projectSshTunnel = null;
     _updateConnectionState(SyncConnectionState.disconnected);
   }
 
@@ -456,24 +864,32 @@ class SyncService {
         _lastLifecycleState == AppLifecycleState.paused) {
       _log.info('App resumed from paused state, reconnecting');
       _reconnectAll();
+    } else {
+      _log.fine(
+        'App lifecycle transition $state does not require reconnect '
+        '(previous: $_lastLifecycleState).',
+      );
     }
 
     _lastLifecycleState = state;
   }
 
   void _reconnectAll() {
-    // Force reconnect global sync if we have a server URL
-    if (_currentGlobalUrl != null) {
+    // Force reconnect global sync — project sync follows automatically
+    // via _connectProjectIfReady() at the end of a successful _connectGlobal.
+    if (_currentGlobalConnectionKey != null) {
+      _log.info(
+        '_reconnectAll: forcing reconnect for key $_currentGlobalConnectionKey.',
+      );
       _disconnectGlobal();
-      final project = ref.read(currentProjectProvider);
-      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
-    }
-
-    // Force reconnect project sync if we have an active project
-    if (_currentProjectId != null && _currentProjectDb != null) {
       _closeProjectConnection();
       _reconnectAttempts = 0;
-      _connectProject(_currentProjectDb!, _currentProjectId!);
+      final project = ref.read(currentProjectProvider);
+      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
+    } else {
+      _log.fine(
+        '_reconnectAll: no active global connection key, nothing to reconnect.',
+      );
     }
   }
 
@@ -510,103 +926,220 @@ class SyncService {
     }
   }
 
+  /// Looks up a tunnel config from [SshTunnelStorage] and connects via SSH.
+  /// Connects a WebSocket tunneled through SSH, returning the channel,
+  /// tunnel handle, and the HTTP upgrade response headers.
+  Future<(WebSocketChannel, _SshTunnel, Map<String, String>)>
+  _connectViaTunnel({
+    required String tunnelId,
+    required String wsPath,
+    Duration? timeout,
+  }) async {
+    final storage = ref.read(sshTunnelStorageProvider);
+    final settings = await storage.get(tunnelId);
+    if (settings == null) {
+      throw Exception('Tunnel config not found for id: $tunnelId');
+    }
+    final privateKey = await storage.getPrivateKey(tunnelId);
+    final passphrase = await storage.getPassphrase(tunnelId);
+
+    return _connectSshWebSocket(
+      sshHost: settings.host,
+      sshPort: settings.port,
+      sshUsername: settings.username,
+      sshPrivateKey: privateKey,
+      sshPassphrase: passphrase,
+      wsPath: wsPath,
+      timeout: timeout,
+    );
+  }
+
+  /// Create a WebSocket channel tunneled through SSH to a remote Unix socket.
+  ///
+  /// 1. Connect SSH to [sshHost] as [sshUsername]
+  /// 2. Discover remote home directory via `echo \$HOME`
+  /// 3. Open a `direct-streamlocal` channel to `$HOME/.fewshell/agent.sock`
+  /// 4. Bind a local TCP proxy that pipes to the SSH forward
+  /// 5. Connect a WebSocket through the local proxy
+  ///
+  /// The [wsPath] (e.g. `/sync/global`) is appended to the WebSocket URL.
+  Future<(WebSocketChannel, _SshTunnel, Map<String, String>)>
+  _connectSshWebSocket({
+    required String sshHost,
+    required int sshPort,
+    required String sshUsername,
+    String? sshPrivateKey,
+    String? sshPassphrase,
+    required String wsPath,
+    Duration? timeout,
+  }) async {
+    _log.info('SSH tunnel: connecting to $sshUsername@$sshHost:$sshPort');
+
+    final sshSocket = await SSHSocket.connect(
+      sshHost,
+      sshPort,
+      timeout: const Duration(seconds: 30),
+    );
+
+    List<SSHKeyPair>? identities;
+    if (sshPrivateKey != null && sshPrivateKey.isNotEmpty) {
+      _log.fine('SSH tunnel: loading private key for authentication.');
+      identities = SSHKeyPair.fromPem(sshPrivateKey, sshPassphrase);
+    } else {
+      _log.fine(
+        'SSH tunnel: no private key provided, relying on agent/default auth.',
+      );
+    }
+
+    final client = SSHClient(
+      sshSocket,
+      username: sshUsername,
+      identities: identities,
+    );
+
+    await client.authenticated;
+    _log.info('SSH tunnel: authenticated');
+
+    // Ensure the fewshell server is installed and running.
+    final installer = RemoteInstaller(client);
+    try {
+      await installer.ensureServerRunning();
+    } finally {
+      installer.dispose();
+    }
+
+    // Discover remote home directory
+    final homeSession = await client.execute('echo \$HOME');
+    final homeOutput = StringBuffer();
+    await for (final data in homeSession.stdout) {
+      homeOutput.write(utf8.decode(data));
+    }
+    await homeSession.done;
+    final remoteHome = homeOutput.toString().trim();
+    if (remoteHome.isEmpty) {
+      client.close();
+      throw Exception('SSH tunnel: failed to discover remote home directory');
+    }
+    final socketPath = '$remoteHome/.fewshell/agent.sock';
+    _log.info('SSH tunnel: forwarding to $socketPath');
+
+    // Bind local TCP proxy
+    final serverSocket = await ServerSocket.bind('localhost', 0);
+    final localPort = serverSocket.port;
+
+    serverSocket.listen((tcpSocket) async {
+      _log.fine(
+        'SSH tunnel: new TCP proxy connection from ${tcpSocket.remoteAddress.address}:${tcpSocket.remotePort}.',
+      );
+      try {
+        final forward = await client.forwardLocalUnix(socketPath);
+        forward.stream.cast<List<int>>().pipe(tcpSocket);
+        tcpSocket.cast<List<int>>().pipe(forward.sink);
+      } catch (e) {
+        _log.warning('SSH tunnel: proxy connection failed: $e');
+        tcpSocket.destroy();
+      }
+    });
+
+    _log.info('SSH tunnel: local proxy on localhost:$localPort');
+
+    // Connect WebSocket through the proxy — use manual upgrade to capture
+    // response headers (e.g. X-Fewshell-Server-Node-Id).
+    final wsUri = Uri.parse('ws://localhost:$localPort$wsPath');
+    final (wsChannel, headers) = await _connectWebSocketWithHeaders(
+      wsUri,
+      timeout: timeout,
+      useMtls: false,
+    );
+
+    final tunnel = _SshTunnel(client, serverSocket);
+    return (wsChannel, tunnel, headers);
+  }
+
+  /// Creates an [HttpClient] configured with mTLS using embedded certificates.
+  HttpClient _createMtlsClient() {
+    final context = SecurityContext(withTrustedRoots: false)
+      ..useCertificateChainBytes(utf8.encode(clientCert))
+      ..usePrivateKeyBytes(utf8.encode(clientKey))
+      ..setTrustedCertificatesBytes(utf8.encode(caCert));
+
+    if (kDebugMode) {
+      HttpClient.enableTimelineLogging = true;
+    }
+
+    final client = HttpClient(context: context);
+    client.badCertificateCallback = _verifyCertificate;
+    return client;
+  }
+
+  /// Certificate verification callback for mTLS connections.
+  ///
+  /// SecurityContext validates the chain; this callback logs details and
+  /// pins by subject/issuer + DER comparison.
+  bool _verifyCertificate(X509Certificate cert, String host, int port) {
+    _log.warning('Certificate verification failed for $host:$port');
+    _log.warning('Subject: ${cert.subject}');
+    _log.warning('Issuer: ${cert.issuer}');
+
+    final isServerCert =
+        cert.subject.contains('localhost') && cert.issuer.contains('Decamp CA');
+
+    final isCaCert =
+        cert.subject.contains('Decamp CA') && cert.issuer.contains('Decamp CA');
+
+    if (!isServerCert && !isCaCert) {
+      _log.severe(
+        'Certificate validation FAILED: Unknown certificate subject/issuer.',
+      );
+      _log.severe('Subject: ${cert.subject}');
+      _log.severe('Issuer: ${cert.issuer}');
+      return false;
+    }
+
+    try {
+      String pemToCompare;
+      if (isServerCert) {
+        final endMarker = '-----END CERTIFICATE-----';
+        final endIndex = serverCert.indexOf(endMarker);
+        if (endIndex == -1) {
+          throw FormatException('Invalid serverCert format');
+        }
+        pemToCompare = serverCert.substring(0, endIndex + endMarker.length);
+      } else {
+        pemToCompare = caCert;
+      }
+
+      final cleanPem = pemToCompare
+          .replaceAll(RegExp(r'-----.*-----'), '')
+          .replaceAll(RegExp(r'\s+'), '');
+
+      final pinnedBytes = base64.decode(cleanPem);
+      final receivedBytes = cert.der;
+
+      if (listEquals(pinnedBytes, receivedBytes)) {
+        _log.info(
+          'Certificate pinning successful: Trusted certificate encountered (${isServerCert ? "Server" : "CA"}). Allowing connection.',
+        );
+        return true;
+      } else {
+        _log.severe(
+          'Certificate pinning FAILED: Certificate bytes do not match pinned certificate.',
+        );
+        _log.severe('Certificate type: ${isServerCert ? "Server" : "CA"}');
+        return false;
+      }
+    } catch (e) {
+      _log.severe('Error during certificate pinning check', e);
+      return false;
+    }
+  }
+
   WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {
     _log.info('_connectWebSocket called for $uri with timeout: $timeout');
 
     try {
       _log.info('Configuring mTLS with embedded certificates');
-
-      final context = SecurityContext(withTrustedRoots: false)
-        ..useCertificateChainBytes(utf8.encode(clientCert))
-        ..usePrivateKeyBytes(utf8.encode(clientKey))
-        ..setTrustedCertificatesBytes(utf8.encode(caCert));
-
-      _log.info('SecurityContext created successfully.');
-
-      if (kDebugMode) {
-        HttpClient.enableTimelineLogging = true;
-      }
-
-      final client = HttpClient(context: context);
-
-      // We rely on SecurityContext for validation, but use this callback
-      // to log detailed errors if validation fails.
-      client.badCertificateCallback = (cert, host, port) {
-        _log.warning('Certificate verification failed for $host:$port');
-        _log.warning('Subject: ${cert.subject}');
-        _log.warning('Issuer: ${cert.issuer}');
-
-        // Strict byte-for-byte pinning is fragile because Dart/BoringSSL may normalize
-        // the certificate (e.g. re-encoding ASN.1), resulting in different bytes
-        // than the file on disk.
-        //
-        // Instead, we validate the Certificate Subject and Issuer to ensure
-        // it is the correct certificate issued by our CA.
-        //
-        // Note: SecurityContext has already validated the signature against the CA
-        // (unless the error is related to the CA itself).
-
-        // We might get a callback for the CA certificate (self-signed error)
-        // or the Server certificate (hostname mismatch error).
-        // We validate that the certificate is either our Server Cert or our CA Cert
-        // by comparing the DER bytes.
-
-        final isServerCert =
-            cert.subject.contains('localhost') &&
-            cert.issuer.contains('Decamp CA');
-
-        final isCaCert =
-            cert.subject.contains('Decamp CA') &&
-            cert.issuer.contains('Decamp CA');
-
-        if (!isServerCert && !isCaCert) {
-          _log.severe(
-            'Certificate validation FAILED: Unknown certificate subject/issuer.',
-          );
-          _log.severe('Subject: ${cert.subject}');
-          _log.severe('Issuer: ${cert.issuer}');
-          return false;
-        }
-
-        try {
-          String pemToCompare;
-          if (isServerCert) {
-            // serverCert contains the chain, we only want the first cert (the server cert)
-            final endMarker = '-----END CERTIFICATE-----';
-            final endIndex = serverCert.indexOf(endMarker);
-            if (endIndex == -1) {
-              throw FormatException('Invalid serverCert format');
-            }
-            pemToCompare = serverCert.substring(0, endIndex + endMarker.length);
-          } else {
-            // caCert contains only the CA cert
-            pemToCompare = caCert;
-          }
-
-          final cleanPem = pemToCompare
-              .replaceAll(RegExp(r'-----.*-----'), '')
-              .replaceAll(RegExp(r'\s+'), '');
-
-          final pinnedBytes = base64.decode(cleanPem);
-          final receivedBytes = cert.der;
-
-          if (listEquals(pinnedBytes, receivedBytes)) {
-            _log.info(
-              'Certificate pinning successful: Trusted certificate encountered (${isServerCert ? "Server" : "CA"}). Allowing connection.',
-            );
-            return true;
-          } else {
-            _log.severe(
-              'Certificate pinning FAILED: Certificate bytes do not match pinned certificate.',
-            );
-            _log.severe('Certificate type: ${isServerCert ? "Server" : "CA"}');
-            return false;
-          }
-        } catch (e) {
-          _log.severe('Error during certificate pinning check', e);
-          return false;
-        }
-      };
+      final client = _createMtlsClient();
 
       _log.info('Connecting with mTLS to $uri');
       return IOWebSocketChannel.connect(
@@ -617,6 +1150,81 @@ class SyncService {
       );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
+      rethrow;
+    }
+  }
+
+  /// Connects a WebSocket with a manual HTTP upgrade, returning both the
+  /// channel and the server's response headers.
+  ///
+  /// Used for global sync connections where we need to read the
+  /// `X-Fewshell-Server-Node-Id` header from the upgrade response.
+  /// When [useMtls] is false (e.g. tunnel connections through a local proxy),
+  /// a plain [HttpClient] is used instead.
+  Future<(WebSocketChannel, Map<String, String>)> _connectWebSocketWithHeaders(
+    Uri uri, {
+    Duration? timeout,
+    bool useMtls = true,
+  }) async {
+    _log.info(
+      '_connectWebSocketWithHeaders called for $uri '
+      '(mTLS: $useMtls, timeout: $timeout)',
+    );
+
+    final httpClient = useMtls ? _createMtlsClient() : HttpClient();
+    if (timeout != null) {
+      httpClient.connectionTimeout = timeout;
+    }
+
+    try {
+      // Convert ws/wss scheme to http/https for the upgrade request.
+      final httpUri = uri.replace(
+        scheme: uri.scheme == 'wss' ? 'https' : 'http',
+      );
+
+      final request = await httpClient.openUrl('GET', httpUri);
+
+      // Standard WebSocket upgrade headers (RFC 6455 §4.1).
+      final nonce = base64.encode(
+        List<int>.generate(16, (_) => Random.secure().nextInt(256)),
+      );
+      request.headers
+        ..set('Connection', 'Upgrade')
+        ..set('Upgrade', 'websocket')
+        ..set('Sec-WebSocket-Version', '13')
+        ..set('Sec-WebSocket-Key', nonce);
+
+      final response = await request.close();
+
+      if (response.statusCode != HttpStatus.switchingProtocols) {
+        // Drain the response body to free resources.
+        await response.drain<void>();
+        throw WebSocketException(
+          'WebSocket upgrade failed with status ${response.statusCode}',
+        );
+      }
+
+      // Collect response headers (lowercased keys for case-insensitive lookup).
+      final responseHeaders = <String, String>{};
+      response.headers.forEach((name, values) {
+        responseHeaders[name.toLowerCase()] = values.join(', ');
+      });
+
+      // Detach the raw socket and wrap it as a WebSocket.
+      final socket = await response.detachSocket();
+      final ws = WebSocket.fromUpgradedSocket(socket, serverSide: false);
+      ws.pingInterval = const Duration(seconds: 10);
+      final channel = IOWebSocketChannel(ws);
+
+      _log.info(
+        'WebSocket connected with headers: '
+        '${responseHeaders.keys.join(', ')}',
+      );
+
+      return (channel as WebSocketChannel, responseHeaders);
+    } catch (e, st) {
+      httpClient.close();
+      _log.severe('Error in _connectWebSocketWithHeaders', e, st);
       rethrow;
     }
   }
@@ -718,4 +1326,30 @@ class _CancellationToken {
   bool _isCancelled = false;
   bool get isCancelled => _isCancelled;
   void cancel() => _isCancelled = true;
+}
+
+/// Result of [SyncService._resolveConnectionSettings].
+class _ResolvedConnection {
+  final String? tunnelId;
+  final String? directUrl;
+  final Map<String, dynamic>? connectionInfo;
+
+  const _ResolvedConnection({
+    this.tunnelId,
+    this.directUrl,
+    this.connectionInfo,
+  });
+}
+
+/// Holds the resources for an SSH tunnel so they can be cleaned up together.
+class _SshTunnel {
+  final SSHClient client;
+  final ServerSocket serverSocket;
+
+  _SshTunnel(this.client, this.serverSocket);
+
+  void close() {
+    serverSocket.close();
+    client.close();
+  }
 }

@@ -12,6 +12,7 @@ import 'package:llm_dart/llm_dart.dart';
 import '../services/database_manager.dart';
 import '../services/local_shell_backend.dart';
 import '../services/notification_dispatcher.dart';
+import '../utils/websocket_upgrade.dart';
 
 class SyncController {
   static final _log = Logger('SyncController');
@@ -107,23 +108,7 @@ class SyncController {
       final path = request.url.path;
 
       if (path == 'global') {
-        return webSocketHandler((WebSocketChannel channel, String? protocol) {
-          _log.info('Starting CrdtSync for global');
-          final sync = CrdtSync.server(
-            dbManager.globalDatabase.crdt,
-            channel,
-            verbose: true,
-          );
-
-          unawaited(
-            channel.sink.done.then((_) {
-              _log.info(
-                'Channel closed for global',
-              );
-              sync.close();
-            }),
-          );
-        })(request);
+        return _handleGlobalSync(request);
       } else if (path.startsWith('project/')) {
         final segments = path.split('/');
         if (segments.length >= 2) {
@@ -190,6 +175,41 @@ class SyncController {
 
       return Response.notFound('Not found');
     };
+  }
+
+  /// Handles the global sync WebSocket connection.
+  ///
+  /// This uses a manual WebSocket upgrade (instead of [webSocketHandler]) so
+  /// we can inject the [kNodeIdHeader] header into the HTTP 101 response.
+  /// Clients read this header to discover the server's CRDT identity.
+  Response _handleGlobalSync(Request request) {
+    return upgradeWebSocket(
+      request,
+      headers: {kNodeIdHeader: dbManager.nodeId},
+      onConnection: (WebSocketChannel channel) {
+        _log.info('Starting CrdtSync for global');
+        final sync = CrdtSync.server(
+          dbManager.globalDatabase.crdt,
+          channel,
+          verbose: true,
+          validateRecord: (table, record) {
+            if (table == 'projects') {
+              // Filter out any projects that don't belong to this server node.
+              final serverNodeId = record['server_node_id'] as String?;
+              return serverNodeId != null && serverNodeId == dbManager.nodeId;
+            }
+            return true;
+          },
+        );
+
+        unawaited(
+          channel.sink.done.then((_) {
+            _log.info('Channel closed for global');
+            sync.close();
+          }),
+        );
+      },
+    );
   }
 
   void _setupCustomMessageHandling(
@@ -704,11 +724,11 @@ class _AgentSession {
                   'Executing shell command. Abort controller: $abortController',
                 );
 
-                final stdoutBuffer = StringBuffer();
+                final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
-                  stdoutBuffer.write(data);
+                  terminalBuffer.write(data);
                   final streamingResultJson = jsonEncode({
-                    'stdout': stdoutBuffer.toString(),
+                    'stdout': terminalBuffer.toString(),
                     'stderr': '',
                     'exitCode': 0,
                     'isStreaming': true,
@@ -757,6 +777,7 @@ class _AgentSession {
                   );
                 });
                 await projectDb!.sessionDao.touchSession(currentSessionId);
+                shellResult['stdout'] = terminalBuffer.toString();
                 result = jsonEncode(shellResult);
               } else if (toolCall.function.name == kFetch) {
                 final fetchResult = await FetchTool.execute(params);

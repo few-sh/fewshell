@@ -34,6 +34,12 @@ class $ProjectsTable extends Projects
   late final GeneratedColumn<String> serverUrl = GeneratedColumn<String>(
       'server_url', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _serverNodeIdMeta =
+      const VerificationMeta('serverNodeId');
+  @override
+  late final GeneratedColumn<String> serverNodeId = GeneratedColumn<String>(
+      'server_node_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _lastSessionDateMeta =
       const VerificationMeta('lastSessionDate');
   @override
@@ -68,6 +74,7 @@ class $ProjectsTable extends Projects
         name,
         description,
         serverUrl,
+        serverNodeId,
         lastSessionDate,
         createdAt,
         updatedAt,
@@ -103,6 +110,12 @@ class $ProjectsTable extends Projects
     if (data.containsKey('server_url')) {
       context.handle(_serverUrlMeta,
           serverUrl.isAcceptableOrUnknown(data['server_url']!, _serverUrlMeta));
+    }
+    if (data.containsKey('server_node_id')) {
+      context.handle(
+          _serverNodeIdMeta,
+          serverNodeId.isAcceptableOrUnknown(
+              data['server_node_id']!, _serverNodeIdMeta));
     }
     if (data.containsKey('last_session_date')) {
       context.handle(
@@ -147,6 +160,8 @@ class $ProjectsTable extends Projects
           .read(DriftSqlType.string, data['${effectivePrefix}description']),
       serverUrl: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}server_url']),
+      serverNodeId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}server_node_id']),
       lastSessionDate: attachedDatabase.typeMapping.read(
           DriftSqlType.dateTime, data['${effectivePrefix}last_session_date'])!,
       createdAt: attachedDatabase.typeMapping
@@ -178,6 +193,15 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
   /// If null, the project is local-only
   final String? serverUrl;
 
+  /// Server's CRDT node ID (e.g. `srv_<uuid>`)
+  /// Set by the server, replicated to all clients via CRDT.
+  /// Used for sync filtering and server identity.
+  /// If null, the project has not yet been assigned to a server.
+  ///
+  /// Named `serverNodeId` (not `nodeId`) to avoid colliding with the CRDT
+  /// metadata column `node_id` that SqliteCrdt adds to every table.
+  final String? serverNodeId;
+
   /// Timestamp of the last session activity
   final DateTime lastSessionDate;
 
@@ -194,6 +218,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       required this.name,
       this.description,
       this.serverUrl,
+      this.serverNodeId,
       required this.lastSessionDate,
       required this.createdAt,
       required this.updatedAt,
@@ -208,6 +233,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
     }
     if (!nullToAbsent || serverUrl != null) {
       map['server_url'] = Variable<String>(serverUrl);
+    }
+    if (!nullToAbsent || serverNodeId != null) {
+      map['server_node_id'] = Variable<String>(serverNodeId);
     }
     map['last_session_date'] = Variable<DateTime>(lastSessionDate);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -226,6 +254,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       serverUrl: serverUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(serverUrl),
+      serverNodeId: serverNodeId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverNodeId),
       lastSessionDate: Value(lastSessionDate),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -241,6 +272,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
       serverUrl: serializer.fromJson<String?>(json['serverUrl']),
+      serverNodeId: serializer.fromJson<String?>(json['serverNodeId']),
       lastSessionDate: serializer.fromJson<DateTime>(json['lastSessionDate']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -255,6 +287,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
       'serverUrl': serializer.toJson<String?>(serverUrl),
+      'serverNodeId': serializer.toJson<String?>(serverNodeId),
       'lastSessionDate': serializer.toJson<DateTime>(lastSessionDate),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -267,6 +300,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           String? name,
           Value<String?> description = const Value.absent(),
           Value<String?> serverUrl = const Value.absent(),
+          Value<String?> serverNodeId = const Value.absent(),
           DateTime? lastSessionDate,
           DateTime? createdAt,
           DateTime? updatedAt,
@@ -276,6 +310,8 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
         name: name ?? this.name,
         description: description.present ? description.value : this.description,
         serverUrl: serverUrl.present ? serverUrl.value : this.serverUrl,
+        serverNodeId:
+            serverNodeId.present ? serverNodeId.value : this.serverNodeId,
         lastSessionDate: lastSessionDate ?? this.lastSessionDate,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -288,6 +324,9 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
       description:
           data.description.present ? data.description.value : this.description,
       serverUrl: data.serverUrl.present ? data.serverUrl.value : this.serverUrl,
+      serverNodeId: data.serverNodeId.present
+          ? data.serverNodeId.value
+          : this.serverNodeId,
       lastSessionDate: data.lastSessionDate.present
           ? data.lastSessionDate.value
           : this.lastSessionDate,
@@ -305,6 +344,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('serverUrl: $serverUrl, ')
+          ..write('serverNodeId: $serverNodeId, ')
           ..write('lastSessionDate: $lastSessionDate, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -315,7 +355,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
 
   @override
   int get hashCode => Object.hash(id, name, description, serverUrl,
-      lastSessionDate, createdAt, updatedAt, isArchived);
+      serverNodeId, lastSessionDate, createdAt, updatedAt, isArchived);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -324,6 +364,7 @@ class ProjectEntity extends DataClass implements Insertable<ProjectEntity> {
           other.name == this.name &&
           other.description == this.description &&
           other.serverUrl == this.serverUrl &&
+          other.serverNodeId == this.serverNodeId &&
           other.lastSessionDate == this.lastSessionDate &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
@@ -335,6 +376,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
   final Value<String> name;
   final Value<String?> description;
   final Value<String?> serverUrl;
+  final Value<String?> serverNodeId;
   final Value<DateTime> lastSessionDate;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -345,6 +387,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.serverUrl = const Value.absent(),
+    this.serverNodeId = const Value.absent(),
     this.lastSessionDate = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -356,6 +399,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     required String name,
     this.description = const Value.absent(),
     this.serverUrl = const Value.absent(),
+    this.serverNodeId = const Value.absent(),
     required DateTime lastSessionDate,
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -371,6 +415,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     Expression<String>? name,
     Expression<String>? description,
     Expression<String>? serverUrl,
+    Expression<String>? serverNodeId,
     Expression<DateTime>? lastSessionDate,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -382,6 +427,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (serverUrl != null) 'server_url': serverUrl,
+      if (serverNodeId != null) 'server_node_id': serverNodeId,
       if (lastSessionDate != null) 'last_session_date': lastSessionDate,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -395,6 +441,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
       Value<String>? name,
       Value<String?>? description,
       Value<String?>? serverUrl,
+      Value<String?>? serverNodeId,
       Value<DateTime>? lastSessionDate,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt,
@@ -405,6 +452,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
       name: name ?? this.name,
       description: description ?? this.description,
       serverUrl: serverUrl ?? this.serverUrl,
+      serverNodeId: serverNodeId ?? this.serverNodeId,
       lastSessionDate: lastSessionDate ?? this.lastSessionDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -427,6 +475,9 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
     }
     if (serverUrl.present) {
       map['server_url'] = Variable<String>(serverUrl.value);
+    }
+    if (serverNodeId.present) {
+      map['server_node_id'] = Variable<String>(serverNodeId.value);
     }
     if (lastSessionDate.present) {
       map['last_session_date'] = Variable<DateTime>(lastSessionDate.value);
@@ -453,6 +504,7 @@ class ProjectEntityCompanion extends UpdateCompanion<ProjectEntity> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('serverUrl: $serverUrl, ')
+          ..write('serverNodeId: $serverNodeId, ')
           ..write('lastSessionDate: $lastSessionDate, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1140,6 +1192,7 @@ typedef $$ProjectsTableCreateCompanionBuilder = ProjectEntityCompanion
   required String name,
   Value<String?> description,
   Value<String?> serverUrl,
+  Value<String?> serverNodeId,
   required DateTime lastSessionDate,
   required DateTime createdAt,
   required DateTime updatedAt,
@@ -1152,6 +1205,7 @@ typedef $$ProjectsTableUpdateCompanionBuilder = ProjectEntityCompanion
   Value<String> name,
   Value<String?> description,
   Value<String?> serverUrl,
+  Value<String?> serverNodeId,
   Value<DateTime> lastSessionDate,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -1179,6 +1233,9 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<String> get serverUrl => $composableBuilder(
       column: $table.serverUrl, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get serverNodeId => $composableBuilder(
+      column: $table.serverNodeId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get lastSessionDate => $composableBuilder(
       column: $table.lastSessionDate,
@@ -1215,6 +1272,10 @@ class $$ProjectsTableOrderingComposer
   ColumnOrderings<String> get serverUrl => $composableBuilder(
       column: $table.serverUrl, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get serverNodeId => $composableBuilder(
+      column: $table.serverNodeId,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get lastSessionDate => $composableBuilder(
       column: $table.lastSessionDate,
       builder: (column) => ColumnOrderings(column));
@@ -1249,6 +1310,9 @@ class $$ProjectsTableAnnotationComposer
 
   GeneratedColumn<String> get serverUrl =>
       $composableBuilder(column: $table.serverUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get serverNodeId => $composableBuilder(
+      column: $table.serverNodeId, builder: (column) => column);
 
   GeneratedColumn<DateTime> get lastSessionDate => $composableBuilder(
       column: $table.lastSessionDate, builder: (column) => column);
@@ -1293,6 +1357,7 @@ class $$ProjectsTableTableManager extends RootTableManager<
             Value<String> name = const Value.absent(),
             Value<String?> description = const Value.absent(),
             Value<String?> serverUrl = const Value.absent(),
+            Value<String?> serverNodeId = const Value.absent(),
             Value<DateTime> lastSessionDate = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -1304,6 +1369,7 @@ class $$ProjectsTableTableManager extends RootTableManager<
             name: name,
             description: description,
             serverUrl: serverUrl,
+            serverNodeId: serverNodeId,
             lastSessionDate: lastSessionDate,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -1315,6 +1381,7 @@ class $$ProjectsTableTableManager extends RootTableManager<
             required String name,
             Value<String?> description = const Value.absent(),
             Value<String?> serverUrl = const Value.absent(),
+            Value<String?> serverNodeId = const Value.absent(),
             required DateTime lastSessionDate,
             required DateTime createdAt,
             required DateTime updatedAt,
@@ -1326,6 +1393,7 @@ class $$ProjectsTableTableManager extends RootTableManager<
             name: name,
             description: description,
             serverUrl: serverUrl,
+            serverNodeId: serverNodeId,
             lastSessionDate: lastSessionDate,
             createdAt: createdAt,
             updatedAt: updatedAt,

@@ -8,12 +8,17 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tower_http::trace::TraceLayer;
 use tracing::{error, info, warn};
 
 mod apns;
 use apns::ApnsClient;
+
+mod pubkey;
+use pubkey::PubkeyStore;
 
 #[derive(Clone)]
 struct AppState {
@@ -68,11 +73,23 @@ async fn main() -> anyhow::Result<()> {
         std::env::var("API_KEY").expect("API_KEY environment variable must be set"),
     );
 
+    let pubkey_store: PubkeyStore = Arc::new(RwLock::new(HashMap::new()));
+
     let state = AppState { apns_client, api_key };
+
+    // Pubkey routes get their own state (just the store) so they
+    // don't depend on the full AppState.
+    let pubkey_router = Router::new()
+        .route(
+            "/pubkey",
+            axum::routing::get(pubkey::get_pubkey).post(pubkey::post_pubkey),
+        )
+        .with_state(pubkey_store);
 
     // Build the router
     let app = Router::new()
         .route("/health", axum::routing::get(health_check))
+        .merge(pubkey_router)
         .route("/send", post(send_notification))
         .route_layer(middleware::from_fn_with_state(state.clone(), api_key_auth))
         .layer(TraceLayer::new_for_http())
@@ -98,8 +115,9 @@ async fn api_key_auth(
     req: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    // Skip auth for health check
-    if req.uri().path() == "/health" {
+    // Skip auth for health check and pubkey exchange
+    let path = req.uri().path();
+    if path == "/health" || path == "/pubkey" {
         return Ok(next.run(req).await);
     }
 
@@ -165,7 +183,7 @@ async fn send_notification(
     Ok(Json(NotificationResponse { success, failed }))
 }
 
-// Error handling
+// ----- Error handling -----
 struct AppError(anyhow::Error);
 
 impl IntoResponse for AppError {

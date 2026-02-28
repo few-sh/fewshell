@@ -38,7 +38,7 @@ class ChatController extends StateNotifier<ChatState> {
   bool _isAborted = false;
 
   /// Whether execution happens locally (no remote server configured).
-  bool get isLocalExecution => _project?.serverUrl == null;
+  bool get isLocalExecution => _project?.serverNodeId == null;
 
   Stream<MessageEntity> get activeMessageStream =>
       _activeMessageController.stream;
@@ -424,7 +424,7 @@ class ChatController extends StateNotifier<ChatState> {
 
       final AgentLoopResult result;
 
-      if (_project?.serverUrl != null) {
+      if (_project?.serverNodeId != null) {
         if (syncChannel == null) {
           if (mounted) {
             state = state.copyWith(
@@ -511,11 +511,11 @@ class ChatController extends StateNotifier<ChatState> {
               );
               _activeMessageController.add(streamingMessage);
               for (final toolCall in toolCalls) {
-                final stdoutBuffer = StringBuffer();
+                final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
-                  stdoutBuffer.write(data);
+                  terminalBuffer.write(data);
                   final streamingResultJson = jsonEncode({
-                    'stdout': stdoutBuffer.toString(),
+                    'stdout': terminalBuffer.toString(),
                     'stderr': '',
                     'exitCode': 0,
                     'isStreaming': true,
@@ -539,6 +539,7 @@ class ChatController extends StateNotifier<ChatState> {
                 // Execute and return result as JSON string
                 final result =
                     await _executeToolCall(toolCall, onOutput: onOutput);
+                result['stdout'] = terminalBuffer.toString();
                 results.add(jsonEncode(result));
                 completedToolResults.add(ToolCall(
                   id: toolCall.id,

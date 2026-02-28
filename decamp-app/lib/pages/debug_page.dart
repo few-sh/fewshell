@@ -165,7 +165,8 @@ class DebugPage extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: 8.0),
                   child: ShadButton.outline(
                     child: const Text('Connect Global Dialog'),
-                    onPressed: () => ConnectToAgentServerDialog.show(context),
+                    onPressed: () =>
+                        ConnectToAgentServerDialog.show(context, ref),
                   ),
                 ),
 

@@ -179,7 +179,8 @@ class ProjectSetupView extends ConsumerWidget {
                 ),
                 const SizedBox(height: 16),
                 ShadButton.outline(
-                  onPressed: () => ConnectToAgentServerDialog.show(context),
+                  onPressed: () =>
+                      ConnectToAgentServerDialog.show(context, ref),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [

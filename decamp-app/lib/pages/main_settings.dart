@@ -3,18 +3,20 @@ import 'package:decamp/providers/providers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:drift/drift.dart' hide Column;
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
 import '../services/project_importer.dart';
+import '../services/sync_service.dart';
 import 'chat_session.dart';
 import 'qr_scanner_page.dart';
 
 import '../components/ai_model_dialog.dart';
+import '../components/connection_progress_dialog.dart';
 import '../components/ssh_settings_dialog.dart';
 import '../components/project_title_bar.dart';
 import '../components/empty_placeholder.dart';
+import '../providers/ssh_tunnel_provider.dart';
 import '../themes/shad_layout_theme.dart';
 
 /// Main settings page with User and Project settings tabs
@@ -1026,58 +1028,219 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildServerUrlSection(ProjectEntity project) {
     final theme = ShadTheme.of(context);
-    final controller = TextEditingController(text: project.serverUrl);
-
-    Future<void> saveChanges(String value) async {
-      final trimmedValue = value.trim();
-      final newValue = trimmedValue.isEmpty ? null : trimmedValue;
-
-      // Check if unchanged
-      if (newValue == project.serverUrl) {
-        return;
-      }
-
-      // Save the change
-      await ref
-          .read(projectControllerProvider)
-          .updateProject(id: project.id, serverUrl: Value(newValue));
-      if (mounted) {
-        _showSnack('Server URL updated');
-      }
-    }
+    final connectionInfoAsync = ref.watch(
+      projectConnectionInfoProvider(project.id),
+    );
+    final tunnelId = connectionInfoAsync.whenOrNull(
+      data: (info) {
+        if (info != null && info['type'] == 'tunnel') {
+          return info['tunnelId'] as String?;
+        }
+        return null;
+      },
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Remote Agent URL', style: theme.textTheme.h4),
-        const SizedBox(height: 16),
-        ShadCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShadInput(
-                contextMenuBuilder: adaptiveContextMenuBuilder,
-                controller: controller,
-                placeholder: const Text('wss://example.com:3123'),
-                autocorrect: false,
-                enableSuggestions: false,
-                leading: const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: Icon(LucideIcons.cloud, size: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('SSH Tunnel', style: theme.textTheme.h4),
+            if (tunnelId == null)
+              ShadButton(
+                onPressed: () => _showTunnelDialog(project: project),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.plus, size: 16),
+                    SizedBox(width: 8),
+                    Text('Configure Tunnel'),
+                  ],
                 ),
-                onSubmitted: saveChanges,
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Leave empty to run locally',
-                style: theme.textTheme.muted.copyWith(fontSize: 12),
+          ],
+        ),
+        if (project.serverNodeId != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Server: ${project.serverNodeId}',
+            style: theme.textTheme.muted.copyWith(fontSize: 11),
+          ),
+        ],
+        const SizedBox(height: 16),
+        _buildTunnelCard(project, tunnelId),
+      ],
+    );
+  }
+
+  Widget _buildTunnelCard(ProjectEntity project, String? tunnelId) {
+    final theme = ShadTheme.of(context);
+
+    if (tunnelId == null) {
+      return const EmptyPlaceholder(
+        icon: LucideIcons.network,
+        title: 'No SSH Tunnel',
+        subtitle: 'Configure an SSH tunnel to connect to a remote agent.',
+      );
+    }
+
+    final tunnelConfigs = ref.watch(sshTunnelConfigsProvider);
+    final settings = tunnelConfigs.whenOrNull(
+      data: (configs) => configs[tunnelId],
+    );
+
+    if (settings == null) {
+      return ShadCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              LucideIcons.circleAlert,
+              color: theme.colorScheme.destructive,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Tunnel configuration not found. It may have been deleted.',
+                style: theme.textTheme.muted,
+              ),
+            ),
+            ShadButton.ghost(
+              width: 32,
+              height: 32,
+              padding: EdgeInsets.zero,
+              onPressed: () => _removeTunnel(project),
+              foregroundColor: theme.colorScheme.destructive,
+              child: const Icon(LucideIcons.trash2, size: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ShadCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.network,
+                      color: theme.colorScheme.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${settings.username}@${settings.host}',
+                        style: theme.textTheme.large.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ShadButton.ghost(
+                    width: 32,
+                    height: 32,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: () => _showTunnelDialog(
+                      project: project,
+                      existingTunnelId: tunnelId,
+                    ),
+                    child: const Icon(LucideIcons.pencil, size: 16),
+                  ),
+                  ShadButton.ghost(
+                    width: 32,
+                    height: 32,
+                    padding: EdgeInsets.zero,
+                    decoration: const ShadDecoration(border: ShadBorder.none),
+                    onPressed: () => _removeTunnel(project),
+                    foregroundColor: theme.colorScheme.destructive,
+                    child: const Icon(LucideIcons.trash2, size: 16),
+                  ),
+                ],
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                LucideIcons.server,
+                size: 16,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${settings.host}:${settings.port}',
+                style: theme.textTheme.muted,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(
+                LucideIcons.key,
+                size: 16,
+                color: theme.colorScheme.mutedForeground,
+              ),
+              const SizedBox(width: 8),
+              Text('Private Key Authentication', style: theme.textTheme.muted),
+            ],
+          ),
+        ],
+      ),
     );
+  }
+
+  void _showTunnelDialog({
+    required ProjectEntity project,
+    String? existingTunnelId,
+  }) {
+    SshSettingsDialog.showTunnel(
+      context,
+      ref,
+      existingTunnelId: existingTunnelId,
+      onSaved: (tunnelId) async {
+        final mappingStorage = ref.read(connectionMappingStorageProvider);
+        await mappingStorage.save(project.id, {
+          'type': 'tunnel',
+          'tunnelId': tunnelId,
+        });
+        ref.invalidate(projectConnectionInfoProvider(project.id));
+        if (!mounted) return;
+        ConnectionProgressDialog.show(
+          context,
+          initialStatus: 'Establishing SSH tunnel...',
+          connect: (onStatus) async {
+            final syncService = ref.read(syncServiceProvider);
+            await syncService.connectViaTunnel(tunnelId, onStatus: onStatus);
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _removeTunnel(ProjectEntity project) async {
+    final mappingStorage = ref.read(connectionMappingStorageProvider);
+    await mappingStorage.delete(project.id);
+    ref.invalidate(projectConnectionInfoProvider(project.id));
+    if (mounted) _showSnack('SSH tunnel removed');
   }
 
   Future<void> _showDeleteProjectDialog({

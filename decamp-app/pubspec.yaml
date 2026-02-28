@@ -73,7 +73,8 @@ dependencies:
   flutter_local_notifications: ^18.0.1
 
   # SSH Client
-  dartssh2: ^2.9.2
+  dartssh2:
+    path: ../dartssh2
   stream_channel: ^2.1.4
   shadcn_ui: ^0.43.0
   async: ^2.13.0
