@@ -7,8 +7,8 @@ import 'package:logging/logging.dart';
 final _log = Logger('RemoteInstaller');
 
 ///
-/// Installing the latest: https://release.few.sh/releases/latest/fewshell-agent-linux-amd64.zip
-/// or arm64: https://release.few.sh/releases/latest/fewshell-agent-linux-arm64.zip
+/// Installing the latest: https://release.few.sh/releases/latest/fewshell-agent-linux-amd64.tar.gz
+/// or arm64: https://release.few.sh/releases/latest/fewshell-agent-linux-arm64.tar.gz
 
 /// URL for the installer script.
 const _installerScriptUrl = 'https://get.fewshell.com';

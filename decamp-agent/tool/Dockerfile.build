@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     xz-utils \
-    zip \
     libglu1-mesa \
     libsqlite3-dev \
     build-essential \

@@ -62,13 +62,13 @@ main() {
     os="$(detect_os)"
     arch="$(detect_arch)"
 
-    local zip_name="fewshell-agent-${os}-${arch}.zip"
-    local url="${BASE_URL}/${zip_name}"
+    local tgz_name="fewshell-agent-${os}-${arch}.tar.gz"
+    local url="${BASE_URL}/${tgz_name}"
 
     info "OS: ${os}  Architecture: ${arch}"
 
     # --- Check for required tools ---
-    for cmd in curl unzip; do
+    for cmd in curl tar; do
         if ! command -v "$cmd" &>/dev/null; then
             warn "Required command not found: $cmd"
             exit 1
@@ -80,8 +80,8 @@ main() {
     tmp_dir="$(mktemp -d)"
     trap 'rm -rf "$tmp_dir"' EXIT
 
-    step "Downloading ${zip_name}…"
-    if ! curl -fSL --progress-bar -o "${tmp_dir}/${zip_name}" "$url"; then
+    step "Downloading ${tgz_name}…"
+    if ! curl -fSL --progress-bar -o "${tmp_dir}/${tgz_name}" "$url"; then
         warn "Download failed. Check your network connection."
         exit 1
     fi
@@ -89,7 +89,7 @@ main() {
     # --- Install ---
     step "Installing to ${INSTALL_DIR}…"
     mkdir -p "$INSTALL_DIR"
-    unzip -o "${tmp_dir}/${zip_name}" -d "$INSTALL_DIR"
+    tar xzf "${tmp_dir}/${tgz_name}" -C "$INSTALL_DIR"
 
     chmod +x "${INSTALL_DIR}/fewshell-server"
     chmod 700 "${INSTALL_DIR}/fewshell-server"
