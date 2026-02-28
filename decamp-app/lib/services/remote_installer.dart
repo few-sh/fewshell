@@ -120,9 +120,15 @@ class RemoteInstaller {
   Future<void> _startServer() async {
     _log.info('Starting fewshell-server…');
 
-    await _execSilent(
-      'cd ~/.fewshell && nohup ./fewshell-server > /dev/null 2>&1 &',
+    // Fire-and-forget: launch the server and don't await session.done,
+    // because the SSH channel won't close while the backgrounded process
+    // is alive. We verify success by waiting for the domain socket instead.
+    final session = await client.execute(
+      'cd ~/.fewshell && nohup ./fewshell-server < /dev/null > /dev/null 2>&1 &',
     );
+    // Close the session immediately — the server is backgrounded and doesn't
+    // need the channel. This frees the SSH channel resource.
+    session.close();
 
     await _waitForSocket();
 
