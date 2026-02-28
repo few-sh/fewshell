@@ -16,9 +16,6 @@ const _installerScriptUrl = 'https://get.fewshell.com';
 /// Relative path (from $HOME) to the server binary.
 const _serverBinaryPath = '.fewshell/fewshell-server';
 
-/// Process name used with pgrep.
-const _serverProcessName = 'fewshell-server';
-
 /// Relative path (from $HOME) to the domain socket the server creates.
 const _serverSocketPath = '.fewshell/agent.sock';
 
@@ -85,11 +82,14 @@ class RemoteInstaller {
     return result == 'YES';
   }
 
-  /// `true` when a fewshell-server process is found via pgrep.
+  /// `true` when the fewshell-server process is running.
   Future<bool> _isRunning() async {
     _log.fine('Checking if fewshell-server is running…');
+    // Use -f to match the full command line (the comm name may differ from
+    // the binary name). The [f] bracket trick prevents pgrep from matching
+    // its own command line.
     final result = await _execStdout(
-      'pgrep -f -u \$(whoami) $_serverProcessName > /dev/null 2>&1 && echo YES || echo NO',
+      'pgrep -f -u \$(whoami) "[f]ewshell-server" > /dev/null 2>&1 && echo YES || echo NO',
     );
     _log.fine('_isRunning: result = $result');
     return result == 'YES';
