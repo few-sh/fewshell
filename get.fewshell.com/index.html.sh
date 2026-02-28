@@ -20,6 +20,7 @@ BASE_URL="https://release.few.sh/releases/latest"
 RELAY_URL="https://relay.fewshell.com"
 SSH_DIR="$HOME/.ssh"
 AUTH_KEYS="$SSH_DIR/authorized_keys"
+TMP_DIR=""
 
 info()  { echo -e "${GREEN}▸${RESET} $*"; }
 warn()  { echo -e "${RED}▸${RESET} $*"; }
@@ -76,12 +77,11 @@ main() {
     done
 
     # --- Download ---
-    local tmp_dir
-    tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
+    TMP_DIR="$(mktemp -d)"
+    trap 'rm -rf "$TMP_DIR"' EXIT
 
-    step "Downloading ${tgz_name}…"
-    if ! curl -fSL --progress-bar -o "${tmp_dir}/${tgz_name}" "$url"; then
+    step "Downloading ${tgz_name}\u2026"
+    if ! curl -fSL --progress-bar -o "${TMP_DIR}/${tgz_name}" "$url"; then
         warn "Download failed. Check your network connection."
         exit 1
     fi
@@ -89,7 +89,7 @@ main() {
     # --- Install ---
     step "Installing to ${INSTALL_DIR}…"
     mkdir -p "$INSTALL_DIR"
-    tar xzf "${tmp_dir}/${tgz_name}" -C "$INSTALL_DIR"
+    tar xzf "${TMP_DIR}/${tgz_name}" -C "$INSTALL_DIR"
 
     chmod +x "${INSTALL_DIR}/fewshell-server"
     chmod 700 "${INSTALL_DIR}/fewshell-server"

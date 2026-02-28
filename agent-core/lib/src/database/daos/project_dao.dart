@@ -131,6 +131,7 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
   Future<String> createProjectWithId({
     required String name,
     String? description,
+    String? serverNodeId,
   }) async {
     final now = DateTime.now();
     final id = generateProjectId();
@@ -139,6 +140,7 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
       id: Value(id),
       name: Value(name),
       description: Value(description),
+      serverNodeId: Value(serverNodeId),
       lastSessionDate: Value(now),
       createdAt: Value(now),
       updatedAt: Value(now),

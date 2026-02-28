@@ -13,8 +13,10 @@ import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:decamp/certs.dart';
+import 'package:decamp/models/app_event.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/providers/ssh_tunnel_provider.dart';
+import 'package:decamp/services/app_event_bus.dart';
 import 'package:decamp/services/remote_installer.dart';
 
 final _log = Logger('SyncService');
@@ -76,14 +78,23 @@ class SyncService {
   Stream<bool> get isSyncing => _isSyncingController.stream;
 
   Timer? _reconnectTimer;
+  Timer? _globalReconnectTimer;
   String? _currentProjectId;
   ProjectDatabase? _currentProjectDb;
   _CancellationToken? _connectionToken;
   int _reconnectAttempts = 0;
+  int _globalReconnectAttempts = 0;
   AppLifecycleListener? _lifecycleListener;
   AppLifecycleState? _lastLifecycleState;
 
+  /// When true, [_checkProjectsForServer] is suppressed because
+  /// [connectViaTunnel] is running its own polling + emission logic.
+  bool _tunnelConnectInProgress = false;
+
+  late final AppEventBus _appEventBus;
+
   SyncService(this.ref) {
+    _appEventBus = ref.read(appEventBusProvider);
     _init();
   }
 
@@ -165,71 +176,86 @@ class SyncService {
     String tunnelId, {
     void Function(String message)? onStatus,
   }) async {
-    onStatus?.call('Establishing SSH tunnel...');
-    await reconnectGlobal(
-      connectionInfo: {'type': 'tunnel', 'tunnelId': tunnelId},
-    );
-
-    onStatus?.call('Waiting for global sync...');
-    await waitForGlobalSync();
-
-    onStatus?.call('Checking projects...');
-    final serverNodeId = _currentServerNodeId;
-    if (serverNodeId == null) {
-      throw Exception('Server did not provide a node ID.');
-    }
-
-    // If the current project already belongs to this server, skip discovery.
-    final currentProject = ref.read(currentProjectProvider);
-    if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
-      _log.info(
-        'Current project ${currentProject.id} already belongs to server $serverNodeId, skipping discovery.',
+    _tunnelConnectInProgress = true;
+    try {
+      onStatus?.call('Establishing SSH tunnel...');
+      await reconnectGlobal(
+        connectionInfo: {'type': 'tunnel', 'tunnelId': tunnelId},
       );
-      onStatus?.call('Syncing project data...');
+
+      onStatus?.call('Waiting for global sync...');
+      await waitForGlobalSync();
+
+      onStatus?.call('Checking projects...');
+      final serverNodeId = _currentServerNodeId;
+      if (serverNodeId == null) {
+        throw Exception('Server did not provide a node ID.');
+      }
+
+      // If the current project already belongs to this server, skip discovery.
+      final currentProject = ref.read(currentProjectProvider);
+      if (currentProject != null &&
+          currentProject.serverNodeId == serverNodeId) {
+        _log.info(
+          'Current project ${currentProject.id} already belongs to server $serverNodeId, skipping discovery.',
+        );
+        onStatus?.call('Syncing project data...');
+        await Future.delayed(const Duration(milliseconds: 200));
+        await waitForProjectSync();
+        return;
+      } else {
+        _log.info(
+          'No current project matches server $serverNodeId '
+          '(current: ${currentProject?.serverNodeId}), proceeding with discovery.',
+        );
+      }
+
+      final globalDb = ref.read(globalDatabaseProvider);
+      List<ProjectEntity> matchingProjects = [];
+
+      // Poll for projects for up to 10 seconds.
+      for (int i = 0; i < 20; i++) {
+        matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
+          serverNodeId,
+        );
+        if (matchingProjects.isNotEmpty) {
+          _log.info(
+            'Found ${matchingProjects.length} project(s) for server $serverNodeId after ${i + 1} poll(s).',
+          );
+          break;
+        }
+        _log.fine('No projects for $serverNodeId yet, poll ${i + 1}/20...');
+        onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+
+      if (matchingProjects.isEmpty) {
+        _log.info(
+          'No projects found for server $serverNodeId after polling, '
+          'emitting NoProjectsForServer event.',
+        );
+        _appEventBus.emit(
+          NoProjectsForServer(
+            serverNodeId,
+            connectionInfo: _currentGlobalConnectionInfo,
+          ),
+        );
+        return;
+      }
+
+      // Switch to the first matching project.
+      final targetProject = matchingProjects.first;
+      onStatus?.call('Switching to project ${targetProject.name}...');
+      await ref
+          .read(currentProjectIdProvider.notifier)
+          .select(targetProject.id);
+
+      onStatus?.call('Waiting for project sync...');
       await Future.delayed(const Duration(milliseconds: 200));
       await waitForProjectSync();
-      return;
-    } else {
-      _log.info(
-        'No current project matches server $serverNodeId '
-        '(current: ${currentProject?.serverNodeId}), proceeding with discovery.',
-      );
+    } finally {
+      _tunnelConnectInProgress = false;
     }
-
-    final globalDb = ref.read(globalDatabaseProvider);
-    List<ProjectEntity> matchingProjects = [];
-
-    // Poll for projects for up to 10 seconds.
-    for (int i = 0; i < 20; i++) {
-      matchingProjects = await globalDb.projectDao.getProjectsByServerNodeId(
-        serverNodeId,
-      );
-      if (matchingProjects.isNotEmpty) {
-        _log.info(
-          'Found ${matchingProjects.length} project(s) for server $serverNodeId after ${i + 1} poll(s).',
-        );
-        break;
-      }
-      _log.fine('No projects for $serverNodeId yet, poll ${i + 1}/20...');
-      onStatus?.call('Waiting for projects to sync... (${i + 1}/20)');
-      await Future.delayed(const Duration(milliseconds: 500));
-    }
-
-    if (matchingProjects.isEmpty) {
-      throw Exception(
-        'No projects found for this tunnel. '
-        'Make sure the remote agent has a project configured.',
-      );
-    }
-
-    // Switch to the first matching project.
-    final targetProject = matchingProjects.first;
-    onStatus?.call('Switching to project ${targetProject.name}...');
-    await ref.read(currentProjectIdProvider.notifier).select(targetProject.id);
-
-    onStatus?.call('Waiting for project sync...');
-    await Future.delayed(const Duration(milliseconds: 200));
-    await waitForProjectSync();
   }
 
   /// Forces a global sync reconnect.
@@ -317,6 +343,7 @@ class SyncService {
           tunnelId: resolved.tunnelId!,
           wsPath: '/sync/global',
           timeout: defaultConnectionTimeout,
+          ensureServer: true,
         );
         channel = wsChannel;
         responseHeaders = headers;
@@ -345,7 +372,9 @@ class SyncService {
         );
       }
       _currentServerNodeId = headerNodeId;
+      _globalReconnectAttempts = 0;
       _log.info('Discovered server node ID: $headerNodeId');
+      _appEventBus.emit(GlobalSyncConnected(headerNodeId));
 
       _globalChannel = MultiplexedWebSocketChannel(
         channel,
@@ -467,9 +496,20 @@ class SyncService {
 
       // Global sync connected — now connect project sync.
       _connectProjectIfReady();
+
+      // After initial changeset exchange completes, emit idle event and
+      // check whether any projects exist for this server.
+      _globalAdapter!.onIdle.then((_) {
+        final nodeId = _currentServerNodeId;
+        if (nodeId != null) {
+          _appEventBus.emit(GlobalSyncIdle(nodeId));
+          _checkProjectsForServer();
+        }
+      });
     } catch (e, stackTrace) {
       _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
+      _scheduleGlobalReconnect();
     }
   }
 
@@ -480,6 +520,68 @@ class SyncService {
     final projectId = ref.read(currentProjectIdProvider);
     if (projectDb != null && projectId != null) {
       _connectProject(projectDb, projectId);
+    }
+  }
+
+  /// Checks whether any projects exist for the current server after global
+  /// sync reaches idle. If none exist, emits [NoProjectsForServer] so the UI
+  /// can prompt the user to create one.
+  Future<void> _checkProjectsForServer() async {
+    final serverNodeId = _currentServerNodeId;
+    if (serverNodeId == null) return;
+
+    // Skip when connectViaTunnel is running — it has its own polling logic.
+    if (_tunnelConnectInProgress) {
+      _log.fine(
+        '_checkProjectsForServer: skipping, tunnel connect in progress.',
+      );
+      return;
+    }
+
+    // Skip if the user already has a project selected.
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject != null) {
+      _log.fine(
+        '_checkProjectsForServer: project ${currentProject.id} already selected, skipping.',
+      );
+      return;
+    }
+
+    final globalDb = ref.read(globalDatabaseProvider);
+
+    // Poll briefly — the CRDT changeset with project data may not have been
+    // merged yet when onIdle fires. Give sync up to 5 seconds.
+    // HACK - Ideally onIdly really should work for us.
+    List<ProjectEntity> projects = [];
+    for (int i = 0; i < 10; i++) {
+      projects = await globalDb.projectDao.getProjectsByServerNodeId(
+        serverNodeId,
+      );
+      if (projects.isNotEmpty) {
+        _log.fine(
+          '_checkProjectsForServer: found ${projects.length} project(s) '
+          'for server $serverNodeId after ${i + 1} poll(s).',
+        );
+        return;
+      }
+      // Re-check that we're still relevant before sleeping.
+      if (_currentServerNodeId != serverNodeId) return;
+      _log.fine('_checkProjectsForServer: no projects yet, poll ${i + 1}/10…');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // Still empty after polling — emit event so the UI can prompt.
+    if (projects.isEmpty) {
+      _log.info(
+        '_checkProjectsForServer: no projects for server $serverNodeId '
+        'after polling, emitting event.',
+      );
+      _appEventBus.emit(
+        NoProjectsForServer(
+          serverNodeId,
+          connectionInfo: _currentGlobalConnectionInfo,
+        ),
+      );
     }
   }
 
@@ -637,6 +739,7 @@ class SyncService {
         final (ch, tunnel, _) = await _connectViaTunnel(
           tunnelId: tunnelId,
           wsPath: '/sync/project/$projectId',
+          ensureServer: false,
         );
         wsChannel = ch;
         _projectSshTunnel = tunnel;
@@ -769,6 +872,9 @@ class SyncService {
   }
 
   void _disconnectGlobal() {
+    final wasConnected = _currentServerNodeId != null;
+    _globalReconnectTimer?.cancel();
+    _globalReconnectTimer = null;
     _globalSync?.close();
     _globalSync = null;
     _globalChannel = null;
@@ -779,6 +885,28 @@ class SyncService {
     _currentServerNodeId = null;
     _globalSshTunnel?.close();
     _globalSshTunnel = null;
+    if (wasConnected) {
+      _appEventBus.emit(const GlobalSyncDisconnected());
+    }
+  }
+
+  void _scheduleGlobalReconnect() {
+    if (_globalReconnectTimer?.isActive ?? false) {
+      _log.fine('_scheduleGlobalReconnect: timer already active, skipping.');
+      return;
+    }
+
+    final delaySeconds = _getFibonacciDelay(_globalReconnectAttempts);
+    _log.info(
+      'Scheduling global reconnect in $delaySeconds seconds '
+      '(attempt $_globalReconnectAttempts)...',
+    );
+
+    _globalReconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      _globalReconnectAttempts++;
+      final project = ref.read(currentProjectProvider);
+      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
+    });
   }
 
   void _scheduleReconnect() {
@@ -884,6 +1012,7 @@ class SyncService {
       _disconnectGlobal();
       _closeProjectConnection();
       _reconnectAttempts = 0;
+      _globalReconnectAttempts = 0;
       final project = ref.read(currentProjectProvider);
       _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
     } else {
@@ -934,6 +1063,7 @@ class SyncService {
     required String tunnelId,
     required String wsPath,
     Duration? timeout,
+    bool ensureServer = true,
   }) async {
     final storage = ref.read(sshTunnelStorageProvider);
     final settings = await storage.get(tunnelId);
@@ -951,6 +1081,7 @@ class SyncService {
       sshPassphrase: passphrase,
       wsPath: wsPath,
       timeout: timeout,
+      ensureServer: ensureServer,
     );
   }
 
@@ -972,6 +1103,7 @@ class SyncService {
     String? sshPassphrase,
     required String wsPath,
     Duration? timeout,
+    bool ensureServer = true,
   }) async {
     _log.info('SSH tunnel: connecting to $sshUsername@$sshHost:$sshPort');
 
@@ -1000,12 +1132,14 @@ class SyncService {
     await client.authenticated;
     _log.info('SSH tunnel: authenticated');
 
-    // Ensure the fewshell server is installed and running.
-    final installer = RemoteInstaller(client);
-    try {
-      await installer.ensureServerRunning();
-    } finally {
-      installer.dispose();
+    // Ensure the fewshell server is installed and running (global only).
+    if (ensureServer) {
+      final installer = RemoteInstaller(client);
+      try {
+        await installer.ensureServerRunning();
+      } finally {
+        installer.dispose();
+      }
     }
 
     // Discover remote home directory

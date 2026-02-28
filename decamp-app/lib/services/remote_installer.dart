@@ -16,9 +16,6 @@ const _installerScriptUrl = 'https://get.fewshell.com';
 /// Relative path (from $HOME) to the server binary.
 const _serverBinaryPath = '.fewshell/fewshell-server';
 
-/// Process name used with pgrep.
-const _serverProcessName = 'fewshell-server';
-
 /// Relative path (from $HOME) to the domain socket the server creates.
 const _serverSocketPath = '.fewshell/agent.sock';
 
@@ -76,17 +73,26 @@ class RemoteInstaller {
   /// `true` when the server binary exists and is executable.
   Future<bool> _isInstalled() async {
     _log.fine('Checking if fewshell-server is installed…');
-    final exitCode = await _execSilent('test -x ~/$_serverBinaryPath');
-    return exitCode == 0;
+    // Use stdout instead of exit codes — dartssh2 doesn't reliably
+    // deliver exitCode before session.done completes.
+    final result = await _execStdout(
+      'test -x \$HOME/$_serverBinaryPath && echo YES || echo NO',
+    );
+    _log.fine('_isInstalled: result = $result');
+    return result == 'YES';
   }
 
-  /// `true` when a fewshell-server process is found via pgrep.
+  /// `true` when the fewshell-server process is running.
   Future<bool> _isRunning() async {
     _log.fine('Checking if fewshell-server is running…');
-    final exitCode = await _execSilent(
-      'pgrep -f -u \$(whoami) $_serverProcessName',
+    // Use -f to match the full command line (the comm name may differ from
+    // the binary name). The [f] bracket trick prevents pgrep from matching
+    // its own command line.
+    final result = await _execStdout(
+      'pgrep -f -u \$(whoami) "[f]ewshell-server" > /dev/null 2>&1 && echo YES || echo NO',
     );
-    return exitCode == 0;
+    _log.fine('_isRunning: result = $result');
+    return result == 'YES';
   }
 
   /// Runs the installer script, streaming output to [output].
@@ -94,14 +100,19 @@ class RemoteInstaller {
     _log.info('Installing fewshell-server…');
 
     final session = await client.execute(
-      'curl -LsSf $_installerScriptUrl | bash',
+      'curl -LsSf $_installerScriptUrl | bash -s -- --skip-pairing',
     );
 
+    final outputBuffer = StringBuffer();
     final stdoutSub = session.stdout.listen((data) {
-      _emit(utf8.decode(data));
+      final text = utf8.decode(data);
+      outputBuffer.write(text);
+      _emit(text);
     });
     final stderrSub = session.stderr.listen((data) {
-      _emit(utf8.decode(data));
+      final text = utf8.decode(data);
+      outputBuffer.write(text);
+      _emit(text);
     });
 
     await session.done;
@@ -110,19 +121,42 @@ class RemoteInstaller {
 
     final code = session.exitCode;
     if (code != null && code != 0) {
-      throw Exception('Installation failed with exit code $code');
+      // The script may exit non-zero due to a non-critical step (e.g.
+      // copying the shared library). Verify the binary actually landed.
+      final installed = await _isInstalled();
+      if (installed) {
+        _log.warning(
+          'Install script exited with code $code but binary is present, '
+          'continuing. Output:\n$outputBuffer',
+        );
+      } else {
+        _log.warning(
+          'Installation failed (exit code $code). Output:\n$outputBuffer',
+        );
+        throw Exception('Installation failed with exit code $code');
+      }
+    } else {
+      _log.info('Installation completed.');
     }
-
-    _log.info('Installation completed.');
   }
 
   /// Starts the server in the background and waits for the domain socket.
   Future<void> _startServer() async {
     _log.info('Starting fewshell-server…');
 
-    await _execSilent(
-      'cd ~/.fewshell && nohup ./fewshell-server > /dev/null 2>&1 &',
+    // Remove stale socket from a previous run so _waitForSocket polls
+    // until the new server creates a fresh one.
+    await _execStdout('rm -f \$HOME/$_serverSocketPath');
+
+    // Fire-and-forget: launch the server and don't await session.done,
+    // because the SSH channel won't close while the backgrounded process
+    // is alive. We verify success by waiting for the domain socket instead.
+    final session = await client.execute(
+      'cd ~/.fewshell && nohup ./fewshell-server < /dev/null > /dev/null 2>&1 &',
     );
+    // Close the session immediately — the server is backgrounded and doesn't
+    // need the channel. This frees the SSH channel resource.
+    session.close();
 
     await _waitForSocket();
 
@@ -135,8 +169,10 @@ class RemoteInstaller {
     final deadline = DateTime.now().add(_socketTimeout);
 
     while (DateTime.now().isBefore(deadline)) {
-      final exists = await _execSilent('test -S ~/$_serverSocketPath');
-      if (exists == 0) {
+      final result = await _execStdout(
+        'test -S \$HOME/$_serverSocketPath && echo YES || echo NO',
+      );
+      if (result == 'YES') {
         _log.fine('Domain socket detected.');
         return;
       }
@@ -149,13 +185,16 @@ class RemoteInstaller {
     );
   }
 
-  /// Executes [command] silently (output discarded) and returns the exit code.
-  Future<int> _execSilent(String command) async {
+  /// Executes [command] and returns the trimmed stdout.
+  Future<String> _execStdout(String command) async {
     final session = await client.execute(command);
-    await session.stdout.drain<void>();
+    final bytes = await session.stdout.fold<List<int>>(
+      <int>[],
+      (prev, chunk) => prev..addAll(chunk),
+    );
     await session.stderr.drain<void>();
     await session.done;
-    return session.exitCode ?? -1;
+    return utf8.decode(bytes).trim();
   }
 
   void _emit(String message) {
