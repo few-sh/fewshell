@@ -138,7 +138,7 @@ class DecampApp extends ConsumerWidget {
       appBuilder: (context) {
         return MaterialApp(
           navigatorKey: navigatorKey,
-          title: 'Decamp AI Chat',
+          title: 'Fewshell',
           theme: neonLightTheme,
           darkTheme: neonDarkTheme,
           themeMode: themeMode,
