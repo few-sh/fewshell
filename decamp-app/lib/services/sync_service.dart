@@ -78,10 +78,12 @@ class SyncService {
   Stream<bool> get isSyncing => _isSyncingController.stream;
 
   Timer? _reconnectTimer;
+  Timer? _globalReconnectTimer;
   String? _currentProjectId;
   ProjectDatabase? _currentProjectDb;
   _CancellationToken? _connectionToken;
   int _reconnectAttempts = 0;
+  int _globalReconnectAttempts = 0;
   AppLifecycleListener? _lifecycleListener;
   AppLifecycleState? _lastLifecycleState;
 
@@ -324,6 +326,7 @@ class SyncService {
           tunnelId: resolved.tunnelId!,
           wsPath: '/sync/global',
           timeout: defaultConnectionTimeout,
+          ensureServer: true,
         );
         channel = wsChannel;
         responseHeaders = headers;
@@ -352,6 +355,7 @@ class SyncService {
         );
       }
       _currentServerNodeId = headerNodeId;
+      _globalReconnectAttempts = 0;
       _log.info('Discovered server node ID: $headerNodeId');
       _appEventBus.emit(GlobalSyncConnected(headerNodeId));
 
@@ -488,6 +492,7 @@ class SyncService {
     } catch (e, stackTrace) {
       _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
+      _scheduleGlobalReconnect();
     }
   }
 
@@ -688,6 +693,7 @@ class SyncService {
         final (ch, tunnel, _) = await _connectViaTunnel(
           tunnelId: tunnelId,
           wsPath: '/sync/project/$projectId',
+          ensureServer: false,
         );
         wsChannel = ch;
         _projectSshTunnel = tunnel;
@@ -821,6 +827,8 @@ class SyncService {
 
   void _disconnectGlobal() {
     final wasConnected = _currentServerNodeId != null;
+    _globalReconnectTimer?.cancel();
+    _globalReconnectTimer = null;
     _globalSync?.close();
     _globalSync = null;
     _globalChannel = null;
@@ -834,6 +842,25 @@ class SyncService {
     if (wasConnected) {
       _appEventBus.emit(const GlobalSyncDisconnected());
     }
+  }
+
+  void _scheduleGlobalReconnect() {
+    if (_globalReconnectTimer?.isActive ?? false) {
+      _log.fine('_scheduleGlobalReconnect: timer already active, skipping.');
+      return;
+    }
+
+    final delaySeconds = _getFibonacciDelay(_globalReconnectAttempts);
+    _log.info(
+      'Scheduling global reconnect in $delaySeconds seconds '
+      '(attempt $_globalReconnectAttempts)...',
+    );
+
+    _globalReconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      _globalReconnectAttempts++;
+      final project = ref.read(currentProjectProvider);
+      _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
+    });
   }
 
   void _scheduleReconnect() {
@@ -939,6 +966,7 @@ class SyncService {
       _disconnectGlobal();
       _closeProjectConnection();
       _reconnectAttempts = 0;
+      _globalReconnectAttempts = 0;
       final project = ref.read(currentProjectProvider);
       _connectGlobal(ref.read(globalDatabaseProvider), project?.serverUrl);
     } else {
@@ -989,6 +1017,7 @@ class SyncService {
     required String tunnelId,
     required String wsPath,
     Duration? timeout,
+    bool ensureServer = true,
   }) async {
     final storage = ref.read(sshTunnelStorageProvider);
     final settings = await storage.get(tunnelId);
@@ -1006,6 +1035,7 @@ class SyncService {
       sshPassphrase: passphrase,
       wsPath: wsPath,
       timeout: timeout,
+      ensureServer: ensureServer,
     );
   }
 
@@ -1027,6 +1057,7 @@ class SyncService {
     String? sshPassphrase,
     required String wsPath,
     Duration? timeout,
+    bool ensureServer = true,
   }) async {
     _log.info('SSH tunnel: connecting to $sshUsername@$sshHost:$sshPort');
 
@@ -1055,12 +1086,14 @@ class SyncService {
     await client.authenticated;
     _log.info('SSH tunnel: authenticated');
 
-    // Ensure the fewshell server is installed and running.
-    final installer = RemoteInstaller(client);
-    try {
-      await installer.ensureServerRunning();
-    } finally {
-      installer.dispose();
+    // Ensure the fewshell server is installed and running (global only).
+    if (ensureServer) {
+      final installer = RemoteInstaller(client);
+      try {
+        await installer.ensureServerRunning();
+      } finally {
+        installer.dispose();
+      }
     }
 
     // Discover remote home directory
