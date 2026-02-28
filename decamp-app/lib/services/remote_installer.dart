@@ -76,19 +76,23 @@ class RemoteInstaller {
   /// `true` when the server binary exists and is executable.
   Future<bool> _isInstalled() async {
     _log.fine('Checking if fewshell-server is installed…');
-    final exitCode = await _execSilent('test -x \$HOME/$_serverBinaryPath');
-    _log.fine('_isInstalled: test exit code = $exitCode');
-    return exitCode == 0;
+    // Use stdout instead of exit codes — dartssh2 doesn't reliably
+    // deliver exitCode before session.done completes.
+    final result = await _execStdout(
+      'test -x \$HOME/$_serverBinaryPath && echo YES || echo NO',
+    );
+    _log.fine('_isInstalled: result = $result');
+    return result == 'YES';
   }
 
   /// `true` when a fewshell-server process is found via pgrep.
   Future<bool> _isRunning() async {
     _log.fine('Checking if fewshell-server is running…');
-    final exitCode = await _execSilent(
-      'pgrep -f -u \$(whoami) $_serverProcessName',
+    final result = await _execStdout(
+      'pgrep -f -u \$(whoami) $_serverProcessName > /dev/null 2>&1 && echo YES || echo NO',
     );
-    _log.fine('_isRunning: pgrep exit code = $exitCode');
-    return exitCode == 0;
+    _log.fine('_isRunning: result = $result');
+    return result == 'YES';
   }
 
   /// Runs the installer script, streaming output to [output].
@@ -142,7 +146,7 @@ class RemoteInstaller {
 
     // Remove stale socket from a previous run so _waitForSocket polls
     // until the new server creates a fresh one.
-    await _execSilent('rm -f \$HOME/$_serverSocketPath');
+    await _execStdout('rm -f \$HOME/$_serverSocketPath');
 
     // Fire-and-forget: launch the server and don't await session.done,
     // because the SSH channel won't close while the backgrounded process
@@ -165,8 +169,10 @@ class RemoteInstaller {
     final deadline = DateTime.now().add(_socketTimeout);
 
     while (DateTime.now().isBefore(deadline)) {
-      final exists = await _execSilent('test -S \$HOME/$_serverSocketPath');
-      if (exists == 0) {
+      final result = await _execStdout(
+        'test -S \$HOME/$_serverSocketPath && echo YES || echo NO',
+      );
+      if (result == 'YES') {
         _log.fine('Domain socket detected.');
         return;
       }
@@ -179,15 +185,16 @@ class RemoteInstaller {
     );
   }
 
-  /// Executes [command] silently (output discarded) and returns the exit code.
-  Future<int> _execSilent(String command) async {
+  /// Executes [command] and returns the trimmed stdout.
+  Future<String> _execStdout(String command) async {
     final session = await client.execute(command);
-    await session.stdout.drain<void>();
+    final bytes = await session.stdout.fold<List<int>>(
+      <int>[],
+      (prev, chunk) => prev..addAll(chunk),
+    );
     await session.stderr.drain<void>();
     await session.done;
-    // Yield so dartssh2 can process the exit-status channel request.
-    await Future<void>.delayed(Duration.zero);
-    return session.exitCode ?? -1;
+    return utf8.decode(bytes).trim();
   }
 
   void _emit(String message) {
