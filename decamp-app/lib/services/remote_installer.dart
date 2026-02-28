@@ -83,7 +83,9 @@ class RemoteInstaller {
   /// `true` when a fewshell-server process is found via pgrep.
   Future<bool> _isRunning() async {
     _log.fine('Checking if fewshell-server is running…');
-    final exitCode = await _execSilent('pgrep -x $_serverProcessName');
+    final exitCode = await _execSilent(
+      'pgrep -f -u \$(whoami) $_serverProcessName',
+    );
     return exitCode == 0;
   }
 
