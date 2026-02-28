@@ -1070,6 +1070,7 @@ class SyncService {
     if (settings == null) {
       throw Exception('Tunnel config not found for id: $tunnelId');
     }
+    final password = await storage.getPassword(tunnelId);
     final privateKey = await storage.getPrivateKey(tunnelId);
     final passphrase = await storage.getPassphrase(tunnelId);
 
@@ -1077,6 +1078,7 @@ class SyncService {
       sshHost: settings.host,
       sshPort: settings.port,
       sshUsername: settings.username,
+      sshPassword: password,
       sshPrivateKey: privateKey,
       sshPassphrase: passphrase,
       wsPath: wsPath,
@@ -1099,6 +1101,7 @@ class SyncService {
     required String sshHost,
     required int sshPort,
     required String sshUsername,
+    String? sshPassword,
     String? sshPrivateKey,
     String? sshPassphrase,
     required String wsPath,
@@ -1119,7 +1122,7 @@ class SyncService {
       identities = SSHKeyPair.fromPem(sshPrivateKey, sshPassphrase);
     } else {
       _log.fine(
-        'SSH tunnel: no private key provided, relying on agent/default auth.',
+        'SSH tunnel: no private key provided, relying on password/agent auth.',
       );
     }
 
@@ -1127,6 +1130,9 @@ class SyncService {
       sshSocket,
       username: sshUsername,
       identities: identities,
+      onPasswordRequest: sshPassword != null && sshPassword.isNotEmpty
+          ? () => sshPassword
+          : null,
     );
 
     await client.authenticated;

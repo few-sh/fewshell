@@ -8,6 +8,7 @@ import 'package:agent_core/agent_core.dart';
 ///
 /// Key scheme:
 /// - `tunnelId:{id}` → JSON-encoded [SshSettings] metadata
+/// - `tunnelId:{id}:password` → password string
 /// - `tunnelId:{id}:privateKey` → private key PEM string
 /// - `tunnelId:{id}:passphrase` → optional passphrase
 class SshTunnelStorage {
@@ -51,6 +52,7 @@ class SshTunnelStorage {
   Future<void> save({
     required String id,
     required SshSettings settings,
+    String? password,
     String? privateKey,
     String? passphrase,
   }) async {
@@ -58,19 +60,34 @@ class SshTunnelStorage {
       key: '$_prefix$id',
       value: jsonEncode(settings.toJson()),
     );
+    if (password != null && password.isNotEmpty) {
+      await _storage.write(key: '$_prefix$id:password', value: password);
+    } else {
+      await _storage.delete(key: '$_prefix$id:password');
+    }
     if (privateKey != null && privateKey.isNotEmpty) {
       await _storage.write(key: '$_prefix$id:privateKey', value: privateKey);
+    } else {
+      await _storage.delete(key: '$_prefix$id:privateKey');
     }
     if (passphrase != null && passphrase.isNotEmpty) {
       await _storage.write(key: '$_prefix$id:passphrase', value: passphrase);
+    } else {
+      await _storage.delete(key: '$_prefix$id:passphrase');
     }
   }
 
   /// Deletes a tunnel config and its credential sub-keys.
   Future<void> delete(String id) async {
     await _storage.delete(key: '$_prefix$id');
+    await _storage.delete(key: '$_prefix$id:password');
     await _storage.delete(key: '$_prefix$id:privateKey');
     await _storage.delete(key: '$_prefix$id:passphrase');
+  }
+
+  /// Returns the password for the given tunnel [id], or null.
+  Future<String?> getPassword(String id) async {
+    return _storage.read(key: '$_prefix$id:password');
   }
 
   /// Returns the private key for the given tunnel [id], or null.

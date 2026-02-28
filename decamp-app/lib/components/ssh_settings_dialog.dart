@@ -265,9 +265,11 @@ class _SshSettingsDialogFormState
         _usernameController.text = settings.username;
         _authMethod = settings.authMethod;
       }
+      final password = await storage.getPassword(tunnelId);
       final privateKey = await storage.getPrivateKey(tunnelId);
       final passphrase = await storage.getPassphrase(tunnelId);
       if (mounted) {
+        _passwordController.text = password ?? '';
         _privateKeyController.text = privateKey ?? '';
         _passphraseController.text = passphrase ?? '';
         _privateKeyController.obscure = true;
@@ -475,317 +477,312 @@ class _SshSettingsDialogFormState
       child: GestureDetector(
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            controller: _scrollController,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tunnel picker dropdown (tunnel mode only)
-                if (widget.tunnelMode) ...[
-                  _buildTunnelPicker(theme),
-                  const SizedBox(height: 16),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          controller: _scrollController,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tunnel picker dropdown (tunnel mode only)
+              if (widget.tunnelMode) ...[
+                _buildTunnelPicker(theme),
+                const SizedBox(height: 16),
+              ],
+
+              if (_isLoadingTunnel)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                // Host field
+                _buildLabeledInput(
+                  label: 'Host',
+                  controller: _hostController,
+                  placeholder: 'example.com or 192.168.1.100',
+                  errorKey: 'host',
+                ),
+                const SizedBox(height: 12),
+
+                // Port field
+                _buildLabeledInput(
+                  label: 'Port',
+                  controller: _portController,
+                  placeholder: '22',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  errorKey: 'port',
+                ),
+                const SizedBox(height: 12),
+
+                // Username field
+                _buildLabeledInput(
+                  label: 'Username',
+                  controller: _usernameController,
+                  placeholder: 'root or admin',
+                  errorKey: 'username',
+                ),
+                const SizedBox(height: 16),
+
+                // Authentication method selector
+                Text(
+                  'Authentication Method',
+                  style: theme.textTheme.small.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildAuthMethodCard(
+                        title: 'Password',
+                        icon: LucideIcons.lock,
+                        method: SshAuthMethod.password,
+                        isSelected: _authMethod == SshAuthMethod.password,
+                        onTap: () {
+                          setState(() {
+                            _authMethod = SshAuthMethod.password;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildAuthMethodCard(
+                        title: 'Private Key',
+                        icon: LucideIcons.key,
+                        method: SshAuthMethod.privateKey,
+                        isSelected: _authMethod == SshAuthMethod.privateKey,
+                        onTap: () {
+                          setState(() {
+                            _authMethod = SshAuthMethod.privateKey;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_authMethod == SshAuthMethod.password)
+                  _buildLabeledInput(
+                    label: 'Password',
+                    controller: _passwordController,
+                    placeholder: _isEditMode
+                        ? 'Leave blank to keep current password'
+                        : 'Enter your password',
+                    obscureText: _obscurePassword,
+                    trailing: ShadButton.ghost(
+                      width: 24,
+                      height: 24,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                      child: Icon(
+                        _obscurePassword ? LucideIcons.eye : LucideIcons.eyeOff,
+                        size: 16,
+                      ),
+                    ),
+                    errorKey: 'password',
+                    maxLines: null,
+                  ),
+                if (_authMethod == SshAuthMethod.privateKey) ...[
+                  _buildLabeledInput(
+                    label: 'Private Key',
+                    controller: _privateKeyController,
+                    placeholder: _isEditMode
+                        ? 'Leave blank to keep current key'
+                        : 'Paste your private key',
+                    description: 'Paste the contents of your private key file',
+                    minLines: _privateKeyController.obscure ? 1 : 3,
+                    maxLines: null,
+                    trailing: ShadButton.ghost(
+                      width: 24,
+                      height: 24,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() {
+                          _privateKeyController.obscure =
+                              !_privateKeyController.obscure;
+                        });
+                      },
+                      child: Icon(
+                        _privateKeyController.obscure
+                            ? LucideIcons.eye
+                            : LucideIcons.eyeOff,
+                        size: 16,
+                      ),
+                    ),
+                    errorKey: 'privateKey',
+                  ),
+                  const SizedBox(height: 12),
+                  _buildLabeledInput(
+                    label: 'Passphrase (Optional)',
+                    controller: _passphraseController,
+                    placeholder: 'Enter passphrase if key is encrypted',
+                    obscureText: _obscurePassphrase,
+                    maxLines: null,
+                    trailing: ShadButton.ghost(
+                      width: 24,
+                      height: 24,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassphrase = !_obscurePassphrase;
+                        });
+                      },
+                      child: Icon(
+                        _obscurePassphrase
+                            ? LucideIcons.eye
+                            : LucideIcons.eyeOff,
+                        size: 16,
+                      ),
+                    ),
+                  ),
                 ],
 
-                if (_isLoadingTunnel)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 32),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else ...[
-                  // Host field
-                  _buildLabeledInput(
-                    label: 'Host',
-                    controller: _hostController,
-                    placeholder: 'example.com or 192.168.1.100',
-                    errorKey: 'host',
-                  ),
+                // Sudo password field (hidden in tunnel mode)
+                if (!widget.tunnelMode) ...[
                   const SizedBox(height: 12),
-
-                  // Port field
                   _buildLabeledInput(
-                    label: 'Port',
-                    controller: _portController,
-                    placeholder: '22',
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    errorKey: 'port',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Username field
-                  _buildLabeledInput(
-                    label: 'Username',
-                    controller: _usernameController,
-                    placeholder: 'root or admin',
-                    errorKey: 'username',
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Authentication method selector (hidden in tunnel mode)
-                  if (!widget.tunnelMode) ...[
-                    Text(
-                      'Authentication Method',
-                      style: theme.textTheme.small.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
+                    label: 'Sudo Password (Optional)',
+                    controller: _sudoPasswordController,
+                    placeholder: _isEditMode
+                        ? 'Leave blank to keep current sudo password'
+                        : 'Enter password for sudo commands',
+                    description:
+                        'Required for commands needing elevated privileges',
+                    obscureText: _obscureSudoPassword,
+                    maxLines: null,
+                    trailing: ShadButton.ghost(
+                      width: 24,
+                      height: 24,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        setState(() {
+                          _obscureSudoPassword = !_obscureSudoPassword;
+                        });
+                      },
+                      child: Icon(
+                        _obscureSudoPassword
+                            ? LucideIcons.eye
+                            : LucideIcons.eyeOff,
+                        size: 16,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildAuthMethodCard(
-                            title: 'Password',
-                            icon: LucideIcons.lock,
-                            method: SshAuthMethod.password,
-                            isSelected: _authMethod == SshAuthMethod.password,
-                            onTap: () {
-                              setState(() {
-                                _authMethod = SshAuthMethod.password;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildAuthMethodCard(
-                            title: 'Private Key',
-                            icon: LucideIcons.key,
-                            method: SshAuthMethod.privateKey,
-                            isSelected: _authMethod == SshAuthMethod.privateKey,
-                            onTap: () {
-                              setState(() {
-                                _authMethod = SshAuthMethod.privateKey;
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (_authMethod == SshAuthMethod.password)
-                      _buildLabeledInput(
-                        label: 'Password',
-                        controller: _passwordController,
-                        placeholder: _isEditMode
-                            ? 'Leave blank to keep current password'
-                            : 'Enter your password',
-                        obscureText: _obscurePassword,
-                        trailing: ShadButton.ghost(
-                          width: 24,
-                          height: 24,
-                          padding: EdgeInsets.zero,
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                          child: Icon(
-                            _obscurePassword
-                                ? LucideIcons.eye
-                                : LucideIcons.eyeOff,
-                            size: 16,
-                          ),
-                        ),
-                        errorKey: 'password',
-                        maxLines: null,
-                      ),
-                  ],
-                  if (_authMethod == SshAuthMethod.privateKey) ...[
-                    _buildLabeledInput(
-                      label: 'Private Key',
-                      controller: _privateKeyController,
-                      placeholder: _isEditMode
-                          ? 'Leave blank to keep current key'
-                          : 'Paste your private key',
-                      description:
-                          'Paste the contents of your private key file',
-                      minLines: _privateKeyController.obscure ? 1 : 3,
-                      maxLines: null,
-                      trailing: ShadButton.ghost(
-                        width: 24,
-                        height: 24,
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
+                  ),
+                ],
+
+                if (_isEditMode) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ShadSwitch(
+                        value: _enabled,
+                        onChanged: (value) {
                           setState(() {
-                            _privateKeyController.obscure =
-                                !_privateKeyController.obscure;
+                            _enabled = value;
                           });
                         },
-                        child: Icon(
-                          _privateKeyController.obscure
-                              ? LucideIcons.eye
-                              : LucideIcons.eyeOff,
-                          size: 16,
-                        ),
                       ),
-                      errorKey: 'privateKey',
-                    ),
-                    const SizedBox(height: 12),
-                    _buildLabeledInput(
-                      label: 'Passphrase (Optional)',
-                      controller: _passphraseController,
-                      placeholder: 'Enter passphrase if key is encrypted',
-                      obscureText: _obscurePassphrase,
-                      maxLines: null,
-                      trailing: ShadButton.ghost(
-                        width: 24,
-                        height: 24,
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassphrase = !_obscurePassphrase;
-                          });
-                        },
-                        child: Icon(
-                          _obscurePassphrase
-                              ? LucideIcons.eye
-                              : LucideIcons.eyeOff,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  // Sudo password field (hidden in tunnel mode)
-                  if (!widget.tunnelMode) ...[
-                    const SizedBox(height: 12),
-                    _buildLabeledInput(
-                      label: 'Sudo Password (Optional)',
-                      controller: _sudoPasswordController,
-                      placeholder: _isEditMode
-                          ? 'Leave blank to keep current sudo password'
-                          : 'Enter password for sudo commands',
-                      description:
-                          'Required for commands needing elevated privileges',
-                      obscureText: _obscureSudoPassword,
-                      maxLines: null,
-                      trailing: ShadButton.ghost(
-                        width: 24,
-                        height: 24,
-                        padding: EdgeInsets.zero,
-                        onPressed: () {
-                          setState(() {
-                            _obscureSudoPassword = !_obscureSudoPassword;
-                          });
-                        },
-                        child: Icon(
-                          _obscureSudoPassword
-                              ? LucideIcons.eye
-                              : LucideIcons.eyeOff,
-                          size: 16,
-                        ),
-                      ),
-                    ),
-                  ],
-
-                  if (_isEditMode) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        ShadSwitch(
-                          value: _enabled,
-                          onChanged: (value) {
-                            setState(() {
-                              _enabled = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        const Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Enabled',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text('Allow connections using this configuration'),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ShadButton.outline(
-                      onPressed: _isTestingConnection
-                          ? _abortConnection
-                          : _testConnection,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      const SizedBox(width: 12),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_isTestingConnection)
-                            const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            const Icon(LucideIcons.network, size: 16),
-                          const SizedBox(width: 8),
                           Text(
-                            _isTestingConnection ? 'Abort' : 'Test Connection',
+                            'Enabled',
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+                          Text('Allow connections using this configuration'),
                         ],
                       ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ShadButton.outline(
+                    onPressed: _isTestingConnection
+                        ? _abortConnection
+                        : _testConnection,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_isTestingConnection)
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          const Icon(LucideIcons.network, size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          _isTestingConnection ? 'Abort' : 'Test Connection',
+                        ),
+                      ],
                     ),
                   ),
+                ),
 
-                  // Display test result message
-                  if (_testResultMessage != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      key: _testResultKey,
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
+                // Display test result message
+                if (_testResultMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    key: _testResultKey,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _testResultSuccess == true
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : theme.colorScheme.destructive.withValues(
+                              alpha: 0.1,
+                            ),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
                         color: _testResultSuccess == true
-                            ? Colors.green.withValues(alpha: 0.1)
-                            : theme.colorScheme.destructive.withValues(
-                                alpha: 0.1,
-                              ),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
+                            ? Colors.green
+                            : theme.colorScheme.destructive,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _testResultSuccess == true
+                              ? LucideIcons.check
+                              : LucideIcons.circleAlert,
                           color: _testResultSuccess == true
                               ? Colors.green
                               : theme.colorScheme.destructive,
-                          width: 1,
+                          size: 18,
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _testResultSuccess == true
-                                ? LucideIcons.check
-                                : LucideIcons.circleAlert,
-                            color: _testResultSuccess == true
-                                ? Colors.green
-                                : theme.colorScheme.destructive,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _testResultMessage!,
-                              style: TextStyle(
-                                color: _testResultSuccess == true
-                                    ? Colors.green.shade700
-                                    : theme.colorScheme.destructive,
-                                fontSize: 13,
-                              ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _testResultMessage!,
+                            style: TextStyle(
+                              color: _testResultSuccess == true
+                                  ? Colors.green.shade700
+                                  : theme.colorScheme.destructive,
+                              fontSize: 13,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ], // end of !_isLoadingTunnel
-              ],
-            ),
+                  ),
+                ],
+              ], // end of !_isLoadingTunnel
+            ],
           ),
         ),
+      ),
     );
   }
 
@@ -1057,6 +1054,7 @@ class _SshSettingsDialogFormState
             port: port,
             username: username,
             authMethod: authMethod,
+            password: password,
             privateKey: privateKey,
             passphrase: passphrase,
           );
@@ -1067,6 +1065,7 @@ class _SshSettingsDialogFormState
             port: port,
             username: username,
             authMethod: authMethod,
+            password: password,
             privateKey: privateKey,
             passphrase: passphrase,
           );

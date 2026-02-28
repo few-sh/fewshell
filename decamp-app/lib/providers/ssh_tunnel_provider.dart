@@ -36,6 +36,7 @@ class SshTunnelConfigsNotifier extends AsyncNotifier<Map<String, SshSettings>> {
     required int port,
     required String username,
     SshAuthMethod authMethod = SshAuthMethod.privateKey,
+    String? password,
     String? privateKey,
     String? passphrase,
   }) async {
@@ -58,6 +59,7 @@ class SshTunnelConfigsNotifier extends AsyncNotifier<Map<String, SshSettings>> {
     await storage.save(
       id: id,
       settings: settings,
+      password: password,
       privateKey: privateKey,
       passphrase: passphrase,
     );
@@ -74,6 +76,7 @@ class SshTunnelConfigsNotifier extends AsyncNotifier<Map<String, SshSettings>> {
     required int port,
     required String username,
     SshAuthMethod authMethod = SshAuthMethod.privateKey,
+    String? password,
     String? privateKey,
     String? passphrase,
   }) async {
@@ -93,6 +96,7 @@ class SshTunnelConfigsNotifier extends AsyncNotifier<Map<String, SshSettings>> {
     await storage.save(
       id: id,
       settings: settings,
+      password: password,
       privateKey: privateKey,
       passphrase: passphrase,
     );
