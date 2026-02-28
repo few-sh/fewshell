@@ -42,7 +42,13 @@ class _CreateProjectDialogContentState
       setState(() => _errorText = 'Project name cannot be empty');
       return;
     }
-    Navigator.pop(context, name);
+    // Guard against navigator being locked by a concurrent navigation
+    // (e.g. project auto-selected while the dialog is open).
+    try {
+      Navigator.pop(context, name);
+    } catch (_) {
+      // Navigator locked — dialog will be dismissed by the framework.
+    }
   }
 
   @override
