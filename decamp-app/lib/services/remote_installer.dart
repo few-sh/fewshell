@@ -76,7 +76,8 @@ class RemoteInstaller {
   /// `true` when the server binary exists and is executable.
   Future<bool> _isInstalled() async {
     _log.fine('Checking if fewshell-server is installed…');
-    final exitCode = await _execSilent('test -x ~/$_serverBinaryPath');
+    final exitCode = await _execSilent('test -x \$HOME/$_serverBinaryPath');
+    _log.fine('_isInstalled: test exit code = $exitCode');
     return exitCode == 0;
   }
 
@@ -86,6 +87,7 @@ class RemoteInstaller {
     final exitCode = await _execSilent(
       'pgrep -f -u \$(whoami) $_serverProcessName',
     );
+    _log.fine('_isRunning: pgrep exit code = $exitCode');
     return exitCode == 0;
   }
 
@@ -94,7 +96,7 @@ class RemoteInstaller {
     _log.info('Installing fewshell-server…');
 
     final session = await client.execute(
-      'curl -LsSf $_installerScriptUrl | bash',
+      'curl -LsSf $_installerScriptUrl | bash -s -- --skip-pairing',
     );
 
     final outputBuffer = StringBuffer();
@@ -115,13 +117,23 @@ class RemoteInstaller {
 
     final code = session.exitCode;
     if (code != null && code != 0) {
-      _log.warning(
-        'Installation failed (exit code $code). Output:\n$outputBuffer',
-      );
-      throw Exception('Installation failed with exit code $code');
+      // The script may exit non-zero due to a non-critical step (e.g.
+      // copying the shared library). Verify the binary actually landed.
+      final installed = await _isInstalled();
+      if (installed) {
+        _log.warning(
+          'Install script exited with code $code but binary is present, '
+          'continuing. Output:\n$outputBuffer',
+        );
+      } else {
+        _log.warning(
+          'Installation failed (exit code $code). Output:\n$outputBuffer',
+        );
+        throw Exception('Installation failed with exit code $code');
+      }
+    } else {
+      _log.info('Installation completed.');
     }
-
-    _log.info('Installation completed.');
   }
 
   /// Starts the server in the background and waits for the domain socket.
@@ -130,7 +142,7 @@ class RemoteInstaller {
 
     // Remove stale socket from a previous run so _waitForSocket polls
     // until the new server creates a fresh one.
-    await _execSilent('rm -f ~/$_serverSocketPath');
+    await _execSilent('rm -f \$HOME/$_serverSocketPath');
 
     // Fire-and-forget: launch the server and don't await session.done,
     // because the SSH channel won't close while the backgrounded process
@@ -153,7 +165,7 @@ class RemoteInstaller {
     final deadline = DateTime.now().add(_socketTimeout);
 
     while (DateTime.now().isBefore(deadline)) {
-      final exists = await _execSilent('test -S ~/$_serverSocketPath');
+      final exists = await _execSilent('test -S \$HOME/$_serverSocketPath');
       if (exists == 0) {
         _log.fine('Domain socket detected.');
         return;
@@ -173,6 +185,8 @@ class RemoteInstaller {
     await session.stdout.drain<void>();
     await session.stderr.drain<void>();
     await session.done;
+    // Yield so dartssh2 can process the exit-status channel request.
+    await Future<void>.delayed(Duration.zero);
     return session.exitCode ?? -1;
   }
 
