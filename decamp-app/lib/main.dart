@@ -12,6 +12,7 @@ import 'package:agent_core/agent_core.dart';
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
 import 'package:decamp/providers/providers.dart';
+import 'components/app_event_listener.dart';
 import 'services/sync_service.dart';
 import 'themes/neon_dark.dart';
 import 'themes/neon_light.dart';
@@ -184,6 +185,10 @@ class _HomeSelectorState extends ConsumerState<_HomeSelector>
   @override
   Widget build(BuildContext context) {
     final currentProject = ref.watch(currentProjectProvider);
-    return currentProject == null ? const ProjectsPage() : const ChatSession();
+    return AppEventListener(
+      child: currentProject == null
+          ? const ProjectsPage()
+          : const ChatSession(),
+    );
   }
 }

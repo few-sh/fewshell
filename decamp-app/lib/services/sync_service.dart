@@ -13,8 +13,10 @@ import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:decamp/certs.dart';
+import 'package:decamp/models/app_event.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/providers/ssh_tunnel_provider.dart';
+import 'package:decamp/services/app_event_bus.dart';
 import 'package:decamp/services/remote_installer.dart';
 
 final _log = Logger('SyncService');
@@ -83,7 +85,10 @@ class SyncService {
   AppLifecycleListener? _lifecycleListener;
   AppLifecycleState? _lastLifecycleState;
 
+  late final AppEventBus _appEventBus;
+
   SyncService(this.ref) {
+    _appEventBus = ref.read(appEventBusProvider);
     _init();
   }
 
@@ -216,10 +221,12 @@ class SyncService {
     }
 
     if (matchingProjects.isEmpty) {
-      throw Exception(
-        'No projects found for this tunnel. '
-        'Make sure the remote agent has a project configured.',
+      _log.info(
+        'No projects found for server $serverNodeId after polling, '
+        'emitting NoProjectsForServer event.',
       );
+      _appEventBus.emit(NoProjectsForServer(serverNodeId));
+      return;
     }
 
     // Switch to the first matching project.
@@ -346,6 +353,7 @@ class SyncService {
       }
       _currentServerNodeId = headerNodeId;
       _log.info('Discovered server node ID: $headerNodeId');
+      _appEventBus.emit(GlobalSyncConnected(headerNodeId));
 
       _globalChannel = MultiplexedWebSocketChannel(
         channel,
@@ -467,6 +475,16 @@ class SyncService {
 
       // Global sync connected — now connect project sync.
       _connectProjectIfReady();
+
+      // After initial changeset exchange completes, emit idle event and
+      // check whether any projects exist for this server.
+      _globalAdapter!.onIdle.then((_) {
+        final nodeId = _currentServerNodeId;
+        if (nodeId != null) {
+          _appEventBus.emit(GlobalSyncIdle(nodeId));
+          _checkProjectsForServer();
+        }
+      });
     } catch (e, stackTrace) {
       _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
@@ -480,6 +498,39 @@ class SyncService {
     final projectId = ref.read(currentProjectIdProvider);
     if (projectDb != null && projectId != null) {
       _connectProject(projectDb, projectId);
+    }
+  }
+
+  /// Checks whether any projects exist for the current server after global
+  /// sync reaches idle. If none exist, emits [NoProjectsForServer] so the UI
+  /// can prompt the user to create one.
+  Future<void> _checkProjectsForServer() async {
+    final serverNodeId = _currentServerNodeId;
+    if (serverNodeId == null) return;
+
+    // Skip if the user already has a project for this server selected.
+    final currentProject = ref.read(currentProjectProvider);
+    if (currentProject != null && currentProject.serverNodeId == serverNodeId) {
+      _log.fine(
+        '_checkProjectsForServer: current project already matches $serverNodeId, skipping.',
+      );
+      return;
+    }
+
+    final globalDb = ref.read(globalDatabaseProvider);
+    final projects = await globalDb.projectDao.getProjectsByServerNodeId(
+      serverNodeId,
+    );
+
+    if (projects.isEmpty) {
+      _log.info(
+        '_checkProjectsForServer: no projects for server $serverNodeId, emitting event.',
+      );
+      _appEventBus.emit(NoProjectsForServer(serverNodeId));
+    } else {
+      _log.fine(
+        '_checkProjectsForServer: found ${projects.length} project(s) for server $serverNodeId.',
+      );
     }
   }
 
@@ -769,6 +820,7 @@ class SyncService {
   }
 
   void _disconnectGlobal() {
+    final wasConnected = _currentServerNodeId != null;
     _globalSync?.close();
     _globalSync = null;
     _globalChannel = null;
@@ -779,6 +831,9 @@ class SyncService {
     _currentServerNodeId = null;
     _globalSshTunnel?.close();
     _globalSshTunnel = null;
+    if (wasConnected) {
+      _appEventBus.emit(const GlobalSyncDisconnected());
+    }
   }
 
   void _scheduleReconnect() {
