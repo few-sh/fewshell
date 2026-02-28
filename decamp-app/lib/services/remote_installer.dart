@@ -120,6 +120,10 @@ class RemoteInstaller {
   Future<void> _startServer() async {
     _log.info('Starting fewshell-server…');
 
+    // Remove stale socket from a previous run so _waitForSocket polls
+    // until the new server creates a fresh one.
+    await _execSilent('rm -f ~/$_serverSocketPath');
+
     // Fire-and-forget: launch the server and don't await session.done,
     // because the SSH channel won't close while the backgrounded process
     // is alive. We verify success by waiting for the domain socket instead.
