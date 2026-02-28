@@ -234,7 +234,12 @@ class SyncService {
           'No projects found for server $serverNodeId after polling, '
           'emitting NoProjectsForServer event.',
         );
-        _appEventBus.emit(NoProjectsForServer(serverNodeId));
+        _appEventBus.emit(
+          NoProjectsForServer(
+            serverNodeId,
+            connectionInfo: _currentGlobalConnectionInfo,
+          ),
+        );
         return;
       }
 
@@ -571,7 +576,12 @@ class SyncService {
         '_checkProjectsForServer: no projects for server $serverNodeId '
         'after polling, emitting event.',
       );
-      _appEventBus.emit(NoProjectsForServer(serverNodeId));
+      _appEventBus.emit(
+        NoProjectsForServer(
+          serverNodeId,
+          connectionInfo: _currentGlobalConnectionInfo,
+        ),
+      );
     }
   }
 

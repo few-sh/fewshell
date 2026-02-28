@@ -29,5 +29,10 @@ class GlobalSyncDisconnected extends AppEvent {
 /// server. The UI should prompt the user to create one.
 class NoProjectsForServer extends AppEvent {
   final String serverNodeId;
-  const NoProjectsForServer(this.serverNodeId);
+
+  /// The connection info map (e.g. `{'type': 'tunnel', 'tunnelId': '...'}`) so
+  /// the newly created project can be mapped to this connection.
+  final Map<String, dynamic>? connectionInfo;
+
+  const NoProjectsForServer(this.serverNodeId, {this.connectionInfo});
 }

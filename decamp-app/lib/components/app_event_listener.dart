@@ -43,8 +43,8 @@ class _AppEventListenerState extends ConsumerState<AppEventListener> {
 
   void _onEvent(AppEvent event) {
     switch (event) {
-      case NoProjectsForServer(:final serverNodeId):
-        _handleNoProjects(serverNodeId);
+      case NoProjectsForServer(:final serverNodeId, :final connectionInfo):
+        _handleNoProjects(serverNodeId, connectionInfo);
       case GlobalSyncConnected():
       case GlobalSyncIdle():
       case GlobalSyncDisconnected():
@@ -52,7 +52,10 @@ class _AppEventListenerState extends ConsumerState<AppEventListener> {
     }
   }
 
-  Future<void> _handleNoProjects(String serverNodeId) async {
+  Future<void> _handleNoProjects(
+    String serverNodeId,
+    Map<String, dynamic>? connectionInfo,
+  ) async {
     if (_dialogShowing || !mounted) return;
     _dialogShowing = true;
 
@@ -78,6 +81,16 @@ class _AppEventListenerState extends ConsumerState<AppEventListener> {
       _log.info(
         'Created project "$name" ($projectId) for server $serverNodeId.',
       );
+
+      // Save the connection mapping so the sync service can reconnect
+      // for this project without re-resolving connection details.
+      if (connectionInfo != null) {
+        final mappingStorage = ref.read(connectionMappingStorageProvider);
+        await mappingStorage.save(projectId, connectionInfo);
+        _log.info(
+          'Saved connection mapping for project $projectId: $connectionInfo',
+        );
+      }
 
       await ref.read(currentProjectIdProvider.notifier).select(projectId);
     } catch (e, st) {
