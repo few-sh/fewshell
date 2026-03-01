@@ -43,31 +43,23 @@ class CrdtQueryExecutor extends QueryExecutor {
         final currentVersion = (versionResult.first.values.first as int?) ?? 0;
         final db = user as GeneratedDatabase;
 
+        // Drift's beforeOpen() internally calls migration.onCreate (when
+        // wasCreated) or migration.onUpgrade (when hadUpgrade), then
+        // migration.beforeOpen.  We must NOT call them again — doing so
+        // fires DDL through the CRDT after _setupCrdtListener is active,
+        // which triggers onTablesChanged notifications that race with
+        // drift's stream-query initial fetch and can prevent it from
+        // ever emitting (stuck AsyncLoading on first launch).
+        //
+        // Note: PRAGMA user_version is not supported by SqliteCrdt, so
+        // currentVersion is always 0 and wasCreated is always true.
+        final OpeningDetails details;
         if (currentVersion == 0) {
-          await db.beforeOpen(this, OpeningDetails(null, user.schemaVersion));
-
-          final migrator = Migrator(db);
-          await db.migration.onCreate(migrator);
-
-          // TODO: PRAGMA is not supported by SqliteCrdt yet. Need to fork and PR
-          // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
-        } else if (currentVersion < user.schemaVersion) {
-          await db.beforeOpen(
-            this,
-            OpeningDetails(currentVersion, user.schemaVersion),
-          );
-
-          final migrator = Migrator(db);
-          await db.migration
-              .onUpgrade(migrator, currentVersion, user.schemaVersion);
-
-          // await _crdt.execute('PRAGMA user_version = ${user.schemaVersion}');
+          details = OpeningDetails(null, user.schemaVersion);
         } else {
-          await db.beforeOpen(
-            this,
-            OpeningDetails(currentVersion, user.schemaVersion),
-          );
+          details = OpeningDetails(currentVersion, user.schemaVersion);
         }
+        await db.beforeOpen(this, details);
 
         _isOpen = true;
         _openingCompleter!.complete();
