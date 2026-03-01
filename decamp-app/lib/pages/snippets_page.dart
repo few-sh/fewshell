@@ -549,7 +549,7 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
           ShadSwitch(
             value: widget.snippet.isVisibleToLlm,
             onChanged: _toggleVisibility,
-            label: const Text('Visible to AI'),
+            label: const Text('Enabled'),
             sublabel: const Text('Include this snippet in the AI context'),
           ),
         ],
