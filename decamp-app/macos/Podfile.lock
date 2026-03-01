@@ -39,6 +39,8 @@ PODS:
     - sqlite3/perf-threadsafe
     - sqlite3/rtree
     - sqlite3/session
+  - url_launcher_macos (0.0.1):
+    - FlutterMacOS
 
 DEPENDENCIES:
   - file_selector_macos (from `Flutter/ephemeral/.symlinks/plugins/file_selector_macos/macos`)
@@ -49,6 +51,7 @@ DEPENDENCIES:
   - path_provider_foundation (from `Flutter/ephemeral/.symlinks/plugins/path_provider_foundation/darwin`)
   - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqlite3_flutter_libs (from `Flutter/ephemeral/.symlinks/plugins/sqlite3_flutter_libs/darwin`)
+  - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
 
 SPEC REPOS:
   trunk:
@@ -71,6 +74,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin
   sqlite3_flutter_libs:
     :path: Flutter/ephemeral/.symlinks/plugins/sqlite3_flutter_libs/darwin
+  url_launcher_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos
 
 SPEC CHECKSUMS:
   file_selector_macos: 9e9e068e90ebee155097d00e89ae91edb2374db7
@@ -82,6 +87,7 @@ SPEC CHECKSUMS:
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqlite3: 8d708bc63e9f4ce48f0ad9d6269e478c5ced1d9b
   sqlite3_flutter_libs: d13b8b3003f18f596e542bcb9482d105577eff41
+  url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
 
 PODFILE CHECKSUM: 0989fe9c0a0c72388134e5f35db1a80ba42c5b80
 

@@ -14,6 +14,7 @@ import 'package:decamp/pages/feedback_page.dart';
 import 'package:decamp/pages/debug_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MainDrawer extends ConsumerWidget {
   const MainDrawer({super.key});
@@ -247,6 +248,18 @@ class MainDrawer extends ConsumerWidget {
                         error: (_, _) => const SizedBox.shrink(),
                       );
                     },
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: () =>
+                        launchUrl(Uri.parse('https://fewshell.com/privacy/')),
+                    child: Text(
+                      'Privacy Policy',
+                      style: theme.textTheme.muted.copyWith(
+                        fontSize: 11,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
                   ),
                 ],
               ),

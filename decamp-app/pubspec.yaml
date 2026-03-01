@@ -79,6 +79,7 @@ dependencies:
   shadcn_ui: ^0.43.0
   async: ^2.13.0
   file_selector: ^1.1.0
+  url_launcher: ^6.3.2
 
 dependency_overrides:
   postgres_crdt: 3.0.0
