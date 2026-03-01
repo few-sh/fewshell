@@ -378,8 +378,10 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                     isGlobal: isGlobal,
                     projectId: projectId,
                   ),
-                  label: const Text('Visible to AI'),
-                  sublabel: const Text('Include this secret in the AI context'),
+                  label: const Text('Enabled'),
+                  sublabel: const Text(
+                    'Pass the name of this secret to the AI to include it in the context.',
+                  ),
                 ),
               ],
             ),
@@ -425,6 +427,20 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
               children: [
                 Text(
                   '• All secrets are stored using secure system keychain',
+                  style: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.mutedForeground,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• When approving commands, you can select which secrets to pass to the command',
+                  style: theme.textTheme.small.copyWith(
+                    color: theme.colorScheme.mutedForeground,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '• The names correspond to the environment variables that will be passed to the command',
                   style: theme.textTheme.small.copyWith(
                     color: theme.colorScheme.mutedForeground,
                   ),
