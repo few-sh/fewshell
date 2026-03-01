@@ -113,7 +113,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildUserSettings() {
     return _buildResponsiveContent([
-      _buildAIModelsSection(isGlobal: true),
+      // _buildAIModelsSection(isGlobal: true),
       const SizedBox(height: 24),
       _buildThemeSection(),
     ]);
