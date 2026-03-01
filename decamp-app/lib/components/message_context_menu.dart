@@ -154,7 +154,7 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
         if (isUser)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.bookmark),
-            child: const Text('Add to Saved Prompts'),
+            child: const Text('Add to Quick Prompts'),
             onPressed: () async {
               await showSavedPromptDialog(
                 context,

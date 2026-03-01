@@ -189,8 +189,9 @@ class _SavedPromptsPageState extends ConsumerState<SavedPromptsPage>
           constraints: const BoxConstraints(maxWidth: 800),
           child: const EmptyPlaceholder(
             icon: LucideIcons.messageSquare,
-            title: 'No Saved Prompts Yet',
-            subtitle: 'Add your first saved prompt using the + button below.',
+            title: 'No Quick Prompts Yet',
+            subtitle:
+                'Quick prompts are frequently-used prompts that you can quickly access from the chat session using the button to the left of the chat input. Add your first quick prompt using the + button below.',
           ),
         ),
       );

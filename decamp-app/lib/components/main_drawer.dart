@@ -127,7 +127,7 @@ class MainDrawer extends ConsumerWidget {
                 const SizedBox(height: 8),
                 _DrawerItem(
                   icon: LucideIcons.messageSquare,
-                  label: 'Saved Prompts',
+                  label: 'Quick Prompts',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
