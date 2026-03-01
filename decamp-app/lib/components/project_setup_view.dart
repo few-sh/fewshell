@@ -124,60 +124,6 @@ class ProjectSetupView extends ConsumerWidget {
                     alpha: 0.3,
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'run this command from a host',
-                  style: theme.textTheme.h4.copyWith(
-                    color: theme.colorScheme.mutedForeground,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: ExpandableCodeBlock(
-                    code: 'curl -LsSf get.few.sh | bash',
-                    language: 'bash',
-                    heroTag: 'projects_setup_command',
-                    terminalTheme: terminalTheme,
-                    centered: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'then scan the QR code',
-                  style: theme.textTheme.h4.copyWith(
-                    color: theme.colorScheme.mutedForeground,
-                    fontSize: 18,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ShadButton.outline(
-                  onPressed: () =>
-                      _handleScanQrCode(context, ref, existingNames),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(LucideIcons.qrCode),
-                      SizedBox(width: 8),
-                      Text('Scan QR Code'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ShadButton.outline(
-                  onPressed: () =>
-                      _createProjectWithRandomName(context, ref, existingNames),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(LucideIcons.pencil),
-                      SizedBox(width: 8),
-                      Text('Enter Manually'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
                 ShadButton.outline(
                   onPressed: () =>
                       ConnectToAgentServerDialog.show(context, ref),
@@ -186,10 +132,68 @@ class ProjectSetupView extends ConsumerWidget {
                     children: const [
                       Icon(LucideIcons.globe),
                       SizedBox(width: 8),
-                      Text('Connect to Agent Server'),
+                      Text('Connect via SSH'),
                     ],
                   ),
                 ),
+                // const SizedBox(height: 16),
+                // Text(
+                //   'run this command from a host',
+                //   style: theme.textTheme.h4.copyWith(
+                //     color: theme.colorScheme.mutedForeground,
+                //     fontSize: 18,
+                //   ),
+                // ),
+                // const SizedBox(height: 16),
+                // Padding(
+                //   padding: const EdgeInsets.symmetric(horizontal: 8),
+                //   child: ExpandableCodeBlock(
+                //     code: 'curl -LsSf get.few.sh | bash',
+                //     language: 'bash',
+                //     heroTag: 'projects_setup_command',
+                //     terminalTheme: terminalTheme,
+                //     centered: true,
+                //   ),
+                // ),
+                const SizedBox(height: 16),
+                // Text(
+                //   'then scan the QR code',
+                //   style: theme.textTheme.h4.copyWith(
+                //     color: theme.colorScheme.mutedForeground,
+                //     fontSize: 18,
+                //   ),
+                // ),
+                // const SizedBox(height: 24),
+                // ShadButton.outline(
+                //   onPressed: () =>
+                //       _handleScanQrCode(context, ref, existingNames),
+                //   child: Row(
+                //     mainAxisSize: MainAxisSize.min,
+                //     children: const [
+                //       Icon(LucideIcons.qrCode),
+                //       SizedBox(width: 8),
+                //       Text('Scan QR Code'),
+                //     ],
+                //   ),
+                // ),
+                const SizedBox(height: 16),
+                if (kDebugMode)
+                  ShadButton.outline(
+                    onPressed: () => _createProjectWithRandomName(
+                      context,
+                      ref,
+                      existingNames,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(LucideIcons.pencil),
+                        SizedBox(width: 8),
+                        Text('Enter Manually'),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 16),
               ],
             ),
           ),
