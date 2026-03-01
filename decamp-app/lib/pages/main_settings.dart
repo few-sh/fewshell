@@ -584,25 +584,26 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Remote Shell', style: theme.textTheme.h4),
-            if (currentProjectId != null && sshSettings == null)
-              ShadButton(
-                onPressed: () =>
-                    _showSshSettingsDialog(projectId: currentProjectId),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(LucideIcons.plus, size: 16),
-                    SizedBox(width: 8),
-                    Text('Configure Connection'),
-                  ],
+        if (kDebugMode)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Remote Shell', style: theme.textTheme.h4),
+              if (currentProjectId != null && sshSettings == null)
+                ShadButton(
+                  onPressed: () =>
+                      _showSshSettingsDialog(projectId: currentProjectId),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.plus, size: 16),
+                      SizedBox(width: 8),
+                      Text('Configure Connection'),
+                    ],
+                  ),
                 ),
-              ),
-          ],
-        ),
+            ],
+          ),
         const SizedBox(height: 16),
         // Show message if no project selected
         if (currentProjectId == null)
