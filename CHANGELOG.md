@@ -3,6 +3,17 @@
 - Switch to .tar.gz packaging format
 - Fix detection of when server is running
 
+# App 1.0.1+27
+
+- Add privacy policy link
+- Rename Saved Prompts to Quick Prompts
+- Simplify the onboarding screen
+- Reinstate password option for SSH tunnel dialog
+- Update app name for macOS
+- Fix project creation issues on clean install
+- Fix stuck loading indicator on brand new install
+- Improve server installation and connection reliability
+
 # Server 0.1.23
 
 - SSH tunnel support
