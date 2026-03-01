@@ -137,7 +137,7 @@ class SyncController {
             final secretsSync = CrdtSync.server(
               secretsCrdt,
               secretsChannel,
-              verbose: true,
+              verbose: false,
             );
 
             final keychain = KeychainService(secretsCrdt);

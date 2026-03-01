@@ -835,7 +835,7 @@ class SyncService {
       _secretsSync = CrdtSync.client(
         secretsCrdt,
         secretsChannel,
-        verbose: true,
+        verbose: false,
         changesetBuilder:
             ({
               exceptNodeId,
