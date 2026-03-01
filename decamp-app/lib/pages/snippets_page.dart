@@ -434,17 +434,16 @@ class _SnippetCardContentState extends ConsumerState<_SnippetCardContent> {
           Stack(
             alignment: Alignment.center,
             children: [
-              ReorderableDragStartListener(
-                index: widget.index,
-                child: Container(
-                  width: double.infinity,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  color: Colors.transparent, // Hit test
-                  child: Icon(
-                    LucideIcons.gripHorizontal,
-                    size: 20,
-                    color: theme.colorScheme.mutedForeground,
+              Center(
+                child: ReorderableDragStartListener(
+                  index: widget.index,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Icon(
+                      LucideIcons.gripHorizontal,
+                      size: 20,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
                   ),
                 ),
               ),
