@@ -1,3 +1,8 @@
+# Server 0.1.24
+
+- Switch to .tar.gz packaging format
+- Fix detection of when server is running
+
 # Server 0.1.23
 
 - SSH tunnel support
