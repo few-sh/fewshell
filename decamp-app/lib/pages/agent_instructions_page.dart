@@ -397,56 +397,57 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
                 // Default Instruction Section
                 _InstructionSection(
                   title: 'Default Instruction',
-                  subtitle: 'Applies to all models unless overridden',
+                  subtitle:
+                      'This is the system prompt that is passed in all projects and sessions.',
                   controller: _defaultController,
                   onChanged: _checkForChanges,
                 ),
                 const SizedBox(height: 24),
 
                 // Model-Specific Overrides
-                ShadAccordion<String>.multiple(
-                  children: [
-                    ShadAccordionItem(
-                      value: 'overrides',
-                      title: const Text('Model-Specific Overrides'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_modelControllers.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                'No overrides configured',
-                                style: ShadTheme.of(context).textTheme.muted,
-                              ),
-                            )
-                          else
-                            ..._modelControllers.entries.map((entry) {
-                              return _ModelOverrideSection(
-                                modelIdentifier: entry.key,
-                                controller: entry.value,
-                                onChanged: _checkForChanges,
-                                onRemove: () => _removeModelOverride(entry.key),
-                                onPreview: () =>
-                                    AgentInstructionPreviewModal.show(
-                                      context,
-                                      entry.value.text,
-                                    ),
-                              );
-                            }),
+                // ShadAccordion<String>.multiple(
+                //   children: [
+                //     ShadAccordionItem(
+                //       value: 'overrides',
+                //       title: const Text('Model-Specific Overrides'),
+                //       child: Column(
+                //         crossAxisAlignment: CrossAxisAlignment.start,
+                //         children: [
+                //           if (_modelControllers.isEmpty)
+                //             Padding(
+                //               padding: const EdgeInsets.only(bottom: 16.0),
+                //               child: Text(
+                //                 'No overrides configured',
+                //                 style: ShadTheme.of(context).textTheme.muted,
+                //               ),
+                //             )
+                //           else
+                //             ..._modelControllers.entries.map((entry) {
+                //               return _ModelOverrideSection(
+                //                 modelIdentifier: entry.key,
+                //                 controller: entry.value,
+                //                 onChanged: _checkForChanges,
+                //                 onRemove: () => _removeModelOverride(entry.key),
+                //                 onPreview: () =>
+                //                     AgentInstructionPreviewModal.show(
+                //                       context,
+                //                       entry.value.text,
+                //                     ),
+                //               );
+                //             }),
 
-                          // Add new override button
-                          const SizedBox(height: 16),
-                          _AddModelOverrideButton(
-                            existingIdentifiers: _modelControllers.keys.toSet(),
-                            availableLlms: llmSettings,
-                            onAdd: _addModelOverride,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                //           // Add new override button
+                //           const SizedBox(height: 16),
+                //           _AddModelOverrideButton(
+                //             existingIdentifiers: _modelControllers.keys.toSet(),
+                //             availableLlms: llmSettings,
+                //             onAdd: _addModelOverride,
+                //           ),
+                //         ],
+                //       ),
+                //     ),
+                //   ],
+                // ),
               ],
             ),
           ),
@@ -733,59 +734,59 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
                 _InstructionSection(
                   title: 'Default Project Instruction',
                   subtitle:
-                      'Applies to all models in this project unless overridden',
+                      'This is the system prompt that is passed for the current project. Include additional project-specific instructions here.',
                   controller: _defaultController,
                   onChanged: _checkForChanges,
                 ),
                 const SizedBox(height: 24),
 
                 // Model-Specific Overrides
-                ShadAccordion<String>.multiple(
-                  children: [
-                    ShadAccordionItem(
-                      value: 'overrides',
-                      title: const Text('Model-Specific Overrides'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_modelControllers.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: Text(
-                                'No overrides configured',
-                                style: ShadTheme.of(context).textTheme.muted,
-                              ),
-                            )
-                          else
-                            ..._modelControllers.entries.map((entry) {
-                              return _ModelOverrideSection(
-                                modelIdentifier: entry.key,
-                                controller: entry.value,
-                                onChanged: _checkForChanges,
-                                onRemove: () => _removeModelOverride(entry.key),
-                                onPreview: () =>
-                                    AgentInstructionPreviewModal.show(
-                                      context,
-                                      _getPreviewInstruction(
-                                        entry.key,
-                                        entry.value.text,
-                                      ),
-                                    ),
-                              );
-                            }),
+                // ShadAccordion<String>.multiple(
+                //   children: [
+                //     ShadAccordionItem(
+                //       value: 'overrides',
+                //       title: const Text('Model-Specific Overrides'),
+                //       child: Column(
+                //         crossAxisAlignment: CrossAxisAlignment.start,
+                //         children: [
+                //           if (_modelControllers.isEmpty)
+                //             Padding(
+                //               padding: const EdgeInsets.only(bottom: 16.0),
+                //               child: Text(
+                //                 'No overrides configured',
+                //                 style: ShadTheme.of(context).textTheme.muted,
+                //               ),
+                //             )
+                //           else
+                //             ..._modelControllers.entries.map((entry) {
+                //               return _ModelOverrideSection(
+                //                 modelIdentifier: entry.key,
+                //                 controller: entry.value,
+                //                 onChanged: _checkForChanges,
+                //                 onRemove: () => _removeModelOverride(entry.key),
+                //                 onPreview: () =>
+                //                     AgentInstructionPreviewModal.show(
+                //                       context,
+                //                       _getPreviewInstruction(
+                //                         entry.key,
+                //                         entry.value.text,
+                //                       ),
+                //                     ),
+                //               );
+                //             }),
 
-                          // Add new override button
-                          const SizedBox(height: 16),
-                          _AddModelOverrideButton(
-                            existingIdentifiers: _modelControllers.keys.toSet(),
-                            availableLlms: llmSettings,
-                            onAdd: _addModelOverride,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+                //           // Add new override button
+                //           const SizedBox(height: 16),
+                //           _AddModelOverrideButton(
+                //             existingIdentifiers: _modelControllers.keys.toSet(),
+                //             availableLlms: llmSettings,
+                //             onAdd: _addModelOverride,
+                //           ),
+                //         ],
+                //       ),
+                //     ),
+                //   ],
+                // ),
               ],
             ),
           ),
