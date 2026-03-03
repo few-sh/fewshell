@@ -13,6 +13,10 @@ const String kDefaultSessionDescription = 'New conversation';
 /// the global sync WebSocket upgrade. Only sent on the `/sync/global` endpoint.
 const String kNodeIdHeader = 'X-Fewshell-Server-Node-Id';
 
+/// HTTP header name used to communicate the server version during
+/// the WebSocket upgrade response.
+const String kServerVersionHeader = 'X-Fewshell-Server-Version';
+
 // ============================================================================
 // Terminal Display Constants
 // ============================================================================

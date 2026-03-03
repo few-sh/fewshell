@@ -13,6 +13,7 @@ import '../services/database_manager.dart';
 import '../services/local_shell_backend.dart';
 import '../services/notification_dispatcher.dart';
 import '../utils/websocket_upgrade.dart';
+import 'package:fewshell_agent/version.dart';
 
 class SyncController {
   static final _log = Logger('SyncController');
@@ -185,7 +186,10 @@ class SyncController {
   Response _handleGlobalSync(Request request) {
     return upgradeWebSocket(
       request,
-      headers: {kNodeIdHeader: dbManager.nodeId},
+      headers: {
+        kNodeIdHeader: dbManager.nodeId,
+        kServerVersionHeader: packageVersion,
+      },
       onConnection: (WebSocketChannel channel) {
         _log.info('Starting CrdtSync for global');
         final sync = CrdtSync.server(
