@@ -21,6 +21,10 @@ const String kServerVersionHeader = 'X-Fewshell-Server-Version';
 /// required to connect to this server.
 const String kMinClientVersionHeader = 'X-Fewshell-Min-Client-Version';
 
+/// HTTP header name sent by the client to communicate its version
+/// during the WebSocket upgrade request.
+const String kClientVersionHeader = 'X-Fewshell-Client-Version';
+
 // ============================================================================
 // Terminal Display Constants
 // ============================================================================

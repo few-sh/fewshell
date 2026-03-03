@@ -12,6 +12,7 @@ import 'package:web_socket_channel/io.dart';
 import 'package:stream_channel/stream_channel.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:dartssh2/dartssh2.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:decamp/certs.dart';
 import 'package:decamp/models/app_event.dart';
 import 'package:decamp/providers/providers.dart';
@@ -93,8 +94,12 @@ class SyncService {
 
   late final AppEventBus _appEventBus;
 
+  /// The client version string (e.g. '1.0.1+27'), resolved from PackageInfo.
+  String? _clientVersion;
+
   SyncService(this.ref) {
     _appEventBus = ref.read(appEventBusProvider);
+    _initClientVersion();
     _init();
   }
 
@@ -108,6 +113,17 @@ class SyncService {
   void _updateConnectionState(SyncConnectionState state) {
     _currentConnectionState = state;
     _connectionStateController.add(state);
+  }
+
+  void _initClientVersion() {
+    PackageInfo.fromPlatform()
+        .then((info) {
+          _clientVersion = '${info.version}+${info.buildNumber}';
+          _log.info('Client version resolved: $_clientVersion');
+        })
+        .catchError((Object e) {
+          _log.warning('Failed to resolve client version: $e');
+        });
   }
 
   void _init() {
@@ -1292,6 +1308,9 @@ class SyncService {
         uri,
         customClient: client,
         connectTimeout: timeout,
+        headers: _clientVersion != null
+            ? {kClientVersionHeader: _clientVersion!}
+            : null,
         // Generous fallback ping for connections without activity-based
         // keep-alive (e.g. global sync). Project connections use
         // _ActivityMonitorWebSocketChannel which handles keep-alive
@@ -1343,6 +1362,11 @@ class SyncService {
         ..set('Upgrade', 'websocket')
         ..set('Sec-WebSocket-Version', '13')
         ..set('Sec-WebSocket-Key', nonce);
+
+      final clientVersion = _clientVersion;
+      if (clientVersion != null) {
+        request.headers.set(kClientVersionHeader, clientVersion);
+      }
 
       final response = await request.close();
 
