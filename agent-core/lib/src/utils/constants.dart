@@ -17,6 +17,10 @@ const String kNodeIdHeader = 'X-Fewshell-Server-Node-Id';
 /// the WebSocket upgrade response.
 const String kServerVersionHeader = 'X-Fewshell-Server-Version';
 
+/// HTTP header name used to communicate the minimum client version
+/// required to connect to this server.
+const String kMinClientVersionHeader = 'X-Fewshell-Min-Client-Version';
+
 // ============================================================================
 // Terminal Display Constants
 // ============================================================================

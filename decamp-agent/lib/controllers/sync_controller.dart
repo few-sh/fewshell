@@ -189,6 +189,7 @@ class SyncController {
       headers: {
         kNodeIdHeader: dbManager.nodeId,
         kServerVersionHeader: packageVersion,
+        kMinClientVersionHeader: minimumClientVersion,
       },
       onConnection: (WebSocketChannel channel) {
         _log.info('Starting CrdtSync for global');
