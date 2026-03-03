@@ -768,6 +768,12 @@ class SyncService {
           _updateConnectionState(SyncConnectionState.disconnected);
           _scheduleReconnect();
         },
+        onPing: () {
+          _projectChannel?.safeSendCustomMessage({
+            'type': 'PING',
+            'payload': 'keepalive',
+          });
+        },
       );
 
       try {
@@ -982,7 +988,7 @@ class SyncService {
   /// Handle app lifecycle state changes.
   /// On macOS, connections stay alive through inactive/hidden states.
   /// Only reconnect when transitioning from paused->resumed (mobile scenario).
-  /// For system sleep/wake, rely on pingInterval timeout to detect dead connections.
+  /// For system sleep/wake, rely on activity-based keep-alive to detect dead connections.
   void _handleLifecycleStateChange(AppLifecycleState state) {
     _log.info('App lifecycle state: $_lastLifecycleState -> $state');
 
@@ -1286,7 +1292,11 @@ class SyncService {
         uri,
         customClient: client,
         connectTimeout: timeout,
-        pingInterval: const Duration(seconds: 10),
+        // Generous fallback ping for connections without activity-based
+        // keep-alive (e.g. global sync). Project connections use
+        // _ActivityMonitorWebSocketChannel which handles keep-alive
+        // based on actual data activity.
+        pingInterval: const Duration(seconds: 120),
       );
     } catch (e, st) {
       _log.severe('Error configuring mTLS', e, st);
@@ -1353,7 +1363,9 @@ class SyncService {
       // Detach the raw socket and wrap it as a WebSocket.
       final socket = await response.detachSocket();
       final ws = WebSocket.fromUpgradedSocket(socket, serverSide: false);
-      ws.pingInterval = const Duration(seconds: 10);
+      // Generous fallback — activity-based keep-alive handles project
+      // connections; this is a safety net for global sync.
+      ws.pingInterval = const Duration(seconds: 120);
       final channel = IOWebSocketChannel(ws);
 
       _log.info(
@@ -1372,24 +1384,50 @@ class SyncService {
 
 enum SyncConnectionState { disconnected, connecting, connected }
 
+/// Wraps a [WebSocketChannel] with activity tracking and keep-alive.
+///
+/// Instead of relying on the built-in WebSocket `pingInterval` (which fires
+/// pings on a fixed timer regardless of data activity), this monitor only
+/// sends pings when the connection is truly idle — i.e. no data has been
+/// *received* for [_keepAliveInterval].  Any received data (including pong
+/// responses) resets the idle clock, so large changeset transfers keep the
+/// connection alive without needing ping/pong round-trips.
+///
+/// If no data is received for [_deadTimeout], the connection is considered
+/// dead and is closed with status 4001.
 class _ActivityMonitorWebSocketChannel
     with StreamChannelMixin
     implements WebSocketChannel {
+  /// Send an application-level ping after this much idle time.
+  static const _keepAliveInterval = Duration(seconds: 30);
+
+  /// Close the connection if no data received for this long.
+  static const _deadTimeout = Duration(seconds: 90);
+
+  /// How often the keep-alive timer checks for activity.
+  static const _checkInterval = Duration(seconds: 10);
+
   final WebSocketChannel _inner;
   final void Function() onActivity;
   final void Function() onDisconnect;
+  final void Function()? onPing;
   late final WebSocketSink _sink;
   late final Stream _stream;
+
+  DateTime _lastReceivedAt = DateTime.now();
+  Timer? _keepAliveTimer;
 
   _ActivityMonitorWebSocketChannel(
     this._inner, {
     required this.onActivity,
     required this.onDisconnect,
+    this.onPing,
   }) {
     _sink = _ActivityMonitorSink(_inner.sink, onActivity);
     _stream = _inner.stream.transform(
       StreamTransformer.fromHandlers(
         handleData: (data, sink) {
+          _lastReceivedAt = DateTime.now();
           onActivity();
           sink.add(data);
         },
@@ -1399,11 +1437,13 @@ class _ActivityMonitorWebSocketChannel
             error,
             stackTrace,
           );
+          _keepAliveTimer?.cancel();
           onDisconnect();
           sink.addError(error, stackTrace);
         },
         handleDone: (sink) {
           _log.info('ActivityMonitor: Stream done (closed by remote or local)');
+          _keepAliveTimer?.cancel();
           if (_inner.closeCode != null) {
             _log.info(
               'Close Code: ${_inner.closeCode}, Reason: ${_inner.closeReason}',
@@ -1414,6 +1454,30 @@ class _ActivityMonitorWebSocketChannel
         },
       ),
     );
+    _startKeepAlive();
+  }
+
+  void _startKeepAlive() {
+    _keepAliveTimer = Timer.periodic(_checkInterval, (_) {
+      final idle = DateTime.now().difference(_lastReceivedAt);
+      if (idle > _deadTimeout) {
+        _log.warning(
+          'ActivityMonitor: No data received for ${idle.inSeconds}s '
+          '(dead timeout: ${_deadTimeout.inSeconds}s), closing connection',
+        );
+        _keepAliveTimer?.cancel();
+        _inner.sink.close(4001, 'Keep-alive timeout');
+      } else if (idle > _keepAliveInterval) {
+        _log.fine(
+          'ActivityMonitor: Idle for ${idle.inSeconds}s, sending keep-alive ping',
+        );
+        try {
+          onPing?.call();
+        } catch (e) {
+          _log.warning('ActivityMonitor: Error sending keep-alive ping', e);
+        }
+      }
+    });
   }
 
   @override
