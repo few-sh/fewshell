@@ -56,7 +56,8 @@ Response upgradeWebSocket(
     sink.add('\r\n');
 
     final socket = channel.sink as Socket;
-    final webSocket = WebSocket.fromUpgradedSocket(socket, serverSide: true);
+    final webSocket = WebSocket.fromUpgradedSocket(socket, serverSide: true)
+      ..pingInterval = const Duration(seconds: 30);
     onConnection(IOWebSocketChannel(webSocket));
   });
 }

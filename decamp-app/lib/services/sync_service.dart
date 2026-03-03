@@ -1402,7 +1402,9 @@ class _ActivityMonitorWebSocketChannel
   static const _keepAliveInterval = Duration(seconds: 30);
 
   /// Close the connection if no data received for this long.
-  static const _deadTimeout = Duration(seconds: 90);
+  /// Set generously to handle large initial CRDT changeset transfers
+  /// where the server's event loop may be blocked computing the changeset.
+  static const _deadTimeout = Duration(minutes: 5);
 
   /// How often the keep-alive timer checks for activity.
   static const _checkInterval = Duration(seconds: 10);

@@ -113,7 +113,7 @@ class SyncController {
         final segments = path.split('/');
         if (segments.length >= 2) {
           final projectId = segments[1];
-          return webSocketHandler(
+          return webSocketHandler(pingInterval: const Duration(seconds: 30),
               (WebSocketChannel channel, String? protocol) async {
             final projectDb = await dbManager.getProjectDatabase(projectId);
             final multiplexed = MultiplexedWebSocketChannel(channel);
