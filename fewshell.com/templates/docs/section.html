@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{%- block title -%}
+{{ section.title }} | {{ config.title }}
+{%- endblock -%}
+
+{%- block description -%}
+    {%- if section.description %}
+    <meta name="description" content="{{ section.description | markdown(inline=true) | striptags }}">
+    {%- endif %}
+{%- endblock -%}
+
+{%- block main -%}
+<link rel="stylesheet" href="{{ get_url(path='docs.css', cachebust=true) }}">
+<div class="docs-container">
+    <aside class="docs-sidebar">
+        <button class="docs-sidebar-toggle" onclick="this.setAttribute('aria-expanded', this.nextElementSibling.hidden = !this.nextElementSibling.hidden ? '' : 'true'); this.nextElementSibling.hidden = !this.nextElementSibling.hidden" aria-expanded="false">
+            Navigation
+        </button>
+        <div class="docs-sidebar-content" hidden>
+            <nav aria-label="Docs navigation">
+                {%- set docs_section = get_section(path="docs/_index.md") -%}
+                {%- if docs_section.pages %}
+                <h3>{{ docs_section.title }}</h3>
+                <ul>
+                    {%- for page in docs_section.pages %}
+                    <li><a href="{{ page.permalink | safe }}">{{ page.title }}</a></li>
+                    {%- endfor %}
+                </ul>
+                {%- endif %}
+                {%- for s in docs_section.subsections %}
+                    {%- set subsection = get_section(path=s) %}
+                    {%- if subsection.pages %}
+                    <h3>{{ subsection.title }}</h3>
+                    <ul>
+                        {%- for page in subsection.pages %}
+                        <li><a href="{{ page.permalink | safe }}">{{ page.title }}</a></li>
+                        {%- endfor %}
+                    </ul>
+                    {%- endif %}
+                {%- endfor %}
+            </nav>
+        </div>
+    </aside>
+
+    <div class="docs-content">
+        <h1>{{ section.title }}</h1>
+        {%- if section.description %}
+        <p class="lead">{{ section.description }}</p>
+        {%- endif %}
+
+        {%- if section.content %}
+        {{ section.content | safe }}
+        {%- endif %}
+
+        <div class="docs-section-list">
+            {%- set docs_section = get_section(path="docs/_index.md") %}
+            {%- for s in docs_section.subsections %}
+                {%- set subsection = get_section(path=s) %}
+                <div class="docs-section-group">
+                    <h2>{{ subsection.title }}</h2>
+                    {%- for page in subsection.pages %}
+                    <a class="docs-card" href="{{ page.permalink | safe }}">
+                        <div class="card-title">{{ page.title }} &rarr;</div>
+                        {%- if page.description %}
+                        <div class="card-description">{{ page.description }}</div>
+                        {%- endif %}
+                    </a>
+                    {%- endfor %}
+                </div>
+            {%- endfor %}
+        </div>
+    </div>
+</div>
+{%- endblock -%}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{%- block title -%}
+{{ page.title }} | Docs | {{ config.title }}
+{%- endblock -%}
+
+{%- block description -%}
+    {%- if page.description %}
+    <meta name="description" content="{{ page.description | markdown(inline=true) | striptags }}">
+    {%- endif %}
+{%- endblock -%}
+
+{%- block main -%}
+<link rel="stylesheet" href="{{ get_url(path='docs.css', cachebust=true) }}">
+<div class="docs-container">
+    {# --- Sidebar navigation --- #}
+    <aside class="docs-sidebar">
+        <button class="docs-sidebar-toggle" onclick="var c=this.nextElementSibling; c.hidden=!c.hidden; this.setAttribute('aria-expanded', !c.hidden)" aria-expanded="false">
+            Navigation
+        </button>
+        <div class="docs-sidebar-content" hidden>
+            <nav aria-label="Docs navigation">
+                {%- set docs_section = get_section(path="docs/_index.md") -%}
+                {%- if docs_section.pages %}
+                <h3>{{ docs_section.title }}</h3>
+                <ul>
+                    {%- for p in docs_section.pages %}
+                    <li><a class="{% if current_url == p.permalink %}active{% endif %}" href="{{ p.permalink | safe }}">{{ p.title }}</a></li>
+                    {%- endfor %}
+                </ul>
+                {%- endif %}
+                {%- for s in docs_section.subsections %}
+                    {%- set subsection = get_section(path=s) %}
+                    {%- if subsection.pages %}
+                    <h3>{{ subsection.title }}</h3>
+                    <ul>
+                        {%- for p in subsection.pages %}
+                        <li><a class="{% if current_url == p.permalink %}active{% endif %}" href="{{ p.permalink | safe }}">{{ p.title }}</a></li>
+                        {%- endfor %}
+                    </ul>
+                    {%- endif %}
+                {%- endfor %}
+            </nav>
+        </div>
+    </aside>
+
+    {# --- Main content --- #}
+    <main class="docs-content">
+        <h1>{{ page.title }}</h1>
+        {%- if page.extra.lead %}
+        <p class="lead">{{ page.extra.lead | safe }}</p>
+        {%- endif %}
+
+        {{ page.content | safe }}
+
+        {# --- Prev / Next navigation --- #}
+        {%- if page.lighter or page.heavier %}
+        <nav class="docs-navigation" aria-label="Page navigation">
+            {%- if page.lighter %}
+            <a class="nav-prev" href="{{ page.lighter.permalink | safe }}">
+                <span class="nav-label">&larr; Previous</span>
+                {{ page.lighter.title }}
+            </a>
+            {%- endif %}
+            {%- if page.heavier %}
+            <a class="nav-next" href="{{ page.heavier.permalink | safe }}">
+                <span class="nav-label">Next &rarr;</span>
+                {{ page.heavier.title }}
+            </a>
+            {%- endif %}
+        </nav>
+        {%- endif %}
+    </main>
+
+    {# --- Table of Contents (right sidebar) --- #}
+    {%- if page.extra.toc is defined and page.extra.toc %}
+    <nav class="docs-toc" aria-label="Table of contents">
+        <h3>On this page</h3>
+        <ul>
+            {%- for h1 in page.toc %}
+            <li>
+                <a href="{{ h1.permalink | safe }}">{{ h1.title }}</a>
+                {%- if h1.children %}
+                <ul>
+                    {%- for h2 in h1.children %}
+                    <li><a href="{{ h2.permalink | safe }}">{{ h2.title }}</a></li>
+                    {%- endfor %}
+                </ul>
+                {%- endif %}
+            </li>
+            {%- endfor %}
+        </ul>
+    </nav>
+    {%- endif %}
+</div>
+{%- endblock -%}

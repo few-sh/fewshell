@@ -1,0 +1,265 @@
+// Docs layout styles (AdiDoks-inspired, using terminus CSS variables)
+
+.docs-container {
+    display: flex;
+    gap: 2rem;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+
+    @media (max-width: 768px) {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
+// --- Sidebar ---
+
+.docs-sidebar {
+    flex: 0 0 220px;
+    position: sticky;
+    top: 40px;
+    align-self: flex-start;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    padding-right: 1rem;
+    border-right: 1px solid color-mix(in srgb, var(--accent-color) 15%, transparent);
+
+    @media (max-width: 768px) {
+        position: static;
+        flex: none;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 15%, transparent);
+        padding-right: 0;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    nav h3 {
+        font-size: calc(var(--font-size) * 0.85);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--accent-color);
+        margin: 1.2rem 0 0.4rem;
+        padding: 0;
+
+        &:first-child {
+            margin-top: 0;
+        }
+    }
+
+    nav ul {
+        list-style: none;
+        margin: 0 0 0.5rem;
+        padding: 0;
+
+        li {
+            margin: 0;
+            padding: 0;
+        }
+
+        a {
+            display: block;
+            padding: 0.2rem 0.5rem;
+            text-decoration: none;
+            font-size: calc(var(--font-size) * 0.9);
+            color: var(--text-color);
+            border-left: 2px solid transparent;
+            transition: border-color 0.15s, color 0.15s;
+
+            &:hover {
+                color: var(--accent-color);
+                border-left-color: color-mix(in srgb, var(--accent-color) 40%, transparent);
+            }
+
+            &.active {
+                color: var(--accent-color);
+                border-left-color: var(--accent-color);
+                font-weight: bold;
+            }
+        }
+    }
+}
+
+// --- Mobile sidebar toggle ---
+
+.docs-sidebar-toggle {
+    display: none;
+    width: 100%;
+    font-size: calc(var(--font-size) * 0.9);
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 20%, transparent);
+    color: var(--text-color);
+    font-family: inherit;
+    text-align: left;
+
+    @media (max-width: 768px) {
+        display: block;
+    }
+
+    &::after {
+        content: ' ▾';
+    }
+
+    &[aria-expanded="true"]::after {
+        content: ' ▴';
+    }
+}
+
+.docs-sidebar-content {
+    @media (max-width: 768px) {
+        &[hidden] {
+            display: none;
+        }
+    }
+}
+
+// --- Main content ---
+
+.docs-content {
+    flex: 1;
+    min-width: 0;
+    max-width: 720px;
+
+    h1 {
+        margin-top: 0;
+    }
+
+    .lead {
+        font-size: calc(var(--font-size) * 1.1);
+        color: color-mix(in srgb, var(--text-color) 75%, transparent);
+        margin-bottom: 2rem;
+    }
+}
+
+// --- Table of Contents (right sidebar) ---
+
+.docs-toc {
+    flex: 0 0 180px;
+    position: sticky;
+    top: 40px;
+    align-self: flex-start;
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+    padding-left: 1rem;
+    border-left: 1px solid color-mix(in srgb, var(--accent-color) 15%, transparent);
+
+    @media (max-width: 1024px) {
+        display: none;
+    }
+
+    h3 {
+        font-size: calc(var(--font-size) * 0.8);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--accent-color);
+        margin: 0 0 0.5rem;
+    }
+
+    ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+
+        ul {
+            padding-left: 0.75rem;
+        }
+
+        li {
+            margin: 0;
+        }
+
+        a {
+            display: block;
+            padding: 0.15rem 0;
+            font-size: calc(var(--font-size) * 0.8);
+            text-decoration: none;
+            color: color-mix(in srgb, var(--text-color) 70%, transparent);
+            transition: color 0.15s;
+
+            &:hover {
+                color: var(--accent-color);
+            }
+        }
+    }
+}
+
+// --- Prev/Next navigation ---
+
+.docs-navigation {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid color-mix(in srgb, var(--accent-color) 15%, transparent);
+
+    a {
+        display: block;
+        padding: 0.6rem 1rem;
+        text-decoration: none;
+        border: 1px solid color-mix(in srgb, var(--accent-color) 25%, transparent);
+        font-size: calc(var(--font-size) * 0.9);
+        transition: border-color 0.15s;
+        max-width: 45%;
+
+        &:hover {
+            border-color: var(--accent-color);
+        }
+
+        .nav-label {
+            display: block;
+            font-size: calc(var(--font-size) * 0.75);
+            color: color-mix(in srgb, var(--text-color) 50%, transparent);
+            margin-bottom: 0.2rem;
+        }
+    }
+
+    .nav-next {
+        margin-left: auto;
+        text-align: right;
+    }
+}
+
+// --- Section listing (docs landing page) ---
+
+.docs-section-list {
+    .docs-section-group {
+        margin-bottom: 2rem;
+
+        h2 {
+            font-size: calc(var(--font-size) * 1.15);
+            color: var(--accent-color);
+            margin-bottom: 0.5rem;
+        }
+    }
+
+    .docs-card {
+        display: block;
+        padding: 0.8rem 1rem;
+        margin: 0.5rem 0;
+        text-decoration: none;
+        border: 1px solid color-mix(in srgb, var(--accent-color) 15%, transparent);
+        transition: border-color 0.15s, background 0.15s;
+        color: var(--text-color);
+
+        &:hover {
+            border-color: var(--accent-color);
+            background: color-mix(in srgb, var(--accent-color) 5%, transparent);
+        }
+
+        .card-title {
+            color: var(--accent-color);
+        }
+
+        .card-description {
+            font-size: calc(var(--font-size) * 0.9);
+            color: color-mix(in srgb, var(--text-color) 65%, transparent);
+            margin-top: 0.25rem;
+        }
+    }
+}

@@ -18,9 +18,10 @@ generate_feeds = false
 author = "Fewshot Corp"
 
 [markdown]
-# Whether to do syntax highlighting
-highlight_code = true
-highlight_theme = "monokai"
+# Syntax highlighting
+[markdown.highlighting]
+enabled = true
+theme = "monokai"
 
 # When set to "true", emoji aliases translated to their corresponding
 # Unicode emoji equivalent in the rendered Markdown files.
@@ -41,7 +42,7 @@ show_default_author = false
 
 main_menu = [
     { name = "Home", url = "", trailing_slash = true },
-
+    { name = "Docs", url = "docs", trailing_slash = true },
     { name = "Contact", url = "contact", trailing_slash = true },
 ]
 
