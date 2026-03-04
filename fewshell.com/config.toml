@@ -42,7 +42,7 @@ show_default_author = false
 
 main_menu = [
     { name = "Home", url = "", trailing_slash = true },
-    { name = "Docs", url = "docs", trailing_slash = true },
+#    { name = "Docs", url = "docs", trailing_slash = true },
     { name = "Contact", url = "contact", trailing_slash = true },
 ]
 
