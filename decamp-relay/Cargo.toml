@@ -16,6 +16,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1.0"
 dotenvy = "0.15"
 rand = "0.8"
+tokio-stream = "0.1"
 
 [profile.release]
 opt-level = 3
