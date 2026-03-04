@@ -146,6 +146,11 @@ pub async fn post_pubkey(
                     info!("Pubkey id {} was consumed, closing SSE stream", current_id);
                     break true;
                 }
+                _ = tx.closed() => {
+                    // POST client disconnected — clean up immediately.
+                    info!("POST client disconnected, removing pubkey id {}", current_id);
+                    break false;
+                }
                 _ = tokio::time::sleep(std::time::Duration::from_secs(PUBKEY_ROTATION_SECS)) => {
                     // Rotate: remove old ID, generate new one.
                     let new_id = {
@@ -176,7 +181,6 @@ pub async fn post_pubkey(
         };
 
         if !consumed_by_get {
-            // Client disconnected before the key was consumed.
             store.write().await.remove(&current_id);
         }
     });
