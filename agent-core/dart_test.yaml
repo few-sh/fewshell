@@ -1,0 +1,3 @@
+tags:
+  integration:
+    skip: "Requires a running relay server. Run with: dart test -t integration"
