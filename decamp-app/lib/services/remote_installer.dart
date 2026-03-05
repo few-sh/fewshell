@@ -20,10 +20,10 @@ const _serverBinaryPath = '.fewshell/fewshell-server';
 const _serverSocketPath = '.fewshell/agent.sock';
 
 /// Maximum time to wait for the domain socket to appear after starting.
-const _socketTimeout = Duration(seconds: 10);
+const _socketTimeout = Duration(seconds: 60);
 
 /// Polling interval when waiting for the domain socket.
-const _socketPollInterval = Duration(milliseconds: 500);
+const _socketPollInterval = Duration(seconds: 1);
 
 /// Ensures the fewshell server is installed and running on a remote system
 /// via an authenticated SSH connection.
@@ -65,6 +65,14 @@ class RemoteInstaller {
     } else {
       _log.fine('Server process already running.');
       _emit('Server already running.\n');
+      // The process may be running but the socket may not be ready yet
+      // (e.g. server is still initializing). Wait for it.
+      final socketReady = await _isSocketReady();
+      if (!socketReady) {
+        _log.info('Server running but socket not ready, waiting…');
+        _emit('Waiting for server socket…\n');
+        await _waitForSocket();
+      }
     }
 
     _emit('Server is ready.\n');
@@ -161,6 +169,14 @@ class RemoteInstaller {
     await _waitForSocket();
 
     _log.info('Server started.');
+  }
+
+  /// One-shot check whether the domain socket exists right now.
+  Future<bool> _isSocketReady() async {
+    final result = await _execStdout(
+      'test -S \$HOME/$_serverSocketPath && echo YES || echo NO',
+    );
+    return result == 'YES';
   }
 
   /// Polls until `~/.fewshell/agent.sock` exists, or times out.
