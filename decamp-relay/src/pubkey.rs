@@ -1,6 +1,6 @@
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{
         sse::{Event, KeepAlive, Sse},
         IntoResponse, Response,
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::{watch, RwLock};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::info;
 
@@ -20,10 +20,12 @@ use tracing::info;
 const PUBKEY_ROTATION_SECS: u64 = 30;
 
 /// An entry in the pubkey store, linking an ID to a public key and
-/// a notification handle used to signal when the key is consumed.
+/// a channel used to deliver the consumer's IP address when the key
+/// is retrieved via GET.
 pub struct PubkeyEntry {
     public_key: String,
-    consumed: Arc<Notify>,
+    /// Sender half — GET writes `Some(ip)` to signal consumption.
+    consumed_tx: Arc<watch::Sender<Option<String>>>,
 }
 
 pub type PubkeyStore = Arc<RwLock<HashMap<String, PubkeyEntry>>>;
@@ -84,7 +86,8 @@ fn generate_id(map: &HashMap<String, PubkeyEntry>) -> String {
 /// The stream immediately emits the initial ID, then every
 /// [`PUBKEY_ROTATION_SECS`] seconds generates a new ID (removing
 /// the old one from the store) and emits it. When a GET consumer
-/// retrieves the key, the stream closes.
+/// retrieves the key, the consumer's IP is sent as a final
+/// `connected` event before the stream closes.
 pub async fn post_pubkey(
     State(store): State<PubkeyStore>,
     Json(payload): Json<PostPubkeyRequest>,
@@ -99,7 +102,8 @@ pub async fn post_pubkey(
             .into_response();
     }
 
-    let consumed = Arc::new(Notify::new());
+    let (consumed_tx, mut consumed_rx) = watch::channel::<Option<String>>(None);
+    let consumed_tx = Arc::new(consumed_tx);
     let public_key = payload.public_key;
 
     let initial_id = {
@@ -109,7 +113,7 @@ pub async fn post_pubkey(
             id.clone(),
             PubkeyEntry {
                 public_key: public_key.clone(),
-                consumed: consumed.clone(),
+                consumed_tx: consumed_tx.clone(),
             },
         );
         id
@@ -134,16 +138,22 @@ pub async fn post_pubkey(
             return;
         }
 
-        let notified = consumed.notified();
-        tokio::pin!(notified);
-
         let mut current_id = initial_id;
 
         let consumed_by_get = loop {
             tokio::select! {
-                _ = &mut notified => {
-                    // Key was consumed via GET — stop streaming.
-                    info!("Pubkey id {} was consumed, closing SSE stream", current_id);
+                result = consumed_rx.changed() => {
+                    if result.is_ok() {
+                        let ip = {
+                            consumed_rx.borrow_and_update().clone()
+                        };
+                        if let Some(ip) = ip {
+                            info!("Pubkey id {} consumed by {}, sending final event", current_id, ip);
+                            let _ = tx.send(Ok(
+                                Event::default().event("connected").data(ip)
+                            )).await;
+                        }
+                    }
                     break true;
                 }
                 _ = tx.closed() => {
@@ -161,7 +171,7 @@ pub async fn post_pubkey(
                             new_id.clone(),
                             PubkeyEntry {
                                 public_key: public_key.clone(),
-                                consumed: consumed.clone(),
+                                consumed_tx: consumed_tx.clone(),
                             },
                         );
                         new_id
@@ -191,15 +201,25 @@ pub async fn post_pubkey(
         .into_response()
 }
 
-/// GET /pubkey?id=… — consumes the key, notifies the SSE stream to close.
+/// GET /pubkey?id=… — consumes the key and notifies the SSE stream
+/// with the client's IP address (from `X-Forwarded-For`).
 pub async fn get_pubkey(
     State(store): State<PubkeyStore>,
     Query(params): Query<GetPubkeyParams>,
+    headers: HeaderMap,
 ) -> Response {
+    let client_ip = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
     let mut map = store.write().await;
     match map.remove(&params.id) {
         Some(entry) => {
-            entry.consumed.notify_one();
+            // Signal the SSE stream with the consumer's IP.
+            let _ = entry.consumed_tx.send(Some(client_ip));
             Json(GetPubkeyResponse {
                 public_key: entry.public_key,
             })

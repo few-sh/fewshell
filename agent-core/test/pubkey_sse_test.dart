@@ -10,7 +10,7 @@ import 'package:test/test.dart';
 ///
 /// Requires the relay server running on localhost:8080.
 void main() {
-  const baseUrl = 'http://localhost:8080';
+  const baseUrl = 'http://localhost:8090';
   const testKey =
       'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGtQRGwEMGaJNcGxIGJMfPMYhMIjbdMElANOqFBHrBfg test@dart';
 
@@ -40,21 +40,36 @@ void main() {
         .transform(const LineSplitter());
 
     final ids = <String>[];
-    final completer = Completer<void>();
+    String? connectedIp;
+    bool sawConnectedEvent = false;
+    final idsCompleter = Completer<void>();
+    final connectedCompleter = Completer<void>();
 
     final subscription = stream.listen((line) {
-      // SSE data lines look like: "data: 123456"
+      if (line == 'event: connected') {
+        sawConnectedEvent = true;
+        return;
+      }
       if (line.startsWith('data: ')) {
-        final id = line.substring(6).trim();
-        ids.add(id);
-        if (ids.length == 2) {
-          completer.complete();
+        final value = line.substring(6).trim();
+        if (sawConnectedEvent) {
+          // This data line follows "event: connected" — it's the IP.
+          connectedIp = value;
+          if (!connectedCompleter.isCompleted) {
+            connectedCompleter.complete();
+          }
+        } else {
+          // Regular rotation ID.
+          ids.add(value);
+          if (ids.length == 2 && !idsCompleter.isCompleted) {
+            idsCompleter.complete();
+          }
         }
       }
     });
 
-    // Wait for two events (initial + one rotation).
-    await completer.future.timeout(
+    // Wait for two rotation events (initial + one rotation).
+    await idsCompleter.future.timeout(
       const Duration(seconds: 65),
       onTimeout: () => fail('Timed out waiting for 2 SSE events'),
     );
@@ -75,13 +90,22 @@ void main() {
     final getResponse = await dio.get(
       '/pubkey',
       queryParameters: {'id': ids[1]},
+      options: Options(headers: {'X-Forwarded-For': '1.2.3.4'}),
     );
     expect(getResponse.statusCode, 200);
     expect(getResponse.data['public_key'], testKey);
 
-    // After GET consumption the SSE stream should close.
-    // Give it a moment, then cancel the subscription.
-    await Future<void>.delayed(const Duration(seconds: 1));
+    // After GET consumption a final "connected" event with the client IP
+    // should arrive before the stream closes.
+    await connectedCompleter.future.timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => fail('Timed out waiting for connected event'),
+    );
+
+    expect(connectedIp, isNotNull);
+    expect(connectedIp, isNotEmpty);
+    expect(connectedIp, equals('1.2.3.4'));
+
     await subscription.cancel();
   }, timeout: Timeout(Duration(seconds: 75)));
 }
