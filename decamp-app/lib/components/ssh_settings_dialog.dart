@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/providers/ssh_tunnel_provider.dart';
 import 'package:flutter/material.dart';
@@ -137,6 +139,9 @@ class SshSettingsDialog {
 /// Sentinel value for the "New tunnel" option in the dropdown.
 const _newTunnelId = '__new__';
 
+/// Phases for the automated pairing section.
+enum _PairingPhase { idle, generating, pairing, connected }
+
 /// Internal form widget for the SSH settings dialog
 class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   final String title;
@@ -200,6 +205,18 @@ class _SshSettingsDialogFormState
   late bool _enabled;
   late SshAuthMethod _authMethod;
 
+  // --- Automated pairing state ---
+  bool _pairingExpanded = false;
+  _PairingPhase _pairingPhase = _PairingPhase.idle;
+  SshPairingService? _pairingService;
+  SshKeyPairResult? _keyPair;
+  StreamSubscription<SshPairingEvent>? _pairingSubscription;
+  String? _pairingCode;
+  String? _pairingError;
+  Timer? _countdownTimer;
+  int _countdownSeconds = 30;
+  static const _rotationIntervalSeconds = 30;
+
   /// In tunnel mode, tracks the currently selected tunnel ID
   /// (_newTunnelId for a blank form, or a real tunnel UUID).
   late String _selectedTunnelId;
@@ -250,7 +267,98 @@ class _SshSettingsDialogFormState
     _passphraseController.dispose();
     _sudoPasswordController.dispose();
     _scrollController.dispose();
+    _disposePairing();
     super.dispose();
+  }
+
+  // ===== Automated Pairing =====
+
+  void _startPairing() {
+    setState(() {
+      _pairingPhase = _PairingPhase.generating;
+      _pairingCode = null;
+      _pairingError = null;
+    });
+
+    try {
+      final keygen = SshKeygenService();
+      _keyPair = keygen.generate(comment: 'fewshell-pairing');
+
+      _pairingService = SshPairingService(relayBaseUrl: kRelayBaseUrl);
+      _pairingSubscription = _pairingService!.events.listen(_onPairingEvent);
+      _pairingService!.start(_keyPair!.publicKeyString);
+
+      setState(() {
+        _pairingPhase = _PairingPhase.pairing;
+      });
+    } catch (e) {
+      setState(() {
+        _pairingPhase = _PairingPhase.idle;
+        _pairingError = 'Failed to generate key: $e';
+      });
+    }
+  }
+
+  void _onPairingEvent(SshPairingEvent event) {
+    if (!mounted) return;
+    switch (event) {
+      case PairingCodeEvent(:final code):
+        setState(() {
+          _pairingCode = code;
+          _pairingError = null;
+          _countdownSeconds = _rotationIntervalSeconds;
+        });
+        _startCountdown();
+      case PairingConnectedEvent(:final ipAddress):
+        _countdownTimer?.cancel();
+        setState(() {
+          _pairingPhase = _PairingPhase.connected;
+          _hostController.text = ipAddress;
+          _authMethod = SshAuthMethod.privateKey;
+          _privateKeyController.text = _keyPair!.privatePem;
+          _privateKeyController.obscure = true;
+          if (_usernameController.text.isEmpty) {
+            _usernameController.text = 'root';
+          }
+        });
+      case PairingErrorEvent(:final message):
+        setState(() => _pairingError = message);
+      case PairingReconnectingEvent():
+        // Keep showing the last code (if any) while reconnecting
+        break;
+    }
+  }
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() {
+        if (_countdownSeconds > 0) {
+          _countdownSeconds--;
+        }
+      });
+    });
+  }
+
+  void _cancelPairing() {
+    _disposePairing();
+    setState(() {
+      _pairingPhase = _PairingPhase.idle;
+      _pairingCode = null;
+      _pairingError = null;
+    });
+  }
+
+  void _disposePairing() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
+    _pairingSubscription?.cancel();
+    _pairingSubscription = null;
+    _pairingService?.dispose();
+    _pairingService = null;
+    _keyPair?.dispose();
+    _keyPair = null;
   }
 
   /// Loads a tunnel config's fields into the form controllers.
@@ -495,6 +603,12 @@ class _SshSettingsDialogFormState
                   child: Center(child: CircularProgressIndicator()),
                 )
               else ...[
+                // Automated pairing section (create mode only)
+                if (!_isEditMode) ...[
+                  _buildPairingSection(theme),
+                  const SizedBox(height: 16),
+                ],
+
                 // Host field
                 _buildLabeledInput(
                   label: 'Host',
@@ -784,6 +898,253 @@ class _SshSettingsDialogFormState
         ),
       ),
     );
+  }
+
+  Widget _buildPairingSection(ShadThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header — always visible, toggles expansion
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _pairingPhase != _PairingPhase.idle
+                ? null // don't collapse while active
+                : () => setState(() => _pairingExpanded = !_pairingExpanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Icon(
+                    LucideIcons.radio,
+                    size: 16,
+                    color: _pairingPhase == _PairingPhase.connected
+                        ? Colors.green
+                        : theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Automated Pairing',
+                      style: theme.textTheme.small.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  if (_pairingPhase == _PairingPhase.connected)
+                    Text(
+                      'Paired',
+                      style: theme.textTheme.muted.copyWith(
+                        color: Colors.green,
+                        fontSize: 12,
+                      ),
+                    )
+                  else
+                    Icon(
+                      _pairingExpanded || _pairingPhase != _PairingPhase.idle
+                          ? LucideIcons.chevronUp
+                          : LucideIcons.chevronDown,
+                      size: 16,
+                      color: theme.colorScheme.mutedForeground,
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // Expanded content
+          if (_pairingExpanded || _pairingPhase != _PairingPhase.idle)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: _buildPairingContent(theme),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPairingContent(ShadThemeData theme) {
+    switch (_pairingPhase) {
+      case _PairingPhase.idle:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Generate a key pair and get a pairing code to '
+              'connect a server automatically.',
+              style: theme.textTheme.muted.copyWith(fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ShadButton.outline(
+                onPressed: _startPairing,
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(LucideIcons.key, size: 16),
+                    SizedBox(width: 8),
+                    Text('Generate Key & Start Pairing'),
+                  ],
+                ),
+              ),
+            ),
+            if (_pairingError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _pairingError!,
+                style: TextStyle(
+                  color: theme.colorScheme.destructive,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ],
+        );
+
+      case _PairingPhase.generating:
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+
+      case _PairingPhase.pairing:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Run this on your server:',
+              style: theme.textTheme.muted.copyWith(fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.muted.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: SelectableText(
+                'curl -LsSf get.few.sh | bash',
+                style: TextStyle(
+                  fontFamily: 'Courier New',
+                  fontFamilyFallback: const ['Courier', 'Monaco', 'Menlo'],
+                  fontSize: 13,
+                  color: theme.colorScheme.foreground,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_pairingCode != null) ...[
+              Text(
+                'Enter this code when prompted:',
+                style: theme.textTheme.muted.copyWith(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              // Centered code + segmented countdown
+              Center(
+                child: IntrinsicWidth(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Code display
+                      Center(
+                        child: Text(
+                          _pairingCode!,
+                          style: TextStyle(
+                            fontFamily: 'Courier New',
+                            fontFamilyFallback: const [
+                              'Courier',
+                              'Monaco',
+                              'Menlo',
+                            ],
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 8,
+                            color: theme.colorScheme.foreground,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      // Segmented countdown bar
+                      _SegmentedCountdown(
+                        total: _rotationIntervalSeconds,
+                        remaining: _countdownSeconds,
+                        activeColor: theme.colorScheme.primary,
+                        inactiveColor: theme.colorScheme.muted.withValues(
+                          alpha: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              const Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ],
+            if (_pairingError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _pairingError!,
+                style: TextStyle(
+                  color: theme.colorScheme.destructive,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ShadButton.ghost(
+                size: ShadButtonSize.sm,
+                onPressed: _cancelPairing,
+                child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        );
+
+      case _PairingPhase.connected:
+        return Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.green.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.green, width: 1),
+          ),
+          child: Row(
+            children: [
+              const Icon(LucideIcons.check, color: Colors.green, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Connected from ${_hostController.text}. '
+                  'Host and key have been filled in below.',
+                  style: TextStyle(color: Colors.green.shade700, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        );
+    }
   }
 
   Widget _buildTunnelPicker(ShadThemeData theme) {
@@ -1145,5 +1506,104 @@ class _SshSettingsDialogFormState
         );
       }
     }
+  }
+}
+
+/// A segmented countdown indicator where segments fade out one by one
+/// from right to left as time elapses.
+///
+/// Each segment represents one second. The currently fading segment
+/// smoothly animates its opacity using [AnimationController].
+class _SegmentedCountdown extends StatefulWidget {
+  final int total;
+  final int remaining;
+  final Color activeColor;
+  final Color inactiveColor;
+
+  const _SegmentedCountdown({
+    required this.total,
+    required this.remaining,
+    required this.activeColor,
+    required this.inactiveColor,
+  });
+
+  @override
+  State<_SegmentedCountdown> createState() => _SegmentedCountdownState();
+}
+
+class _SegmentedCountdownState extends State<_SegmentedCountdown>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _fadeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+  }
+
+  @override
+  void didUpdateWidget(_SegmentedCountdown old) {
+    super.didUpdateWidget(old);
+    if (old.remaining != widget.remaining) {
+      // Restart the fade animation for each new second tick.
+      _fadeController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.total;
+    final remaining = widget.remaining;
+
+    return AnimatedBuilder(
+      animation: _fadeController,
+      builder: (context, _) {
+        // The currently fading segment opacity (1 → 0 over 900ms).
+        final fadingOpacity = 1.0 - _fadeController.value;
+
+        return Row(
+          children: List.generate(total, (i) {
+            final double opacity;
+            if (i < remaining) {
+              opacity = 1.0;
+            } else if (i == remaining) {
+              opacity = fadingOpacity;
+            } else {
+              opacity = 0.0;
+            }
+
+            final color = Color.lerp(
+              widget.inactiveColor,
+              widget.activeColor,
+              opacity,
+            )!;
+
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: i < total - 1 ? 1.5 : 0),
+                child: SizedBox(
+                  height: 3,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
   }
 }

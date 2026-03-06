@@ -26,6 +26,13 @@ const String kMinClientVersionHeader = 'X-Fewshell-Min-Client-Version';
 const String kClientVersionHeader = 'X-Fewshell-Client-Version';
 
 // ============================================================================
+// Relay Constants
+// ============================================================================
+
+/// Base URL for the relay server used for SSH key pairing.
+const String kRelayBaseUrl = 'https://relay.fewshell.com';
+
+// ============================================================================
 // Terminal Display Constants
 // ============================================================================
 
