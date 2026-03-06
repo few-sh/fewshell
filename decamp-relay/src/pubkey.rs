@@ -54,8 +54,13 @@ struct ErrorResponse {
 ///
 /// Expected format: `ssh-ed25519 <68-char-base64> [optional comment]`
 fn is_valid_ed25519_pubkey(key: &str) -> bool {
-    let parts: Vec<&str> = key.split_whitespace().collect();
-    if parts.len() < 2 || parts.len() > 3 {
+    // Reject control characters (newlines, tabs, etc.) which would break
+    // authorized_keys format or could be used for injection.
+    if key.chars().any(|c| c.is_control()) {
+        return false;
+    }
+    let parts: Vec<&str> = key.splitn(3, ' ').collect();
+    if parts.len() < 2 {
         return false;
     }
     if parts[0] != "ssh-ed25519" {
