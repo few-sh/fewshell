@@ -125,7 +125,7 @@ pair_device() {
     local PUBKEY=""
     while [ -z "$PUBKEY" ]; do
         printf "Enter 6-digit pairing code: "
-        read -r CODE
+        read -r CODE </dev/tty
 
         # Validate format
         case "$CODE" in
