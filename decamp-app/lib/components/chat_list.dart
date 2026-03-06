@@ -499,7 +499,7 @@ class _MessageItem extends ConsumerWidget {
           child: Align(
             alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
+              constraints: const BoxConstraints(),
               child: RichMessageContent(
                 // Force rebuild for streaming messages to ensure updates are shown
                 // This handles cases where the message object instance might be reused
