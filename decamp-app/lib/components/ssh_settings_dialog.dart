@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../themes/terminal_theme.dart';
 import '../utils/ui_utils.dart';
 import 'ssh_prompt_dialog.dart';
 
@@ -903,7 +904,10 @@ class _SshSettingsDialogFormState
   Widget _buildPairingSection(ShadThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.border),
+        color: theme.colorScheme.accent.withValues(alpha: 0.08),
+        border: Border.all(
+          color: theme.colorScheme.accent.withValues(alpha: 0.25),
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -924,15 +928,15 @@ class _SshSettingsDialogFormState
                     size: 16,
                     color: _pairingPhase == _PairingPhase.connected
                         ? Colors.green
-                        : theme.colorScheme.primary,
+                        : theme.colorScheme.accent,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Automated Pairing',
+                      'Automated Pairing (recommended)',
                       style: theme.textTheme.small.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
+                        color: theme.colorScheme.accentForeground,
                       ),
                     ),
                   ),
@@ -950,7 +954,9 @@ class _SshSettingsDialogFormState
                           ? LucideIcons.chevronUp
                           : LucideIcons.chevronDown,
                       size: 16,
-                      color: theme.colorScheme.mutedForeground,
+                      color: theme.colorScheme.accentForeground.withValues(
+                        alpha: 0.5,
+                      ),
                     ),
                 ],
               ),
@@ -975,8 +981,10 @@ class _SshSettingsDialogFormState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Generate a key pair and get a pairing code to '
-              'connect a server automatically.',
+              'Generates a ed25519 key pair on this device and '
+              'uses our relay service to transfer the public key to your server when you run the provided one-liner script. '
+              'A short-lived pairing code is used to link the server to this device during the one-time setup. '
+              'Your private key never leaves your device.',
               style: theme.textTheme.muted.copyWith(fontSize: 12),
             ),
             const SizedBox(height: 8),
@@ -1028,23 +1036,61 @@ class _SshSettingsDialogFormState
               style: theme.textTheme.muted.copyWith(fontSize: 12),
             ),
             const SizedBox(height: 6),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.muted.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: SelectableText(
-                'curl -LsSf get.few.sh | bash',
-                style: TextStyle(
-                  fontFamily: 'Courier New',
-                  fontFamilyFallback: const ['Courier', 'Monaco', 'Menlo'],
-                  fontSize: 13,
-                  color: theme.colorScheme.foreground,
+            Builder(builder: (context) {
+              final terminalTheme =
+                  Theme.of(context).extension<TerminalTheme>();
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
                 ),
-              ),
-            ),
+                decoration: BoxDecoration(
+                  color:
+                      terminalTheme?.backgroundColor ?? Colors.black,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color:
+                        terminalTheme?.borderColor ?? Colors.grey,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SelectableText(
+                        'curl -LsSf get.few.sh | bash',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 13,
+                          color: terminalTheme?.textColor ??
+                              Colors.greenAccent.shade400,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(const ClipboardData(
+                          text: 'curl -LsSf get.few.sh | bash',
+                        ));
+                        ShadToaster.of(context).show(
+                          const ShadToast(
+                            description: Text('Copied to clipboard'),
+                          ),
+                        );
+                      },
+                      child: Icon(
+                        LucideIcons.copy,
+                        size: 14,
+                        color: terminalTheme?.textColor
+                                .withValues(alpha: 0.5) ??
+                            Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
             const SizedBox(height: 12),
             if (_pairingCode != null) ...[
               Text(
