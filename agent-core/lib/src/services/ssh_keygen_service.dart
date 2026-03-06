@@ -133,6 +133,60 @@ class SshKeygenService {
     );
   }
 
+  /// Reconstructs an [SshKeyPairResult] from a stored OpenSSH PEM string.
+  ///
+  /// This derives the public key, fingerprint, and randomart from the
+  /// private key material in the PEM. Useful for loading a previously
+  /// generated key from secure storage without regenerating.
+  SshKeyPairResult fromPem(String pem) {
+    final pairs = SSHKeyPair.fromPem(pem);
+    if (pairs.isEmpty) {
+      throw ArgumentError('No key pairs found in PEM');
+    }
+    final pair = pairs.first;
+    if (pair is! OpenSSHEd25519KeyPair) {
+      throw ArgumentError(
+        'Expected ed25519 key, got ${pair.runtimeType}',
+      );
+    }
+
+    final publicKeyRaw = Uint8List.fromList(pair.publicKey);
+    final privateKeyFull = Uint8List.fromList(pair.privateKey);
+    final seed = Uint8List.fromList(privateKeyFull.sublist(0, 32));
+    final comment = pair.comment;
+
+    // Rebuild public key string.
+    final publicKeyEncoded = pair.toPublicKey().encode();
+    final publicKeyBase64 = base64.encode(publicKeyEncoded);
+    final publicKeyString = comment.isNotEmpty
+        ? 'ssh-ed25519 $publicKeyBase64 $comment'
+        : 'ssh-ed25519 $publicKeyBase64';
+
+    // SHA-256 fingerprint.
+    final digest = crypto.sha256.convert(publicKeyEncoded);
+    final fingerprintBase64 =
+        base64.encode(digest.bytes).replaceAll(RegExp(r'=+$'), '');
+    final fingerprint = 'SHA256:$fingerprintBase64';
+
+    // Randomart.
+    final randomart = _generateRandomart(
+      Uint8List.fromList(digest.bytes),
+      'ED25519',
+      256,
+    );
+
+    return SshKeyPairResult(
+      privateSeed: seed,
+      privateKeyBytes: privateKeyFull,
+      publicKeyBytes: publicKeyRaw,
+      privatePem: pem,
+      publicKeyString: publicKeyString,
+      fingerprint: fingerprint,
+      randomart: randomart,
+      comment: comment,
+    );
+  }
+
   /// Generates the "Bishop" randomart visualization for an SSH key fingerprint.
   ///
   /// This implements the same algorithm as OpenSSH's `ssh-keygen -lv`,

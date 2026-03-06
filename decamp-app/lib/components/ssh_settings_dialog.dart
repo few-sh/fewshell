@@ -143,6 +143,9 @@ const _newTunnelId = '__new__';
 /// Phases for the automated pairing section.
 enum _PairingPhase { idle, generating, pairing, connected }
 
+/// Keychain key for the persisted pairing SSH private key PEM.
+const _pairingKeySecretKey = 'pairing:ssh-private-key';
+
 /// Internal form widget for the SSH settings dialog
 class _SshSettingsDialogForm extends ConsumerStatefulWidget {
   final String title;
@@ -274,7 +277,7 @@ class _SshSettingsDialogFormState
 
   // ===== Automated Pairing =====
 
-  void _startPairing() {
+  Future<void> _startPairing() async {
     setState(() {
       _pairingPhase = _PairingPhase.generating;
       _pairingCode = null;
@@ -283,7 +286,25 @@ class _SshSettingsDialogFormState
 
     try {
       final keygen = SshKeygenService();
-      _keyPair = keygen.generate(comment: 'fewshell-pairing');
+      final keychain = ref.read(keychainServiceProvider);
+
+      // Try to load an existing key from keychain.
+      final storedPem = await keychain.getGlobalSecret(_pairingKeySecretKey);
+      if (storedPem != null && storedPem.isNotEmpty) {
+        _keyPair = keygen.fromPem(storedPem);
+      } else {
+        _keyPair = keygen.generate(comment: 'fewshell-pairing');
+        await keychain.saveGlobalSecret(
+          _pairingKeySecretKey,
+          Secret(
+            value: _keyPair!.privatePem,
+            isVisibleToLlm: false,
+            isSystem: true,
+          ),
+        );
+      }
+
+      if (!mounted) return;
 
       _pairingService = SshPairingService(relayBaseUrl: kRelayBaseUrl);
       _pairingSubscription = _pairingService!.events.listen(_onPairingEvent);
@@ -293,9 +314,10 @@ class _SshSettingsDialogFormState
         _pairingPhase = _PairingPhase.pairing;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _pairingPhase = _PairingPhase.idle;
-        _pairingError = 'Failed to generate key: $e';
+        _pairingError = 'Failed to start pairing: $e';
       });
     }
   }
@@ -358,7 +380,7 @@ class _SshSettingsDialogFormState
     _pairingSubscription = null;
     _pairingService?.dispose();
     _pairingService = null;
-    _keyPair?.dispose();
+    // Key pair is persisted in keychain — don't zero out bytes.
     _keyPair = null;
   }
 
@@ -997,7 +1019,7 @@ class _SshSettingsDialogFormState
                   children: [
                     Icon(LucideIcons.key, size: 16),
                     SizedBox(width: 8),
-                    Text('Generate Key & Start Pairing'),
+                    Text('Begin Pairing'),
                   ],
                 ),
               ),
@@ -1036,61 +1058,65 @@ class _SshSettingsDialogFormState
               style: theme.textTheme.muted.copyWith(fontSize: 12),
             ),
             const SizedBox(height: 6),
-            Builder(builder: (context) {
-              final terminalTheme =
-                  Theme.of(context).extension<TerminalTheme>();
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color:
-                      terminalTheme?.backgroundColor ?? Colors.black,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color:
-                        terminalTheme?.borderColor ?? Colors.grey,
-                    width: 1,
+            Builder(
+              builder: (context) {
+                final terminalTheme = Theme.of(
+                  context,
+                ).extension<TerminalTheme>();
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText(
-                        'curl -LsSf get.few.sh | bash',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 13,
-                          color: terminalTheme?.textColor ??
-                              Colors.greenAccent.shade400,
+                  decoration: BoxDecoration(
+                    color: terminalTheme?.backgroundColor ?? Colors.black,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: terminalTheme?.borderColor ?? Colors.grey,
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SelectableText(
+                          'curl -LsSf get.few.sh | bash',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                            color:
+                                terminalTheme?.textColor ??
+                                Colors.greenAccent.shade400,
+                          ),
                         ),
                       ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Clipboard.setData(const ClipboardData(
-                          text: 'curl -LsSf get.few.sh | bash',
-                        ));
-                        ShadToaster.of(context).show(
-                          const ShadToast(
-                            description: Text('Copied to clipboard'),
-                          ),
-                        );
-                      },
-                      child: Icon(
-                        LucideIcons.copy,
-                        size: 14,
-                        color: terminalTheme?.textColor
-                                .withValues(alpha: 0.5) ??
-                            Colors.grey,
+                      GestureDetector(
+                        onTap: () {
+                          Clipboard.setData(
+                            const ClipboardData(
+                              text: 'curl -LsSf get.few.sh | bash',
+                            ),
+                          );
+                          ShadToaster.of(context).show(
+                            const ShadToast(
+                              description: Text('Copied to clipboard'),
+                            ),
+                          );
+                        },
+                        child: Icon(
+                          LucideIcons.copy,
+                          size: 14,
+                          color:
+                              terminalTheme?.textColor.withValues(alpha: 0.5) ??
+                              Colors.grey,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              );
-            }),
+                    ],
+                  ),
+                );
+              },
+            ),
             const SizedBox(height: 12),
             if (_pairingCode != null) ...[
               Text(
