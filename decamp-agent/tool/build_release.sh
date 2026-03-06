@@ -113,6 +113,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
     MACOS_ARCH="arm64"
     MACOS_OUTPUT_NAME="fewshell-agent-macos-$MACOS_ARCH"
     MACOS_OUTPUT_PATH="$BUILD_DIR/$MACOS_OUTPUT_NAME"
+    MACOS_BUILD_BIN="$PROJECT_ROOT/build/macos_bin"
     
     echo "🔨 Building binary for macOS ($MACOS_ARCH)..."
     
@@ -126,16 +127,24 @@ if [[ "$(uname)" == "Darwin" ]]; then
 
         dart pub get
         dart build cli -t bin/server.dart -o build/macos_cli_out
-        mv build/macos_cli_out/bundle/bin/server "$MACOS_OUTPUT_PATH"
+
+        # Stage binary and libs into a flat directory (consistent with Linux)
+        rm -rf "$MACOS_BUILD_BIN"
+        mkdir -p "$MACOS_BUILD_BIN"
+        cp build/macos_cli_out/bundle/bin/server "$MACOS_BUILD_BIN/fewshell-server"
+        if [ -d "build/macos_cli_out/bundle/lib" ]; then
+            cp -r build/macos_cli_out/bundle/lib/* "$MACOS_BUILD_BIN/" || true
+        fi
     )
     
-    # Tar it (no need to bundle sqlite on macOS, it uses system framework)
+    # Create tarball from flat staging dir (consistent with Linux)
     echo "📦 Creating macOS tarball..."
     TGZ_NAME="fewshell-agent-macos-$MACOS_ARCH.tar.gz"
     TGZ_PATH="$BUILD_DIR/$TGZ_NAME"
-    (cd "$BUILD_DIR" && tar czf "$TGZ_PATH" "$MACOS_OUTPUT_NAME")
+    (cd "$MACOS_BUILD_BIN" && tar czf "$TGZ_PATH" .)
     
-    # Keep raw binary executable
+    # Keep raw binary for reference
+    cp "$MACOS_BUILD_BIN/fewshell-server" "$MACOS_OUTPUT_PATH"
     chmod +x "$MACOS_OUTPUT_PATH"
 else
     echo "🐧 Not running on macOS. Skipping native build."
