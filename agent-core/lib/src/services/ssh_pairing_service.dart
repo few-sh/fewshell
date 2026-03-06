@@ -20,14 +20,29 @@ class PairingCodeEvent extends SshPairingEvent {
   String toString() => 'PairingCodeEvent($code)';
 }
 
-/// The key was consumed and the remote client's IP address was received.
+/// The key was consumed and the remote client's identity was received.
 /// This is the final event before the stream closes.
+///
+/// The relay sends either `username@ip` or just `ip`.
 class PairingConnectedEvent extends SshPairingEvent {
   final String ipAddress;
-  const PairingConnectedEvent(this.ipAddress);
+  final String? username;
+  const PairingConnectedEvent(this.ipAddress, {this.username});
+
+  /// Parse the connected event data which is either `username@ip` or just `ip`.
+  factory PairingConnectedEvent.parse(String data) {
+    final atIndex = data.indexOf('@');
+    if (atIndex > 0) {
+      return PairingConnectedEvent(
+        data.substring(atIndex + 1),
+        username: data.substring(0, atIndex),
+      );
+    }
+    return PairingConnectedEvent(data);
+  }
 
   @override
-  String toString() => 'PairingConnectedEvent($ipAddress)';
+  String toString() => 'PairingConnectedEvent($ipAddress, username: $username)';
 }
 
 /// An error occurred. The service will attempt reconnection automatically
@@ -172,7 +187,7 @@ class SshPairingService {
             final value = line.substring(6).trim();
             if (sawConnectedEvent) {
               _connected = true;
-              _controller.add(PairingConnectedEvent(value));
+              _controller.add(PairingConnectedEvent.parse(value));
               // Final event — clean up without reconnecting.
               _cancelCurrentSession();
             } else {

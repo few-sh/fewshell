@@ -2,6 +2,25 @@
 
 This document describes the steps to deploy the fewshell-relay push notification service to Google Cloud Platform.
 
+## TL;DR - Updating the Service:
+
+To deploy a new version:
+
+```bash
+cd decamp-relay
+
+# Rebuild and push
+gcloud builds submit \
+  --tag us-central1-docker.pkg.dev/few-sh/cloud-run-source-deploy/fewshell-relay:latest \
+  --project=few-sh
+
+# Deploy new revision
+gcloud run deploy fewshell-relay \
+  --image us-central1-docker.pkg.dev/few-sh/cloud-run-source-deploy/fewshell-relay:latest \
+  --region us-central1 \
+  --project=few-sh
+```
+
 ## Prerequisites
 
 - `gcloud` CLI installed and authenticated
@@ -326,25 +345,6 @@ curl -X POST https://relay.fewshell.com/send \
     "title": "Test",
     "body": "Hello from fewshell-relay!"
   }'
-```
-
-## Updating the Service
-
-To deploy a new version:
-
-```bash
-cd decamp-relay
-
-# Rebuild and push
-gcloud builds submit \
-  --tag us-central1-docker.pkg.dev/few-sh/cloud-run-source-deploy/fewshell-relay:latest \
-  --project=few-sh
-
-# Deploy new revision
-gcloud run deploy fewshell-relay \
-  --image us-central1-docker.pkg.dev/few-sh/cloud-run-source-deploy/fewshell-relay:latest \
-  --region us-central1 \
-  --project=few-sh
 ```
 
 ## Cost Estimate

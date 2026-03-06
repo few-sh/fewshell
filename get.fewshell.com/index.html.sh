@@ -112,6 +112,9 @@ pair_device() {
     step "Device pairing"
     echo ""
 
+    # Detect the current username for relay identification.
+    local CURRENT_USER="${USER:-${LOGNAME:-$(whoami 2>/dev/null || echo "")}}"
+
     # --- Prompt for pairing code and fetch key (retry loop) ---
     local PUBKEY=""
     while [ -z "$PUBKEY" ]; do
@@ -124,9 +127,15 @@ pair_device() {
             *) warn "Pairing code must be exactly 6 digits."; continue ;;
         esac
 
+        # Build relay URL with optional username parameter.
+        local PAIR_URL="${RELAY_URL}/pubkey?id=${CODE}"
+        if [ -n "$CURRENT_USER" ]; then
+            PAIR_URL="${PAIR_URL}&username=${CURRENT_USER}"
+        fi
+
         # Fetch the public key
         local RESPONSE
-        RESPONSE=$(curl -sf "${RELAY_URL}/pubkey?id=${CODE}") || {
+        RESPONSE=$(curl -sf "$PAIR_URL") || {
             warn "Failed to retrieve key (invalid code, expired, or network error)."
             continue
         }

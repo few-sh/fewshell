@@ -38,6 +38,7 @@ pub struct PostPubkeyRequest {
 #[derive(Debug, Deserialize)]
 pub struct GetPubkeyParams {
     id: String,
+    username: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -206,13 +207,37 @@ pub async fn post_pubkey(
         .into_response()
 }
 
-/// GET /pubkey?id=… — consumes the key and notifies the SSE stream
-/// with the client's IP address (from `X-Forwarded-For`).
+/// Validates that a username contains only characters valid across
+/// Unix, macOS and Windows: letters, digits, dot, underscore, hyphen.
+fn is_valid_username(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-')
+}
+
+/// GET /pubkey?id=…&username=… — consumes the key and notifies the SSE stream
+/// with the client's identity. The optional `username` parameter, if valid,
+/// is included as `username@<ip>` in the connected event.
 pub async fn get_pubkey(
     State(store): State<PubkeyStore>,
     Query(params): Query<GetPubkeyParams>,
     headers: HeaderMap,
 ) -> Response {
+    // Validate username if provided.
+    if let Some(ref username) = params.username {
+        if !is_valid_username(username) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "Invalid username: only letters, digits, dot, underscore and hyphen are allowed (max 64 chars)".to_string(),
+                }),
+            )
+                .into_response();
+        }
+    }
+
     let client_ip = headers
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
@@ -220,11 +245,17 @@ pub async fn get_pubkey(
         .map(|s| s.trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
 
+    // Format: "username@ip" when username is present, otherwise just "ip".
+    let identity = match &params.username {
+        Some(username) => format!("{}@{}", username, client_ip),
+        None => client_ip,
+    };
+
     let mut map = store.write().await;
     match map.remove(&params.id) {
         Some(entry) => {
-            // Signal the SSE stream with the consumer's IP.
-            let _ = entry.consumed_tx.send(Some(client_ip));
+            // Signal the SSE stream with the consumer's identity.
+            let _ = entry.consumed_tx.send(Some(identity));
             Json(GetPubkeyResponse {
                 public_key: entry.public_key,
             })

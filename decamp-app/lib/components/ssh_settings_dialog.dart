@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/providers/ssh_tunnel_provider.dart';
@@ -293,7 +294,14 @@ class _SshSettingsDialogFormState
       if (storedPem != null && storedPem.isNotEmpty) {
         _keyPair = keygen.fromPem(storedPem);
       } else {
-        _keyPair = keygen.generate(comment: 'fewshell-pairing');
+        final userName = ref.read(userProvider);
+        final platform = Platform.operatingSystemVersion;
+        final now = DateTime.now();
+        final date =
+            '${now.year}.${now.month.toString().padLeft(2, '0')}.${now.day.toString().padLeft(2, '0')}'
+            ' ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+        final comment = '$userName @fewshell-app ($platform) $date';
+        _keyPair = keygen.generate(comment: comment);
         await keychain.saveGlobalSecret(
           _pairingKeySecretKey,
           Secret(
@@ -332,7 +340,7 @@ class _SshSettingsDialogFormState
           _countdownSeconds = _rotationIntervalSeconds;
         });
         _startCountdown();
-      case PairingConnectedEvent(:final ipAddress):
+      case PairingConnectedEvent(:final ipAddress, :final username):
         _countdownTimer?.cancel();
         setState(() {
           _pairingPhase = _PairingPhase.connected;
@@ -341,7 +349,7 @@ class _SshSettingsDialogFormState
           _privateKeyController.text = _keyPair!.privatePem;
           _privateKeyController.obscure = true;
           if (_usernameController.text.isEmpty) {
-            _usernameController.text = 'root';
+            _usernameController.text = username ?? '';
           }
         });
       case PairingErrorEvent(:final message):
