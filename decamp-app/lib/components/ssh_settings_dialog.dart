@@ -1089,7 +1089,7 @@ class _SshSettingsDialogFormState
                     children: [
                       Expanded(
                         child: SelectableText(
-                          'curl -LsSf get.few.sh | bash',
+                          'curl -LsSf https://get.fewshell.com | bash',
                           style: TextStyle(
                             fontFamily: 'monospace',
                             fontSize: 13,
@@ -1103,7 +1103,8 @@ class _SshSettingsDialogFormState
                         onTap: () {
                           Clipboard.setData(
                             const ClipboardData(
-                              text: 'curl -LsSf get.few.sh | bash',
+                              text:
+                                  'curl -LsSf https://get.fewshell.com | bash',
                             ),
                           );
                           ShadToaster.of(context).show(
