@@ -94,16 +94,22 @@ main() {
     chmod +x "${INSTALL_DIR}/fewshell-server"
     chmod 700 "${INSTALL_DIR}/fewshell-server"
 
-    # --- Copy shared library ---
-    step "Copying libpty_bridge.so to ${LIB_DIR}…"
+    # --- Copy shared library (OS-aware extension) ---
+    local lib_ext="so"
+    if [ "$os" = "macos" ]; then
+        lib_ext="dylib"
+    fi
+    local lib_name="libpty_bridge.${lib_ext}"
+
+    step "Copying ${lib_name} to ${LIB_DIR}…"
     mkdir -p "$LIB_DIR"
-    cp -f "${INSTALL_DIR}/libpty_bridge.so" "${LIB_DIR}/libpty_bridge.so"
-    chmod 600 "${LIB_DIR}/libpty_bridge.so"
+    cp -f "${INSTALL_DIR}/${lib_name}" "${LIB_DIR}/${lib_name}"
+    chmod 600 "${LIB_DIR}/${lib_name}"
 
     echo ""
     info "${BOLD}Installation complete!${RESET}"
     echo -e "  ${DIM}Server binary:${RESET}  ${INSTALL_DIR}/fewshell-server"
-    echo -e "  ${DIM}Shared library:${RESET} ${LIB_DIR}/libpty_bridge.so"
+    echo -e "  ${DIM}Shared library:${RESET} ${LIB_DIR}/${lib_name}"
     echo ""
 }
 
