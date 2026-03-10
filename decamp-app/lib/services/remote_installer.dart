@@ -47,16 +47,6 @@ class RemoteInstaller {
   /// Returns normally when the server is confirmed running.
   /// Throws on installation or startup failure.
   Future<void> ensureServerRunning() async {
-    // --- install check ---
-    final installed = await _isInstalled();
-    if (!installed) {
-      _emit('Server not found, installing…\n');
-      await _install();
-    } else {
-      _log.fine('Server binary already present.');
-      _emit('Server already installed.\n');
-    }
-
     // --- running check ---
     final running = await _isRunning();
     if (!running) {
@@ -72,10 +62,10 @@ class RemoteInstaller {
         _log.info('Server running but socket not ready, waiting…');
         _emit('Waiting for server socket…\n');
         await _waitForSocket();
+        _emit('Server is ready.\n');
       }
+      return;
     }
-
-    _emit('Server is ready.\n');
   }
 
   /// `true` when the server binary exists and is executable.
@@ -97,7 +87,7 @@ class RemoteInstaller {
     // the binary name). The [f] bracket trick prevents pgrep from matching
     // its own command line.
     final result = await _execStdout(
-      'pgrep -f -u \$(whoami) "[f]ewshell-server" > /dev/null 2>&1 && echo YES || echo NO',
+      '(pgrep -f -u \$(whoami) "[f]ewshell-server" > /dev/null 2>&1 || pgrep -f -u \$(whoami) "[d]ecamp-agent/bin/server.dart" > /dev/null 2>&1) && echo YES || echo NO',
     );
     _log.fine('_isRunning: result = $result');
     return result == 'YES';
@@ -152,6 +142,16 @@ class RemoteInstaller {
   Future<void> _startServer() async {
     _log.info('Starting fewshell-server…');
 
+    // --- install check ---
+    final installed = await _isInstalled();
+    if (!installed) {
+      _emit('Server not found, installing…\n');
+      await _install();
+    } else {
+      _log.fine('Server binary already present.');
+      _emit('Server already installed.\n');
+    }
+
     // Remove stale socket from a previous run so _waitForSocket polls
     // until the new server creates a fresh one.
     await _execStdout('rm -f \$HOME/$_serverSocketPath');
@@ -173,9 +173,11 @@ class RemoteInstaller {
 
   /// One-shot check whether the domain socket exists right now.
   Future<bool> _isSocketReady() async {
+    _log.info('Checking if server socket is ready…');
     final result = await _execStdout(
       'test -S \$HOME/$_serverSocketPath && echo YES || echo NO',
     );
+    _log.info('_isSocketReady: result = $result');
     return result == 'YES';
   }
 

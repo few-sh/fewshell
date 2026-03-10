@@ -6,12 +6,11 @@
     "configurations": [
         {
             "name": "decamp-agent (server)",
-            "cwd": "decamp-agent",
+            "cwd": "${userHome}/.fewshell",
             "request": "launch",
             "type": "dart",
-            "program": "bin/server.dart",
+            "program": "${workspaceFolder}/decamp-agent/bin/server.dart",
             "env": {
-                "LISTEN": "tcp://0.0.0.0:3123",
                 "PUSH_NOTIFICATION_URL": "http://localhost:8080",
                 "PUSH_NOTIFICATION_API_KEY": "test-api-key"
             }
