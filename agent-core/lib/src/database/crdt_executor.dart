@@ -22,7 +22,7 @@ class CrdtQueryExecutor extends QueryExecutor {
     // Check if we are already inside the opening process (re-entrant call from migration)
     final isOpening = Zone.current[#isOpening] as bool? ?? false;
     if (isOpening) {
-      _log.info('re-entrant open detected, proceeding');
+      _log.fine('re-entrant open detected, proceeding');
       return true;
     }
 
