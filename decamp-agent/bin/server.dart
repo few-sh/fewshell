@@ -85,7 +85,7 @@ void main(List<String> args) async {
   }
 
   // Configure logging
-  Logger.root.level = Level.ALL;
+  Logger.root.level = Level.INFO;
   Logger.root.onRecord.listen((record) {
     final timestamp = record.time.toIso8601String();
     final loggerName = record.loggerName;
