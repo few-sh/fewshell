@@ -408,7 +408,7 @@ class SyncService {
       _globalSync = CrdtSync.client(
         _globalAdapter!,
         _globalChannel!,
-        verbose: true,
+        verbose: false,
         validateRecord: (table, record) {
           if (table == 'projects') {
             final remoteNodeId = record['server_node_id'] as String?;
@@ -846,7 +846,7 @@ class SyncService {
       _settingsSync = CrdtSync.client(
         settingsCrdt,
         settingsChannel,
-        verbose: true,
+        verbose: false,
       );
 
       // Secrets Sync
@@ -884,7 +884,7 @@ class SyncService {
       _projectSync = CrdtSync.client(
         _projectAdapter!,
         _projectChannel!,
-        verbose: true,
+        verbose: false,
       );
     } catch (e, stackTrace) {
       if (token.isCancelled) return;

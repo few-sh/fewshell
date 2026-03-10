@@ -89,13 +89,13 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<void> runCustom(String statement, [List<Object?>? args]) {
-    _log.info('runCustom $statement args: $args');
+    _log.fine('runCustom $statement args: $args');
     return _crdt.execute(statement, args ?? const []);
   }
 
   @override
   Future<int> runDelete(String statement, List<Object?> args) async {
-    _log.info('runDelete $statement args: $args');
+    _log.fine('runDelete $statement args: $args');
     await _crdt.execute(statement, args);
     final result = await _crdt.query('SELECT changes()');
     return (result.first.values.first as int?) ?? 0;
@@ -103,7 +103,7 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   Future<int> runInsert(String statement, List<Object?> args) async {
-    _log.info('runInsert $statement args: $args');
+    _log.fine('runInsert $statement args: $args');
     await _crdt.execute(statement, args);
     final result = await _crdt.query('SELECT last_insert_rowid()');
     return (result.first.values.first as int?) ?? 0;
@@ -114,13 +114,13 @@ class CrdtQueryExecutor extends QueryExecutor {
     String statement,
     List<Object?> args,
   ) {
-    _log.info('runSelect $statement args: $args');
+    _log.fine('runSelect $statement args: $args');
     return _crdt.query(statement, args);
   }
 
   @override
   Future<int> runUpdate(String statement, List<Object?> args) async {
-    _log.info('runUpdate $statement args: $args');
+    _log.fine('runUpdate $statement args: $args');
     await _crdt.execute(statement, args);
     final result = await _crdt.query('SELECT changes()');
     return (result.first.values.first as int?) ?? 0;
@@ -133,7 +133,7 @@ class CrdtQueryExecutor extends QueryExecutor {
 
   @override
   TransactionExecutor beginTransaction() {
-    _log.info('beginTransaction');
+    _log.fine('beginTransaction');
     return _CrdtTransactionExecutor(_crdt);
   }
 

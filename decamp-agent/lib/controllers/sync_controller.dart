@@ -129,7 +129,7 @@ class SyncController {
             final settingsSync = CrdtSync.server(
               settingsCrdt,
               settingsChannel,
-              verbose: true,
+              verbose: false,
             );
 
             // Secrets Sync
@@ -156,7 +156,7 @@ class SyncController {
             final sync = CrdtSync.server(
               projectDb.crdt,
               multiplexed,
-              verbose: true,
+              verbose: false,
             );
 
             // Ensure sync is closed when channel is closed
@@ -196,7 +196,7 @@ class SyncController {
         final sync = CrdtSync.server(
           dbManager.globalDatabase.crdt,
           channel,
-          verbose: true,
+          verbose: false,
           validateRecord: (table, record) {
             if (table == 'projects') {
               // Filter out any projects that don't belong to this server node.
