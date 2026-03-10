@@ -48,9 +48,6 @@ build_arch() {
     local ARCH=$1
     local PLATFORM=$2 # Renamed from DOCKER_PLATFORM to PLATFORM
     local IMAGE_TAG="${IMAGE_NAME}:${ARCH}"
-    local OUTPUT_NAME="fewshell-agent-linux-$ARCH"
-    local OUTPUT_PATH="$BUILD_DIR/$OUTPUT_NAME"
-    local OUTPUT_DIR="$BUILD_DIR" # Directory where the binary and libs will go
 
     echo "🏗️  Preparing builder for $ARCH ($PLATFORM)..."
     docker build \
@@ -84,7 +81,6 @@ build_arch() {
             cp /usr/lib/*-linux-gnu/libsqlite3.so.0 build/bin/libsqlite3.so
         "
 
-    # Copy binary to release artifact name (e.g. fewshell-agent-linux-amd64)
     local TGZ_NAME="fewshell-agent-linux-$ARCH.tar.gz"
     local TGZ_PATH="$BUILD_DIR/$TGZ_NAME"
     
@@ -92,9 +88,6 @@ build_arch() {
     # CD into build/bin so the archive structure is flat
     (cd "$PROJECT_ROOT/build/bin" && tar czf "$TGZ_PATH" .)
     
-    # Also keep the raw binary for reference (or if user wants just that)
-    cp "$PROJECT_ROOT/build/bin/fewshell-server" "$OUTPUT_PATH"
-    chmod +x "$OUTPUT_PATH"
 }
 
 # Build for AMD64 (x86_64)
@@ -111,8 +104,6 @@ if [[ "$(uname)" == "Darwin" ]]; then
     
     # Assuming Apple Silicon (arm64) for M-class macs
     MACOS_ARCH="arm64"
-    MACOS_OUTPUT_NAME="fewshell-agent-macos-$MACOS_ARCH"
-    MACOS_OUTPUT_PATH="$BUILD_DIR/$MACOS_OUTPUT_NAME"
     MACOS_BUILD_BIN="$PROJECT_ROOT/build/macos_bin"
     
     echo "🔨 Building binary for macOS ($MACOS_ARCH)..."
@@ -143,9 +134,6 @@ if [[ "$(uname)" == "Darwin" ]]; then
     TGZ_PATH="$BUILD_DIR/$TGZ_NAME"
     (cd "$MACOS_BUILD_BIN" && tar czf "$TGZ_PATH" .)
     
-    # Keep raw binary for reference
-    cp "$MACOS_BUILD_BIN/fewshell-server" "$MACOS_OUTPUT_PATH"
-    chmod +x "$MACOS_OUTPUT_PATH"
 else
     echo "🐧 Not running on macOS. Skipping native build."
 fi
