@@ -1,0 +1,30 @@
+Operate your infrastructure from your phone — without fighting the keyboard.
+
+Fewshell is an AI-augmented mobile SSH client built with strict operational safety and security guardrails for real-world production use. Typing complex shell commands on a phone is slow and error-prone. Instead, steer AI to do most of the heavy lifting for you. Fewshell generates the commands, you review, approve, edit, and execute safely.
+
+(( BUILT FOR ON-CALL REALITY ))
+
+AI-AUGMENTED WORKFLOW
+Stop typing long commands on a tiny keyboard. Ask for what you need. The AI drafts commands — you stay in control.
+
+NO YOLO MODE
+Every command requires your approval. There is no way to turn this off. No accidents or surprises.
+
+SECURE BY DEFAULT
+End-to-end encrypted connections. Secrets stored only in your device’s secure keychain. Automatic redaction keeps credentials out of logs and AI context.
+
+COMPLETE SESSION HISTORY
+Every interaction is stored on your device and your server so you know exactly what changed and when.
+
+SNIPPETS & PROJECTS
+Organize environments and frequently used commands. Inspect logs. Restart services. Debug failed jobs. All from your pocket.
+
+TEAM COLLABORATION
+Connect multiple devices and share real-time sessions.
+
+FULLY SELF-HOSTED
+No cloud services, no sign-ups, no BS.
+
+BRING YOUR OWN MODEL
+Use your preferred LLM — Claude, Gemini, or self-hosted open-weight models.
+

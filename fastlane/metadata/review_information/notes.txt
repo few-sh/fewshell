@@ -1,0 +1,8 @@
+1. Go to New Project -> Connect via SSH
+2. Enter host: 34.134.78.251
+3. Enter username: review
+4. Click on Password
+5. Enter aibooZ2a
+6. Press save
+
+

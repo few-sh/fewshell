@@ -1,0 +1,223 @@
+default_platform(:ios)
+
+platform :ios do
+  before_all do
+    app_store_connect_api_key(
+      key_id: "Y7LC4232T5",
+      issuer_id: "cf0ac305-a498-42a9-902c-3a70f3a3f3bf",
+      key_filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_Y7LC4232T5.p8"),
+    )
+  end
+
+  desc "Check current App Store availability (territories)"
+  lane :check_availability do
+    require 'spaceship'
+    require 'net/http'
+    require 'json'
+
+    token = Spaceship::ConnectAPI::Token.create(
+      key_id: "Y7LC4232T5",
+      issuer_id: "cf0ac305-a498-42a9-902c-3a70f3a3f3bf",
+      filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_Y7LC4232T5.p8"),
+    )
+    Spaceship::ConnectAPI.token = token
+
+    app = Spaceship::ConnectAPI::App.find("sh.few.fewshell")
+
+    if app.nil?
+      UI.error("App not found!")
+      next
+    end
+
+    UI.success("Found app: #{app.name} (#{app.bundle_id})")
+    UI.message("App ID: #{app.id}")
+
+    base_url = "https://api.appstoreconnect.apple.com"
+    http = Net::HTTP.new("api.appstoreconnect.apple.com", 443)
+    http.use_ssl = true
+
+    # Fetch all territory availabilities (paginated)
+    all_territories = []
+    next_url = "#{base_url}/v2/appAvailabilities/#{app.id}/territoryAvailabilities?limit=200"
+
+    while next_url
+      uri = URI(next_url)
+      req = Net::HTTP::Get.new(uri)
+      req["Authorization"] = "Bearer #{token.text}"
+      resp = http.request(req)
+
+      if resp.code.to_i != 200
+        UI.error("Failed to fetch territories: #{resp.code} #{resp.body[0..500]}")
+        next_url = nil
+        next
+      end
+
+      page = JSON.parse(resp.body)
+      all_territories.concat(page["data"] || [])
+      next_url = page.dig("links", "next")
+    end
+
+    UI.message("Found #{all_territories.count} territory entries")
+
+    # Territory IDs are base64-encoded JSON like {"s":"appId","t":"USA"}
+    require 'base64'
+
+    china_entry = nil
+    territory_list = []
+
+    all_territories.each do |t|
+      decoded = JSON.parse(Base64.decode64(t["id"])) rescue {}
+      territory_code = decoded["t"]
+      available = t.dig("attributes", "available")
+      territory_list << { code: territory_code, available: available, raw: t }
+      if territory_code == "CHN"
+        china_entry = t
+      end
+    end
+
+    # Sort and display
+    territory_list.sort_by { |t| t[:code] || "" }.each do |t|
+      status = t[:available] ? "✅" : "❌"
+      UI.message("  #{status} #{t[:code]}")
+    end
+
+    available_count = territory_list.count { |t| t[:available] }
+    unavailable_count = territory_list.count - available_count
+    UI.message("")
+    UI.message("#{available_count} available, #{unavailable_count} unavailable out of #{territory_list.count} total")
+
+    if china_entry
+      decoded = JSON.parse(Base64.decode64(china_entry["id"])) rescue {}
+      china_available = china_entry.dig("attributes", "available")
+      if china_available
+        UI.important("⚠️  China (CHN) IS available — this is causing the rejection!")
+        UI.message("Run 'fastlane ios remove_china' to deselect China from availability.")
+      else
+        UI.success("✅ China (CHN) is listed but marked as unavailable")
+      end
+    else
+      UI.success("✅ China (CHN) is NOT in the territory list at all")
+    end
+  end
+
+  desc "Remove China from App Store availability"
+  lane :remove_china do
+    require 'spaceship'
+    require 'net/http'
+    require 'json'
+
+    token = Spaceship::ConnectAPI::Token.create(
+      key_id: "Y7LC4232T5",
+      issuer_id: "cf0ac305-a498-42a9-902c-3a70f3a3f3bf",
+      filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_Y7LC4232T5.p8"),
+    )
+    Spaceship::ConnectAPI.token = token
+
+    app = Spaceship::ConnectAPI::App.find("sh.few.fewshell")
+
+    if app.nil?
+      UI.error("App not found!")
+      next
+    end
+
+    UI.success("Found app: #{app.name} (#{app.bundle_id})")
+
+    base_url = "https://api.appstoreconnect.apple.com"
+    http = Net::HTTP.new("api.appstoreconnect.apple.com", 443)
+    http.use_ssl = true
+
+    # Fetch all territory availabilities
+    all_territories = []
+    next_url = "#{base_url}/v2/appAvailabilities/#{app.id}/territoryAvailabilities?limit=200"
+
+    while next_url
+      uri = URI(next_url)
+      req = Net::HTTP::Get.new(uri)
+      req["Authorization"] = "Bearer #{token.text}"
+      resp = http.request(req)
+
+      if resp.code.to_i != 200
+        UI.error("Failed to fetch territories: #{resp.code}")
+        next_url = nil
+        next
+      end
+
+      page = JSON.parse(resp.body)
+      all_territories.concat(page["data"] || [])
+      next_url = page.dig("links", "next")
+    end
+
+    territory_ids = all_territories.map { |t| t.dig("relationships", "territory", "data", "id") }.compact
+    
+    unless territory_ids.include?("CHN")
+      UI.success("✅ China is already NOT in your availability list. No changes needed.")
+      next
+    end
+
+    UI.important("🇨🇳 China (CHN) is currently available (#{territory_ids.count} territories). Removing it...")
+
+    new_territory_ids = territory_ids.reject { |t| t == "CHN" }
+    UI.message("Updating: #{territory_ids.count} → #{new_territory_ids.count} territories")
+
+    # Use v2 POST /appAvailabilities to replace availability
+    post_uri = URI("#{base_url}/v2/appAvailabilities")
+    post_request = Net::HTTP::Post.new(post_uri)
+    post_request["Authorization"] = "Bearer #{token.text}"
+    post_request["Content-Type"] = "application/json"
+    post_request.body = {
+      data: {
+        type: "appAvailabilities",
+        attributes: {
+          availableInNewTerritories: false
+        },
+        relationships: {
+          app: {
+            data: { type: "apps", id: app.id }
+          },
+          territoryAvailabilities: {
+            data: new_territory_ids.map { |t|
+              { type: "territoryAvailabilities", id: t }
+            }
+          }
+        }
+      }
+    }.to_json
+
+    post_response = http.request(post_request)
+
+    if post_response.code.to_i >= 200 && post_response.code.to_i < 300
+      UI.success("✅ China has been removed from App Store availability!")
+      UI.message("You can now resubmit your app for review.")
+    else
+      UI.error("Failed to update availability: #{post_response.code}")
+      UI.error("Response: #{post_response.body[0..1000]}")
+    end
+  end
+
+  desc "Download App Store metadata for inspection"
+  lane :download_metadata do
+    deliver(
+      app_identifier: "sh.few.fewshell",
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      skip_metadata: false,
+      run_precheck_before_submit: false,
+      force: true,
+      metadata_path: "./fastlane/metadata",
+      download_metadata: true,
+    )
+  end
+
+  desc "Upload updated metadata to App Store Connect"
+  lane :upload_metadata do
+    deliver(
+      app_identifier: "sh.few.fewshell",
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      skip_metadata: false,
+      metadata_path: "./fastlane/metadata",
+      run_precheck_before_submit: false,
+      force: true,
+    )
+  end
+end
