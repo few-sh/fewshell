@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -23,7 +24,11 @@ final _log = Logger('DecampApp');
 
 void main() async {
   // Configure logging
-  Logger.root.level = Level.ALL;
+  if (kDebugMode) {
+    Logger.root.level = Level.ALL;
+  } else {
+    Logger.root.level = Level.INFO;
+  }
   Logger.root.onRecord.listen((record) {
     debugPrint(
       '${record.time.toIso8601String()} [${record.loggerName}] ${record.level.name}: ${record.message}',
