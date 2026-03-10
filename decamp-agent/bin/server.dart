@@ -256,12 +256,12 @@ Future<void> _startServer(
   server.listen(
     (HttpRequest request) async {
       try {
+        final clientIp = request.connectionInfo?.remoteAddress.address;
+        _log.info("REQ: [$clientIp] ${request.method} ${request.uri}");
         if (useTcp) {
-          final clientIp = request.connectionInfo?.remoteAddress.address;
           final cert = request.certificate;
 
           if (cert != null) {
-            _log.info('Client connection from $clientIp');
             _log.info('  Client Cert Subject: ${cert.subject}');
             _log.info('  Client Cert Issuer:  ${cert.issuer}');
           } else {
