@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:agent_core/agent_core.dart';
 import 'package:logging/logging.dart';
+import 'package:uuid/uuid.dart';
 
 /// Manages a shared interactive shell session with sentinel-based command
 /// completion detection.
@@ -70,7 +71,7 @@ class InteractiveShellSession {
     void Function(String)? onStderr,
   }) async {
     final session = await _session;
-    final uuid = _generateUuid();
+    final uuid = generateUuid();
     final completer = Completer<int>();
     _commandCompleters[uuid] = completer;
 
@@ -218,10 +219,8 @@ class InteractiveShellSession {
     return command.replaceAll("'", "'\"'\"'").replaceAll('\\', '\\\\');
   }
 
-  /// Simple UUID v4 generation (hex-only for sentinel regex compatibility).
-  static String _generateUuid() {
-    final random = DateTime.now().microsecondsSinceEpoch;
-    return '${random.toRadixString(16).padLeft(12, '0')}'
-        '-${(random ~/ 7).toRadixString(16).padLeft(4, '0')}';
-  }
+  static const _uuid = Uuid();
+
+  /// Generate a UUID v4 for sentinel markers.
+  static String generateUuid() => _uuid.v4();
 }
