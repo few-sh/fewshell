@@ -179,11 +179,15 @@ else
             # Upload to latest
             LATEST_KEY="releases/latest/$FILENAME"
             echo "    ⬆️  Uploading $FILENAME to $LATEST_KEY..."
-            # Use 'no-cache' to force clients to validate the ETag with R2 every time.
-            # R2 handles ETags automatically. If the file hasn't changed, R2 returns 304.
-            npx wrangler r2 object put "fewshell-releases/$LATEST_KEY" --file "$FILE" --remote --cc "no-cache"
+            npx wrangler r2 object put "fewshell-releases/$LATEST_KEY" --file "$FILE" --remote --cc "max-age=60"
         fi
     done
+    # Upload version.txt to latest/
+    VERSION_TXT="$BUILD_DIR/version.txt"
+    echo "$VERSION" > "$VERSION_TXT"
+    echo "    ⬆️  Uploading version.txt to releases/latest/version.txt..."
+    npx wrangler r2 object put "fewshell-releases/releases/latest/version.txt" --file "$VERSION_TXT" --remote --ct "text/plain" --cc "max-age=60"
+
     echo "✅ Uploaded to R2."
 fi
 
