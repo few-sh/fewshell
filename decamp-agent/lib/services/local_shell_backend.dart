@@ -130,6 +130,12 @@ class LocalShellSession implements ShellSession {
   void write(Uint8List data) => _pty.writeBytes(data);
 
   @override
+  void signalForeground(ProcessSignal signal) {
+    _log.info('Sending $signal to foreground process group');
+    _pty.signalForeground(signal.signalNumber);
+  }
+
+  @override
   Future<void> kill(ProcessSignal signal) async {
     _log.info('Killing local PTY process with signal $signal');
 

@@ -38,6 +38,12 @@ abstract class ShellSession {
   Future<void> get done;
   void write(Uint8List data);
   Future<void> kill(ProcessSignal signal);
+
+  /// Send a signal to only the foreground process group without killing the
+  /// shell session itself. This is used to interrupt a running command while
+  /// keeping the interactive session alive.
+  void signalForeground(ProcessSignal signal);
+
   void close();
 }
 
@@ -712,6 +718,31 @@ class SshShellSession implements ShellSession {
 
   @override
   void write(Uint8List data) => _session.write(data);
+
+  @override
+  void signalForeground(ProcessSignal signal) {
+    // For SSH, write the control character and send the SSH signal.
+    // SSH doesn't distinguish foreground process groups — the remote
+    // shell handles signal delivery to its foreground job.
+    if (signal == ProcessSignal.sigint) {
+      _session.write(Uint8List.fromList([0x03]));
+    } else if (signal == ProcessSignal.sigquit) {
+      _session.write(Uint8List.fromList([0x1c]));
+    } else if (signal == ProcessSignal.sigtstp) {
+      _session.write(Uint8List.fromList([0x1a]));
+    }
+    final sshSignal = switch (signal) {
+      ProcessSignal.sigint => SSHSignal.INT,
+      ProcessSignal.sigterm => SSHSignal.TERM,
+      ProcessSignal.sigkill => SSHSignal.KILL,
+      ProcessSignal.sigquit => SSHSignal.QUIT,
+      ProcessSignal.sighup => SSHSignal.HUP,
+      _ => null,
+    };
+    if (sshSignal != null) {
+      _session.kill(sshSignal);
+    }
+  }
 
   @override
   Future<void> kill(ProcessSignal signal) async {

@@ -182,6 +182,18 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
+  /// Send terminal key input to the server's interactive shell session
+  void sendTerminalKeys(
+      MultiplexedWebSocketChannel? syncChannel, List<int> keyBytes) {
+    if (syncChannel != null && sessionId != null) {
+      syncChannel.sendCustomMessage({
+        'type': 'terminal_keys',
+        'sessionId': sessionId,
+        'data': keyBytes,
+      });
+    }
+  }
+
   /// Build conversation history from database messages
   /// Reconstructs proper ChatMessage objects including tool use and tool results
   List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {

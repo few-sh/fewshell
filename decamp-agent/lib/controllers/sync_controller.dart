@@ -10,6 +10,7 @@ import 'package:crdt_sync/crdt_sync.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:llm_dart/llm_dart.dart';
 import '../services/database_manager.dart';
+import '../services/interactive_shell_session.dart';
 import '../services/local_shell_backend.dart';
 import '../services/notification_dispatcher.dart';
 import '../utils/websocket_upgrade.dart';
@@ -114,6 +115,13 @@ class SyncController {
         final segments = path.split('/');
         if (segments.length >= 2) {
           final projectId = segments[1];
+          if (projectId.isEmpty) {
+            _log.warning(
+                'Received project sync request with missing project ID');
+            return Response.badRequest(
+              body: 'Project ID is required in the URL',
+            );
+          }
           return webSocketHandler(pingInterval: const Duration(seconds: 30),
               (WebSocketChannel channel, String? protocol) async {
             final projectDb = await dbManager.getProjectDatabase(projectId);
@@ -221,13 +229,13 @@ class SyncController {
     MultiplexedWebSocketChannel channel,
     String context, {
     ProjectDatabase? db,
-    String? projectId,
-    KeychainService? keychain,
+    required String projectId,
+    required KeychainService keychain,
   }) {
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
     channel.onCustomMessage.listen((msg) {
-      _log.info('Server ($context): Received custom message: $msg');
+      _log.fine('Server ($context): Received custom message: $msg');
       if (msg['type'] == 'PING') {
         channel.safeSendCustomMessage({
           'type': 'PONG',
@@ -236,7 +244,8 @@ class SyncController {
       } else if (msg['type'] == 'start_chat' ||
           msg['type'] == 'approval_response' ||
           msg['type'] == 'abort_chat' ||
-          msg['type'] == 'summarize') {
+          msg['type'] == 'summarize' ||
+          msg['type'] == 'terminal_keys') {
         // Extract sessionId from the message to look up or create the session
         String? sessionId = msg['sessionId'] as String?;
 
@@ -322,6 +331,7 @@ class SyncController {
       if (!isLocked) {
         _log.info(
             'Cleaning up session $sessionId (no active channel, not locked)');
+        session._interactiveSession.close();
         _activeSessions.remove(sessionId);
       } else {
         _log.info(
@@ -340,8 +350,8 @@ class _AgentSession {
 
   final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
-  final String? projectId;
-  final ShellService _shellService;
+  final String projectId;
+  final KeychainService _keychainService;
   final NotificationDispatcher _notificationDispatcher;
   final void Function() onComplete;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
@@ -349,22 +359,44 @@ class _AgentSession {
   CancelToken? _currentCancelToken;
   StreamController<ProcessSignal>? _currentAbortController;
 
+  /// The shared interactive shell session
+  late final InteractiveShellSession _interactiveSession;
+
   Future<void> _lastDbWrite = Future.value();
 
   _AgentSession(
     this.globalDb,
     this.projectDb,
     this.projectId,
-    KeychainService? keychain, {
+    KeychainService keychain, {
     required NotificationDispatcher notificationDispatcher,
     required this.onComplete,
   })  : _notificationDispatcher = notificationDispatcher,
-        _shellService = ShellService(
-          null,
-          keychain,
-          projectId,
-          backend: LocalShellBackend(),
-        );
+        _keychainService = keychain {
+    _interactiveSession = InteractiveShellSession(
+      shellService: ShellService(
+        null,
+        _keychainService,
+        projectId,
+        backend: LocalShellBackend(),
+      ),
+      onOutput: (data) {
+        for (final channel in _channels) {
+          channel.safeSendCustomMessage({
+            'type': 'terminal_output',
+            'data': data,
+          });
+        }
+      },
+      onSessionEnded: () {
+        for (final channel in _channels) {
+          channel.safeSendCustomMessage({
+            'type': 'terminal_session_ended',
+          });
+        }
+      },
+    );
+  }
 
   /// Register a new channel with this session (handles reconnections)
   void registerChannel(MultiplexedWebSocketChannel channel) {
@@ -403,13 +435,26 @@ class _AgentSession {
       _handleApproval(msg);
     } else if (msg['type'] == 'abort_chat') {
       _handleAbort(msg);
+    } else if (msg['type'] == 'terminal_keys') {
+      _handleTerminalKeys(msg);
     }
   }
 
   void _handleAbort(Map<String, dynamic> data) {
     _log.info('🛑 Received abort request');
     _currentCancelToken?.cancel('Aborted by user');
-    _currentAbortController?.add(ProcessSignal.sigterm);
+    _currentAbortController?.add(ProcessSignal.sigint);
+  }
+
+  /// Handle terminal key input from the client
+  void _handleTerminalKeys(Map<String, dynamic> data) {
+    final keyData = data['data'];
+    if (keyData is! List) {
+      _log.warning('Received terminal_keys with invalid data type');
+      return;
+    }
+    final bytes = Uint8List.fromList(List<int>.from(keyData));
+    _interactiveSession.writeKeys(bytes);
   }
 
   Future<ChatCapability> _createProviderFromConfig(
@@ -721,19 +766,30 @@ class _AgentSession {
               String result;
               if (toolCall.function.name == kExecuteShellCommand) {
                 final command = params['command'] as String;
+                _log.info(
+                  'Executing shell command on shared session. Abort controller: $abortController',
+                );
+
                 final sudoRequired = params['sudo_required'] as bool? ?? false;
                 final secrets = params['secrets'] != null
                     ? List<String>.from(params['secrets'] as List)
-                    : null;
-                _log.info(
-                  'Executing shell command. Abort controller: $abortController',
+                    : List<String>.empty();
+
+                final envVars = await _keychainService.getProjectSecrets(
+                  projectId,
+                  secrets,
                 );
+
+                final secretRedactor =
+                    SecretRedactor(_keychainService, projectId);
+                await secretRedactor.load();
 
                 final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
                   terminalBuffer.write(data);
                   final streamingResultJson = jsonEncode({
-                    'stdout': terminalBuffer.toString(),
+                    'stdout':
+                        secretRedactor.redactSync(terminalBuffer.toString()),
                     'stderr': '',
                     'exitCode': 0,
                     'isStreaming': true,
@@ -758,31 +814,22 @@ class _AgentSession {
                   });
                 }
 
-                final Map<String, dynamic> shellResult;
-                if (sudoRequired) {
-                  shellResult = await _shellService.executeWithSudo(
-                    command: command,
-                    secrets: secrets,
-                    abortSignal: abortController.stream,
-                    onStdout: onOutput,
-                    onStderr: onOutput,
-                  );
-                } else {
-                  shellResult = await _shellService.executeCommand(
-                    command,
-                    secrets: secrets,
-                    abortSignal: abortController.stream,
-                    onStdout: onOutput,
-                    onStderr: onOutput,
-                  );
-                }
+                final shellResult = await _interactiveSession.executeCommand(
+                  command: command,
+                  abortSignal: abortController.stream,
+                  onStdout: onOutput,
+                  onStderr: onOutput,
+                  environmentVars: envVars,
+                  sudo: sudoRequired,
+                );
                 await _lastDbWrite.catchError((e) {
                   _log.warning(
                     'Error writing streaming message: $e',
                   );
                 });
                 await projectDb!.sessionDao.touchSession(currentSessionId);
-                shellResult['stdout'] = terminalBuffer.toString();
+                shellResult['stdout'] =
+                    secretRedactor.redactSync(terminalBuffer.toString());
                 result = jsonEncode(shellResult);
               } else if (toolCall.function.name == kFetch) {
                 final fetchResult = await FetchTool.execute(params);

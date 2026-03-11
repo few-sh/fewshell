@@ -69,6 +69,8 @@ class SyncService {
       StreamController<SyncConnectionState>.broadcast();
   final StreamController<bool> _isSyncingController =
       StreamController<bool>.broadcast();
+  final StreamController<List<int>> _terminalOutputController =
+      StreamController<List<int>>.broadcast();
   Timer? _syncDebounceTimer;
   SyncConnectionState _currentConnectionState =
       SyncConnectionState.disconnected;
@@ -77,6 +79,9 @@ class SyncService {
       _connectionStateController.stream;
   SyncConnectionState get currentConnectionState => _currentConnectionState;
   Stream<bool> get isSyncing => _isSyncingController.stream;
+
+  /// Stream of terminal output bytes from the server's interactive shell session
+  Stream<List<int>> get terminalOutput => _terminalOutputController.stream;
 
   Timer? _reconnectTimer;
   Timer? _globalReconnectTimer;
@@ -879,6 +884,11 @@ class SyncService {
         _log.fine('Project sync received custom message: $msg');
         if (msg['type'] == 'PONG') {
           _log.fine('PONG received: ${msg['payload']}');
+        } else if (msg['type'] == 'terminal_output') {
+          final data = msg['data'];
+          if (data != null) {
+            _terminalOutputController.add(List<int>.from(data as List));
+          }
         }
       });
       _projectSync = CrdtSync.client(
@@ -998,6 +1008,7 @@ class SyncService {
     _resetProjectSync();
     _connectionStateController.close();
     _isSyncingController.close();
+    _terminalOutputController.close();
     _syncDebounceTimer?.cancel();
   }
 

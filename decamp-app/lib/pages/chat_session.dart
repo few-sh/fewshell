@@ -8,6 +8,7 @@ import 'package:decamp/components/multi_command_approval_overlay.dart';
 import 'package:decamp/components/execution_progress_overlay.dart';
 import 'package:decamp/components/chat_list.dart';
 import 'package:decamp/components/chat_input.dart';
+import 'package:decamp/components/chat_session_empty_state.dart';
 import 'package:decamp/components/search_controls.dart';
 import 'package:decamp/components/search_match_navigator.dart';
 import 'package:decamp/components/project_title_bar.dart';
@@ -32,6 +33,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   bool _previousKeyboardVisible = false;
   bool _forceAppBarVisible = false;
   final FocusNode _inputFocusNode = FocusNode();
+  final TextEditingController _inputController = TextEditingController();
 
   // Search state
   bool _isSearchActive = false;
@@ -44,7 +46,14 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
   @override
   void dispose() {
     _inputFocusNode.dispose();
+    _inputController.dispose();
     super.dispose();
+  }
+
+  void _prefillPrompt(String text) {
+    _inputController.text = text;
+    _inputController.selection = TextSelection.collapsed(offset: text.length);
+    _inputFocusNode.requestFocus();
   }
 
   void _activateSearch() {
@@ -105,6 +114,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           (_currentMatchIndex - 1 + _searchMatches.length) %
           _searchMatches.length;
     });
+  }
+
+  /// Returns true when the streaming message is an in-progress shell tool result.
+  bool _isShellToolStreaming(MessageEntity? message) {
+    if (message == null || !message.isStreaming) return false;
+    if (message.messageKind != MessageKind.toolResult) return false;
+    final toolCalls = message.toolCallsJson;
+    if (toolCalls == null) return false;
+    return toolCalls.any((tc) => tc.function.name == kExecuteShellCommand);
   }
 
   void _handleAbort() {
@@ -389,22 +407,26 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                     child: Stack(
                       children: [
                         messagesAsync.when(
-                          data: (messages) => ChatList(
-                            messages: messages,
-                            isLoading: isLoading,
-                            streamingMessageStream:
-                                chatController.streamingMessageStream,
-                            searchMatches: _searchMatches,
-                            currentMatchIndex: _searchMatches.isNotEmpty
-                                ? _currentMatchIndex
-                                : null,
-                            searchNavigatorHeight:
-                                _isSearchActive && _searchQuery.isNotEmpty
-                                ? _searchNavigatorHeight + 16
-                                : 0,
-                            messageSubscribers:
-                                messageSubscribersAsync.valueOrNull,
-                          ),
+                          data: (messages) => messages.isEmpty && !isLoading
+                              ? ChatSessionEmptyState(
+                                  onPromptSelected: _prefillPrompt,
+                                )
+                              : ChatList(
+                                  messages: messages,
+                                  isLoading: isLoading,
+                                  streamingMessageStream:
+                                      chatController.streamingMessageStream,
+                                  searchMatches: _searchMatches,
+                                  currentMatchIndex: _searchMatches.isNotEmpty
+                                      ? _currentMatchIndex
+                                      : null,
+                                  searchNavigatorHeight:
+                                      _isSearchActive && _searchQuery.isNotEmpty
+                                      ? _searchNavigatorHeight + 16
+                                      : 0,
+                                  messageSubscribers:
+                                      messageSubscribersAsync.valueOrNull,
+                                ),
                           loading: () => Center(
                             child: CircularProgressIndicator(
                               color: ShadTheme.of(context).colorScheme.primary,
@@ -445,15 +467,37 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       initialQuery: _searchQuery,
                     )
                   else
-                    ChatInput(
-                      onSend: _handleSendMessage,
-                      onAbort: isLoading ? _handleAbort : null,
-                      isLoading: isLoading,
-                      enabled: hasProject,
-                      focusNode: _inputFocusNode,
-                      hintText: activeModel != null
-                          ? 'Send to $activeModel'
-                          : 'No LLM Model selected.',
+                    StreamBuilder<MessageEntity?>(
+                      stream: chatController.streamingMessageStream,
+                      builder: (context, snapshot) {
+                        final streamingMessage = snapshot.data;
+                        final isTerminalMode = _isShellToolStreaming(
+                          streamingMessage,
+                        );
+                        return ChatInput(
+                          onSend: _handleSendMessage,
+                          onAbort: isLoading ? _handleAbort : null,
+                          isLoading: isLoading,
+                          enabled: hasProject,
+                          focusNode: _inputFocusNode,
+                          controller: _inputController,
+                          isTerminalMode: isTerminalMode,
+                          onTerminalKeys: isTerminalMode
+                              ? (keyBytes) {
+                                  final syncChannel = ref
+                                      .read(syncServiceProvider)
+                                      .projectChannel;
+                                  chatController.sendTerminalKeys(
+                                    syncChannel,
+                                    keyBytes,
+                                  );
+                                }
+                              : null,
+                          hintText: activeModel != null
+                              ? 'Send to $activeModel'
+                              : 'No LLM Model selected.',
+                        );
+                      },
                     ),
                 ],
               ),
