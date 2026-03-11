@@ -223,7 +223,7 @@ class SyncController {
     String context, {
     ProjectDatabase? db,
     String? projectId,
-    KeychainService? keychain,
+    required KeychainService keychain,
   }) {
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
@@ -344,7 +344,7 @@ class _AgentSession {
   final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
   final String? projectId;
-  KeychainService? _keychainService;
+  final KeychainService _keychainService;
   final NotificationDispatcher _notificationDispatcher;
   final void Function() onComplete;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
@@ -361,7 +361,7 @@ class _AgentSession {
     this.globalDb,
     this.projectDb,
     this.projectId,
-    KeychainService? keychain, {
+    KeychainService keychain, {
     required NotificationDispatcher notificationDispatcher,
     required this.onComplete,
   })  : _notificationDispatcher = notificationDispatcher,
@@ -369,7 +369,7 @@ class _AgentSession {
     _interactiveSession = InteractiveShellSession(
       shellService: ShellService(
         null,
-        keychain,
+        _keychainService,
         projectId,
         backend: LocalShellBackend(),
       ),
@@ -447,6 +447,7 @@ class _AgentSession {
       return;
     }
     final bytes = Uint8List.fromList(List<int>.from(keyData));
+    _interactiveSession.writeKeys(bytes);
   }
 
   Future<ChatCapability> _createProviderFromConfig(
@@ -767,13 +768,13 @@ class _AgentSession {
                     ? List<String>.from(params['secrets'] as List)
                     : List<String>.empty();
 
-                final envVars = await _keychainService?.getProjectSecrets(
+                final envVars = await _keychainService.getProjectSecrets(
                   projectId ?? "",
                   secrets,
                 );
 
                 final secretRedactor =
-                    SecretRedactor(_keychainService!, projectId ?? "");
+                    SecretRedactor(_keychainService, projectId ?? "");
                 await secretRedactor.load();
 
                 final terminalBuffer = TerminalBuffer();
