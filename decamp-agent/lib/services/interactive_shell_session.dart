@@ -74,6 +74,7 @@ class InteractiveShellSession {
     required String command,
     required Stream<ProcessSignal>? abortSignal,
     Map<String, String>? environmentVars,
+    bool sudo = false,
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
@@ -110,7 +111,11 @@ class InteractiveShellSession {
       });
     }
 
-    // Build env var prefix for scoped variables
+    // Build the command with optional sudo and scoped env vars.
+    // Order matters: sudo must wrap the env vars so they're set in the
+    // elevated context, not the outer shell.
+    //   Without sudo:  VAR=val bash -c '...'
+    //   With sudo:     sudo VAR=val bash -c '...'
     var envPrefix = '';
     if (environmentVars != null && environmentVars.isNotEmpty) {
       envPrefix = environmentVars.entries
@@ -118,12 +123,13 @@ class InteractiveShellSession {
               .join(' ') +
           ' ';
     }
+    final sudoPrefix = sudo ? 'sudo ' : '';
 
     // Write the wrapped command to the shared session.
     // Leading space prevents the command (which may contain secrets in env
     // var values) from being saved in bash history.
     final wrappedCommand =
-        " ${envPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
+        " ${sudoPrefix}${envPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
     session.write(Uint8List.fromList(utf8.encode(wrappedCommand)));
 
     try {

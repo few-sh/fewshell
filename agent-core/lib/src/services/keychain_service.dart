@@ -77,6 +77,22 @@ class KeychainService {
     return await getSecret(key);
   }
 
+  /// Retrieve multiple project-scoped secrets by name.
+  /// Returns a map of secret name to value for secrets that exist.
+  Future<Map<String, String>> getProjectSecrets(
+    String projectId,
+    List<String> secretNames,
+  ) async {
+    final results = <String, String>{};
+    for (final name in secretNames) {
+      final value = await getProjectSecret(projectId, name);
+      if (value != null) {
+        results[name] = value;
+      }
+    }
+    return results;
+  }
+
   /// Retrieve a project-scoped secret object.
   Future<Secret?> getProjectSecretObject(
       String projectId, String secretName) async {

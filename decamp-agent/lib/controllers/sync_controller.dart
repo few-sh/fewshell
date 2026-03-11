@@ -344,6 +344,7 @@ class _AgentSession {
   final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
   final String? projectId;
+  KeychainService? _keychainService;
   final NotificationDispatcher _notificationDispatcher;
   final void Function() onComplete;
   Completer<List<PendingToolCall>?>? _approvalCompleter;
@@ -363,7 +364,8 @@ class _AgentSession {
     KeychainService? keychain, {
     required NotificationDispatcher notificationDispatcher,
     required this.onComplete,
-  }) : _notificationDispatcher = notificationDispatcher {
+  })  : _notificationDispatcher = notificationDispatcher,
+        _keychainService = keychain {
     _interactiveSession = InteractiveShellSession(
       shellService: ShellService(
         null,
@@ -761,6 +763,16 @@ class _AgentSession {
                   'Executing shell command on shared session. Abort controller: $abortController',
                 );
 
+                final sudoRequired = params['sudo_required'] as bool? ?? false;
+                final secrets = params['secrets'] != null
+                    ? List<String>.from(params['secrets'] as List)
+                    : List<String>.empty();
+
+                final envVars = await _keychainService?.getProjectSecrets(
+                  projectId ?? "",
+                  secrets,
+                );
+
                 final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
                   terminalBuffer.write(data);
@@ -795,6 +807,8 @@ class _AgentSession {
                   abortSignal: abortController.stream,
                   onStdout: onOutput,
                   onStderr: onOutput,
+                  environmentVars: envVars,
+                  sudo: sudoRequired,
                 );
                 await _lastDbWrite.catchError((e) {
                   _log.warning(
