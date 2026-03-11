@@ -257,6 +257,58 @@ void main() {
       await abortController.close();
     });
 
+    test('sigint interrupts command and captures partial output', () async {
+      final abortController = StreamController<ProcessSignal>.broadcast();
+      final stdoutChunks = <String>[];
+
+      // Start a command that produces output before blocking
+      final resultFuture = session.executeCommand(
+        command: 'echo before_interrupt; sleep 30; echo after_interrupt',
+        abortSignal: abortController.stream,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      // Wait for the first echo to appear, then send SIGINT
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      abortController.add(ProcessSignal.sigint);
+
+      final result = await resultFuture.timeout(const Duration(seconds: 5));
+      expect(result['exitCode'], isNot(equals(0)));
+      expect(result['stdout'], contains('before_interrupt'));
+      expect(result['stdout'], isNot(contains('after_interrupt')));
+
+      await abortController.close();
+    });
+
+    test('session remains usable after sigint abort', () async {
+      final abortController = StreamController<ProcessSignal>.broadcast();
+
+      // Start a long-running command and abort it
+      final resultFuture = session.executeCommand(
+        command: 'sleep 30',
+        abortSignal: abortController.stream,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      abortController.add(ProcessSignal.sigint);
+
+      final abortedResult =
+          await resultFuture.timeout(const Duration(seconds: 5));
+      expect(abortedResult['exitCode'], isNot(equals(0)));
+      await abortController.close();
+
+      // Run another command on the same session — should succeed
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: 'echo after_abort_ok',
+        abortSignal: null,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      expect(result['stdout'], contains('after_abort_ok'));
+    });
+
     test('routes output to onOutput when no tool call active', () async {
       // Write keys (not a tool call) — output should go to onOutput
       session.writeKeys(Uint8List.fromList(utf8.encode('echo idle_output\n')));
