@@ -44,6 +44,9 @@ class InteractiveShellSession {
   /// Partial line buffer for sentinel detection across chunk boundaries.
   String _partialLineBuffer = '';
 
+  /// Timer for flushing partial lines (e.g. prompts without trailing newline).
+  Timer? _partialLineFlushTimer;
+
   static final RegExp sentinelPattern =
       RegExp(r'__FEWSHELL_DONE_([a-f0-9-]+)_(\d+)__');
 
@@ -126,6 +129,7 @@ class InteractiveShellSession {
 
   /// Close the interactive session if it has been initialized.
   void close() {
+    _partialLineFlushTimer?.cancel();
     unawaited(
       _session.then((session) {
         session.close();
@@ -215,6 +219,15 @@ class InteractiveShellSession {
       _partialLineBuffer = '';
     }
 
+    // Schedule a debounced flush for any remaining partial line data
+    // (e.g. prompts from `read -p` that have no trailing newline).
+    _partialLineFlushTimer?.cancel();
+    if (_partialLineBuffer.isNotEmpty) {
+      _partialLineFlushTimer = Timer(const Duration(milliseconds: 100), () {
+        _flushPartialLine();
+      });
+    }
+
     // If all lines were filtered (echo/sentinel), nothing to forward.
     if (cleanedLines.isEmpty) return;
 
@@ -232,6 +245,20 @@ class InteractiveShellSession {
       // Route to terminal_output for the client terminal screen
       final outputBytes = utf8.encode(outputText);
       onOutput(outputBytes);
+    }
+  }
+
+  /// Flush the partial-line buffer to the appropriate callback.
+  void _flushPartialLine() {
+    if (_partialLineBuffer.isEmpty) return;
+    final text = _partialLineBuffer;
+    _partialLineBuffer = '';
+
+    if (_activeToolStdoutCallback != null) {
+      _activeToolOutputBuffer.write(text);
+      _activeToolStdoutCallback!(text);
+    } else {
+      onOutput(utf8.encode(text));
     }
   }
 

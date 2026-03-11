@@ -325,5 +325,33 @@ void main() {
       // No sentinel marker in output
       expect(stdout, isNot(contains('__FEWSHELL_DONE_')));
     });
+
+    test('streams prompt from read -p (no trailing newline)', () async {
+      final stdoutChunks = <String>[];
+      final promptSeen = Completer<void>();
+
+      // Start the command in a future (it will block on read)
+      final resultFuture = session.executeCommand(
+        command: r'read -p "Enter your name: " name && echo "Hello, $name!"',
+        abortSignal: null,
+        onStdout: (data) {
+          stdoutChunks.add(data);
+          if (stdoutChunks.join().contains('Enter your name')) {
+            if (!promptSeen.isCompleted) promptSeen.complete();
+          }
+        },
+      );
+
+      // Wait for the prompt to be flushed (partial line without \n)
+      await promptSeen.future.timeout(const Duration(seconds: 5));
+      expect(stdoutChunks.join(), contains('Enter your name'));
+
+      // Provide input so the command can complete
+      session.writeKeys(Uint8List.fromList(utf8.encode('World\n')));
+
+      final result = await resultFuture.timeout(const Duration(seconds: 5));
+      expect(result['exitCode'], equals(0));
+      expect(result['stdout'], contains('Hello, World!'));
+    });
   });
 }
