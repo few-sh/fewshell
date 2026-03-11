@@ -15,6 +15,7 @@ class ChatInput extends StatefulWidget {
   final bool enabled;
   final String hintText;
   final FocusNode? focusNode;
+  final TextEditingController? controller;
   final bool isTerminalMode;
   final void Function(List<int>)? onTerminalKeys;
 
@@ -26,6 +27,7 @@ class ChatInput extends StatefulWidget {
     this.enabled = true,
     this.hintText = 'Type your message...',
     this.focusNode,
+    this.controller,
     this.isTerminalMode = false,
     this.onTerminalKeys,
   });
@@ -35,13 +37,20 @@ class ChatInput extends StatefulWidget {
 }
 
 class _ChatInputState extends State<ChatInput> {
-  final TextEditingController _controller = TextEditingController();
+  late final TextEditingController _controller;
+  bool _isLocalController = false;
   late final FocusNode _focusNode;
   bool _isLocalFocusNode = false;
 
   @override
   void initState() {
     super.initState();
+    if (widget.controller == null) {
+      _controller = TextEditingController();
+      _isLocalController = true;
+    } else {
+      _controller = widget.controller!;
+    }
     if (widget.focusNode == null) {
       _focusNode = FocusNode();
       _isLocalFocusNode = true;
@@ -52,7 +61,9 @@ class _ChatInputState extends State<ChatInput> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_isLocalController) {
+      _controller.dispose();
+    }
     if (_isLocalFocusNode) {
       _focusNode.dispose();
     }
