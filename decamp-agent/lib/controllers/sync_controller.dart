@@ -228,7 +228,7 @@ class SyncController {
     // The subscription will be automatically cancelled when the channel is closed
     // (connection dropped) as the stream will send a done event.
     channel.onCustomMessage.listen((msg) {
-      _log.info('Server ($context): Received custom message: $msg');
+      _log.fine('Server ($context): Received custom message: $msg');
       if (msg['type'] == 'PING') {
         channel.safeSendCustomMessage({
           'type': 'PONG',
