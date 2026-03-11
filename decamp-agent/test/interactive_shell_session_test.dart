@@ -287,5 +287,43 @@ void main() {
       // (it may have received the command echo from the PTY, but not the
       // actual command output since that was during the tool call)
     });
+
+    test('filters command echo from tool output', () async {
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: 'echo clean_output',
+        abortSignal: null,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      final stdout = result['stdout'] as String;
+      // The actual command output should be present
+      expect(stdout, contains('clean_output'));
+      // The sentinel marker text (echoed by PTY with unresolved $?) should
+      // NOT appear in the tool output
+      expect(stdout, isNot(contains('__FEWSHELL_DONE_')));
+      // The bash -c wrapper should NOT appear in the tool output
+      expect(stdout, isNot(contains("bash -c")));
+    });
+
+    test('streams output progressively from slow command', () async {
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: 'for i in 1 2 3; do echo "num_\$i"; sleep 0.1; done',
+        abortSignal: null,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      final stdout = result['stdout'] as String;
+      expect(stdout, contains('num_1'));
+      expect(stdout, contains('num_2'));
+      expect(stdout, contains('num_3'));
+      // Should have received multiple streaming chunks (not all at once)
+      expect(stdoutChunks.length, greaterThan(1));
+      // No sentinel marker in output
+      expect(stdout, isNot(contains('__FEWSHELL_DONE_')));
+    });
   });
 }

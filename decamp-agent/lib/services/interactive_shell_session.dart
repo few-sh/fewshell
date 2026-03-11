@@ -38,6 +38,9 @@ class InteractiveShellSession {
   /// Buffer for accumulating tool call output.
   final StringBuffer _activeToolOutputBuffer = StringBuffer();
 
+  /// UUID of the command currently being executed (for echo filtering).
+  String? _activeCommandUuid;
+
   /// Partial line buffer for sentinel detection across chunk boundaries.
   String _partialLineBuffer = '';
 
@@ -78,6 +81,14 @@ class InteractiveShellSession {
     // Set the active tool callback so stdout routes to streaming message
     _activeToolOutputBuffer.clear();
     _activeToolStdoutCallback = onStdout;
+    _activeCommandUuid = uuid;
+
+    // Flush any pending partial line (e.g. shell prompt) to terminal output
+    // so it doesn't get prepended to tool output.
+    if (_partialLineBuffer.isNotEmpty) {
+      onOutput(utf8.encode(_partialLineBuffer));
+      _partialLineBuffer = '';
+    }
 
     StreamSubscription<ProcessSignal>? abortSubscription;
     if (abortSignal != null) {
@@ -107,6 +118,7 @@ class InteractiveShellSession {
       };
     } finally {
       _activeToolStdoutCallback = null;
+      _activeCommandUuid = null;
       _activeToolOutputBuffer.clear();
       _commandCompleters.remove(uuid);
     }
@@ -169,6 +181,7 @@ class InteractiveShellSession {
 
     final cleanedLines = <String>[];
     for (final line in lines) {
+      // Check for resolved sentinel marker (with numeric exit code)
       final match = sentinelPattern.firstMatch(line);
       if (match != null) {
         final uuid = match.group(1)!;
@@ -178,6 +191,13 @@ class InteractiveShellSession {
           completer.complete(exitCode);
         }
         // Don't forward marker lines
+        continue;
+      }
+      // Filter the PTY command echo: it contains the sentinel marker text
+      // with unresolved $? (not matched by the regex above). Terminal control
+      // characters (\r, \b) from line wrapping fracture the UUID, but the
+      // __FEWSHELL_DONE_ prefix always appears intact in the raw line.
+      if (_activeCommandUuid != null && line.contains('__FEWSHELL_DONE_')) {
         continue;
       }
       cleanedLines.add(line);
@@ -195,11 +215,12 @@ class InteractiveShellSession {
       _partialLineBuffer = '';
     }
 
-    // Reconstruct cleaned text
-    final cleanedText = cleanedLines.join('\n');
-    // Add back partial buffer content if there's more to come
-    final outputText =
-        _partialLineBuffer.isEmpty ? cleanedText : '$cleanedText\n';
+    // If all lines were filtered (echo/sentinel), nothing to forward.
+    if (cleanedLines.isEmpty) return;
+
+    // Reconstruct cleaned text. Each entry in cleanedLines was a complete
+    // \n-terminated line (the \n was consumed by split), so restore it.
+    final outputText = cleanedLines.map((l) => '$l\n').join();
 
     if (outputText.isEmpty) return;
 
