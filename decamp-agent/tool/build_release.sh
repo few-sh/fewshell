@@ -71,7 +71,7 @@ build_arch() {
             echo '🔌 Compiling fewshell-server...' && \
             mkdir -p build/bin && \
             VERSION=\$(sed -n 's/^version: //p' pubspec.yaml) && \
-            echo \"const packageVersion = '\$VERSION';\" > lib/version.dart && \
+            sed -i \"s/^const packageVersion = .*/const packageVersion = '\$VERSION';/\" lib/version.dart && \
             dart build cli -t bin/server.dart -o build/cli_out && \
             cp build/cli_out/bundle/bin/server build/bin/fewshell-server && \
             if [ -d "build/cli_out/bundle/lib" ]; then cp -r build/cli_out/bundle/lib/* build/bin/ || true; fi && \
@@ -114,7 +114,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
         
         # Generate version file
         VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-        echo "const packageVersion = '$VERSION';" > lib/version.dart
+        sed -i '' "s/^const packageVersion = .*/const packageVersion = '$VERSION';/" lib/version.dart
 
         dart pub get
         dart build cli -t bin/server.dart -o build/macos_cli_out
