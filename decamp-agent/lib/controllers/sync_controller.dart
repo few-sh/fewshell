@@ -442,12 +442,11 @@ class _AgentSession {
   /// Handle terminal key input from the client
   void _handleTerminalKeys(Map<String, dynamic> data) {
     final keyData = data['data'];
-    if (keyData == null) {
-      _log.warning('Received terminal_keys without data');
+    if (keyData is! List) {
+      _log.warning('Received terminal_keys with invalid data type');
       return;
     }
-    final bytes = Uint8List.fromList(List<int>.from(keyData as List));
-    _interactiveSession.writeKeys(bytes);
+    final bytes = Uint8List.fromList(List<int>.from(keyData));
   }
 
   Future<ChatCapability> _createProviderFromConfig(
