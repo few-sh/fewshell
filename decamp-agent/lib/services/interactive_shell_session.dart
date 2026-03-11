@@ -131,13 +131,13 @@ class InteractiveShellSession {
             '${validEntries.map((e) => '${e.key}=${shellQuote(e.value)}').join(' ')} ';
       }
     }
-    final sudoPrefix = sudo ? 'sudo ' : '';
+    final sudoPrefix = sudo ? 'sudo -E ' : '';
 
     // Write the wrapped command to the shared session.
     // Leading space prevents the command (which may contain secrets in env
     // var values) from being saved in bash history.
     final wrappedCommand =
-        " ${sudoPrefix}${envPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
+        " ${envPrefix} ${sudoPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
     session.write(Uint8List.fromList(utf8.encode(wrappedCommand)));
 
     try {
