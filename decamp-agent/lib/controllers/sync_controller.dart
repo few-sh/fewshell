@@ -781,7 +781,7 @@ class _AgentSession {
                 );
 
                 final secretRedactor =
-                    SecretRedactor(_keychainService, projectId ?? "");
+                    SecretRedactor(_keychainService, projectId);
                 await secretRedactor.load();
 
                 final terminalBuffer = TerminalBuffer();
