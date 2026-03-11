@@ -107,6 +107,15 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     });
   }
 
+  /// Returns true when the streaming message is an in-progress shell tool result.
+  bool _isShellToolStreaming(MessageEntity? message) {
+    if (message == null || !message.isStreaming) return false;
+    if (message.messageKind != MessageKind.toolResult) return false;
+    final toolCalls = message.toolCallsJson;
+    if (toolCalls == null) return false;
+    return toolCalls.any((tc) => tc.function.name == kExecuteShellCommand);
+  }
+
   void _handleAbort() {
     final currentSessionId = ref.read(currentSessionIdProvider);
     final chatController = ref.read(
@@ -445,15 +454,36 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                       initialQuery: _searchQuery,
                     )
                   else
-                    ChatInput(
-                      onSend: _handleSendMessage,
-                      onAbort: isLoading ? _handleAbort : null,
-                      isLoading: isLoading,
-                      enabled: hasProject,
-                      focusNode: _inputFocusNode,
-                      hintText: activeModel != null
-                          ? 'Send to $activeModel'
-                          : 'No LLM Model selected.',
+                    StreamBuilder<MessageEntity?>(
+                      stream: chatController.streamingMessageStream,
+                      builder: (context, snapshot) {
+                        final streamingMessage = snapshot.data;
+                        final isTerminalMode = _isShellToolStreaming(
+                          streamingMessage,
+                        );
+                        return ChatInput(
+                          onSend: _handleSendMessage,
+                          onAbort: isLoading ? _handleAbort : null,
+                          isLoading: isLoading,
+                          enabled: hasProject,
+                          focusNode: _inputFocusNode,
+                          isTerminalMode: isTerminalMode,
+                          onTerminalKeys: isTerminalMode
+                              ? (keyBytes) {
+                                  final syncChannel = ref
+                                      .read(syncServiceProvider)
+                                      .projectChannel;
+                                  chatController.sendTerminalKeys(
+                                    syncChannel,
+                                    keyBytes,
+                                  );
+                                }
+                              : null,
+                          hintText: activeModel != null
+                              ? 'Send to $activeModel'
+                              : 'No LLM Model selected.',
+                        );
+                      },
                     ),
                 ],
               ),
