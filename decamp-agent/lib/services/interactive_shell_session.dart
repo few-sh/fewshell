@@ -118,10 +118,18 @@ class InteractiveShellSession {
     //   With sudo:     sudo VAR=val bash -c '...'
     var envPrefix = '';
     if (environmentVars != null && environmentVars.isNotEmpty) {
-      envPrefix = environmentVars.entries
-              .map((e) => '${e.key}=${shellQuote(e.value)}')
-              .join(' ') +
-          ' ';
+      final validEntries = environmentVars.entries
+          .where((e) => _isValidEnvVarName(e.key))
+          .toList();
+      for (final e in environmentVars.entries) {
+        if (!_isValidEnvVarName(e.key)) {
+          _log.warning('Skipping invalid environment variable name: ${e.key}');
+        }
+      }
+      if (validEntries.isNotEmpty) {
+        envPrefix =
+            '${validEntries.map((e) => '${e.key}=${shellQuote(e.value)}').join(' ')} ';
+      }
     }
     final sudoPrefix = sudo ? 'sudo ' : '';
 
@@ -295,6 +303,10 @@ class InteractiveShellSession {
   /// Wrap a value in single quotes, escaping any embedded single quotes.
   static String shellQuote(String value) {
     return "'${value.replaceAll("'", "'\"'\"'")}'";
+  }
+
+  bool _isValidEnvVarName(String name) {
+    return RegExp(r'^[a-zA-Z_][a-zA-Z0-9_]*$').hasMatch(name);
   }
 
   static const _uuid = Uuid();
