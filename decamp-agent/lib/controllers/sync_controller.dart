@@ -773,11 +773,16 @@ class _AgentSession {
                   secrets,
                 );
 
+                final secretRedactor =
+                    SecretRedactor(_keychainService!, projectId ?? "");
+                await secretRedactor.load();
+
                 final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
                   terminalBuffer.write(data);
                   final streamingResultJson = jsonEncode({
-                    'stdout': terminalBuffer.toString(),
+                    'stdout':
+                        secretRedactor.redactSync(terminalBuffer.toString()),
                     'stderr': '',
                     'exitCode': 0,
                     'isStreaming': true,
@@ -816,7 +821,8 @@ class _AgentSession {
                   );
                 });
                 await projectDb!.sessionDao.touchSession(currentSessionId);
-                shellResult['stdout'] = terminalBuffer.toString();
+                shellResult['stdout'] =
+                    secretRedactor.redactSync(terminalBuffer.toString());
                 result = jsonEncode(shellResult);
               } else if (toolCall.function.name == kFetch) {
                 final fetchResult = await FetchTool.execute(params);

@@ -8,7 +8,18 @@ class SecretRedactor {
   final KeychainService _keychain;
   final String? _projectId;
 
+  /// Cached secret values sorted by length descending, populated by [load].
+  List<String>? _cachedSecretValues;
+
   SecretRedactor(this._keychain, this._projectId);
+
+  /// Pre-fetches all secrets so that [redactSync] can be used without await.
+  /// Must be called (and awaited) before using [redactSync].
+  Future<void> load() async {
+    final secrets = await _getAllSecrets();
+    _cachedSecretValues = secrets.values.where((s) => s.isNotEmpty).toList()
+      ..sort((a, b) => b.length.compareTo(a.length));
+  }
 
   /// Redacts all known secrets from the given text.
   ///
@@ -34,6 +45,21 @@ class SecretRedactor {
       if (secret.isNotEmpty) {
         redactedText = redactedText.replaceAll(secret, '[REDACTED]');
       }
+    }
+    return redactedText;
+  }
+
+  /// Synchronous variant of [redact] that uses cached secrets from [load].
+  ///
+  /// Returns the original text if [load] has not been called yet.
+  String redactSync(String text) {
+    if (text.isEmpty) return text;
+    final values = _cachedSecretValues;
+    if (values == null || values.isEmpty) return text;
+
+    String redactedText = text;
+    for (final secret in values) {
+      redactedText = redactedText.replaceAll(secret, '[REDACTED]');
     }
     return redactedText;
   }
