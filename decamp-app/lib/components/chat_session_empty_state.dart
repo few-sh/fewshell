@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:decamp/providers/providers.dart';
 
 /// Landing page shown when a chat session has no messages yet.
-/// Displays a brief overview and example prompts that pre-fill the input.
-class ChatSessionEmptyState extends StatelessWidget {
+/// Shows the user's saved quick prompts if any exist, otherwise
+/// falls back to built-in example prompts.
+class ChatSessionEmptyState extends ConsumerWidget {
   final ValueChanged<String> onPromptSelected;
 
   const ChatSessionEmptyState({super.key, required this.onPromptSelected});
@@ -16,9 +20,23 @@ class ChatSessionEmptyState extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final shadTheme = ShadTheme.of(context);
     final colorScheme = shadTheme.colorScheme;
+
+    // Collect saved prompts: project-scoped + global
+    final currentProjectId = ref.watch(currentProjectIdProvider);
+    final projectPrompts = currentProjectId != null
+        ? ref.watch(projectSavedPromptsProvider(currentProjectId)).valueOrNull
+        : null;
+    final globalPrompts = ref.watch(globalSavedPromptsProvider).valueOrNull;
+
+    final allSavedPrompts = <SavedPromptEntity>[
+      ...?projectPrompts,
+      ...?globalPrompts,
+    ];
+
+    final hasSavedPrompts = allSavedPrompts.isNotEmpty;
 
     return Center(
       child: SingleChildScrollView(
@@ -68,13 +86,13 @@ class ChatSessionEmptyState extends StatelessWidget {
               ),
               const SizedBox(height: 32),
 
-              // "Try asking" label
+              // Section label
               Align(
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: const EdgeInsets.only(left: 4, bottom: 12),
                   child: Text(
-                    'Try asking',
+                    hasSavedPrompts ? 'Your quick prompts' : 'Try asking',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -86,18 +104,31 @@ class ChatSessionEmptyState extends StatelessWidget {
               ),
 
               // Prompt cards
-              ...List.generate(_examplePrompts.length, (i) {
-                final prompt = _examplePrompts[i];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _PromptCard(
-                    icon: prompt.icon,
-                    text: prompt.text,
-                    onTap: () => onPromptSelected(prompt.text),
-                    colorScheme: colorScheme,
+              if (hasSavedPrompts)
+                ...allSavedPrompts.map(
+                  (p) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _PromptCard(
+                      icon: LucideIcons.bookmark,
+                      text: p.description ?? p.content,
+                      onTap: () => onPromptSelected(p.content),
+                      colorScheme: colorScheme,
+                    ),
                   ),
-                );
-              }),
+                )
+              else
+                ...List.generate(_examplePrompts.length, (i) {
+                  final prompt = _examplePrompts[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _PromptCard(
+                      icon: prompt.icon,
+                      text: prompt.text,
+                      onTap: () => onPromptSelected(prompt.text),
+                      colorScheme: colorScheme,
+                    ),
+                  );
+                }),
             ],
           ),
         ),
