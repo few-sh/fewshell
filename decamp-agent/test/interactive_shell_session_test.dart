@@ -378,6 +378,58 @@ void main() {
       expect(stdout, isNot(contains('__FEWSHELL_DONE_')));
     });
 
+    test('sigkill terminates command and returns exit code 137', () async {
+      final abortController = StreamController<ProcessSignal>.broadcast();
+      final stdoutChunks = <String>[];
+
+      // Start a command that produces output before blocking
+      final resultFuture = session.executeCommand(
+        command: 'echo before_kill; sleep 30; echo after_kill',
+        abortSignal: abortController.stream,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      // Wait for the first echo to appear, then send SIGKILL
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      abortController.add(ProcessSignal.sigkill);
+
+      final result = await resultFuture.timeout(const Duration(seconds: 5));
+      expect(result['exitCode'], equals(137));
+      expect(result['stdout'], contains('before_kill'));
+      expect(result['stdout'], isNot(contains('after_kill')));
+
+      await abortController.close();
+    });
+
+    test('session remains usable after sigkill abort', () async {
+      final abortController = StreamController<ProcessSignal>.broadcast();
+
+      // Start a long-running command and kill it
+      final resultFuture = session.executeCommand(
+        command: 'sleep 30',
+        abortSignal: abortController.stream,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      abortController.add(ProcessSignal.sigkill);
+
+      final killedResult =
+          await resultFuture.timeout(const Duration(seconds: 5));
+      expect(killedResult['exitCode'], equals(137));
+      await abortController.close();
+
+      // Run another command on the same session — should succeed
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: 'echo after_kill_ok',
+        abortSignal: null,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      expect(result['stdout'], contains('after_kill_ok'));
+    });
+
     test('streams prompt from read -p (no trailing newline)', () async {
       final stdoutChunks = <String>[];
       final promptSeen = Completer<void>();
