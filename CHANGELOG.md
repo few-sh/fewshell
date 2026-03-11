@@ -1,3 +1,23 @@
+# Server 0.1.25
+
+- Interactive shell session support
+- Environment variable passing to shell commands
+- Foreground signal for process interruption
+- SSH public key pairing service
+- Server version and minimum client version headers
+- Connection keepalive support
+- Hardened security for environment variables and sudo
+- Secrets redaction improvements
+- Debug CLI option and improved logging
+
+# App 1.0.2+28
+
+- Interactive terminal input mode
+- Quick prompts on landing page
+- SSH key pairing in settings dialog
+- Connection keepalive and activity monitoring
+- Improved window sizing and rich message layout
+
 # Server 0.1.24
 
 - Switch to .tar.gz packaging format
