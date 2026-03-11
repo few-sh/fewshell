@@ -73,6 +73,7 @@ class InteractiveShellSession {
   Future<Map<String, dynamic>> executeCommand({
     required String command,
     required Stream<ProcessSignal>? abortSignal,
+    Map<String, String>? environmentVars,
     void Function(String)? onStdout,
     void Function(String)? onStderr,
   }) async {
@@ -109,9 +110,20 @@ class InteractiveShellSession {
       });
     }
 
-    // Write the wrapped command to the shared session
+    // Build env var prefix for scoped variables
+    var envPrefix = '';
+    if (environmentVars != null && environmentVars.isNotEmpty) {
+      envPrefix = environmentVars.entries
+              .map((e) => '${e.key}=${shellQuote(e.value)}')
+              .join(' ') +
+          ' ';
+    }
+
+    // Write the wrapped command to the shared session.
+    // Leading space prevents the command (which may contain secrets in env
+    // var values) from being saved in bash history.
     final wrappedCommand =
-        "bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
+        " ${envPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
     session.write(Uint8List.fromList(utf8.encode(wrappedCommand)));
 
     try {
@@ -272,6 +284,11 @@ class InteractiveShellSession {
   /// Escape single quotes for bash -c wrapping.
   static String escapeForCommand(String command) {
     return command.replaceAll("'", "'\"'\"'").replaceAll('\\', '\\\\');
+  }
+
+  /// Wrap a value in single quotes, escaping any embedded single quotes.
+  static String shellQuote(String value) {
+    return "'${value.replaceAll("'", "'\"'\"'")}'";
   }
 
   static const _uuid = Uuid();

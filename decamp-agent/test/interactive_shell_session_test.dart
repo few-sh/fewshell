@@ -71,6 +71,29 @@ void main() {
     });
   });
 
+  group('InteractiveShellSession.shellQuote', () {
+    test('wraps plain value in single quotes', () {
+      expect(
+        InteractiveShellSession.shellQuote('hello'),
+        equals("'hello'"),
+      );
+    });
+
+    test('escapes embedded single quotes', () {
+      expect(
+        InteractiveShellSession.shellQuote("it's"),
+        equals("'it'\"'\"'s'"),
+      );
+    });
+
+    test('handles empty string', () {
+      expect(
+        InteractiveShellSession.shellQuote(''),
+        equals("''"),
+      );
+    });
+  });
+
   group('InteractiveShellSession - writeKeys', () {
     late InteractiveShellSession session;
     late List<List<int>> receivedOutput;
@@ -428,6 +451,58 @@ void main() {
 
       expect(result['exitCode'], equals(0));
       expect(result['stdout'], contains('after_kill_ok'));
+    });
+
+    test('passes environment variables to command', () async {
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: r'echo "$MY_VAR:$OTHER_VAR"',
+        abortSignal: null,
+        environmentVars: {
+          'MY_VAR': 'secret_value',
+          'OTHER_VAR': 'second_value',
+        },
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      expect(result['stdout'], contains('secret_value:second_value'));
+    });
+
+    test('environment variables are scoped to the command', () async {
+      // Set an env var in the first command
+      await session.executeCommand(
+        command: 'echo first',
+        abortSignal: null,
+        environmentVars: {'SCOPED_SECRET': 'should_not_leak'},
+        onStdout: (_) {},
+      );
+
+      // Second command without env vars should NOT see it
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: r'echo "val=${SCOPED_SECRET:-unset}"',
+        abortSignal: null,
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      expect(result['stdout'], contains('val=unset'));
+    });
+
+    test('environment variables with special characters', () async {
+      final stdoutChunks = <String>[];
+      final result = await session.executeCommand(
+        command: r'echo "$SPECIAL"',
+        abortSignal: null,
+        environmentVars: {
+          'SPECIAL': "has 'quotes' and \$dollars",
+        },
+        onStdout: (data) => stdoutChunks.add(data),
+      );
+
+      expect(result['exitCode'], equals(0));
+      expect(result['stdout'], contains("has 'quotes' and \$dollars"));
     });
 
     test('streams prompt from read -p (no trailing newline)', () async {
