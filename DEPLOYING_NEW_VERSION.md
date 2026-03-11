@@ -13,7 +13,7 @@ on the main branch, it should be up to date and we should have no local modifica
 1. Increment the build number in decamp-app/pubspec.yaml
 2. Update the CHANGELOG.md based on app-related git commits since the last version
 3. Deploy the ios app using the command: cd decamp-app && ./deploy_ios.sh && cd ..
-4. Deploy the macos app using the command: cd decamp-app && ./deploy_macos.sh && cd ..
+4. Deploy the macos app using the command: cd decamp-app && deploy_macos_direct.sh && cd ..
 5. If everything went well, commit the changes using git message format "version: ..." that matches decamp-app/pubspec.yml version line.
 
 IMPORTANT:
