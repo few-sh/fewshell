@@ -95,10 +95,17 @@ class InteractiveShellSession {
 
     StreamSubscription<ProcessSignal>? abortSubscription;
     if (abortSignal != null) {
-      abortSubscription = abortSignal.listen((signal) async {
+      abortSubscription = abortSignal.listen((signal) {
         _log.info('Aborting shared session command with signal: $signal');
-        // Send Ctrl+C to the PTY to interrupt the running command
-        session.write(Uint8List.fromList([3])); // ETX / Ctrl+C
+        // Send signal to the foreground process group only, keeping the
+        // interactive shell session alive. This writes the control character
+        // AND sends the signal via kill() to handle both canonical and raw
+        // terminal modes.
+        try {
+          session.signalForeground(signal);
+        } catch (e) {
+          _log.warning('Failed to signal foreground process: $e');
+        }
       });
     }
 

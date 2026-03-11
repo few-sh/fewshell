@@ -249,7 +249,7 @@ void main() {
 
       // Wait briefly, then abort
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      abortController.add(ProcessSignal.sigterm);
+      abortController.add(ProcessSignal.sigint);
 
       final result = await resultFuture.timeout(const Duration(seconds: 5));
       expect(result['exitCode'], isNot(equals(0)));

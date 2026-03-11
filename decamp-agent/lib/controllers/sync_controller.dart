@@ -434,7 +434,7 @@ class _AgentSession {
   void _handleAbort(Map<String, dynamic> data) {
     _log.info('🛑 Received abort request');
     _currentCancelToken?.cancel('Aborted by user');
-    _currentAbortController?.add(ProcessSignal.sigterm);
+    _currentAbortController?.add(ProcessSignal.sigint);
   }
 
   /// Handle terminal key input from the client
