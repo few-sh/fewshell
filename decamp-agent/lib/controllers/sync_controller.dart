@@ -115,6 +115,13 @@ class SyncController {
         final segments = path.split('/');
         if (segments.length >= 2) {
           final projectId = segments[1];
+          if (projectId.isEmpty) {
+            _log.warning(
+                'Received project sync request with missing project ID');
+            return Response.badRequest(
+              body: 'Project ID is required in the URL',
+            );
+          }
           return webSocketHandler(pingInterval: const Duration(seconds: 30),
               (WebSocketChannel channel, String? protocol) async {
             final projectDb = await dbManager.getProjectDatabase(projectId);
@@ -222,7 +229,7 @@ class SyncController {
     MultiplexedWebSocketChannel channel,
     String context, {
     ProjectDatabase? db,
-    String? projectId,
+    required String projectId,
     required KeychainService keychain,
   }) {
     // The subscription will be automatically cancelled when the channel is closed
@@ -343,7 +350,7 @@ class _AgentSession {
 
   final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
-  final String? projectId;
+  final String projectId;
   final KeychainService _keychainService;
   final NotificationDispatcher _notificationDispatcher;
   final void Function() onComplete;
@@ -769,7 +776,7 @@ class _AgentSession {
                     : List<String>.empty();
 
                 final envVars = await _keychainService.getProjectSecrets(
-                  projectId ?? "",
+                  projectId,
                   secrets,
                 );
 
