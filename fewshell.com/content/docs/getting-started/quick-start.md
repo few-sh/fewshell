@@ -10,33 +10,55 @@ lead = "Get Fewshell installed and connect to your first server."
 toc = true
 +++
 
-## Installation
+# Prerequisites
 
-### iOS
+1. A server with SSH access (Linux or macOS).
+2. An LLM provider — Claude, OpenAI, or a self-hosted endpoint. For hosted providers, you'll need an API key.
 
-Download Fewshell from the App Store on your iPhone or iPad.
+[Claude](https://platform.claude.com/)
+[OpenAI](https://platform.openai.com/api-keys)
 
-### macOS
 
-Download the macOS application from the [releases page](https://fewshell.com) or install via Homebrew:
+3. A client device — macOS, Linux desktop, or iOS.
 
-```bash
-brew install fewshell
+# 3-step Installation
+
+## Setting up SSH keys via automated pairing
+
+1. Download the client app: 
+[iOS](https://apps.apple.com/us/app/fewshell/id6755896752) 
+[Mac OS](https://release.few.sh/releases/latest/Fewshell-1.0.2.dmg)
+[Desktop Linux - AMD64](https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz)
+[Desktop Linux - ARM64](https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz)
+Android - Coming soon!
+
+2. Click Connect via SSH -> Automated Pairing -> Begin Pairing
+the app will display a 6 digit pairing code that rotates every 30 seconds.
+
+
+3. On your server, run the installation+pairing script:
 ```
+curl -LsSf https://get.fewshell.com | bash
+```
+Enter the 6-digit code.
 
-## Creating Your First Project
+4. Verify the auto-detected IP (if you are on a lan or a VPN, you may need to adjust it).
+Use the Test Connection button, if all works, hit save.
 
-1. Open Fewshell and tap **New Project**.
-2. Give your project a name (e.g., "Production" or "Staging").
-3. Configure your server connection details.
+### How it works:
 
-## Starting a Session
+1. The client generates a public-private SSH key pair.
+2. The public key is pulled by the installation+pairing script using the one-time 6 digit code. (We use a simple service to relay your public key.)
+3. Your new public key is added to ~/.ssh/authorized_keys on your server. Private key is added to the keychain on the client.
 
-Once your project is set up:
+If you prefer not using the relay, you can manually generate the key pair and paste the private key into the SSH tunnel dialog on the app.
 
-1. Navigate to the project.
-2. Tap **New Session** to start a chat-assisted shell.
-3. Type a command or describe what you need in natural language.
+
+
+## Adding LLM configuration
+
+1. Tap on the upper-left menu icon. Go to Settings -> Add Model
+2. Follow the on-screen instructions.
 
 ## Example Workflow
 
