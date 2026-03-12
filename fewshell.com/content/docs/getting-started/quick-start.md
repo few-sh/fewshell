@@ -6,7 +6,7 @@ weight = 20
 template = "docs/page.html"
 
 [extra]
-lead = "Get Fewshell installed and connect to your first server in minutes."
+lead = "Get Fewshell installed and connect to your first server."
 toc = true
 +++
 
