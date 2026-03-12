@@ -1,0 +1,39 @@
+FROM ubuntu:22.04
+
+# Install Flutter + GTK desktop dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    unzip \
+    xz-utils \
+    # Flutter Linux desktop / GTK
+    libgtk-3-dev \
+    libglu1-mesa \
+    pkg-config \
+    liblzma-dev \
+    # Build toolchain
+    build-essential \
+    cmake \
+    ninja-build \
+    clang \
+    # Plugin deps: flutter_secure_storage (libsecret), sqlite3
+    libsecret-1-dev \
+    libsqlite3-dev \
+    # Bundling
+    patchelf \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up Flutter
+ENV FLUTTER_ROOT=/sdk/flutter
+ENV PATH="${FLUTTER_ROOT}/bin:${PATH}"
+
+RUN git clone https://github.com/flutter/flutter.git -b 3.38.5 --depth 1 $FLUTTER_ROOT
+
+# Safe directory for mounted volumes
+RUN git config --global --add safe.directory '*'
+
+# Pre-download Dart SDK and Linux desktop artifacts
+RUN flutter precache --linux
+
+WORKDIR /app/decamp-app
