@@ -760,6 +760,7 @@ class SyncService {
         final (ch, tunnel, _) = await _connectViaTunnel(
           tunnelId: tunnelId,
           wsPath: '/sync/project/$projectId',
+          timeout: defaultConnectionTimeout,
           ensureServer: false,
         );
         wsChannel = ch;
@@ -1205,7 +1206,9 @@ class SyncService {
         'SSH tunnel: new TCP proxy connection from ${tcpSocket.remoteAddress.address}:${tcpSocket.remotePort}.',
       );
       try {
+        _log.info('SSH tunnel: opening forwardLocalUnix channel...');
         final forward = await client.forwardLocalUnix(socketPath);
+        _log.info('SSH tunnel: forwardLocalUnix channel established, piping.');
         forward.stream.cast<List<int>>().pipe(tcpSocket);
         tcpSocket.cast<List<int>>().pipe(forward.sink);
       } catch (e) {
@@ -1219,14 +1222,26 @@ class SyncService {
     // Connect WebSocket through the proxy — use manual upgrade to capture
     // response headers (e.g. X-Fewshell-Server-Node-Id).
     final wsUri = Uri.parse('ws://localhost:$localPort$wsPath');
-    final (wsChannel, headers) = await _connectWebSocketWithHeaders(
-      wsUri,
-      timeout: timeout,
-      useMtls: false,
-    );
+    try {
+      final (wsChannel, headers) = await _connectWebSocketWithHeaders(
+        wsUri,
+        timeout: timeout,
+        useMtls: false,
+      );
 
-    final tunnel = _SshTunnel(client, serverSocket);
-    return (wsChannel, tunnel, headers);
+      final tunnel = _SshTunnel(client, serverSocket);
+      return (wsChannel, tunnel, headers);
+    } catch (e) {
+      // Clean up the SSH connection and local proxy on failure — without
+      // this, each failed attempt leaks an SSHClient (with its keep-alive
+      // timer) and a ServerSocket, eventually exhausting resources on the
+      // remote SSH server and causing subsequent forwardLocalUnix calls to
+      // hang indefinitely.
+      _log.info('SSH tunnel: cleaning up after connection failure.');
+      serverSocket.close();
+      client.close();
+      rethrow;
+    }
   }
 
   /// Creates an [HttpClient] configured with mTLS using embedded certificates.
@@ -1379,7 +1394,21 @@ class SyncService {
         request.headers.set(kClientVersionHeader, clientVersion);
       }
 
-      final response = await request.close();
+      // Use an overall timeout for the HTTP upgrade handshake.
+      // HttpClient.connectionTimeout only covers TCP establishment — once
+      // the TCP connection is up (e.g. to a local SSH proxy), request.close()
+      // can hang indefinitely if the far end never responds.
+      final effectiveTimeout = timeout ?? defaultConnectionTimeout;
+      final response = await request.close().timeout(
+        effectiveTimeout,
+        onTimeout: () {
+          httpClient.close(force: true);
+          throw TimeoutException(
+            'WebSocket upgrade timed out after $effectiveTimeout',
+            effectiveTimeout,
+          );
+        },
+      );
 
       if (response.statusCode != HttpStatus.switchingProtocols) {
         // Drain the response body to free resources.
