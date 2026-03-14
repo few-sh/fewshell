@@ -163,6 +163,17 @@ class InteractiveShellSession {
   /// Close the interactive session if it has been initialized.
   void close() {
     _partialLineFlushTimer?.cancel();
+
+    // Complete any pending command completers so executeCommand doesn't hang
+    for (final entry in _commandCompleters.entries) {
+      if (!entry.value.isCompleted) {
+        entry.value.completeError(
+          StateError('Interactive session closed while command was running'),
+        );
+      }
+    }
+    _commandCompleters.clear();
+
     unawaited(
       _session.then((session) {
         session.close();
