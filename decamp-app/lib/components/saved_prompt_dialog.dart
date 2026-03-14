@@ -15,7 +15,7 @@ Future<void> showSavedPromptDialog(
   String? title,
   String? savedPromptId,
 }) {
-  return showDialog(
+  return showShadDialog(
     context: context,
     builder: (context) => ShadDialog(
       child: ConstrainedBox(
@@ -78,11 +78,6 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
     );
     _contentController = TextEditingController(text: widget.initialContent);
     _isGlobalSelection = widget.isGlobal ?? false;
-
-    // Auto-focus on content field
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _contentFocus.requestFocus();
-    });
 
     _contentController.addListener(_checkForDuplicates);
     _descriptionController.addListener(_onDescriptionChanged);
@@ -291,6 +286,7 @@ class _SavedPromptDialogState extends ConsumerState<SavedPromptDialog> {
           contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: _contentController,
           focusNode: _contentFocus,
+          autofocus: true,
           placeholder: const Text('Prompt Content'),
           autocorrect: false,
           maxLines: 5,

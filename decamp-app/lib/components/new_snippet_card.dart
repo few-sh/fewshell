@@ -24,7 +24,7 @@ Future<void> showNewSnippetDialog(
   String? snippetId,
   bool? initialIsVisibleToLlm,
 }) {
-  return showDialog(
+  return showShadDialog(
     context: context,
     builder: (context) => ShadDialog(
       child: ConstrainedBox(
@@ -179,9 +179,8 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
 
     _contentController.addListener(_checkForDuplicate);
 
-    // Auto-focus on description field
+    // Defer initial duplicate check to avoid setState during focus setup
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _descriptionFocus.requestFocus();
       _checkForDuplicate();
     });
   }
@@ -317,6 +316,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
           contextMenuBuilder: adaptiveContextMenuBuilder,
           controller: _descriptionController,
           focusNode: _descriptionFocus,
+          autofocus: true,
           placeholder: const Text('Description (e.g., List all pods)'),
           autocorrect: false,
           minLines: 1,
