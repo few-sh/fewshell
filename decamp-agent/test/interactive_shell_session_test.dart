@@ -533,4 +533,94 @@ void main() {
       expect(result['stdout'], contains('Hello, World!'));
     });
   });
+
+  group('InteractiveShellSession - close behavior', () {
+    test('close() returns immediately without blocking the event loop',
+        () async {
+      // This reproduces the server hang scenario:
+      // 1. An InteractiveShellSession spawns bash -i via LocalShellBackend
+      // 2. A client disconnects, triggering session cleanup
+      // 3. session.close() calls NativePty.close() which calls pty_close()
+      // Previously, pty_close() would block the Dart worker thread waiting
+      // for bash to exit (pthread_join), which froze the entire server.
+
+      final session = InteractiveShellSession(
+        shellService: ShellService(
+          null,
+          null,
+          'test-project',
+          backend: LocalShellBackend(),
+        ),
+        onOutput: (data) {},
+      );
+
+      // Run a command to force the lazy bash -i session to be created
+      final result = await session
+          .executeCommand(
+            command: 'echo hello',
+            abortSignal: null,
+          )
+          .timeout(const Duration(seconds: 5));
+      expect(result['exitCode'], equals(0));
+
+      // Now close — this must return instantly, not block.
+      // If pty_close is blocking, this Future.delayed won't run until
+      // the bash process exits, and the test will time out.
+      final stopwatch = Stopwatch()..start();
+      session.close();
+      // Yield to the event loop to verify it's not blocked
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      stopwatch.stop();
+
+      // close() + a 50ms delay should complete in well under 1 second.
+      // If pty_close were blocking (waiting for bash -i to exit), this
+      // would take seconds or hang indefinitely.
+      expect(
+        stopwatch.elapsedMilliseconds,
+        lessThan(1000),
+        reason:
+            'close() blocked the event loop — pty_close is not non-blocking',
+      );
+    });
+
+    test('close() while command is running does not block', () async {
+      // Scenario: a long-running command is active when close() is called.
+      // This happens when a client disconnects mid-command.
+
+      final session = InteractiveShellSession(
+        shellService: ShellService(
+          null,
+          null,
+          'test-project',
+          backend: LocalShellBackend(),
+        ),
+        onOutput: (data) {},
+      );
+
+      // Start a long-running command (sleep)
+      unawaited(
+        session
+            .executeCommand(
+              command: 'sleep 30',
+              abortSignal: null,
+            )
+            .catchError((_) => <String, dynamic>{}),
+      );
+
+      // Wait for the command to start
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+
+      // Close while sleep is still running — must not block
+      final stopwatch = Stopwatch()..start();
+      session.close();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      stopwatch.stop();
+
+      expect(
+        stopwatch.elapsedMilliseconds,
+        lessThan(1000),
+        reason: 'close() blocked the event loop while command was running',
+      );
+    });
+  });
 }
