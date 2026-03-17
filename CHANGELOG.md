@@ -1,3 +1,8 @@
+# Server 0.1.26
+
+- Fix sentinel output after shell interrupt
+- Clear command completers on session close
+
 # Server 0.1.25
 
 - Interactive shell session support
