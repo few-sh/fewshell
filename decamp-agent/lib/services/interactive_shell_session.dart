@@ -100,13 +100,23 @@ class InteractiveShellSession {
       abortSubscription = abortSignal.listen((signal) {
         _log.info('Aborting shared session command with signal: $signal');
         // Send signal to the foreground process group only, keeping the
-        // interactive shell session alive. This writes the control character
-        // AND sends the signal via kill() to handle both canonical and raw
-        // terminal modes.
+        // interactive shell session alive.
         try {
           session.signalForeground(signal);
         } catch (e) {
           _log.warning('Failed to signal foreground process: $e');
+        }
+
+        // SIGKILL/SIGSTOP can't be trapped, so the outer subshell's trap
+        // handler won't fire and the sentinel echo inside it won't run.
+        // Re-send the sentinel as a standalone command — bash will process
+        // it after reaping the killed foreground group (the write goes into
+        // the kernel's PTY buffer until bash is ready to read).
+        if (signal == ProcessSignal.sigkill ||
+            signal == ProcessSignal.sigstop) {
+          session.write(Uint8List.fromList(
+            utf8.encode(' echo "__FEWSHELL_DONE_${uuid}_\$?__"\n'),
+          ));
         }
       });
     }
@@ -136,8 +146,13 @@ class InteractiveShellSession {
     // Write the wrapped command to the shared session.
     // Leading space prevents the command (which may contain secrets in env
     // var values) from being saved in bash history.
+    //
+    // The outer subshell uses `trap true INT` so that SIGINT kills the inner
+    // bash -c (default handler) but the subshell survives and continues to
+    // the sentinel echo. `trap true` sets a handler (not SIG_IGN), so child
+    // processes inherit default SIGINT handling per POSIX.
     final wrappedCommand =
-        " ${envPrefix} ${sudoPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\"\n";
+        " (trap true INT; ${envPrefix}${sudoPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\")\n";
     session.write(Uint8List.fromList(utf8.encode(wrappedCommand)));
 
     try {
