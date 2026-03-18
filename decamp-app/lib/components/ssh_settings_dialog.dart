@@ -664,7 +664,7 @@ class _SshSettingsDialogFormState
                 _buildLabeledInput(
                   label: 'Username',
                   controller: _usernameController,
-                  placeholder: 'root or admin',
+                  placeholder: 'eg: ubuntu',
                   errorKey: 'username',
                 ),
                 const SizedBox(height: 16),
