@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartssh2/dartssh2.dart' show SSHKeyPair;
+import 'package:flutter/foundation.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/providers/ssh_tunnel_provider.dart';
 import 'package:flutter/material.dart';
@@ -138,6 +141,31 @@ class SshSettingsDialog {
   }
 }
 
+/// Extracts the public key string from a PEM private key.
+/// Runs on a background isolate via [compute].
+/// Returns the public key string on success, or an error prefixed with
+/// 'error:' on failure.
+String _extractPublicKey(({String pem, String? passphrase}) args) {
+  try {
+    final pairs = SSHKeyPair.fromPem(args.pem, args.passphrase);
+    if (pairs.isEmpty) return 'error:No key pairs found in PEM';
+    final pair = pairs.first;
+    final encoded = pair.toPublicKey().encode();
+    final b64 = base64.encode(encoded);
+    return '${pair.type} $b64';
+  } on ArgumentError catch (e) {
+    return 'error:${e.message}';
+  } catch (e) {
+    final msg = e.toString();
+    if (msg.contains('encrypted') ||
+        msg.contains('passphrase') ||
+        msg.contains('decrypt')) {
+      return 'error:Passphrase required to decrypt this key';
+    }
+    return 'error:Invalid private key';
+  }
+}
+
 /// Sentinel value for the "New tunnel" option in the dropdown.
 const _newTunnelId = '__new__';
 
@@ -203,6 +231,12 @@ class _SshSettingsDialogFormState
   bool _obscurePassword = true;
   bool _obscurePassphrase = true;
   bool _obscureSudoPassword = true;
+  String _publicKey = '';
+  String? _publicKeyError;
+  bool _isDerivingPublicKey = false;
+  Timer? _derivePublicKeyDebounce;
+  String _lastDerivedPem = '';
+  String _lastDerivedPassphrase = '';
   bool _isTestingConnection = false;
   ShellService? _testShellService;
   String? _testResultMessage;
@@ -256,14 +290,68 @@ class _SshSettingsDialogFormState
     _authMethod = widget.initialAuthMethod ?? SshAuthMethod.privateKey;
     _selectedTunnelId = widget.existingTunnelId ?? _newTunnelId;
 
+    _privateKeyController.addListener(_scheduleDerivePublicKey);
+    _passphraseController.addListener(_scheduleDerivePublicKey);
+    _scheduleDerivePublicKey();
+
     // If pre-selecting an existing tunnel, load its data
     if (widget.tunnelMode && widget.existingTunnelId != null) {
       _loadTunnelConfig(widget.existingTunnelId!);
     }
   }
 
+  /// Schedules a debounced public key derivation.
+  void _scheduleDerivePublicKey() {
+    final pem = _privateKeyController.text.trim();
+    final passphrase = _passphraseController.text;
+    if (pem == _lastDerivedPem && passphrase == _lastDerivedPassphrase) return;
+    _derivePublicKeyDebounce?.cancel();
+    if (pem.isEmpty) {
+      _lastDerivedPem = pem;
+      _lastDerivedPassphrase = passphrase;
+      setState(() {
+        _publicKey = '';
+        _publicKeyError = null;
+        _isDerivingPublicKey = false;
+      });
+      return;
+    }
+    setState(() => _isDerivingPublicKey = true);
+    _derivePublicKeyDebounce = Timer(
+      const Duration(milliseconds: 300),
+      () => _derivePublicKey(pem, passphrase),
+    );
+  }
+
+  /// Derives the public key from [pem] on a background isolate.
+  Future<void> _derivePublicKey(String pem, String passphrase) async {
+    final result = await compute(_extractPublicKey, (
+      pem: pem,
+      passphrase: passphrase.isNotEmpty ? passphrase : null,
+    ));
+    if (!mounted) return;
+    _lastDerivedPem = pem;
+    _lastDerivedPassphrase = passphrase;
+    if (result.startsWith('error:')) {
+      setState(() {
+        _publicKey = '';
+        _publicKeyError = result.substring(6);
+        _isDerivingPublicKey = false;
+      });
+    } else {
+      setState(() {
+        _publicKey = result;
+        _publicKeyError = null;
+        _isDerivingPublicKey = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    _derivePublicKeyDebounce?.cancel();
+    _privateKeyController.removeListener(_scheduleDerivePublicKey);
+    _passphraseController.removeListener(_scheduleDerivePublicKey);
     _hostController.dispose();
     _portController.dispose();
     _usernameController.dispose();
@@ -534,6 +622,61 @@ class _SshSettingsDialogFormState
     return isValid;
   }
 
+  Widget _buildPublicKeyField() {
+    final theme = ShadTheme.of(context);
+    final hasKey = _publicKey.isNotEmpty;
+    final displayText = _publicKeyError != null
+        ? 'Error: $_publicKeyError'
+        : _publicKey;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Public Key', style: theme.textTheme.small),
+        const SizedBox(height: 4),
+        ShadInput(
+          controller: TextEditingController(text: displayText),
+          readOnly: true,
+          maxLines: 1,
+          placeholder: _isDerivingPublicKey
+              ? const Text('Deriving public key...')
+              : const Text('Enter a private key to derive the public key'),
+          style: TextStyle(
+            fontFamily: 'Courier New',
+            fontFamilyFallback: const ['Courier', 'Monaco', 'Menlo'],
+            fontFeatures: const [FontFeature.tabularFigures()],
+            color: _publicKeyError != null
+                ? theme.colorScheme.destructive
+                : null,
+          ),
+          trailing: _isDerivingPublicKey
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : hasKey
+              ? ShadButton.ghost(
+                  width: 24,
+                  height: 24,
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _publicKey));
+                    ShadToaster.of(context).show(
+                      const ShadToast(
+                        description: Text('Public key copied to clipboard'),
+                      ),
+                    );
+                  },
+                  child: const Icon(LucideIcons.copy, size: 16),
+                )
+              : null,
+        ),
+      ],
+    );
+  }
+
   Widget _buildLabeledInput({
     required String label,
     required TextEditingController controller,
@@ -788,6 +931,8 @@ class _SshSettingsDialogFormState
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  _buildPublicKeyField(),
                 ],
 
                 // Sudo password field (hidden in tunnel mode)
