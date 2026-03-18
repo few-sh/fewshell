@@ -21,9 +21,7 @@ toc = true
 
 3. A client device — macOS, Linux desktop, or iOS.
 
-# 3-step Installation
-
-## Setting up SSH keys via automated pairing
+# Setup
 
 1. Download the client app: 
 
@@ -35,12 +33,13 @@ toc = true
 
 <a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz" target="_blank"><img src="/linux-badge-arm64.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"> ARM64</a>
 
-2. Click Connect via SSH -> Automated Pairing -> Begin Pairing
-the app will display a 6 digit pairing code that rotates every 30 seconds.
+## Setting up SSH keys (easy mode)
+
+2. Click Connect via SSH -> Automated Pairing -> Begin Pairing.
 
 <img src="/ssh-dialog.png" alt="SSH Pairing Dialog" style="max-width: 400px;">
 
-3. On your server, run the installation+pairing script:
+3. On your server, run:
 ```
 curl -LsSf https://get.fewshell.com | bash
 ```
