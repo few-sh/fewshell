@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
@@ -12,9 +13,16 @@ class SyncIndicator extends ConsumerStatefulWidget {
 }
 
 class _SyncIndicatorState extends ConsumerState<SyncIndicator>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late AnimationController _spinController;
-  late AnimationController _pulseController;
+
+  /// Ethernet LED state: ON for a fixed pulse per activity hit.
+  bool _ledOn = false;
+  Timer? _ledTimer;
+  StreamSubscription<bool>? _syncSubscription;
+
+  /// Fixed LED-on duration per activity hit, like an ethernet port LED.
+  static const _ledPulseDuration = Duration(milliseconds: 150);
 
   @override
   void initState() {
@@ -23,16 +31,31 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
       duration: const Duration(seconds: 2),
       vsync: this,
     );
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    );
+  }
+
+  void _subscribeSyncStream(SyncService syncService) {
+    _syncSubscription?.cancel();
+    _syncSubscription = syncService.isSyncing.listen((active) {
+      if (active) _triggerLed();
+    });
+  }
+
+  /// Fire the LED ON for [_ledPulseDuration], then OFF.
+  /// Activity during ON is ignored — every pulse completes its full cycle,
+  /// producing visible blinks even at high packet rates.
+  void _triggerLed() {
+    if (!mounted || _ledOn) return;
+    setState(() => _ledOn = true);
+    _ledTimer = Timer(_ledPulseDuration, () {
+      if (mounted) setState(() => _ledOn = false);
+    });
   }
 
   @override
   void dispose() {
     _spinController.dispose();
-    _pulseController.dispose();
+    _ledTimer?.cancel();
+    _syncSubscription?.cancel();
     super.dispose();
   }
 
@@ -45,6 +68,8 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
       if (!_spinController.isAnimating) {
         _spinController.repeat();
       }
+      _syncSubscription?.cancel();
+      _syncSubscription = null;
       return ShadTooltip(
         builder: (context) => const Text('Connecting...'),
         child: RotationTransition(
@@ -64,6 +89,8 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
     }
 
     if (aggregate == LayerConnectionState.disconnected) {
+      _syncSubscription?.cancel();
+      _syncSubscription = null;
       return ShadTooltip(
         builder: (context) => const Text('Disconnected'),
         child: Icon(
@@ -74,51 +101,45 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
       );
     }
 
-    // Connected state
+    // Connected state — ethernet LED style activity indicator.
     final syncService = ref.watch(syncServiceProvider);
-    return StreamBuilder<bool>(
-      stream: syncService.isSyncing,
-      initialData: false,
-      builder: (context, syncingSnapshot) {
-        final isSyncing = syncingSnapshot.data ?? false;
+    if (_syncSubscription == null) {
+      _subscribeSyncStream(syncService);
+    }
 
-        if (isSyncing) {
-          if (!_pulseController.isAnimating) {
-            _pulseController.repeat(reverse: true);
-          }
-        } else {
-          if (_pulseController.isAnimating) {
-            _pulseController.stop();
-            _pulseController.value = 0.0;
-          }
-        }
-
-        return AnimatedBuilder(
-          animation: _pulseController,
-          builder: (context, child) {
-            double opacity;
-            if (isSyncing) {
-              // Pulse between 0.5 and 1.0
-              opacity = 0.5 + (_pulseController.value * 0.5);
-            } else {
-              // Idle dimmed state
-              opacity = 0.5;
-            }
-
-            return ShadTooltip(
-              builder: (context) => Text(isSyncing ? 'Syncing...' : 'Synced'),
+    return ShadTooltip(
+      builder: (context) => Text(_ledOn ? 'Syncing...' : 'Synced'),
+      child: SizedBox(
+        width: 20,
+        height: 20,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Cloud icon — dimmed at rest, brightens on activity
+            Opacity(
+              opacity: _ledOn ? 0.7 : 0.4,
+              child: Icon(
+                LucideIcons.cloud,
+                size: 23,
+                color: theme.colorScheme.foreground,
+              ),
+            ),
+            // Activity LED — bottom-center up/down arrows, snaps on/off
+            Positioned(
+              bottom: 3.5,
+              left: 5,
               child: Opacity(
-                opacity: opacity,
+                opacity: _ledOn ? 1.0 : 0.0,
                 child: Icon(
-                  LucideIcons.cloud,
-                  size: 16,
-                  color: theme.colorScheme.foreground,
+                  LucideIcons.activity,
+                  size: 9,
+                  color: theme.colorScheme.accentForeground,
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
