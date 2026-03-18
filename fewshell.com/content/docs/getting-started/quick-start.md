@@ -26,15 +26,19 @@ toc = true
 ## Setting up SSH keys via automated pairing
 
 1. Download the client app: 
-[iOS](https://apps.apple.com/us/app/fewshell/id6755896752) 
-[Mac OS](https://release.few.sh/releases/latest/Fewshell-1.0.2.dmg)
-[Desktop Linux - AMD64](https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz)
-[Desktop Linux - ARM64](https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz)
-Android - Coming soon!
+
+<a href="https://apps.apple.com/us/app/fewshell/id6755896752" target="_blank"><img src="/app-store-badge.svg" alt="Download on the App Store" height="40"></a>
+
+<a href="https://release.few.sh/releases/latest/Fewshell-1.0.2.dmg" target="_blank"><img src="/macos-badge.png" alt="Download for macOS" style="height: 40px; vertical-align: middle;"></a>
+
+<a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz" target="_blank"><img src="/linux-badge.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"> AMD64</a>
+
+<a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz" target="_blank"><img src="/linux-badge-arm64.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"> ARM64</a>
 
 2. Click Connect via SSH -> Automated Pairing -> Begin Pairing
 the app will display a 6 digit pairing code that rotates every 30 seconds.
 
+<img src="/ssh-dialog.png" alt="SSH Pairing Dialog" style="max-width: 400px;">
 
 3. On your server, run the installation+pairing script:
 ```
