@@ -65,19 +65,14 @@ class SyncService {
   CrdtFlowAdapter? _globalAdapter;
   CrdtFlowAdapter? _projectAdapter;
 
-  final StreamController<SyncConnectionState> _connectionStateController =
-      StreamController<SyncConnectionState>.broadcast();
+  late final ConnectionStateNotifier _connState;
+
   final StreamController<bool> _isSyncingController =
       StreamController<bool>.broadcast();
   final StreamController<List<int>> _terminalOutputController =
       StreamController<List<int>>.broadcast();
   Timer? _syncDebounceTimer;
-  SyncConnectionState _currentConnectionState =
-      SyncConnectionState.disconnected;
 
-  Stream<SyncConnectionState> get connectionState =>
-      _connectionStateController.stream;
-  SyncConnectionState get currentConnectionState => _currentConnectionState;
   Stream<bool> get isSyncing => _isSyncingController.stream;
 
   /// Stream of terminal output bytes from the server's interactive shell session
@@ -104,6 +99,7 @@ class SyncService {
 
   SyncService(this.ref) {
     _appEventBus = ref.read(appEventBusProvider);
+    _connState = ref.read(connectionStateProvider.notifier);
     _initClientVersion();
     _init();
   }
@@ -113,11 +109,6 @@ class SyncService {
       return _projectChannel;
     }
     return null;
-  }
-
-  void _updateConnectionState(SyncConnectionState state) {
-    _currentConnectionState = state;
-    _connectionStateController.add(state);
   }
 
   void _initClientVersion() {
@@ -348,6 +339,8 @@ class SyncService {
     }
 
     try {
+      _connState.setGlobal(LayerConnectionState.connecting);
+
       // Ensure DB is open so that crdt instance is available
       await db.customSelect('SELECT 1;').get();
 
@@ -515,6 +508,8 @@ class SyncService {
             },
       );
 
+      _connState.setGlobal(LayerConnectionState.connected);
+
       // Global sync connected — now connect project sync.
       _connectProjectIfReady();
 
@@ -528,6 +523,7 @@ class SyncService {
         }
       });
     } catch (e, stackTrace) {
+      _connState.setGlobal(LayerConnectionState.disconnected);
       _log.warning('Global DB sync connection error: $e, $stackTrace');
       if (rethrowErrors) rethrow;
       _scheduleGlobalReconnect();
@@ -744,7 +740,7 @@ class SyncService {
         'Connecting to project sync for $projectId via '
         '${tunnelId != null ? "tunnel:$tunnelId" : directUrl}',
       );
-      _updateConnectionState(SyncConnectionState.connecting);
+      _connState.setProject(LayerConnectionState.connecting);
 
       final WebSocketChannel wsChannel;
       if (tunnelId != null) {
@@ -787,7 +783,7 @@ class SyncService {
             'Project sync disconnected for $projectId (current: $_currentProjectId)',
           );
           if (_currentProjectId != projectId) return;
-          _updateConnectionState(SyncConnectionState.disconnected);
+          _connState.setProject(LayerConnectionState.disconnected);
           _scheduleReconnect();
         },
         onPing: () {
@@ -807,13 +803,14 @@ class SyncService {
           monitoredChannel.sink.close();
           return;
         }
-        _updateConnectionState(SyncConnectionState.connected);
+        _connState.setProject(LayerConnectionState.connected);
         // Reset reconnect attempts only after a stable connection duration (5s)
         // to prevent rapid reconnect loops if connection is flapping.
         Future.delayed(const Duration(seconds: 5), () {
+          final projectState = ref.read(connectionStateProvider).project;
           if (!token.isCancelled &&
               _currentProjectId == projectId &&
-              _currentConnectionState == SyncConnectionState.connected) {
+              projectState == LayerConnectionState.connected) {
             _log.fine(
               '_connectProject: connection stable for 5s, resetting reconnect attempts.',
             );
@@ -823,7 +820,7 @@ class SyncService {
               '_connectProject: stability check skipped '
               '(cancelled=${token.isCancelled}, '
               'currentProject=$_currentProjectId, '
-              'state=$_currentConnectionState).',
+              'state=$projectState).',
             );
           }
         });
@@ -834,7 +831,7 @@ class SyncService {
           );
           return;
         }
-        _updateConnectionState(SyncConnectionState.disconnected);
+        _connState.setProject(LayerConnectionState.disconnected);
         _log.warning('Connection failed: $e');
         _scheduleReconnect();
         return;
@@ -918,6 +915,8 @@ class SyncService {
     _currentServerNodeId = null;
     _globalSshTunnel?.close();
     _globalSshTunnel = null;
+    _connState.setGlobal(LayerConnectionState.disconnected);
+    _connState.setTunnel(LayerConnectionState.disconnected);
     if (wasConnected) {
       _appEventBus.emit(const GlobalSyncDisconnected());
     }
@@ -999,7 +998,7 @@ class SyncService {
     _projectSubscription = null;
     _projectSshTunnel?.close();
     _projectSshTunnel = null;
-    _updateConnectionState(SyncConnectionState.disconnected);
+    _connState.setProject(LayerConnectionState.disconnected);
   }
 
   void dispose() {
@@ -1007,7 +1006,6 @@ class SyncService {
     _lifecycleListener = null;
     _disconnectGlobal();
     _resetProjectSync();
-    _connectionStateController.close();
     _isSyncingController.close();
     _terminalOutputController.close();
     _syncDebounceTimer?.cancel();
@@ -1143,6 +1141,7 @@ class SyncService {
     bool ensureServer = true,
   }) async {
     _log.info('SSH tunnel: connecting to $sshUsername@$sshHost:$sshPort');
+    _connState.setTunnel(LayerConnectionState.connecting);
 
     final sshSocket = await SSHSocket.connect(
       sshHost,
@@ -1171,6 +1170,7 @@ class SyncService {
 
     await client.authenticated;
     _log.info('SSH tunnel: authenticated');
+    _connState.setTunnel(LayerConnectionState.connected);
 
     // Ensure the fewshell server is installed and running (global only).
     if (ensureServer) {
@@ -1240,6 +1240,7 @@ class SyncService {
       _log.info('SSH tunnel: cleaning up after connection failure.');
       serverSocket.close();
       client.close();
+      _connState.setTunnel(LayerConnectionState.disconnected);
       rethrow;
     }
   }
@@ -1445,8 +1446,6 @@ class SyncService {
     }
   }
 }
-
-enum SyncConnectionState { disconnected, connecting, connected }
 
 /// Wraps a [WebSocketChannel] with activity tracking and keep-alive.
 ///

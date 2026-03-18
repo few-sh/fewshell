@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+import '../providers/connection_state_provider.dart';
 import '../services/sync_service.dart';
 
 class SyncIndicator extends ConsumerStatefulWidget {
@@ -37,91 +38,83 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final syncService = ref.watch(syncServiceProvider);
+    final aggregate = ref.watch(aggregateConnectionStateProvider);
     final theme = ShadTheme.of(context);
 
-    return StreamBuilder<SyncConnectionState>(
-      stream: syncService.connectionState,
-      initialData: syncService.currentConnectionState,
-      builder: (context, connectionSnapshot) {
-        final connectionState = connectionSnapshot.data!;
+    if (aggregate == LayerConnectionState.connecting) {
+      if (!_spinController.isAnimating) {
+        _spinController.repeat();
+      }
+      return ShadTooltip(
+        builder: (context) => const Text('Connecting...'),
+        child: RotationTransition(
+          turns: _spinController,
+          child: Icon(
+            LucideIcons.refreshCw,
+            size: 16,
+            color: theme.colorScheme.mutedForeground,
+          ),
+        ),
+      );
+    } else {
+      if (_spinController.isAnimating) {
+        _spinController.stop();
+        _spinController.reset();
+      }
+    }
 
-        if (connectionState == SyncConnectionState.connecting) {
-          if (!_spinController.isAnimating) {
-            _spinController.repeat();
+    if (aggregate == LayerConnectionState.disconnected) {
+      return ShadTooltip(
+        builder: (context) => const Text('Disconnected'),
+        child: Icon(
+          LucideIcons.cloudOff,
+          size: 16,
+          color: theme.colorScheme.destructive,
+        ),
+      );
+    }
+
+    // Connected state
+    final syncService = ref.watch(syncServiceProvider);
+    return StreamBuilder<bool>(
+      stream: syncService.isSyncing,
+      initialData: false,
+      builder: (context, syncingSnapshot) {
+        final isSyncing = syncingSnapshot.data ?? false;
+
+        if (isSyncing) {
+          if (!_pulseController.isAnimating) {
+            _pulseController.repeat(reverse: true);
           }
-          return ShadTooltip(
-            builder: (context) => const Text('Connecting...'),
-            child: RotationTransition(
-              turns: _spinController,
-              child: Icon(
-                LucideIcons.refreshCw,
-                size: 16,
-                color: theme.colorScheme.mutedForeground,
-              ),
-            ),
-          );
         } else {
-          if (_spinController.isAnimating) {
-            _spinController.stop();
-            _spinController.reset();
+          if (_pulseController.isAnimating) {
+            _pulseController.stop();
+            _pulseController.value = 0.0;
           }
         }
 
-        if (connectionState == SyncConnectionState.disconnected) {
-          return ShadTooltip(
-            builder: (context) => const Text('Disconnected'),
-            child: Icon(
-              LucideIcons.cloudOff,
-              size: 16,
-              color: theme.colorScheme.destructive,
-            ),
-          );
-        }
-
-        // Connected state
-        return StreamBuilder<bool>(
-          stream: syncService.isSyncing,
-          initialData: false,
-          builder: (context, syncingSnapshot) {
-            final isSyncing = syncingSnapshot.data ?? false;
-
+        return AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            double opacity;
             if (isSyncing) {
-              if (!_pulseController.isAnimating) {
-                _pulseController.repeat(reverse: true);
-              }
+              // Pulse between 0.5 and 1.0
+              opacity = 0.5 + (_pulseController.value * 0.5);
             } else {
-              if (_pulseController.isAnimating) {
-                _pulseController.stop();
-                _pulseController.value = 0.0;
-              }
+              // Idle dimmed state
+              opacity = 0.5;
             }
 
-            return AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                double opacity;
-                if (isSyncing) {
-                  // Pulse between 0.5 and 1.0
-                  opacity = 0.5 + (_pulseController.value * 0.5);
-                } else {
-                  // Idle dimmed state
-                  opacity = 0.5;
-                }
-
-                return ShadTooltip(
-                  builder: (context) =>
-                      Text(isSyncing ? 'Syncing...' : 'Synced'),
-                  child: Opacity(
-                    opacity: opacity,
-                    child: Icon(
-                      LucideIcons.cloud,
-                      size: 16,
-                      color: theme.colorScheme.foreground,
-                    ),
-                  ),
-                );
-              },
+            return ShadTooltip(
+              builder: (context) => Text(isSyncing ? 'Syncing...' : 'Synced'),
+              child: Opacity(
+                opacity: opacity,
+                child: Icon(
+                  LucideIcons.cloud,
+                  size: 16,
+                  color: theme.colorScheme.foreground,
+                ),
+              ),
             );
           },
         );

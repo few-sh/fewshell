@@ -36,6 +36,7 @@ import 'ssh_settings_provider.dart'
 import '../services/connection_mapping_storage.dart';
 import '../services/storage/flutter_secure_storage_impl.dart';
 
+export 'connection_state_provider.dart';
 export 'notification_provider.dart';
 
 final _log = Logger('providers');
