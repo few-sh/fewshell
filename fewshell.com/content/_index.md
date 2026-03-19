@@ -26,7 +26,9 @@ Already have Fewshell? [Quick Start Guide](/docs/getting-started/quick-start/)
 
 - Stop typing long commands on a tiny keyboard. Ask for what you need — the AI drafts commands, you stay in control.
 - Every command requires your approval. There is no way to turn this off. No accidents, no surprises.
+- Syncs in real time across desktop, phone, and tablet. Set up complex commands on your laptop, execute from your phone.
 - Fully self-hosted. No cloud services, no sign-ups. Your keys and secrets never leave your device.
+- Every command, every output, every session — recorded automatically. Your postmortem notes write themselves.
 
 ## Features
 
@@ -40,7 +42,7 @@ Secrets stored in your device's keychain, automatically redacted from all logs a
 Stop fighting a tiny keyboard. Ask for what you need — triage alerts, inspect logs, restart services, debug failed jobs. All from your phone.
 
 ##### Snippets & projects
-Organize environments and frequently used commands. Keep your workflows at your fingertips.
+Organize environments, prompts, context, and frequently used commands. Keep your workflows at your fingertips.
 
 ##### Fully self-hosted
 No cloud services, no sign-ups. Works with your existing infrastructure.
