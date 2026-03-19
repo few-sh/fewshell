@@ -6,47 +6,50 @@ template = "homepage.html"
 stylesheets = ["css/custom.css"]
 +++
 
-Mobile assistant for DevOps practitioners and on-calls. Safely manage your infrastructure from anywhere.
+Respond to incidents from your phone. AI-powered shell, end-to-end encrypted, fully under your control.
 
-<form class="signup-form" action="/api/signup" method="POST">
-    <input type="email" name="email" placeholder="Enter your email" class="signup-input" required />
-    <button type="submit" class="signup-button">Sign Up</button>
-</form>
+## Get the app
 
-Already have Fewshell? [Set it up](@/qr.md)
+<a href="https://apps.apple.com/us/app/fewshell/id6755896752" target="_blank"><img src="/app-store-badge.svg" alt="Download on the App Store" height="40"></a>
 
-## About
+<a href="https://release.few.sh/releases/latest/Fewshell-1.0.2.dmg" target="_blank"><img src="/macos-badge.png" alt="Download for macOS" style="height: 40px; vertical-align: middle;"></a>
 
-**Fewshell** is an AI-assistant for devops practitioners and on-calls with a strong emphasis on safety, allowing full management of cloud and on-premise infrastructure on the go without sacrificing effectiveness.
+<a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz" target="_blank"><img src="/linux-badge.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"></a>
 
-Infrastructure management and on-call has been a long-standing pain point for engineering teams across industries. Being on-call is a particularly dreaded part of the job for many software engineers and devops, requiring the on-call engineer to be within minutes of their laptop at all times.
+<a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz" target="_blank"><img src="/linux-badge-arm64.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"></a>
 
-AI researchers are also confronted with complex infrastructure. Training models involves highly parallelized workloads, such as RL with verifiable rewards, and distributing weights across many GPUs. With training runs that take hours or days, having visibility and being able to remotely stop a training run is essential.
+Already have Fewshell? [Quick Start Guide](/docs/getting-started/quick-start/)
+
+## What is Fewshell?
+
+- AI-assisted shell for managing cloud and on-premise infrastructure on the go.
+- No command is ever run without your approval — you stay in control.
+- Your keys and secrets never leave your device.
 
 ## Features
 
-##### Secure-by-default design
-Full end-to-end encryption along with secrets storage on your device's keychain and automated redaction of secrets from all logs and AI.
+##### End-to-end encryption
+Secrets stored in your device's keychain, automatically redacted from all logs and AI context.
 
-##### First-class AI safety
-You are always in control - no command is ever run without your approval.
+##### AI safety first
+No command runs without your explicit approval. Full visibility into what the AI suggests before anything executes.
 
-##### A powerful sysadmin in your pocket
-Familiar coding/shell assistant interface, optimized for mobile efficiency and ergonomics.
+##### A sysadmin in your pocket
+Optimized for mobile — triage alerts, run diagnostics, and resolve incidents without reaching for your laptop.
 
-##### Full session history
-Maintains a complete record of every interaction. Say goodbye to keeping a manual journal of what you changed and when.
-
-##### Flexible architecture
-Supports direct SSH or secure client-server WebSocket agent deployment.
-
-##### Real-time collaboration
-Optional support for team collaboration in client-server mode to keep your team in the loop and maintain full history of all sessions.
+##### Complete session history
+Every interaction recorded. No more manual journals of what you changed and when.
 
 ##### BYO Intelligence
-Deploy in your own cloud and use your own language model (supports most frontier models, including Claude, OpenAI, and open weight models).
+Use your own language model — Claude, OpenAI, open weight models, or a self-hosted endpoint. Deploy in your own cloud.
 
-##### Secure sync
-Synchronizes securely in real time between mobile, desktop, and tablet.
+##### Flexible deployment
+Direct SSH or secure client-server WebSocket agent. Works with your existing infrastructure.
+
+##### Real-time team collaboration
+Share sessions with your team in client-server mode. Full history, full visibility.
+
+##### Cross-device sync
+Seamless real-time sync between mobile, desktop, and tablet.
 
 <script src="/js/custom.js"></script>
