@@ -13,6 +13,7 @@ import 'package:decamp/components/new_snippet_card.dart';
 import 'package:decamp/components/saved_prompt_dialog.dart';
 
 import 'package:decamp/utils/globals.dart';
+import 'package:decamp/utils/message_formatter.dart';
 import 'package:logging/logging.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
@@ -167,7 +168,10 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           leading: const Icon(LucideIcons.copy),
           child: const Text('Copy content'),
           onPressed: () {
-            Clipboard.setData(ClipboardData(text: widget.message.content));
+            final formatted = MessageFormatter.formatMessageContent(
+              widget.message,
+            );
+            Clipboard.setData(ClipboardData(text: formatted));
             ShadToaster.of(context).show(
               const ShadToast(description: Text('Message copied to clipboard')),
             );
