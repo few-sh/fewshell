@@ -6,7 +6,9 @@ template = "homepage.html"
 stylesheets = ["css/custom.css"]
 +++
 
-Respond to incidents from your phone. AI-powered shell, end-to-end encrypted, fully under your control.
+Human-Gated AI SSH
+
+Operate your infrastructure from your phone — without fighting the keyboard. An AI that knows your servers but won't touch them without permission.
 
 ## Get the app
 
@@ -22,34 +24,34 @@ Already have Fewshell? [Quick Start Guide](/docs/getting-started/quick-start/)
 
 ## What is Fewshell?
 
-- AI-assisted shell for managing cloud and on-premise infrastructure on the go.
-- No command is ever run without your approval — you stay in control.
-- Your keys and secrets never leave your device.
+- Stop typing long commands on a tiny keyboard. Ask for what you need — the AI drafts commands, you stay in control.
+- Every command requires your approval. There is no way to turn this off. No accidents, no surprises.
+- Fully self-hosted. No cloud services, no sign-ups. Your keys and secrets never leave your device.
 
 ## Features
+
+##### No YOLO mode
+Every command requires your explicit approval. There is no way to turn this off. No accidents or surprises.
 
 ##### End-to-end encryption
 Secrets stored in your device's keychain, automatically redacted from all logs and AI context.
 
-##### AI safety first
-No command runs without your explicit approval. Full visibility into what the AI suggests before anything executes.
-
 ##### A sysadmin in your pocket
-Optimized for mobile — triage alerts, run diagnostics, and resolve incidents without reaching for your laptop.
+Stop fighting a tiny keyboard. Ask for what you need — triage alerts, inspect logs, restart services, debug failed jobs. All from your phone.
+
+##### Snippets & projects
+Organize environments and frequently used commands. Keep your workflows at your fingertips.
+
+##### Fully self-hosted
+No cloud services, no sign-ups. Works with your existing infrastructure.
+
+##### Bring your own model
+Use your preferred LLM — Claude, OpenAI, or a self-hosted models. Deploy in your own cloud.
 
 ##### Complete session history
-Every interaction recorded. No more manual journals of what you changed and when.
-
-##### BYO Intelligence
-Use your own language model — Claude, OpenAI, open weight models, or a self-hosted endpoint. Deploy in your own cloud.
-
-##### Flexible deployment
-Direct SSH or secure client-server WebSocket agent. Works with your existing infrastructure.
+Every interaction recorded on your device and your server. Know exactly what changed and when.
 
 ##### Real-time team collaboration
-Share sessions with your team in client-server mode. Full history, full visibility.
-
-##### Cross-device sync
-Seamless real-time sync between mobile, desktop, and tablet.
+Connect multiple devices and share real-time sessions. Full history, full visibility.
 
 <script src="/js/custom.js"></script>
