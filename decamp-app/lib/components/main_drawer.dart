@@ -117,7 +117,7 @@ class MainDrawer extends ConsumerWidget {
                                   ),
                                 );
                               },
-                              child: const Icon(LucideIcons.arrowLeftRight),
+                              child: const Icon(LucideIcons.arrowUpDown),
                             ),
                           ],
                         ),

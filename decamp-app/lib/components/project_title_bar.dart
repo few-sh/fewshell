@@ -40,7 +40,7 @@ class ProjectTitleBar extends StatelessWidget {
           Icon(
             Icons.import_export,
             size: 20,
-            color: iconColor ?? Theme.of(context).colorScheme.onSurface,
+            color: iconColor ?? Theme.of(context).colorScheme.surfaceTint,
           ),
         ],
       ),

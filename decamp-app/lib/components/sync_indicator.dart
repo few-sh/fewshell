@@ -120,19 +120,19 @@ class _SyncIndicatorState extends ConsumerState<SyncIndicator>
               opacity: _ledOn ? 0.7 : 0.4,
               child: Icon(
                 LucideIcons.cloud,
-                size: 23,
+                size: 20,
                 color: theme.colorScheme.foreground,
               ),
             ),
             // Activity LED — bottom-center up/down arrows, snaps on/off
             Positioned(
-              bottom: 3.5,
-              left: 5,
+              bottom: 5,
+              left: 4,
               child: Opacity(
                 opacity: _ledOn ? 1.0 : 0.0,
                 child: Icon(
                   LucideIcons.activity,
-                  size: 9,
+                  size: 10,
                   color: theme.colorScheme.accentForeground,
                 ),
               ),
