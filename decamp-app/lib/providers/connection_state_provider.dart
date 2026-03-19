@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -74,20 +76,28 @@ class ConnectionStateNotifier extends StateNotifier<SyncConnectionState> {
   ConnectionStateNotifier() : super(const SyncConnectionState());
 
   void setTunnel(LayerConnectionState value) {
-    state = state.copyWith(tunnel: value);
+    _deferred(() => state = state.copyWith(tunnel: value));
   }
 
   void setGlobal(LayerConnectionState value) {
-    state = state.copyWith(global: value);
+    _deferred(() => state = state.copyWith(global: value));
   }
 
   void setProject(LayerConnectionState value) {
-    state = state.copyWith(project: value);
+    _deferred(() => state = state.copyWith(project: value));
   }
 
   /// Reset all layers to disconnected.
   void reset() {
-    state = const SyncConnectionState();
+    _deferred(() => state = const SyncConnectionState());
+  }
+
+  /// Schedule [fn] as a microtask so the mutation never lands inside
+  /// a widget build frame (Riverpod forbids that).
+  void _deferred(void Function() fn) {
+    scheduleMicrotask(() {
+      if (mounted) fn();
+    });
   }
 }
 
