@@ -131,7 +131,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       ],
       _buildAIModelsSection(isGlobal: false),
       const SizedBox(height: 24),
-      _buildRemoteShellSection(),
+      // _buildRemoteShellSection(),
       if (currentProject != null) ...[
         const SizedBox(height: 24),
         _buildDeleteProjectSection(currentProject),
