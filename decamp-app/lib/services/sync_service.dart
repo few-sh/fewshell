@@ -87,7 +87,7 @@ class SyncService {
   int _globalReconnectAttempts = 0;
   AppLifecycleListener? _lifecycleListener;
   AppLifecycleState? _lastLifecycleState;
-  bool _wasPaused = false;
+  DateTime? _pausedAt;
 
   /// When true, [_checkProjectsForServer] is suppressed because
   /// [connectViaTunnel] is running its own polling + emission logic.
@@ -1016,17 +1016,34 @@ class SyncService {
   /// On macOS, connections stay alive through inactive/hidden states.
   /// Only reconnect when the app was previously paused (mobile suspension)
   /// and has now fully resumed. iOS transitions through intermediate states
-  /// (paused → hidden → inactive → resumed), so we track the paused flag
+  /// (paused → hidden → inactive → resumed), so we track the pause timestamp
   /// separately rather than checking the immediately-previous state.
+  ///
+  /// To avoid unnecessary 4s SSH tunnel reconnects after brief app switches,
+  /// only force-reconnect if paused for more than 5 seconds. For shorter
+  /// pauses the connection is likely still alive; the activity monitor will
+  /// detect and recover if it isn't.
+  static const _minPauseDurationForReconnect = Duration(seconds: 25);
+
   void _handleLifecycleStateChange(AppLifecycleState state) {
     _log.info('App lifecycle state: $_lastLifecycleState -> $state');
 
     if (state == AppLifecycleState.paused) {
-      _wasPaused = true;
-    } else if (state == AppLifecycleState.resumed && _wasPaused) {
-      _wasPaused = false;
-      _log.info('App resumed from paused state, reconnecting');
-      _reconnectAll();
+      _pausedAt = DateTime.now();
+    } else if (state == AppLifecycleState.resumed && _pausedAt != null) {
+      final pauseDuration = DateTime.now().difference(_pausedAt!);
+      _pausedAt = null;
+      if (pauseDuration >= _minPauseDurationForReconnect) {
+        _log.info(
+          'App resumed after ${pauseDuration.inSeconds}s pause, reconnecting',
+        );
+        _reconnectAll();
+      } else {
+        _log.info(
+          'App resumed after ${pauseDuration.inSeconds}s pause, '
+          'skipping reconnect (< ${_minPauseDurationForReconnect.inSeconds}s)',
+        );
+      }
     }
 
     _lastLifecycleState = state;
