@@ -87,6 +87,7 @@ class SyncService {
   int _globalReconnectAttempts = 0;
   AppLifecycleListener? _lifecycleListener;
   AppLifecycleState? _lastLifecycleState;
+  bool _wasPaused = false;
 
   /// When true, [_checkProjectsForServer] is suppressed because
   /// [connectViaTunnel] is running its own polling + emission logic.
@@ -1013,22 +1014,19 @@ class SyncService {
 
   /// Handle app lifecycle state changes.
   /// On macOS, connections stay alive through inactive/hidden states.
-  /// Only reconnect when transitioning from paused->resumed (mobile scenario).
-  /// For system sleep/wake, rely on activity-based keep-alive to detect dead connections.
+  /// Only reconnect when the app was previously paused (mobile suspension)
+  /// and has now fully resumed. iOS transitions through intermediate states
+  /// (paused → hidden → inactive → resumed), so we track the paused flag
+  /// separately rather than checking the immediately-previous state.
   void _handleLifecycleStateChange(AppLifecycleState state) {
     _log.info('App lifecycle state: $_lastLifecycleState -> $state');
 
-    // On macOS: resumed, inactive, and hidden all keep connections alive
-    // Only paused (mobile-only) indicates actual suspension
-    if (state == AppLifecycleState.resumed &&
-        _lastLifecycleState == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused) {
+      _wasPaused = true;
+    } else if (state == AppLifecycleState.resumed && _wasPaused) {
+      _wasPaused = false;
       _log.info('App resumed from paused state, reconnecting');
       _reconnectAll();
-    } else {
-      _log.fine(
-        'App lifecycle transition $state does not require reconnect '
-        '(previous: $_lastLifecycleState).',
-      );
     }
 
     _lastLifecycleState = state;
