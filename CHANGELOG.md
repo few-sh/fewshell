@@ -1,3 +1,16 @@
+# App 1.0.2+29
+
+- Linux desktop support
+- Improved connection reliability and reconnection
+- Cleaner connection activity indicator
+- Display derived public key in settings
+- Fix copy content for all message types
+- Fix input issues when saving snippets/prompts
+- Fix crash and overflow in SSH settings
+- Simplified SSH connection settings
+- Switched notifications to toast style
+- Tweaked icons
+
 # Server 0.1.26
 
 - Fix sentinel output after shell interrupt
