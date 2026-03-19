@@ -12,6 +12,34 @@ body {
     font-family: var(--font-mono);
 }
 
+/* Get App Section */
+.get-app-section {
+    display: flex;
+    align-items: flex-start;
+    gap: 2rem;
+}
+
+.get-app-badges {
+    flex: 0 0 auto;
+}
+
+.get-app-screenshot {
+    flex: 1;
+    min-width: 0;
+}
+
+.get-app-screenshot img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+@media (max-width: 768px) {
+    .get-app-section {
+        flex-direction: column;
+    }
+}
+
 /* Signup Form */
 .signup-form {
     margin-top: 2rem;

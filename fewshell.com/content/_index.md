@@ -12,6 +12,9 @@ Operate your infrastructure from your phone — without fighting the keyboard. A
 
 ## Get the app
 
+<div class="get-app-section">
+<div class="get-app-badges">
+
 <a href="https://apps.apple.com/us/app/fewshell/id6755896752" target="_blank"><img src="/app-store-badge.svg" alt="Download on the App Store" height="40"></a>
 
 <a href="https://release.few.sh/releases/latest/Fewshell-1.0.2.dmg" target="_blank"><img src="/macos-badge.png" alt="Download for macOS" style="height: 40px; vertical-align: middle;"></a>
@@ -20,7 +23,16 @@ Operate your infrastructure from your phone — without fighting the keyboard. A
 
 <a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz" target="_blank"><img src="/linux-badge-arm64.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"></a>
 
-Already have Fewshell? [Quick Start Guide](/docs/getting-started/quick-start/)
+Already have Fewshell?
+
+[Quick Start Guide](/docs/getting-started/quick-start/)
+
+
+</div>
+<div class="get-app-screenshot">
+<img src="/landing-screenshot-sbs.png" alt="Fewshell screenshot">
+</div>
+</div>
 
 ## What is Fewshell?
 
