@@ -980,15 +980,17 @@ class _SshSettingsDialogFormState
                         },
                       ),
                       const SizedBox(width: 12),
-                      const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Enabled',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text('Allow connections using this configuration'),
-                        ],
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Enabled',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text('Allow connections using this configuration'),
+                          ],
+                        ),
                       ),
                     ],
                   ),
