@@ -311,7 +311,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text('Project Name', style: theme.textTheme.h4),
-            if (!kIsWeb && (Platform.isAndroid || Platform.isIOS))
+            if (false && !kIsWeb && (Platform.isAndroid || Platform.isIOS))
               ShadButton.outline(
                 onPressed: () => _scanAndConfigureProject(project.id),
                 child: const Row(
