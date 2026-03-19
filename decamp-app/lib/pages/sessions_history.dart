@@ -55,8 +55,11 @@ class SessionsHistoryPage extends ConsumerWidget {
           onSelect: (s) {
             ref.read(currentSessionIdProvider.notifier).select(s.id);
             Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Switched to: ${s.description}')),
+            ShadToaster.of(context).show(
+              ShadToast(
+                description: Text('Switched to: ${s.description}'),
+                showCloseIconOnlyWhenHovered: false,
+              ),
             );
           },
           beforeArchive: switchFromSession,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:decamp/providers/notification_provider.dart';
 
 /// Debug widget for testing push notifications
@@ -57,9 +58,9 @@ class NotificationDebugWidget extends ConsumerWidget {
                     ElevatedButton.icon(
                       onPressed: () {
                         Clipboard.setData(ClipboardData(text: token));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Token copied to clipboard'),
+                        ShadToaster.of(context).show(
+                          const ShadToast(
+                            description: Text('Token copied to clipboard'),
                           ),
                         );
                       },
@@ -81,15 +82,17 @@ class NotificationDebugWidget extends ConsumerWidget {
                     body: 'This is a local test notification',
                   );
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Test notification sent')),
+                    ShadToaster.of(context).show(
+                      const ShadToast(
+                        description: Text('Test notification sent'),
+                      ),
                     );
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(
+                    ShadToaster.of(
                       context,
-                    ).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    ).show(ShadToast(description: Text('Error: $e')));
                   }
                 }
               },

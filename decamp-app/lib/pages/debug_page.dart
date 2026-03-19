@@ -279,9 +279,9 @@ class DebugPage extends ConsumerWidget {
     if (Platform.isIOS) {
       await Clipboard.setData(ClipboardData(text: dir.path));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Document directory path copied to clipboard'),
+        ShadToaster.of(context).show(
+          const ShadToast(
+            description: Text('Document directory path copied to clipboard'),
           ),
         );
       }
@@ -294,8 +294,8 @@ class DebugPage extends ConsumerWidget {
         await Process.run('xdg-open', [dir.path]);
       }
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Opening document directory...')),
+        ShadToaster.of(context).show(
+          const ShadToast(description: Text('Opening document directory...')),
         );
       }
     }
@@ -308,9 +308,9 @@ class DebugPage extends ConsumerWidget {
     final projectId = ref.watch(currentProjectIdProvider);
     if (projectId == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
+        ShadToaster.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('No project selected')));
+        ).show(const ShadToast(description: Text('No project selected')));
       }
       return;
     }
@@ -319,9 +319,9 @@ class DebugPage extends ConsumerWidget {
     if (Platform.isIOS) {
       await Clipboard.setData(ClipboardData(text: projectDir.path));
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Project directory path copied to clipboard'),
+        ShadToaster.of(context).show(
+          const ShadToast(
+            description: Text('Project directory path copied to clipboard'),
           ),
         );
       }
@@ -334,8 +334,8 @@ class DebugPage extends ConsumerWidget {
         await Process.run('xdg-open', [projectDir.path]);
       }
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Opening project directory...')),
+        ShadToaster.of(context).show(
+          const ShadToast(description: Text('Opening project directory...')),
         );
       }
     }

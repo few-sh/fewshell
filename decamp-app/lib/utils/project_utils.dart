@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:decamp/components/confirmation_dialog.dart';
 import 'package:decamp/providers/providers.dart';
 
@@ -60,7 +61,6 @@ Future<void> showDeleteProjectDialog({
   required String projectName,
   VoidCallback? onDeleted,
 }) async {
-  final theme = Theme.of(context);
   final confirmed = await showConfirmationDialog(
     context: context,
     title: 'Delete Project',
@@ -73,19 +73,16 @@ Future<void> showDeleteProjectDialog({
     try {
       await ref.read(projectControllerProvider).deleteProject(projectId);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Project "$projectName" deleted')),
-        );
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: Text('Project "$projectName" deleted')));
         onDeleted?.call();
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error deleting project: $e'),
-            backgroundColor: theme.colorScheme.error,
-          ),
-        );
+        ShadToaster.of(
+          context,
+        ).show(ShadToast(description: Text('Error deleting project: $e')));
       }
     }
   }

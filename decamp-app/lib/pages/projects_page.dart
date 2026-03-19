@@ -30,9 +30,12 @@ class ProjectsPage extends ConsumerWidget {
             await ref.read(currentProjectIdProvider.notifier).select(p.id);
             if (context.mounted) {
               Navigator.pop(context);
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Switched to: ${p.name}')));
+              ShadToaster.of(context).show(
+                ShadToast(
+                  description: Text('Switched to: ${p.name}'),
+                  showCloseIconOnlyWhenHovered: false,
+                ),
+              );
             }
           },
         );
