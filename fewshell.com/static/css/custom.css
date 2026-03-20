@@ -23,20 +23,44 @@ body {
     flex: 0 0 auto;
 }
 
-.get-app-screenshot {
+.get-app-screenshots {
     flex: 1;
     min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
 }
 
-.get-app-screenshot img {
-    width: 100%;
+.get-app-screenshots .screenshot-ios {
     height: auto;
     border-radius: 8px;
+    flex: 0 1 auto;
+    max-width: 203px;
+}
+
+.get-app-screenshots .screenshot-desktop {
+    height: auto;
+    border-radius: 8px;
+    flex: 1;
+    min-width: 0;
+    max-width: 1070px;
 }
 
 @media (max-width: 768px) {
     .get-app-section {
         flex-direction: column;
+    }
+
+    .get-app-screenshots {
+        flex-direction: column;
+    }
+
+    .get-app-screenshots .screenshot-ios {
+        max-width: 60%;
+    }
+
+    .get-app-screenshots .screenshot-desktop {
+        max-width: 100%;
     }
 }
 

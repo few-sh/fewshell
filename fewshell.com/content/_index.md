@@ -1,16 +1,12 @@
 +++
-title = "Fewshell"
+title = "Fewshell: Human-Gated AI SSH"
 
 template = "homepage.html"
 [extra]
 stylesheets = ["css/custom.css"]
 +++
 
-Human-Gated AI SSH
-
-Operate your infrastructure from your phone — without fighting the keyboard. An AI that knows your servers but won't touch them without permission.
-
-## Get the app
+Fearlessly use AI for your infrastructure.
 
 <div class="get-app-section">
 <div class="get-app-badges">
@@ -23,49 +19,41 @@ Operate your infrastructure from your phone — without fighting the keyboard. A
 
 <a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz" target="_blank"><img src="/linux-badge-arm64.png" alt="Get it on Linux" style="height: 40px; vertical-align: middle;"></a>
 
-Already have Fewshell?
-
 [Quick Start Guide](/docs/getting-started/quick-start/)
 
 
 </div>
-<div class="get-app-screenshot">
-<img src="/landing-screenshot-sbs.png" alt="Fewshell screenshot">
+<div class="get-app-screenshots">
+<img src="/landing-screenshot-ios.png" alt="Fewshell on iOS" class="screenshot-ios">
+<img src="/landing-screenshot-desktop.png" alt="Fewshell on desktop" class="screenshot-desktop">
 </div>
 </div>
-
-## What is Fewshell?
-
-- Stop typing long commands on a tiny keyboard. Ask for what you need — the AI drafts commands, you stay in control.
-- Every command requires your approval. There is no way to turn this off. No accidents, no surprises.
-- Syncs in real time across desktop, phone, and tablet. Set up complex commands on your laptop, execute from your phone.
-- Fully self-hosted. No cloud services, no sign-ups. Your keys and secrets never leave your device.
-- Every command, every output, every session — recorded automatically. Your postmortem notes write themselves.
 
 ## Features
 
-##### No YOLO mode
-Every command requires your explicit approval. There is no way to turn this off. No accidents or surprises.
+##### Security
+Secrets stored in your device's keychain, automatically redacted from AI. Never stored on disk.
 
-##### End-to-end encryption
-Secrets stored in your device's keychain, automatically redacted from all logs and AI context.
+##### Privacy
+No cloud services, no sign-ups. Works with your existing infrastructure. Use self-hosted models or frontier providers.
 
-##### A sysadmin in your pocket
-Stop fighting a tiny keyboard. Ask for what you need — triage alerts, inspect logs, restart services, debug failed jobs. All from your phone.
+##### Ergonomics
+Turn "clean up old Docker images" into `docker images --format '{{.Repository}}:{{.Tag}} {{.CreatedSince}} {{.Size}}' | grep -E 'months|years' | awk '{print $1}' | xargs -r docker rmi` — reviewed and approved before anything runs.
 
-##### Snippets & projects
-Organize environments, prompts, context, and frequently used commands. Keep your workflows at your fingertips.
+##### Safety
+Every command requires your explicit approval. There is no way to turn this off. No accidents or surprises. Designed for critical infrastructure.
 
-##### Fully self-hosted
-No cloud services, no sign-ups. Works with your existing infrastructure.
-
-##### Bring your own model
-Use your preferred LLM — Claude, OpenAI, or a self-hosted models. Deploy in your own cloud.
-
-##### Complete session history
+##### Transparency
 Every interaction recorded on your device and your server. Know exactly what changed and when.
 
-##### Real-time team collaboration
-Connect multiple devices and share real-time sessions. Full history, full visibility.
+##### Control
+Organize projects, prompts, context, and snippets. Keep your workflows at your fingertips. Set up on your desktop and seamlessly sync to your phone.
+
+##### Collaboration
+Connect multiple devices and share real-time sessions. Share with your team or seamlessly switch between desktop and mobile - securely over your SSH tunnel.
+
+##### Simplicity
+Easy to set up. Minimalist interface. Designed to do one thing and do it well.
+
 
 <script src="/js/custom.js"></script>
