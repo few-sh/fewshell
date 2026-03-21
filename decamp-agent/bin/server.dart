@@ -8,10 +8,8 @@ import 'package:shelf/shelf.dart' as shelf;
 import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:agent_core/agent_core.dart';
-import 'package:fewshell_agent/router.dart';
-import 'package:fewshell_agent/services/database_manager.dart';
+import 'package:fewshell_agent/server_core.dart';
 import 'package:fewshell_agent/services/notification_dispatcher.dart';
-import 'package:fewshell_agent/controllers/sync_controller.dart';
 import 'package:fewshell_agent/certs.dart';
 import 'package:fewshell_agent/version.dart';
 
@@ -137,58 +135,20 @@ void main(List<String> args) async {
     final listenUri = env['LISTEN'] ?? '';
     final bool useTcp = listenUri.startsWith('tcp://');
 
-    // Initialize DatabaseManager
-    final dataPath = '${Directory.current.path}/data';
-    final dbManager = DatabaseManager(dataPath);
-    await dbManager.init();
-
-    // Migrate CRDT settings TOML files from legacy 'server' node ID.
-    // Must run before CrdtSettingsService loads them.
-    await migrateAllSettingsToml(dataPath, 'server', dbManager.nodeId);
-
-    // Initialize CrdtSettingsService
-    final settingsService = CrdtSettingsService(
-      () async => Directory(dataPath),
-      (projectId) async => Directory('$dataPath/projects/$projectId'),
-    );
-    await settingsService.init();
-
-    // Initialize SecretsService
-    final secretsService = SecretsService(
-      (projectId) async => MemoryStorageImpl(),
-    );
-
     // Initialize NotificationDispatcher
     final notificationDispatcher = NotificationDispatcher.fromEnvironment(
       getEnv: (key) => env[key],
     );
 
-    // Initialize SyncController
-    final syncController = await SyncController.create(
-      dbManager,
-      settingsService,
-      secretsService,
-      notificationDispatcher,
+    // Initialize all server services
+    final dataPath = '${Directory.current.path}/data';
+    final core = await startServerCore(
+      dataPath: dataPath,
+      notificationDispatcher: notificationDispatcher,
     );
 
-    // Build the request handler pipeline
-    final handler = const shelf.Pipeline()
-        .addMiddleware(
-          shelf.logRequests(
-            logger: (msg, isError) {
-              if (isError) {
-                _log.severe(msg);
-              } else {
-                _log.info(msg);
-              }
-            },
-          ),
-        )
-        .addMiddleware(_corsMiddleware())
-        .addHandler(createRouter(syncController).call);
-
     // Start the server
-    await _startServer(listenUri, useTcp, handler);
+    await _startServer(listenUri, useTcp, core.handler);
   } catch (e, st) {
     _log.severe('CRITICAL FAILURE', e, st);
     exit(1);
@@ -310,24 +270,3 @@ Future<void> _startServer(
   }
   _log.info('Server serving...');
 }
-
-/// CORS middleware for cross-origin requests
-shelf.Middleware _corsMiddleware() {
-  return shelf.createMiddleware(
-    requestHandler: (shelf.Request request) {
-      if (request.method == 'OPTIONS') {
-        return shelf.Response.ok('', headers: _corsHeaders);
-      }
-      return null;
-    },
-    responseHandler: (shelf.Response response) {
-      return response.change(headers: _corsHeaders);
-    },
-  );
-}
-
-final _corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
-  'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
-};
