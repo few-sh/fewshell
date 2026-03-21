@@ -107,6 +107,14 @@ dependency_overrides:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
+
+  # E2E test server
+  fewshell_agent:
+    path: ../decamp-agent
+  sqflite_common_ffi: ^2.3.3
+  shelf: ^1.4.0
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
