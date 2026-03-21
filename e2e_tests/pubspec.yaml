@@ -13,6 +13,11 @@ dependencies:
   shelf: ^1.4.2
   web_socket_channel: ^3.0.0
   logging: ^1.3.0
+  crdt_sync: ^1.0.10
+  sqlite_crdt: ^3.0.3
+  drift: ^2.20.0
+  sqflite_common_ffi: ^2.3.0
+  path: ^1.9.0
 
 dev_dependencies:
   test: ^1.24.0

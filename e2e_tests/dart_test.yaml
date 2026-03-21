@@ -1,0 +1,3 @@
+# Run test files sequentially to avoid SQLite FFI conflicts
+# between parallel isolates.
+concurrency: 1

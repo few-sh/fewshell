@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:fewshell_agent/server_core.dart';
 import 'package:fewshell_agent/services/notification_dispatcher.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Starts an in-process Fewshell agent server for testing.
 ///
@@ -17,6 +18,8 @@ class TestServerHarness {
   Uri get serverUrl => Uri.parse('http://localhost:${_server.port}');
 
   Future<void> start() async {
+    sqfliteFfiInit();
+
     _tempDir = await Directory.systemTemp.createTemp('e2e_test_');
 
     final notificationDispatcher = NotificationDispatcher.fromEnvironment(
