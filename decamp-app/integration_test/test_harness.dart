@@ -40,6 +40,32 @@ class TestServer {
       notificationDispatcher: notificationDispatcher,
     );
     _server = await shelf_io.serve(core.handler, 'localhost', 0);
+    await _waitForHealthy();
+  }
+
+  Future<void> _waitForHealthy({
+    Duration timeout = const Duration(seconds: 5),
+    Duration interval = const Duration(milliseconds: 50),
+  }) async {
+    final client = HttpClient();
+    final deadline = DateTime.now().add(timeout);
+    try {
+      while (DateTime.now().isBefore(deadline)) {
+        try {
+          final request = await client.getUrl(
+            serverUrl.replace(path: '/health'),
+          );
+          final response = await request.close();
+          if (response.statusCode == 200) return;
+        } on SocketException catch (_) {
+          // Server not ready yet
+        }
+        await Future<void>.delayed(interval);
+      }
+      throw StateError('Test server failed to become healthy within $timeout');
+    } finally {
+      client.close();
+    }
   }
 
   Future<void> stop() async {
