@@ -31,7 +31,7 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [X] ERROR HANDLING - stuck loading when error
 
-[ ] For the header, leave a small button to show it
+[X] For the header, leave a small button to show it
 
 [X] Add prompts list
 
@@ -55,9 +55,9 @@ MVP (Version 0 - private alpha) - Typical use-case
 
 [X] Make sure secrets are properly passed to shell commands
 
-[ ] Allow the user to select/deselect which secrets to provide to each command.
+[X] Allow the user to select/deselect which secrets to provide to each command.
 
-[ ] Allow the user to edit command before approving
+[X] Allow the user to edit command before approving
 
 [X] Allow LLM to pass the list of secrets by name to each shell command tool
 
@@ -80,9 +80,9 @@ and access, "Open a terminal and ssh to your development machine, type curl ... 
 
 [X] Tool result should carry information about the original tool that we invoked
 
-[ ] "Test SSH" button needs an ability to cancel the operation, or shorten the timeout.
+[X] "Test SSH" button needs an ability to cancel the operation, or shorten the timeout.
 
-[ ] "Test LLM" button needs an ability to cancel the operation, or shorten the timeout.
+[X] "Test LLM" button needs an ability to cancel the operation, or shorten the timeout.
 
 [X] Eliminate all non-expandable ellipsis in any of the text controls
 
@@ -135,7 +135,7 @@ Basic architecture:
 *NOTE: Micro instance preferred
 
 ### Error handling:
-[ ] When not connected to server  
+[X] When not connected to server  
 
 [X] When SSH throws an error
 
@@ -157,15 +157,15 @@ Basic architecture:
 
 [X] Snippets
 
-[ ] Push notifications - we could set up our own service
+[X] Push notifications - relay service
 
 [ ] Slack integration
 
-[ ] Export sessions as markdown files
+[X] Export sessions as markdown files
 
 [ ] Import sessions from markdown files
 
-[ ] Compact/summarize session
+[X] Compact/summarize session
 
 [ ] Display token usage
 
@@ -173,7 +173,7 @@ Basic architecture:
 
 [ ] A set of pre-made quick API references in a compressed, summarized format that the LLM can search/include
 
-[ ] Ability to set up multiple SSH configurations (just like we have for models)
+[X] Ability to set up multiple SSH configurations (just like we have for models)
 
 [ ] Ability to attach a note to anything, eg a note for an SSH configuration that LLM would see
 
@@ -187,13 +187,6 @@ Basic architecture:
 
 Background agent:
 [ ] Reactive system to alerts (Webhooks)
-
-Onboarding:
-[ ] Agent-guided onboarding
-
-[ ] Need minimal tools to be able to invoke cloud APIs in order to:
-    1. Spin up a docker instance
-    2. Open a communication channel to it
 
 
 ## Website Design
