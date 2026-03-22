@@ -10,7 +10,7 @@ implementing a feature (eg after we are done testing it).
 Fewshell (codenamed Decamp) is a mobile terminal agent to help on-call infrastructure management
 and troubleshooting for devops engineers.
 
-It allows AI-assisted shell sessions that help send commands to the cloud
+It allows AI-assisted shell sessions that help perform sysadmin tasks via SSH.
 
 
 ## Instructions
@@ -31,8 +31,7 @@ It allows AI-assisted shell sessions that help send commands to the cloud
 Project settings:
 - Manage secrets
 - AGENTS.md editor
-- Manage snippets (future functionality)
-- Github integration for snippets, md files, tools
+- Manage snippets
 
 - All settings can have global or per-project scope, similar to VSCode User/Workspace settings.
 
@@ -40,9 +39,6 @@ Project settings:
 Session page:
 - Shows chat session and short terminal screen (a few lines)
 - Can expand the screen to split with the chat session
-
-Themes:
-- Dark / Light
 
 ## Project structure
 decamp-app/ is the mobile/desktop frontend application:
