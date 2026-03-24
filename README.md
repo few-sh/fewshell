@@ -14,7 +14,7 @@ It's designed around three core principles:
 
 [Quick Start](https://fewshell.com/docs/getting-started/quick-start/)
 
-![Fewshell demo](https://release.few.sh/misc/github_anim_opt.gif)
+![Fewshell demo](https://release.few.sh/misc/github_anim_sm.gif)
 
 ## Why this exists
 
