@@ -28,20 +28,20 @@ Use fewshell if you want to...
 
 ## What fewshell is not:
 
-It is not meant to be a coding agent or an autonomous AI assistant. There are many powerful open source and commercial agents for tis. You can configure some to do the same or similar thing as Fewshell, but it usually takes extra effort. 
+It is not meant to be a coding agent or an autonomous AI assistant. There are many powerful open source and commercial agents for this. You can configure some to do the same or similar thing as Fewshell, but it usually takes extra effort. 
 
 It is not packed with features or many customizable options. It's intended to do one thing and do it well.
-Costraind by-design to allow easy setup and reduce the risk of accidental misconfiguration.
+Constrained by-design to allow easy setup and reduce the risk of accidental misconfiguration.
 
 ## Features
 
 - **Mobile and desktop clients** — iOS, macOS, Linux, (Android and Windows planned)
-- **Secret management** — global and per-project secrets, stored in keychain, with per-secret LLM visibility control
-- **Cross-device sync** — Seamless session sync between devices using your server
+- **Secret management** — user and per-project secrets, stored in keychain, with per-secret LLM visibility control
+- **Cross-device sync** — seamless session sync between devices using your server
 - **Command snippet library** — reusable commands injected into LLM context
 - **Session archival** — full transcript of every session, useful for postmortems
-- **BYOM — bring your own model** () — supports OpenAI, Anthropic, Google, DeepSeek, Ollama, Groq, xAI, OpenRouter, and more
-- **Custom agent instructions** — global and per-project system prompts with template variables
+- **BYOM — bring your own model** — supports OpenAI, Anthropic, Google, DeepSeek, Ollama, Groq, xAI, OpenRouter, and more
+- **Custom agent instructions** — user and per-project system prompts with template variables
 
 - **Push notifications** for long-running commands (optional relay service)
 
