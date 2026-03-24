@@ -51,8 +51,7 @@
             "program": "bin/server.dart",
             "env": {
                 "LISTEN": "tcp://0.0.0.0:3123",
-                "PUSH_NOTIFICATION_URL": "https://fewshell-relay-734417761966.us-central1.run.app/",
-                "PUSH_NOTIFICATION_API_KEY": "ArdmtfC0UM5fdAZEyNrtG4Ws41GfPnIxKSKfSAiOdPM="
+                "PUSH_NOTIFICATION_URL": "https://fewshell-relay-734417761966.us-central1.run.app/"
             }
         }
     ],
