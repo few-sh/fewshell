@@ -1,54 +1,47 @@
-# Fewshell
+# fewshell
 
-**Human-gated AI shell for production systems.**
+**A self-hosted AI agent for sysadmins, on-calls, devops, MLOps, AI researchers and self-hosting enthusiasts.**
 
-Fewshell is a mobile/desktop, self-hosted, collaborative terminal AI agent designed for incident response and infrastructure workflows.
+tl;dr - using ssh on a phone is painful. AI can help, but agents are risky and hard to configure for critical tasks.
 
-It works like a typical terminal agent, with one important caveat:
+fewshell is an attempt to solve this *without sacrificing security, privacy and safety*.
 
-- Every command requires human approval.
+It's designed around three core principles:
 
-There is no autonomous ("YOLO") mode, and no way to enable it.
+1. Secure defaults: mandatory SSH and secrets management.
+2. Must be self-hosted: Eg, cloudless desktop-mobile sync.
+3. Human-first: AI will not run any command without your approval.
 
-[Website](https://fewshell.com) · [Quick Start](https://fewshell.com/docs/getting-started/quick-start/) · [Download](https://fewshell.com)
+[Quick Start](https://fewshell.com/docs/getting-started/quick-start/)
 
-<!-- Screenshot placeholder: add a screenshot or demo GIF here -->
+![Fewshell demo](https://release.few.sh/misc/github_anim.gif)
 
-## The on-call problem
+## Why this exists
 
-Fewshell is an attempt to make something that is safe to use for on-calls, AI researchers, self-hosting enthusiasts or anyone who regularly needs to interact with the terminal in order to fix, restart, or check on something while on the go.
+Use fewshell if you want to...
 
-While LLMs are increasingly good at using the terminal, sysadmin tasks and troubleshooting, there are many cases where you really don't want (or are not allowed) to give admin-level access to an LLM.
+- Have a way to restart, fix, update your autonomous agent (eg OpenClaw) remotely, without using the agent itself (in case it fails to start back up.)
+- Start some long-running command from your desktop and then check on it while on the go.
+- Manage a self-hosted server remotely and run admin commands while on the go.
+- Run serverless infrastructure and use cloud CLI to occasionally fix things remotely via a bastion.
+- Keep track of every command you ever ran on your infrastructure, lab environment, etc through one interface.
 
-## Core design principles
+## What fewshell is not:
 
-### 1. Secure defaults
+It is not meant to be a coding agent or an autonomous AI assistant. There are many powerful open source and commercial agents for tis. You can configure some to do the same or similar thing as Fewshell, but it usually takes extra effort. 
 
-- Communication over SSH tunnel and domain socket
-- Secrets stored in the client device keychain (iOS Keychain, macOS Keychain, Android Keystore) and only stored in memory on the server side
-- Secrets automatically redacted (including base64-encoded forms) from history and LLM context
-
-### 2. Self-hosted
-
-- No mandatory cloud dependency — bring your own LLM provider
-- Optional relay service for push notifications and SSH public key provisioning
-
-### 3. Local-first sync
-
-- CRDT-based data model with real-time sync and offline mode
-- Multiple clients can attach to the same session with shared state
-- Full session history preservation and replication
+It is not packed with features or many customizable options. It's intended to do one thing and do it well.
+Costraind by-design to allow easy setup and reduce the risk of accidental misconfiguration.
 
 ## Features
 
-- **Mobile and desktop clients** — iOS, Android, macOS, Linux, Windows
-- **Cross-device sync** — CRDT-based sync through the self-hosted agent
-- **Real-time sessions** — multiple clients can share the same terminal and chat
+- **Mobile and desktop clients** — iOS, macOS, Linux, (Android and Windows planned)
+- **Secret management** — global and per-project secrets, stored in keychain, with per-secret LLM visibility control
+- **Cross-device sync** — Seamless session sync between devices using your server
+- **Command snippet library** — reusable commands injected into LLM context
 - **Session archival** — full transcript of every session, useful for postmortems
 - **BYOM — bring your own model** () — supports OpenAI, Anthropic, Google, DeepSeek, Ollama, Groq, xAI, OpenRouter, and more
 - **Custom agent instructions** — global and per-project system prompts with template variables
-- **Command snippet library** — reusable commands injected into LLM context
-- **Secret management** — global and per-project secrets, stored in keychain, with per-secret LLM visibility control
 
 - **Push notifications** for long-running commands (optional relay service)
 
@@ -59,7 +52,7 @@ Fewshell has four components:
 
 ```
 ┌──────────────────┐       SSH tunnel         ┌──────────────────┐
-│                  │       or mTLS            │                  │
+│                  │                          │                  │
 │   Client App     │◄────────────────────────►│   Agent Server   │
 │  (mobile/desktop)│                          │  (self-hosted)   │
 │                  │                          │                  │
@@ -71,47 +64,36 @@ Fewshell has four components:
                                                        │
                                                        │ API call
                                                        ▼
-┌──────────────────┐                          ┌──────────────────┐
-│                  │                          │                  │
-│ Relay (optional) │                          │   LLM Provider   │
-│                  │                          │  (user-provided) │
-│ • Push notifs    │                          │                  │
-│ • SSH public key │                          │  • Suggests cmds │
-│                  │                          │  • Never executes│
-└──────────────────┘                          └──────────────────┘
+┌──────────────────┐                          ┌──────────────────────┐
+│                  │                          │                      │
+│ Relay (optional) │                          │   LLM Provider       │
+│                  │                          │  (user-provided)     │
+│ • Push notifs    │                          │                      │
+│ • SSH public key │                          │  • Observes session  │
+│                  │                          │  • Suggests commands │
+└──────────────────┘                          └──────────────────────┘
 ```
 
 **Client** (mobile / desktop)
 - Stores secrets in system keychain
-- Generates SSH keypair (private key never leaves device)
+- Optionally generates SSH keypair during setup (private key never leaves device)
 - Sends user input and command approvals
 - Displays terminal output and AI interaction
 
 **Agent Server** (self-hosted)
 - Executes approved shell commands in a PTY
 - Streams command output to all connected clients
-- Holds secrets in memory only during execution
+- Holds secrets in memory for command use and replication across authenticated devices
 - Redacts secret values before sending context to the LLM
 - Calls the LLM API with redacted context
 
 **LLM Provider** (user-provided)
-- Receives redacted command and output context
-- Suggests next commands
-- Cannot execute anything directly
+- Receives context, command input and output (secrets redacted)
+- Requests command execution for human approval
 
 **Relay** (optional)
 - Sends push notifications for long-running commands (APNs)
-- Facilitates SSH public key exchange during device pairing
-
-### Flow
-
-1. User describes intent
-2. Agent server sends context to LLM
-3. LLM suggests a command
-4. User reviews, edits, or rejects
-5. On approval, server executes command
-6. Output is streamed back to all connected clients
-7. Output (with secrets redacted) is added to LLM context
+- Facilitates SSH public key provisioning during initial device pairing (optional)
 
 ## Security model
 
@@ -123,11 +105,11 @@ Fewshell assumes:
 
 Key properties:
 
-- Secrets are stored in the device keychain and synced to the server over an encrypted channel
-- Secrets are held in server memory only during execution — never persisted to disk on the server
+- Secrets are stored in the device keychain and synced to the server over SSH tunnel
+- Secrets are held in server memory — never persisted to disk on the server
 - Secrets are redacted (plaintext and base64) before being sent to the LLM
 - The LLM cannot execute commands — all tool calls require explicit user approval
-- Client–server connections use mTLS with certificate pinning, or SSH tunnels
+- Client–server connections SSH tunnel to user-owned domain socket on the server
 - Server identity is verified via CRDT node ID to prevent cross-server sync
 
 ## Project structure
@@ -136,7 +118,7 @@ Key properties:
 |---|---|
 | `decamp-app/` | Flutter client (iOS, Android, macOS, Linux, Windows) |
 | `decamp-agent/` | Dart server — shell execution, sync, agent loop |
-| `agent-core/` | Shared library — database schema, CRDT, LLM integration |
+| `agent-core/` | Shared client/server code — database schema, CRDT, LLM integration |
 | `decamp-relay/` | Rust microservice — push notifications, SSH key pairing |
 | `llm_dart/` | LLM provider library — multi-provider, streaming, tool use |
 | `dartssh2/` | SSH client library (fork with domain socket support) |
@@ -155,3 +137,5 @@ Early-stage. Expect rough edges.
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
 
 You can use, modify, and self-host freely. If you run a modified version and expose it over a network, you must provide the source code.
+
+If your organization disallows the use of AGPL, please [contact us](https://fewshell.com/contact/) for custom licensing options.
