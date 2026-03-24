@@ -1,6 +1,5 @@
 +++
 title = "Contact Us"
-date = 2025-01-01
 template = "page.html"
 [extra]
 stylesheets = ["css/custom.css"]
