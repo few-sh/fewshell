@@ -1,6 +1,7 @@
 .env
 .env.deploy_ios
 .env.deploy_appstore
+.env.deploy_playstore
 
 
 # Miscellaneous
