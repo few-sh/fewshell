@@ -21,6 +21,7 @@ Fearlessly use AI for your infrastructure.
 
 [Quick Start Guide](/docs/getting-started/quick-start/)
 
+[Source Code](https://github.com/few-sh/fewshell)
 
 </div>
 <div class="get-app-screenshots">
