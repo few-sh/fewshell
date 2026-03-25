@@ -1,12 +1,36 @@
-use a2::{Client, ClientConfig, Endpoint, DefaultNotificationBuilder, NotificationBuilder, NotificationOptions, Priority};
 use anyhow::{Context, Result};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use reqwest::Client;
+use serde::Serialize;
 use serde_json::json;
-use std::fs::File;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, info};
 
+const PRODUCTION_URL: &str = "https://api.push.apple.com";
+const SANDBOX_URL: &str = "https://api.sandbox.push.apple.com";
+/// APNs tokens are valid for 60 minutes; refresh after 50 to avoid edge cases.
+const TOKEN_REFRESH_SECS: u64 = 50 * 60;
+
+#[derive(Serialize)]
+struct Claims {
+    iss: String,
+    iat: u64,
+}
+
+struct CachedToken {
+    token: String,
+    issued_at: u64,
+}
+
 pub struct ApnsClient {
-    client: Client,
+    http: Client,
+    signing_key: EncodingKey,
+    key_id: String,
+    team_id: String,
     bundle_id: String,
+    base_url: &'static str,
+    cached_token: Mutex<Option<CachedToken>>,
 }
 
 impl ApnsClient {
@@ -31,20 +55,64 @@ impl ApnsClient {
         debug!("Bundle ID: {}", bundle_id);
         debug!("Sandbox: {}", use_sandbox);
 
-        let mut key_file = File::open(&key_path)
-            .with_context(|| format!("Failed to open APNs key file: {}", key_path))?;
+        let key_pem = std::fs::read(&key_path)
+            .with_context(|| format!("Failed to read APNs key file: {}", key_path))?;
+        let signing_key = EncodingKey::from_ec_pem(&key_pem)
+            .context("Failed to parse APNs .p8 key")?;
 
-        let endpoint = if use_sandbox {
-            Endpoint::Sandbox
-        } else {
-            Endpoint::Production
+        let base_url = if use_sandbox { SANDBOX_URL } else { PRODUCTION_URL };
+
+        let http = Client::builder()
+            .http2_prior_knowledge()
+            .build()
+            .context("Failed to build HTTP/2 client")?;
+
+        Ok(Self {
+            http,
+            signing_key,
+            key_id,
+            team_id,
+            bundle_id,
+            base_url,
+            cached_token: Mutex::new(None),
+        })
+    }
+
+    fn bearer_token(&self) -> Result<String> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        // Return cached token if still fresh
+        {
+            let cache = self.cached_token.lock().unwrap();
+            if let Some(ref ct) = *cache {
+                if now - ct.issued_at < TOKEN_REFRESH_SECS {
+                    return Ok(ct.token.clone());
+                }
+            }
+        }
+
+        let header = Header {
+            alg: Algorithm::ES256,
+            kid: Some(self.key_id.clone()),
+            ..Default::default()
         };
+        let claims = Claims {
+            iss: self.team_id.clone(),
+            iat: now,
+        };
+        let token = encode(&header, &claims, &self.signing_key)
+            .context("Failed to sign APNs JWT")?;
 
-        let config = ClientConfig::new(endpoint);
-        let client = Client::token(&mut key_file, &key_id, &team_id, config)
-            .context("Failed to create APNs client")?;
+        let mut cache = self.cached_token.lock().unwrap();
+        *cache = Some(CachedToken {
+            token: token.clone(),
+            issued_at: now,
+        });
 
-        Ok(Self { client, bundle_id })
+        Ok(token)
     }
 
     pub async fn send_notification(
@@ -56,10 +124,7 @@ impl ApnsClient {
         sound: Option<&str>,
         data: Option<serde_json::Value>,
     ) -> Result<()> {
-        let mut alert = json!({
-            "body": body,
-        });
-
+        let mut alert = json!({ "body": body });
         if let Some(title) = title {
             alert["title"] = json!(title);
         }
@@ -67,6 +132,7 @@ impl ApnsClient {
         let mut payload = json!({
             "aps": {
                 "alert": alert,
+                "sound": sound.unwrap_or("default"),
             }
         });
 
@@ -74,13 +140,6 @@ impl ApnsClient {
             payload["aps"]["badge"] = json!(badge);
         }
 
-        if let Some(sound) = sound {
-            payload["aps"]["sound"] = json!(sound);
-        } else {
-            payload["aps"]["sound"] = json!("default");
-        }
-
-        // Add custom data if provided
         if let Some(data) = data {
             if let Some(obj) = data.as_object() {
                 for (key, value) in obj {
@@ -89,44 +148,27 @@ impl ApnsClient {
             }
         }
 
-        let payload_str =
-            serde_json::to_string(&payload).context("Failed to serialize notification payload")?;
+        debug!("APNs payload: {}", payload);
 
-        debug!("APNs payload: {}", payload_str);
-
-        let options = NotificationOptions {
-            apns_topic: Some(&self.bundle_id),
-            apns_priority: Some(Priority::High),
-            ..Default::default()
-        };
-
-        // Build notification with title, body, and sound properly
-        let mut builder = DefaultNotificationBuilder::new();
-        
-        if let Some(title) = title {
-            builder = builder.set_title(title);
-        }
-        
-        builder = builder.set_body(body).set_sound("default");
-        
-        if let Some(badge) = badge {
-            builder = builder.set_badge(badge);
-        }
-        
-        let notification = builder.build(device_token, options);
+        let token = self.bearer_token()?;
+        let url = format!("{}/3/device/{}", self.base_url, device_token);
 
         let response = self
-            .client
-            .send(notification)
+            .http
+            .post(&url)
+            .bearer_auth(&token)
+            .header("apns-topic", &self.bundle_id)
+            .header("apns-priority", "10")
+            .header("apns-push-type", "alert")
+            .json(&payload)
+            .send()
             .await
-            .context("Failed to send notification")?;
+            .context("Failed to send APNs request")?;
 
-        if response.error.is_some() {
-            anyhow::bail!(
-                "APNs error: {:?} - {:?}",
-                response.error,
-                response.code
-            );
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("APNs error ({}): {}", status, body);
         }
 
         Ok(())

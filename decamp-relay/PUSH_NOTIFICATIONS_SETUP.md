@@ -64,8 +64,9 @@ Mobile app updated to receive push notifications.
 
 2. Send a notification using curl:
    ```bash
-   curl -X POST http://localhost:8080/send \
+   curl -X POST http://localhost:8090/send \
      -H "Content-Type: application/json" \
+     -H "Authorization: test-api-key" \
      -d '{
        "device_tokens": ["YOUR_DEVICE_TOKEN_HERE"],
        "title": "Hello from Decamp!",
