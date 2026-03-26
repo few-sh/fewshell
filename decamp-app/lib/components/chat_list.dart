@@ -460,6 +460,9 @@ class _MessageItem extends ConsumerWidget {
             projectId: currentProject.id,
             projectDb: projectDb,
           );
+          if (!context.mounted) {
+            return;
+          }
           ShadToaster.maybeOf(context)?.show(
             ShadToast(
               title: const Text('Subscribed'),
