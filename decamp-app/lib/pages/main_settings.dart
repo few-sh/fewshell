@@ -26,17 +26,118 @@ class MainSettingsPage extends ConsumerStatefulWidget {
 class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late final TextEditingController _projectNameController;
+  String? _projectNameInitialName;
+  String? _projectNameProjectId;
+  bool _isSavingProjectName = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this, initialIndex: 1);
+    _projectNameController = TextEditingController();
   }
 
   @override
   void dispose() {
+    _projectNameController.dispose();
     _tabController.dispose();
     super.dispose();
+  }
+
+  bool get _hasProjectNameChanges {
+    final initialName = _projectNameInitialName;
+    return initialName != null && _projectNameController.text != initialName;
+  }
+
+  void _setProjectNameText(String value) {
+    _projectNameController.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
+  void _syncProjectNameEditor(ProjectEntity project) {
+    final previousInitialName = _projectNameInitialName;
+    final isDifferentProject = _projectNameProjectId != project.id;
+    final hasPendingChanges =
+        previousInitialName != null &&
+        _projectNameController.text != previousInitialName;
+
+    if (isDifferentProject ||
+        (!hasPendingChanges && previousInitialName != project.name)) {
+      _setProjectNameText(project.name);
+    }
+
+    _projectNameProjectId = project.id;
+    _projectNameInitialName = project.name;
+  }
+
+  void _cancelProjectNameChanges() {
+    final initialName = _projectNameInitialName;
+    if (initialName == null) return;
+
+    setState(() {
+      _setProjectNameText(initialName);
+    });
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  Future<void> _saveProjectName(ProjectEntity project) async {
+    final originalName = _projectNameInitialName ?? project.name;
+    final trimmedValue = _projectNameController.text.trim();
+
+    if (trimmedValue.isEmpty) {
+      _showSnack('Project name cannot be empty');
+      return;
+    }
+
+    if (trimmedValue == originalName) {
+      if (_projectNameController.text != originalName) {
+        setState(() {
+          _setProjectNameText(originalName);
+        });
+      }
+      FocusManager.instance.primaryFocus?.unfocus();
+      return;
+    }
+
+    final projects =
+        ref.read(projectsStreamProvider).value ?? <ProjectEntity>[];
+    final existingNames = projects
+        .where((existingProject) => existingProject.id != project.id)
+        .map((existingProject) => existingProject.name)
+        .toSet();
+
+    if (existingNames.contains(trimmedValue)) {
+      _showSnack('A project with this name already exists');
+      return;
+    }
+
+    setState(() {
+      _isSavingProjectName = true;
+    });
+
+    try {
+      await ref
+          .read(projectControllerProvider)
+          .updateProject(id: project.id, name: trimmedValue);
+
+      _projectNameInitialName = trimmedValue;
+      _projectNameProjectId = project.id;
+      _setProjectNameText(trimmedValue);
+
+      if (mounted) {
+        _showSnack('Project name updated');
+        FocusManager.instance.primaryFocus?.unfocus();
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingProjectName = false;
+        });
+      }
+    }
   }
 
   @override
@@ -230,49 +331,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
 
   Widget _buildProjectNameSection(ProjectEntity project) {
     final theme = ShadTheme.of(context);
-    final controller = TextEditingController(text: project.name);
-    final projectsAsync = ref.watch(projectsStreamProvider);
-
-    Future<void> saveChanges(String value) async {
-      final trimmedValue = value.trim();
-
-      // Check if empty
-      if (trimmedValue.isEmpty) {
-        controller.text = project.name;
-        if (mounted) {
-          _showSnack('Project name cannot be empty');
-        }
-        return;
-      }
-
-      // Check if unchanged
-      if (trimmedValue == project.name) {
-        return;
-      }
-
-      // Check for duplicates
-      final projects = projectsAsync.value ?? [];
-      final existingNames = projects
-          .where((p) => p.id != project.id)
-          .map((p) => p.name)
-          .toList();
-
-      if (existingNames.contains(trimmedValue)) {
-        controller.text = project.name;
-        if (mounted) {
-          _showSnack('A project with this name already exists');
-        }
-        return;
-      }
-
-      // Save the change
-      await ref
-          .read(projectControllerProvider)
-          .updateProject(id: project.id, name: trimmedValue);
-      if (mounted) {
-        _showSnack('Project name updated');
-      }
-    }
+    _syncProjectNameEditor(project);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,16 +343,43 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         const SizedBox(height: 16),
         ShadCard(
           padding: const EdgeInsets.all(16),
-          child: ShadInput(
-            contextMenuBuilder: adaptiveContextMenuBuilder,
-            controller: controller,
-            placeholder: const Text('Name'),
-            autocorrect: false,
-            leading: const Padding(
-              padding: EdgeInsets.only(right: 8),
-              child: Icon(LucideIcons.folder, size: 16),
-            ),
-            onSubmitted: saveChanges,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ShadInput(
+                contextMenuBuilder: adaptiveContextMenuBuilder,
+                controller: _projectNameController,
+                placeholder: const Text('Name'),
+                autocorrect: false,
+                leading: const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Icon(LucideIcons.folder, size: 16),
+                ),
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _saveProjectName(project),
+              ),
+              if (_hasProjectNameChanges) ...[
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ShadButton.outline(
+                      onPressed: _isSavingProjectName
+                          ? null
+                          : _cancelProjectNameChanges,
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ShadButton(
+                      onPressed: _isSavingProjectName
+                          ? null
+                          : () => _saveProjectName(project),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ],
           ),
         ),
       ],
