@@ -1,15 +1,11 @@
-import 'dart:io';
 import 'package:decamp/providers/providers.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import '../utils/ui_utils.dart';
-import '../services/project_importer.dart';
 import '../services/sync_service.dart';
 import 'chat_session.dart';
-import 'qr_scanner_page.dart';
 
 import '../components/ai_model_dialog.dart';
 import '../components/connection_progress_dialog.dart';
@@ -164,32 +160,6 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
     );
   }
 
-  Future<void> _scanAndConfigureProject(String? projectId) async {
-    if (projectId == null) return _showSnack('Please select a project first');
-
-    final result = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(builder: (_) => const QrScannerPage()),
-    );
-
-    if (result == null) return;
-
-    try {
-      await ref
-          .read(projectImporterProvider)
-          .importFromQrCode(result, targetProjectId: projectId);
-
-      // Force refresh of the providers to show newly imported settings
-      ref.invalidate(projectLlmSettingsProvider(projectId));
-      ref.invalidate(projectSshSettingsProvider(projectId));
-      ref.invalidate(projectSettingsProvider(projectId));
-
-      if (mounted) _showSnack('Project configured successfully');
-    } catch (e) {
-      if (mounted) _showSnack('Error configuring project: $e');
-    }
-  }
-
   void _showSnack(String message) {
     if (!mounted) return;
     ShadToaster.of(context).show(ShadToast(description: Text(message)));
@@ -309,21 +279,7 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Project Name', style: theme.textTheme.h4),
-            if (false && !kIsWeb && (Platform.isAndroid || Platform.isIOS))
-              ShadButton.outline(
-                onPressed: () => _scanAndConfigureProject(project.id),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(LucideIcons.qrCode, size: 16),
-                    SizedBox(width: 8),
-                    Text('Scan Config'),
-                  ],
-                ),
-              ),
-          ],
+          children: [Text('Project Name', style: theme.textTheme.h4)],
         ),
         const SizedBox(height: 16),
         ShadCard(
@@ -572,250 +528,6 @@ class _MainSettingsPageState extends ConsumerState<MainSettingsPage>
         ],
       ),
     );
-  }
-
-  Widget _buildRemoteShellSection() {
-    final theme = ShadTheme.of(context);
-    final currentProjectId = ref.watch(currentProjectIdProvider);
-    final sshSettings = currentProjectId != null
-        ? ref.watch(projectSshSettingsProvider(currentProjectId))
-        : null;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (kDebugMode)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Remote Shell', style: theme.textTheme.h4),
-              if (currentProjectId != null && sshSettings == null)
-                ShadButton(
-                  onPressed: () =>
-                      _showSshSettingsDialog(projectId: currentProjectId),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(LucideIcons.plus, size: 16),
-                      SizedBox(width: 8),
-                      Text('Configure Connection'),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        const SizedBox(height: 16),
-        // Show message if no project selected
-        if (currentProjectId == null)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.border),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  LucideIcons.info,
-                  color: theme.colorScheme.mutedForeground,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Select a project to configure remote shell connection.',
-                    style: theme.textTheme.muted,
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          _buildSshSettingsCard(currentProjectId),
-      ],
-    );
-  }
-
-  Widget _buildSshSettingsCard(String projectId) {
-    final theme = ShadTheme.of(context);
-    final sshSettings = ref.watch(projectSshSettingsProvider(projectId));
-
-    if (sshSettings == null) {
-      // No SSH configuration yet
-      return const Column(
-        children: [
-          EmptyPlaceholder(
-            icon: LucideIcons.terminal,
-            title: 'No Remote Shell',
-            subtitle: 'No remote shell configured yet.',
-          ),
-        ],
-      );
-    }
-
-    // SSH configuration exists
-    return ShadCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.terminal,
-                      color: theme.colorScheme.primary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${sshSettings.username}@${sshSettings.host}',
-                        style: theme.textTheme.large.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!sshSettings.enabled)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ShadBadge.destructive(
-                        child: const Text('Disabled'),
-                      ),
-                    ),
-                  ShadButton.ghost(
-                    width: 32,
-                    height: 32,
-                    padding: EdgeInsets.zero,
-                    decoration: const ShadDecoration(border: ShadBorder.none),
-                    onPressed: () => _showSshSettingsDialog(
-                      projectId: projectId,
-                      existingSettings: sshSettings,
-                    ),
-                    child: const Icon(LucideIcons.pencil, size: 16),
-                  ),
-                  ShadButton.ghost(
-                    width: 32,
-                    height: 32,
-                    padding: EdgeInsets.zero,
-                    decoration: const ShadDecoration(border: ShadBorder.none),
-                    onPressed: () =>
-                        _showDeleteSshConfirmation(projectId: projectId),
-                    foregroundColor: theme.colorScheme.destructive,
-                    child: const Icon(LucideIcons.trash2, size: 16),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(
-                LucideIcons.server,
-                size: 16,
-                color: theme.colorScheme.mutedForeground,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '${sshSettings.host}:${sshSettings.port}',
-                style: theme.textTheme.muted,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(
-                sshSettings.authMethod == SshAuthMethod.password
-                    ? LucideIcons.lock
-                    : LucideIcons.key,
-                size: 16,
-                color: theme.colorScheme.mutedForeground,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                sshSettings.authMethod == SshAuthMethod.password
-                    ? 'Password Authentication'
-                    : 'Private Key Authentication',
-                style: theme.textTheme.muted,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSshSettingsDialog({
-    required String projectId,
-    SshSettings? existingSettings,
-  }) {
-    SshSettingsDialog.show(
-      context,
-      ref,
-      projectId: projectId,
-      existingSettings: existingSettings,
-    );
-  }
-
-  void _showDeleteSshConfirmation({required String projectId}) async {
-    final confirmed = await showShadDialog<bool>(
-      context: context,
-      builder: (context) => ShadDialog.alert(
-        title: const Text('Delete Remote Shell Configuration'),
-        description: const Text(
-          'Are you sure you want to delete the remote shell configuration? This will also delete all associated credentials.',
-        ),
-        actions: [
-          ShadButton.outline(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.pop(context, false),
-          ),
-          ShadButton.destructive(
-            child: const Text('Delete'),
-            onPressed: () => Navigator.pop(context, true),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await ref
-            .read(projectSshSettingsProvider(projectId).notifier)
-            .deleteSshSettings();
-
-        if (mounted) {
-          ShadToaster.of(context).show(
-            const ShadToast(
-              description: Text('Remote shell configuration deleted'),
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ShadToaster.of(context).show(
-            ShadToast(
-              description: Text('Error deleting configuration: $e'),
-              action: ShadButton.destructive(
-                child: const Text('Dismiss'),
-                onPressed: () => ShadToaster.of(context).hide(),
-              ),
-            ),
-          );
-        }
-      }
-    }
   }
 
   Widget _buildThemeSection() {

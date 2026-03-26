@@ -569,7 +569,7 @@ class SyncService {
 
     // Poll briefly — the CRDT changeset with project data may not have been
     // merged yet when onIdle fires. Give sync up to 5 seconds.
-    // HACK - Ideally onIdly really should work for us.
+    // HACK - Ideally onIdle really should work for us.
     List<ProjectEntity> projects = [];
     for (int i = 0; i < 10; i++) {
       projects = await globalDb.projectDao.getProjectsByServerNodeId(

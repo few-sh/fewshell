@@ -61,7 +61,7 @@ final packageInfoProvider = FutureProvider<PackageInfo>((ref) async {
 
 /// Provider for the client's unique node ID.
 /// Always overridden at startup (see main.dart) with the value read from
-/// <appDocDir>/node_id so that deleting the local data resets the identity.
+/// `<appDocDir>/node_id` so that deleting the local data resets the identity.
 final nodeIdProvider = Provider<String>((ref) {
   throw UnimplementedError('nodeIdProvider must be overridden in main()');
 });

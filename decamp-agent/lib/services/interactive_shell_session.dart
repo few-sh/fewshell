@@ -114,9 +114,11 @@ class InteractiveShellSession {
         // the kernel's PTY buffer until bash is ready to read).
         if (signal == ProcessSignal.sigkill ||
             signal == ProcessSignal.sigstop) {
-          session.write(Uint8List.fromList(
-            utf8.encode(' echo "__FEWSHELL_DONE_${uuid}_\$?__"\n'),
-          ));
+          session.write(
+            Uint8List.fromList(
+              utf8.encode(' echo "__FEWSHELL_DONE_${uuid}_\$?__"\n'),
+            ),
+          );
         }
       });
     }
@@ -152,7 +154,7 @@ class InteractiveShellSession {
     // the sentinel echo. `trap true` sets a handler (not SIG_IGN), so child
     // processes inherit default SIGINT handling per POSIX.
     final wrappedCommand =
-        " (trap true INT; ${envPrefix}${sudoPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\")\n";
+        " (trap true INT; $envPrefix${sudoPrefix}bash -c '${escapeForCommand(command)}'; echo \"__FEWSHELL_DONE_${uuid}_\$?__\")\n";
     session.write(Uint8List.fromList(utf8.encode(wrappedCommand)));
 
     try {

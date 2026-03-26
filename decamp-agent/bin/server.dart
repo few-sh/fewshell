@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'dart:io';
 import 'dart:convert';
 import 'dart:ffi';
@@ -58,7 +60,6 @@ void _setupSigPipeHandler() {
         // No-op: Just ignore the signal.
         // The callback runs on the main isolate event loop, so it's thread-safe,
         // but we avoid logging to keep it lightweight.
-        // ignore: avoid_print
         print("Received SIGPIPE (signal $signal), ignoring.");
       });
 

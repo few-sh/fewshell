@@ -117,7 +117,8 @@ class SyncController {
           final projectId = segments[1];
           if (projectId.isEmpty) {
             _log.warning(
-                'Received project sync request with missing project ID');
+              'Received project sync request with missing project ID',
+            );
             return Response.badRequest(
               body: 'Project ID is required in the URL',
             );
@@ -268,7 +269,8 @@ class SyncController {
           capturedSessionId,
           () {
             _log.info(
-                'Creating new _AgentSession for sessionId: $capturedSessionId');
+              'Creating new _AgentSession for sessionId: $capturedSessionId',
+            );
             return _AgentSession(
               dbManager.globalDatabase,
               db,
@@ -330,7 +332,8 @@ class SyncController {
 
       if (!isLocked) {
         _log.info(
-            'Cleaning up session $sessionId (no active channel, not locked)');
+          'Cleaning up session $sessionId (no active channel, not locked)',
+        );
         session._interactiveSession.close();
         _activeSessions.remove(sessionId);
       } else {
@@ -402,7 +405,8 @@ class _AgentSession {
   void registerChannel(MultiplexedWebSocketChannel channel) {
     _channels.add(channel);
     _log.info(
-        'Registered channel with session. Total channels: ${_channels.length}');
+      'Registered channel with session. Total channels: ${_channels.length}',
+    );
   }
 
   /// Unregister a channel from this session
@@ -411,7 +415,8 @@ class _AgentSession {
     final wasRegistered = _channels.remove(channel);
     if (wasRegistered) {
       _log.info(
-          'Unregistered channel from session. Remaining channels: ${_channels.length}');
+        'Unregistered channel from session. Remaining channels: ${_channels.length}',
+      );
     }
     return wasRegistered;
   }
@@ -420,7 +425,9 @@ class _AgentSession {
   bool get hasActiveChannels => _channels.isNotEmpty;
 
   void handleMessage(
-      Map<String, dynamic> msg, MultiplexedWebSocketChannel channel) {
+    Map<String, dynamic> msg,
+    MultiplexedWebSocketChannel channel,
+  ) {
     if (msg['type'] == 'start_chat') {
       // Give CRDT sync a moment to catch up with secrets
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -618,7 +625,9 @@ class _AgentSession {
   }
 
   Future<void> _startChat(
-      Map<String, dynamic> data, MultiplexedWebSocketChannel channel) async {
+    Map<String, dynamic> data,
+    MultiplexedWebSocketChannel channel,
+  ) async {
     _log.info('🚀 Starting agent loop');
     String? sessionId;
 
@@ -635,8 +644,8 @@ class _AgentSession {
     }
 
     String projectName = '';
-    if (projectId != null && projectDb != null) {
-      final project = await globalDb.projectDao.getProject(projectId!);
+    if (projectDb != null) {
+      final project = await globalDb.projectDao.getProject(projectId);
       if (project != null) {
         projectName = project.name;
       }
@@ -921,28 +930,26 @@ class _AgentSession {
             await projectDb!.sessionDao.touchSession(currentSessionId);
 
             // Send push notification to subscribers
-            if (projectId != null) {
-              unawaited(
-                _notificationDispatcher.sendNotification(
-                  projectDb: projectDb!,
-                  projectId: projectId!,
-                  sessionId: currentSessionId,
-                  messageId: id,
-                  title: 'Tool Execution Complete',
-                  body: 'A tool has finished executing in $projectName',
-                  data: {
-                    'project_id': projectId!,
-                    'session_id': currentSessionId,
-                    'message_id': id,
-                  },
-                ).catchError((e, st) {
-                  _log.severe(
-                    'Error sending push notification for message $id: $e',
-                    st,
-                  );
-                }),
-              );
-            }
+            unawaited(
+              _notificationDispatcher.sendNotification(
+                projectDb: projectDb!,
+                projectId: projectId,
+                sessionId: currentSessionId,
+                messageId: id,
+                title: 'Tool Execution Complete',
+                body: 'A tool has finished executing in $projectName',
+                data: {
+                  'project_id': projectId,
+                  'session_id': currentSessionId,
+                  'message_id': id,
+                },
+              ).catchError((e, st) {
+                _log.severe(
+                  'Error sending push notification for message $id: $e',
+                  st,
+                );
+              }),
+            );
           },
         );
 
@@ -1044,10 +1051,12 @@ class _AgentSession {
     final dbMessages =
         await projectDb!.messageDao.getMessagesBySession(sessionId);
     final conversation = dbMessages
-        .where((m) =>
-            !m.isStreaming &&
-            m.isVisibleToLlm &&
-            m.messageKind != MessageKind.notification)
+        .where(
+      (m) =>
+          !m.isStreaming &&
+          m.isVisibleToLlm &&
+          m.messageKind != MessageKind.notification,
+    )
         .expand((m) {
       final chatMessages = m.toChatMessage();
       // Prepend the summary prefix for conversation summary messages

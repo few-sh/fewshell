@@ -345,28 +345,11 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
     AgentInstructionPreviewModal.show(context, _defaultController.text);
   }
 
-  void _addModelOverride(String modelIdentifier) {
-    if (!_modelControllers.containsKey(modelIdentifier)) {
-      setState(() {
-        _modelControllers[modelIdentifier] = TextEditingController();
-        _checkForChanges();
-      });
-    }
-  }
-
-  void _removeModelOverride(String modelIdentifier) {
-    setState(() {
-      _modelControllers[modelIdentifier]?.dispose();
-      _modelControllers.remove(modelIdentifier);
-      _checkForChanges();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final settings = ref.watch(globalSettingsProvider);
-    final llmSettings = ref.watch(globalLlmSettingsProvider);
+    ref.watch(globalLlmSettingsProvider);
     final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
     final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
@@ -403,51 +386,6 @@ class UserSettingsTabState extends ConsumerState<UserSettingsTab>
                   onChanged: _checkForChanges,
                 ),
                 const SizedBox(height: 24),
-
-                // Model-Specific Overrides
-                // ShadAccordion<String>.multiple(
-                //   children: [
-                //     ShadAccordionItem(
-                //       value: 'overrides',
-                //       title: const Text('Model-Specific Overrides'),
-                //       child: Column(
-                //         crossAxisAlignment: CrossAxisAlignment.start,
-                //         children: [
-                //           if (_modelControllers.isEmpty)
-                //             Padding(
-                //               padding: const EdgeInsets.only(bottom: 16.0),
-                //               child: Text(
-                //                 'No overrides configured',
-                //                 style: ShadTheme.of(context).textTheme.muted,
-                //               ),
-                //             )
-                //           else
-                //             ..._modelControllers.entries.map((entry) {
-                //               return _ModelOverrideSection(
-                //                 modelIdentifier: entry.key,
-                //                 controller: entry.value,
-                //                 onChanged: _checkForChanges,
-                //                 onRemove: () => _removeModelOverride(entry.key),
-                //                 onPreview: () =>
-                //                     AgentInstructionPreviewModal.show(
-                //                       context,
-                //                       entry.value.text,
-                //                     ),
-                //               );
-                //             }),
-
-                //           // Add new override button
-                //           const SizedBox(height: 16),
-                //           _AddModelOverrideButton(
-                //             existingIdentifiers: _modelControllers.keys.toSet(),
-                //             availableLlms: llmSettings,
-                //             onAdd: _addModelOverride,
-                //           ),
-                //         ],
-                //       ),
-                //     ),
-                //   ],
-                // ),
               ],
             ),
           ),
@@ -637,23 +575,6 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
     );
   }
 
-  void _addModelOverride(String modelIdentifier) {
-    if (!_modelControllers.containsKey(modelIdentifier)) {
-      setState(() {
-        _modelControllers[modelIdentifier] = TextEditingController();
-        _checkForChanges();
-      });
-    }
-  }
-
-  void _removeModelOverride(String modelIdentifier) {
-    setState(() {
-      _modelControllers[modelIdentifier]?.dispose();
-      _modelControllers.remove(modelIdentifier);
-      _checkForChanges();
-    });
-  }
-
   String _getPreviewInstruction(String? modelIdentifier, String currentInput) {
     if (!_includeUserInstructions) {
       return currentInput;
@@ -683,7 +604,7 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
   Widget build(BuildContext context) {
     super.build(context);
     final projectId = widget.projectId;
-    final llmSettings = ref.watch(projectLlmSettingsProvider(projectId));
+    ref.watch(projectLlmSettingsProvider(projectId));
     final layoutTheme = Theme.of(context).extension<ShadLayoutTheme>();
     final pagePadding = layoutTheme?.pagePadding ?? const EdgeInsets.all(16);
 
@@ -739,54 +660,6 @@ class ProjectSettingsTabState extends ConsumerState<ProjectSettingsTab>
                   onChanged: _checkForChanges,
                 ),
                 const SizedBox(height: 24),
-
-                // Model-Specific Overrides
-                // ShadAccordion<String>.multiple(
-                //   children: [
-                //     ShadAccordionItem(
-                //       value: 'overrides',
-                //       title: const Text('Model-Specific Overrides'),
-                //       child: Column(
-                //         crossAxisAlignment: CrossAxisAlignment.start,
-                //         children: [
-                //           if (_modelControllers.isEmpty)
-                //             Padding(
-                //               padding: const EdgeInsets.only(bottom: 16.0),
-                //               child: Text(
-                //                 'No overrides configured',
-                //                 style: ShadTheme.of(context).textTheme.muted,
-                //               ),
-                //             )
-                //           else
-                //             ..._modelControllers.entries.map((entry) {
-                //               return _ModelOverrideSection(
-                //                 modelIdentifier: entry.key,
-                //                 controller: entry.value,
-                //                 onChanged: _checkForChanges,
-                //                 onRemove: () => _removeModelOverride(entry.key),
-                //                 onPreview: () =>
-                //                     AgentInstructionPreviewModal.show(
-                //                       context,
-                //                       _getPreviewInstruction(
-                //                         entry.key,
-                //                         entry.value.text,
-                //                       ),
-                //                     ),
-                //               );
-                //             }),
-
-                //           // Add new override button
-                //           const SizedBox(height: 16),
-                //           _AddModelOverrideButton(
-                //             existingIdentifiers: _modelControllers.keys.toSet(),
-                //             availableLlms: llmSettings,
-                //             onAdd: _addModelOverride,
-                //           ),
-                //         ],
-                //       ),
-                //     ),
-                //   ],
-                // ),
               ],
             ),
           ),
@@ -910,6 +783,7 @@ class _ModelOverrideSectionState extends ConsumerState<_ModelOverrideSection> {
 }
 
 /// Button to add a new model override
+// ignore: unused_element
 class _AddModelOverrideButton extends StatelessWidget {
   final Set<String> existingIdentifiers;
   final List<LlmApiSettings> availableLlms;

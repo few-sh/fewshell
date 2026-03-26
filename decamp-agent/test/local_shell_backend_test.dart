@@ -39,6 +39,7 @@ class MockSecretsStorage implements SecretsStorage {
 void main() {
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
+    // ignore: avoid_print
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
 
@@ -261,44 +262,52 @@ echo "Line 3"
       );
     });
 
-    test('aborts command with SIGINT', () async {
-      final abortController = StreamController<ProcessSignal>();
+    test(
+      'aborts command with SIGINT',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
 
-      // Start a long-running command and abort it after a short delay
-      final resultFuture = shellService.executeCommand(
-        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-        abortSignal: abortController.stream,
-      );
+        // Start a long-running command and abort it after a short delay
+        final resultFuture = shellService.executeCommand(
+          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+          abortSignal: abortController.stream,
+        );
 
-      // Wait a bit then send abort signal
-      await Future.delayed(const Duration(milliseconds: 800));
-      abortController.add(ProcessSignal.sigint);
+        // Wait a bit then send abort signal
+        await Future.delayed(const Duration(milliseconds: 800));
+        abortController.add(ProcessSignal.sigint);
 
-      final result = await resultFuture;
-      await abortController.close();
+        final result = await resultFuture;
+        await abortController.close();
 
-      // Command should be interrupted (exit code varies by platform/shell)
-      // Just verify it didn't complete all iterations
-      expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 20)));
+        // Command should be interrupted (exit code varies by platform/shell)
+        // Just verify it didn't complete all iterations
+        expect(result['stdout'], isNot(contains('Second 30')));
+      },
+      timeout: const Timeout(Duration(seconds: 20)),
+    );
 
-    test('aborts command with SIGTERM', () async {
-      final abortController = StreamController<ProcessSignal>();
+    test(
+      'aborts command with SIGTERM',
+      () async {
+        final abortController = StreamController<ProcessSignal>();
 
-      final resultFuture = shellService.executeCommand(
-        'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
-        abortSignal: abortController.stream,
-      );
+        final resultFuture = shellService.executeCommand(
+          'for i in {1..30}; do echo "Second \$i"; sleep 1; done',
+          abortSignal: abortController.stream,
+        );
 
-      await Future.delayed(const Duration(milliseconds: 800));
-      abortController.add(ProcessSignal.sigterm);
+        await Future.delayed(const Duration(milliseconds: 800));
+        abortController.add(ProcessSignal.sigterm);
 
-      final result = await resultFuture;
-      await abortController.close();
+        final result = await resultFuture;
+        await abortController.close();
 
-      // Command should be interrupted
-      expect(result['stdout'], isNot(contains('Second 30')));
-    }, timeout: const Timeout(Duration(seconds: 10)));
+        // Command should be interrupted
+        expect(result['stdout'], isNot(contains('Second 30')));
+      },
+      timeout: const Timeout(Duration(seconds: 10)),
+    );
 
     test(
       'aborts command with child processes using SIGINT',
