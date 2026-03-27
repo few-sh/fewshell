@@ -9,6 +9,59 @@ import 'package:agent_core/agent_core.dart';
 import 'package:fewshell_agent/services/interactive_shell_session.dart';
 import 'package:fewshell_agent/services/local_shell_backend.dart';
 
+Future<Set<int>> _linuxZombieChildPids() async {
+  if (!Platform.isLinux) return <int>{};
+
+  final childrenFile = File('/proc/$pid/task/$pid/children');
+  if (!await childrenFile.exists()) return <int>{};
+
+  final childrenRaw = (await childrenFile.readAsString()).trim();
+  if (childrenRaw.isEmpty) return <int>{};
+
+  final childPids = childrenRaw
+      .split(RegExp(r'\s+'))
+      .where((v) => v.isNotEmpty)
+      .map(int.parse)
+      .toList(growable: false);
+
+  final zombies = <int>{};
+  for (final childPid in childPids) {
+    final statusFile = File('/proc/$childPid/status');
+    if (!await statusFile.exists()) {
+      continue;
+    }
+    final status = await statusFile.readAsString();
+    final stateLine = status
+        .split('\n')
+        .firstWhere((line) => line.startsWith('State:'), orElse: () => '');
+    if (stateLine.contains('\tZ') || stateLine.contains(' Z ')) {
+      zombies.add(childPid);
+    }
+  }
+
+  return zombies;
+}
+
+Future<Set<int>> _waitForLinuxZombieDeltaToSettle(
+  Set<int> baseline, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  if (!Platform.isLinux) return <int>{};
+
+  final deadline = DateTime.now().add(timeout);
+  Set<int> leaked = <int>{};
+  while (DateTime.now().isBefore(deadline)) {
+    final now = await _linuxZombieChildPids();
+    leaked = now.difference(baseline);
+    if (leaked.isEmpty) {
+      return leaked;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+  }
+
+  return leaked;
+}
+
 void main() {
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
@@ -536,6 +589,44 @@ void main() {
   });
 
   group('InteractiveShellSession - close behavior', () {
+    test('linux: does not leak zombie child after command and close', () async {
+      if (!Platform.isLinux) {
+        return;
+      }
+
+      final baselineZombies = await _linuxZombieChildPids();
+
+      final session = InteractiveShellSession(
+        shellService: ShellService(
+          null,
+          null,
+          'test-project',
+          backend: LocalShellBackend(),
+        ),
+        onOutput: (data) {},
+      );
+
+      final result = await session
+          .executeCommand(
+            command: 'echo no_zombie',
+            abortSignal: null,
+          )
+          .timeout(const Duration(seconds: 5));
+      expect(result['exitCode'], equals(0));
+
+      session.close();
+
+      final leakedZombies = await _waitForLinuxZombieDeltaToSettle(
+        baselineZombies,
+      );
+      expect(
+        leakedZombies,
+        isEmpty,
+        reason:
+            'Detected leaked zombie child process(es) after close: $leakedZombies',
+      );
+    });
+
     test('close() returns immediately without blocking the event loop',
         () async {
       // This reproduces the server hang scenario:
