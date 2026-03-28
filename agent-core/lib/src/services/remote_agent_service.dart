@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:logging/logging.dart';
 
 import 'package:agent_core/agent_core.dart';
-import 'package:llm_dart/llm_dart.dart';
 
 final _log = Logger('RemoteAgentService');
 
@@ -27,16 +25,8 @@ Future<AgentLoopResult> runRemoteAgentLoop({
 
       if (type == 'request_approval') {
         final toolsJson = (data['tools'] as List).cast<Map<String, dynamic>>();
-        final pendingCalls = toolsJson
-            .map((j) => PendingToolCall(
-                arguments: j['arguments'],
-                originalToolCall: ToolCall(
-                    id: j['id'],
-                    callType: 'function',
-                    function: FunctionCall(
-                        name: j['name'],
-                        arguments: jsonEncode(j['arguments'])))))
-            .toList();
+        final pendingCalls =
+            toolsJson.map(PendingToolCall.fromApprovalRequestJson).toList();
 
         final approved = await requestApproval(pendingCalls);
 
@@ -49,12 +39,8 @@ Future<AgentLoopResult> runRemoteAgentLoop({
         } else {
           channel.sendCustomMessage({
             'type': 'approval_response',
-            'approvedCalls': approved
-                .map((c) => {
-                      'id': c.id,
-                      'arguments': c.arguments,
-                    })
-                .toList(),
+            'approvedCalls':
+                approved.map((c) => c.toApprovalResponseJson()).toList(),
             'sessionId': sessionId,
           });
         }

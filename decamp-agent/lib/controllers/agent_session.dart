@@ -264,10 +264,7 @@ class AgentSession {
               }
               final arguments = callData['arguments'] as Map<String, dynamic>;
 
-              return PendingToolCall(
-                arguments: arguments,
-                originalToolCall: original.originalToolCall,
-              );
+              return original.withArguments(arguments);
             })
             .whereType<PendingToolCall>()
             .toList();
@@ -416,12 +413,8 @@ class AgentSession {
 
             channel.safeSendCustomMessage({
               'type': 'request_approval',
-              'tools': pendingCalls
-                  .map(
-                    (c) =>
-                        {'id': c.id, 'name': c.name, 'arguments': c.arguments},
-                  )
-                  .toList(),
+              'tools':
+                  pendingCalls.map((c) => c.toApprovalRequestJson()).toList(),
             });
 
             final completer = Completer<List<PendingToolCall>?>();

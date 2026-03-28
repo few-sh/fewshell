@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:llm_dart/llm_dart.dart';
 
 import 'database/project_database.dart';
@@ -14,6 +16,46 @@ class PendingToolCall {
     required this.arguments,
     required this.originalToolCall,
   });
+
+  PendingToolCall withArguments(Map<String, dynamic> newArguments) {
+    return PendingToolCall(
+      arguments: newArguments,
+      originalToolCall: originalToolCall,
+    );
+  }
+
+  Map<String, dynamic> toApprovalRequestJson() {
+    return {
+      'id': id,
+      'name': name,
+      'arguments': arguments,
+    };
+  }
+
+  Map<String, dynamic> toApprovalResponseJson() {
+    return {
+      'id': id,
+      'arguments': arguments,
+    };
+  }
+
+  factory PendingToolCall.fromApprovalRequestJson(Map<String, dynamic> json) {
+    final id = json['id'] as String;
+    final name = json['name'] as String;
+    final args = Map<String, dynamic>.from(json['arguments'] as Map);
+
+    return PendingToolCall(
+      arguments: args,
+      originalToolCall: ToolCall(
+        id: id,
+        callType: 'function',
+        function: FunctionCall(
+          name: name,
+          arguments: jsonEncode(args),
+        ),
+      ),
+    );
+  }
 }
 
 /// Result of the agent loop
