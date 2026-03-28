@@ -265,8 +265,6 @@ class AgentSession {
               final arguments = callData['arguments'] as Map<String, dynamic>;
 
               return PendingToolCall(
-                id: id,
-                name: original.name,
                 arguments: arguments,
                 originalToolCall: original.originalToolCall,
               );

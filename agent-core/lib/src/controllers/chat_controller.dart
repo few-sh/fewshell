@@ -336,8 +336,6 @@ class ChatController extends StateNotifier<ChatState> {
                 return null;
               }
               return PendingToolCall(
-                id: original.id,
-                name: original.name,
                 arguments: action.params,
                 originalToolCall: original.originalToolCall,
               );

@@ -29,8 +29,6 @@ Future<AgentLoopResult> runRemoteAgentLoop({
         final toolsJson = (data['tools'] as List).cast<Map<String, dynamic>>();
         final pendingCalls = toolsJson
             .map((j) => PendingToolCall(
-                id: j['id'],
-                name: j['name'],
                 arguments: j['arguments'],
                 originalToolCall: ToolCall(
                     id: j['id'],

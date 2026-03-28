@@ -4,14 +4,13 @@ import 'database/project_database.dart';
 
 /// Represents a tool call that needs approval
 class PendingToolCall {
-  final String id;
-  final String name;
   final Map<String, dynamic> arguments;
   final ToolCall originalToolCall;
 
+  String get id => originalToolCall.id;
+  String get name => originalToolCall.function.name;
+
   const PendingToolCall({
-    required this.id,
-    required this.name,
     required this.arguments,
     required this.originalToolCall,
   });

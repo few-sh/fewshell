@@ -141,8 +141,6 @@ List<PendingToolCall> _toPendingToolCalls(List<ToolCall> toolCalls) {
 
     pendingCalls.add(
       PendingToolCall(
-        id: tc.id,
-        name: tc.function.name,
         arguments: args,
         originalToolCall: tc,
       ),
