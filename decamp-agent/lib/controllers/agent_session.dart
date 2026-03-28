@@ -293,6 +293,58 @@ class AgentSession {
     }
   }
 
+  bool get _isAwaitingApproval =>
+      _approvalCompleter != null && !_approvalCompleter!.isCompleted;
+
+  void _sendApprovalRequest(
+    MultiplexedWebSocketChannel channel,
+    List<PendingToolCall> pendingCalls,
+  ) {
+    channel.safeSendCustomMessage({
+      'type': 'request_approval',
+      'tools':
+          pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+    });
+  }
+
+  Future<List<PendingToolCall>?> _requestApproval(
+    MultiplexedWebSocketChannel channel,
+    List<PendingToolCall> pendingCalls,
+  ) {
+    _currentPendingCalls = pendingCalls;
+
+    final completer = Completer<List<PendingToolCall>?>();
+    _approvalCompleter = completer;
+    _sendApprovalRequest(channel, pendingCalls);
+
+    completer.future.whenComplete(() {
+      if (identical(_approvalCompleter, completer)) {
+        _approvalCompleter = null;
+        _currentPendingCalls = null;
+      }
+    });
+
+    return completer.future;
+  }
+
+  bool _resendPendingApprovalRequest(MultiplexedWebSocketChannel channel) {
+    if (!_isAwaitingApproval) {
+      return false;
+    }
+
+    final pendingCalls = _currentPendingCalls;
+    if (pendingCalls == null || pendingCalls.isEmpty) {
+      _log.warning(
+        'Approval state exists, but there are no pending tool calls',
+      );
+      return false;
+    }
+
+    _log.info('Re-sending pending approval request to reconnected channel');
+    _sendApprovalRequest(channel, pendingCalls);
+    return true;
+  }
+
   Future<void> _startChat(
     Map<String, dynamic> data,
     MultiplexedWebSocketChannel channel,
@@ -323,6 +375,9 @@ class AgentSession {
     if (sessionId != null) {
       final locked = await _lockSession(sessionId);
       if (!locked) {
+        if (_resendPendingApprovalRequest(channel)) {
+          return;
+        }
         _log.warning('Chat already in progress for session $sessionId');
         channel.safeSendCustomMessage({
           'type': 'error',
@@ -408,19 +463,8 @@ class AgentSession {
           },
           tools: shellTools,
           cancelToken: _currentCancelToken!,
-          requestApproval: (pendingCalls) {
-            _currentPendingCalls = pendingCalls;
-
-            channel.safeSendCustomMessage({
-              'type': 'request_approval',
-              'tools':
-                  pendingCalls.map((c) => c.toApprovalRequestJson()).toList(),
-            });
-
-            final completer = Completer<List<PendingToolCall>?>();
-            _approvalCompleter = completer;
-            return completer.future;
-          },
+          requestApproval: (pendingCalls) =>
+              _requestApproval(channel, pendingCalls),
           executeToolCall: (toolUseMessage, approvedToolCalls) async {
             final results = <String>[];
             final completedToolResults = <ToolCall>[];
