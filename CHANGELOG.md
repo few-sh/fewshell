@@ -1,3 +1,8 @@
+# Server 0.1.27
+
+- Add logging for CRDT merge failures to improve diagnostics
+- Update `native_pty` dependency (fix zombie processes left over from commands)
+
 # App 1.0.2+29
 
 - Linux desktop support
