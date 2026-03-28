@@ -50,19 +50,15 @@ class AgentSession {
         backend: LocalShellBackend(),
       ),
       onOutput: (data) {
-        for (final channel in _channels) {
-          channel.safeSendCustomMessage({
-            'type': 'terminal_output',
-            'data': data,
-          });
-        }
+        _broadcastCustomMessage({
+          'type': 'terminal_output',
+          'data': data,
+        });
       },
       onSessionEnded: () {
-        for (final channel in _channels) {
-          channel.safeSendCustomMessage({
-            'type': 'terminal_session_ended',
-          });
-        }
+        _broadcastCustomMessage({
+          'type': 'terminal_session_ended',
+        });
       },
     );
   }
@@ -89,6 +85,12 @@ class AgentSession {
 
   /// Check if this session has any active channels
   bool get hasActiveChannels => _channels.isNotEmpty;
+
+  void _broadcastCustomMessage(Map<String, dynamic> message) {
+    for (final channel in _channels) {
+      channel.safeSendCustomMessage(message);
+    }
+  }
 
   void dispose() {
     _currentCancelToken?.cancel('Session disposed');
