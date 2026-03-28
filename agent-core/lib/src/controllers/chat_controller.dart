@@ -194,94 +194,6 @@ class ChatController extends StateNotifier<ChatState> {
     }
   }
 
-  /// Build conversation history from database messages
-  /// Reconstructs proper ChatMessage objects including tool use and tool results
-  List<ChatMessage> _buildConversationHistory(List<dynamic> dbMessages) {
-    final conversation = <ChatMessage>[];
-
-    _log.info(
-      '🔄 Building conversation history from ${dbMessages.length} messages',
-    );
-
-    for (final msg in dbMessages) {
-      // Cast to MessageEntity for type-safe access
-      final messageEntity = msg as MessageEntity;
-
-      // Skip streaming messages (placeholders) to prevent sending empty/partial messages to LLM
-      if (messageEntity.isStreaming) {
-        continue;
-      }
-
-      // Skip messages that are not visible to LLM
-      if (!messageEntity.isVisibleToLlm) {
-        continue;
-      }
-
-      // Skip notification messages (errors, system notifications)
-      if (messageEntity.messageKind == MessageKind.notification) {
-        continue;
-      }
-
-      // Use the extension method to convert to ChatMessage
-      final chatMessages = messageEntity.toChatMessage();
-
-      for (final chatMessage in chatMessages) {
-        // Prepend the summary prefix for conversation summary messages
-        // so the LLM understands it's a handoff from a prior model.
-        // The prefix is NOT stored in the DB to avoid nesting on re-summarization.
-        final messageToAdd =
-            messageEntity.messageKind == MessageKind.conversationSummary &&
-                    chatMessage.role == ChatRole.user
-                ? ChatMessage.user(
-                    '$conversationSummaryPrefix${chatMessage.content}')
-                : chatMessage;
-
-        // Log tool calls and results for debugging
-        if (chatMessage.messageType is ToolUseMessage) {
-          final toolUse = chatMessage.messageType as ToolUseMessage;
-          _log.info(
-            '  🔧 Tool calls: ${toolUse.toolCalls.map((tc) => tc.function.name).join(", ")}',
-          );
-        } else if (chatMessage.messageType is ToolResultMessage) {
-          final toolResult = chatMessage.messageType as ToolResultMessage;
-          _log.info(
-            '  📊 Tool results: ${toolResult.results.length} result(s)',
-          );
-        }
-
-        conversation.add(messageToAdd);
-      }
-    }
-
-    if (conversation.isNotEmpty) {
-      for (int i = conversation.length - 1; i >= 0; i--) {
-        if (conversation[i].messageType is TextMessage) {
-          // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
-          // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
-          conversation[i] = conversation[i].withExtension(
-            'anthropic',
-            {
-              'contentBlocks': [
-                {
-                  'type': 'text',
-                  'text': '',
-                  'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
-                },
-              ],
-            },
-          );
-          break; // Only cache the last text message
-        }
-      }
-    }
-
-    _log.info(
-      '✅ Built conversation with ${conversation.length} messages',
-    );
-
-    return conversation;
-  }
-
   /// Validate and prepare for sending a message
   Future<MessageEntity?> _validateAndPrepare({
     required String sessionId,
@@ -489,10 +401,7 @@ class ChatController extends StateNotifier<ChatState> {
         try {
           result = await runAgentLoop(
             getConversation: () async {
-              final dbMessages =
-                  await _messageDao.getMessagesBySession(sessionId);
-              final conversation = _buildConversationHistory(dbMessages);
-              return conversation;
+              return _messageDao.getMessagesBySession(sessionId);
             },
             llmStream: (conv, tools, {cancelToken}) => _llmService.streamChat(
               conv,

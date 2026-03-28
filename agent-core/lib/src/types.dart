@@ -1,5 +1,7 @@
 import 'package:llm_dart/llm_dart.dart';
 
+import 'database/project_database.dart';
+
 /// Represents a tool call that needs approval
 class PendingToolCall {
   final String id;
@@ -72,4 +74,4 @@ typedef ToolResultMessageCallback = Future<void> Function(
 
 /// Optional callback to get fresh conversation (e.g., from database)
 /// If provided, called at the start of each iteration instead of using in-memory list
-typedef ConversationProvider = Future<List<ChatMessage>> Function();
+typedef ConversationProvider = Future<List<MessageEntity>> Function();

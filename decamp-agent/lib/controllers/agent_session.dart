@@ -718,61 +718,9 @@ class AgentSession {
     }
   }
 
-  Future<List<ChatMessage>> _loadConversation(String sessionId) async {
-    // Always load conversation from database (single source of truth)
-    // Filter out streaming placeholders to prevent confusing the LLM with empty assistant messages
-    // Also filter out messages not visible to LLM
-    final dbMessages =
-        await projectDb!.messageDao.getMessagesBySession(sessionId);
-    final conversation = dbMessages
-        .where(
-      (m) =>
-          !m.isStreaming &&
-          m.isVisibleToLlm &&
-          m.messageKind != MessageKind.notification,
-    )
-        .expand((m) {
-      final chatMessages = m.toChatMessage();
-      // Prepend the summary prefix for conversation summary messages
-      // so the LLM understands it's a handoff from a prior model.
-      // The prefix is NOT stored in the DB to avoid nesting on re-summarization.
-      if (m.messageKind == MessageKind.conversationSummary) {
-        return chatMessages.map(
-          (cm) => cm.role == ChatRole.user
-              ? ChatMessage.user(
-                  '$conversationSummaryPrefix${cm.content}',
-                )
-              : cm,
-        );
-      }
-      return chatMessages;
-    }).toList();
-
-    // Add cache control to the last text message for Anthropic prompt caching
-    // Search backwards to find the last TextMessage, as conversation may end with tool calls
-    // Use cache control marker pattern: Empty text block with cache_control
-    if (conversation.isNotEmpty) {
-      for (int i = conversation.length - 1; i >= 0; i--) {
-        if (conversation[i].messageType is TextMessage) {
-          // HACK: This is not the cleanest way to do this, as it assumes anthropic, but we need to, and it works.
-          // other providers simply ignore this extension on the dart_llm library side. -Ivgeni
-          conversation[i] = conversation[i].withExtension(
-            'anthropic',
-            {
-              'contentBlocks': [
-                {
-                  'type': 'text',
-                  'text': '',
-                  'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
-                },
-              ],
-            },
-          );
-          break; // Only cache the last text message
-        }
-      }
-    }
-    return conversation;
+  Future<List<MessageEntity>> _loadConversation(String sessionId) async {
+    // Always load conversation entities from database (single source of truth).
+    return projectDb!.messageDao.getMessagesBySession(sessionId);
   }
 
   void _asyncDbWrite(Future<void> Function() write) {

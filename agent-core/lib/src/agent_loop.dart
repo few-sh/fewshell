@@ -3,6 +3,10 @@ import 'dart:convert';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:logging/logging.dart';
 
+import 'database/project_database.dart';
+import 'database/tables/messages_table.dart';
+import 'extensions/chat_message_extensions.dart';
+import 'services/conversation_summarizer.dart';
 import 'types.dart';
 
 final _log = Logger('AgentLoop');
@@ -58,8 +62,9 @@ Future<AgentLoopResult> runAgentLoop({
       return const AgentLoopCancelled();
     }
 
-    // Get fresh conversation if provider is available (e.g., from database)
-    List<ChatMessage> messages = await getConversation();
+    // Build conversation from DB entities.
+    final dbMessages = await getConversation();
+    final messages = _buildConversationHistory(dbMessages);
 
     // Stream from LLM
     final streamResult = await _streamFromLlm(
@@ -178,6 +183,54 @@ Future<AgentLoopResult> runAgentLoop({
 
     // Loop continues with updated conversation
   }
+}
+
+List<ChatMessage> _buildConversationHistory(List<MessageEntity> dbMessages) {
+  final conversation = <ChatMessage>[];
+
+  for (final messageEntity in dbMessages) {
+    // Skip streaming placeholders and non-LLM-visible/system-only messages.
+    if (messageEntity.isStreaming ||
+        !messageEntity.isVisibleToLlm ||
+        messageEntity.messageKind == MessageKind.notification) {
+      continue;
+    }
+
+    final chatMessages = messageEntity.toChatMessage();
+    for (final chatMessage in chatMessages) {
+      if (messageEntity.messageKind == MessageKind.conversationSummary &&
+          chatMessage.role == ChatRole.user) {
+        conversation.add(
+          ChatMessage.user('$conversationSummaryPrefix${chatMessage.content}'),
+        );
+      } else {
+        conversation.add(chatMessage);
+      }
+    }
+  }
+
+  if (conversation.isNotEmpty) {
+    for (int i = conversation.length - 1; i >= 0; i--) {
+      if (conversation[i].messageType is TextMessage) {
+        // This extension is consumed by Anthropic and ignored by other providers.
+        conversation[i] = conversation[i].withExtension(
+          'anthropic',
+          {
+            'contentBlocks': [
+              {
+                'type': 'text',
+                'text': '',
+                'cache_control': {'type': 'ephemeral', 'ttl': '5m'},
+              },
+            ],
+          },
+        );
+        break;
+      }
+    }
+  }
+
+  return conversation;
 }
 
 /// Internal result from streaming LLM response
