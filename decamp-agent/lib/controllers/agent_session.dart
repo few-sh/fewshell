@@ -245,7 +245,8 @@ class AgentSession {
   void _handleApproval(Map<String, dynamic> data) {
     _log.info('✅ Received approval response');
 
-    if (_approvalCompleter != null && !_approvalCompleter!.isCompleted) {
+    final completer = _approvalCompleter;
+    if (completer != null && !completer.isCompleted) {
       if (data['approvedCalls'] != null) {
         final approvedCalls =
             (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
@@ -269,10 +270,12 @@ class AgentSession {
             .whereType<PendingToolCall>()
             .toList();
 
-        _approvalCompleter!.complete(approved);
+        _clearPendingApprovalState();
+        completer.complete(approved);
       } else {
         // Cancelled
-        _approvalCompleter!.complete(null);
+        _clearPendingApprovalState();
+        completer.complete(null);
       }
     }
   }
@@ -291,6 +294,11 @@ class AgentSession {
     if (projectDb != null) {
       await projectDb!.sessionMutexDao.unlock(sessionId);
     }
+  }
+
+  void _clearPendingApprovalState() {
+    _approvalCompleter = null;
+    _currentPendingCalls = null;
   }
 
   bool get _isAwaitingApproval =>
@@ -316,13 +324,6 @@ class AgentSession {
     final completer = Completer<List<PendingToolCall>?>();
     _approvalCompleter = completer;
     _sendApprovalRequest(channel, pendingCalls);
-
-    completer.future.whenComplete(() {
-      if (identical(_approvalCompleter, completer)) {
-        _approvalCompleter = null;
-        _currentPendingCalls = null;
-      }
-    });
 
     return completer.future;
   }
