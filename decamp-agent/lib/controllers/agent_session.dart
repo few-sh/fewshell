@@ -50,15 +50,19 @@ class AgentSession {
         backend: LocalShellBackend(),
       ),
       onOutput: (data) {
-        _broadcastCustomMessage({
-          'type': 'terminal_output',
-          'data': data,
-        });
+        for (final channel in _channels) {
+          channel.safeSendCustomMessage({
+            'type': 'terminal_output',
+            'data': data,
+          });
+        }
       },
       onSessionEnded: () {
-        _broadcastCustomMessage({
-          'type': 'terminal_session_ended',
-        });
+        for (final channel in _channels) {
+          channel.safeSendCustomMessage({
+            'type': 'terminal_session_ended',
+          });
+        }
       },
     );
   }
@@ -318,14 +322,17 @@ class AgentSession {
   }
 
   Future<List<PendingToolCall>?> _requestApproval(
-    MultiplexedWebSocketChannel channel,
     List<PendingToolCall> pendingCalls,
   ) {
     _currentPendingCalls = pendingCalls;
 
     final completer = Completer<List<PendingToolCall>?>();
     _approvalCompleter = completer;
-    _sendApprovalRequest(channel, pendingCalls);
+    _broadcastCustomMessage({
+      'type': 'request_approval',
+      'tools':
+          pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+    });
 
     return completer.future;
   }
@@ -466,8 +473,7 @@ class AgentSession {
           },
           tools: shellTools,
           cancelToken: _currentCancelToken!,
-          requestApproval: (pendingCalls) =>
-              _requestApproval(channel, pendingCalls),
+          requestApproval: (pendingCalls) => _requestApproval(pendingCalls),
           executeToolCall: (toolUseMessage, approvedToolCalls) async {
             final results = <String>[];
             final completedToolResults = <ToolCall>[];
