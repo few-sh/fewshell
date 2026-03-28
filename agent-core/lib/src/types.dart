@@ -59,7 +59,8 @@ typedef ApprovalFunction = Future<List<PendingToolCall>?> Function(
 );
 
 typedef ToolExecutionFunction = Future<List<String>> Function(
-  List<ToolCall> toolCalls,
+  MessageEntity toolUseMessage,
+  List<ToolCall> approvedToolCalls,
 );
 
 typedef TextDeltaCallback = Future<void> Function(String delta);

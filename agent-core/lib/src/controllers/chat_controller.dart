@@ -421,17 +421,17 @@ class ChatController extends StateNotifier<ChatState> {
               await _messageDao
                   .insertMessage(streamingMessage.toCompanion(true));
             },
-            executeToolCall: (toolCalls) async {
+            executeToolCall: (toolUseMessage, approvedToolCalls) async {
               final results = <String>[];
               final completedToolResults = <ToolCall>[];
 
-              streamingMessage = streamingMessage.copyWith(
+              streamingMessage = toolUseMessage.copyWith(
                 messageKind: MessageKind.toolResult,
                 isStreaming: true,
-                toolCallsJson: Value(toolCalls),
+                toolCallsJson: Value(approvedToolCalls),
               );
               _activeMessageController.add(streamingMessage);
-              for (final toolCall in toolCalls) {
+              for (final toolCall in approvedToolCalls) {
                 final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
                   terminalBuffer.write(data);

@@ -430,17 +430,17 @@ class AgentSession {
             _approvalCompleter = completer;
             return completer.future;
           },
-          executeToolCall: (toolCalls) async {
+          executeToolCall: (toolUseMessage, approvedToolCalls) async {
             final results = <String>[];
             final completedToolResults = <ToolCall>[];
 
-            streamingMessage = streamingMessage.copyWith(
+            streamingMessage = toolUseMessage.copyWith(
               messageKind: MessageKind.toolResult,
               isStreaming: true,
-              toolCallsJson: Value(toolCalls),
+              toolCallsJson: Value(approvedToolCalls),
             );
 
-            for (final toolCall in toolCalls) {
+            for (final toolCall in approvedToolCalls) {
               final argumentsJson = toolCall.function.arguments;
               final params = argumentsJson.isNotEmpty
                   ? Map<String, dynamic>.from(jsonDecode(argumentsJson))

@@ -84,7 +84,7 @@ Future<AgentLoopResult> runAgentLoop({
       try {
         await _executeAndPersistToolResults(
           approved: approved,
-          toolContent: lastMessage.content,
+          toolUseMessage: lastMessage,
           executeToolCall: executeToolCall,
           onToolResultMessage: onToolResultMessage,
         );
@@ -153,7 +153,7 @@ List<PendingToolCall> _toPendingToolCalls(List<ToolCall> toolCalls) {
 
 Future<void> _executeAndPersistToolResults({
   required List<PendingToolCall> approved,
-  required String toolContent,
+  required MessageEntity toolUseMessage,
   required ToolExecutionFunction executeToolCall,
   required ToolResultMessageCallback onToolResultMessage,
 }) async {
@@ -171,13 +171,13 @@ Future<void> _executeAndPersistToolResults({
 
   final toolCallMessage = ChatMessage.toolUse(
     toolCalls: approved.map((p) => p.originalToolCall).toList(),
-    content: toolContent,
+    content: toolUseMessage.content,
   );
 
   // Execute all approved tool calls
   List<String> resultStrings;
   try {
-    resultStrings = await executeToolCall(approvedToolCalls);
+    resultStrings = await executeToolCall(toolUseMessage, approvedToolCalls);
   } on AgentAbortException {
     rethrow;
   } catch (e) {
