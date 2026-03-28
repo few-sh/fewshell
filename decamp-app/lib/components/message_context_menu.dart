@@ -198,7 +198,7 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
               );
             },
           ),
-        if (isUser)
+        if (isUser || shellCommands.isNotEmpty)
           ShadContextMenuItem(
             leading: const Icon(LucideIcons.send),
             onPressed: _handleResend,
