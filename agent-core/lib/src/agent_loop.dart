@@ -208,12 +208,9 @@ Future<void> _executeAndPersistToolResults({
     );
   }
 
-  // Build tool result message
-  final combinedContent =
-      results.map((r) => r.function.arguments).join('\n---\n');
+  // Tool results should flow through the canonical structured payload.
   final toolResultMessage = ChatMessage.toolResult(
     results: results,
-    content: combinedContent,
   );
 
   await onToolResultMessage(toolResultMessage,
