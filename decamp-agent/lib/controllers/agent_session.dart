@@ -428,7 +428,8 @@ class AgentSession {
             streamingMessage = toolUseMessage.copyWith(
               messageKind: MessageKind.toolResult,
               isStreaming: true,
-              toolCallsJson: Value(approvedToolCalls),
+              // Keep the full original tool-use list for provider validation.
+              toolCallsJson: Value(toolUseMessage.toolCallsJson),
             );
 
             for (final toolCall in approvedToolCalls) {
@@ -577,9 +578,11 @@ class AgentSession {
 
             final messageEntity = message.toMessageEntity(
               sessionId: sessionId!,
+              toolCallMessage: toolCallMessage,
             );
             streamingMessage = streamingMessage.copyWith(
               messageKind: MessageKind.toolResult,
+              toolCallsJson: Value(messageEntity.toolCallsJson),
               toolResultsJson: Value(messageEntity.toolResultsJson),
               isStreaming: false,
             );

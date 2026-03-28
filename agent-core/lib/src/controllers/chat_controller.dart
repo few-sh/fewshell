@@ -426,7 +426,8 @@ class ChatController extends StateNotifier<ChatState> {
               streamingMessage = toolUseMessage.copyWith(
                 messageKind: MessageKind.toolResult,
                 isStreaming: true,
-                toolCallsJson: Value(approvedToolCalls),
+                // Keep the original full tool-use list for strict provider validation.
+                toolCallsJson: Value(toolUseMessage.toolCallsJson),
               );
               _activeMessageController.add(streamingMessage);
               for (final toolCall in approvedToolCalls) {
@@ -504,9 +505,11 @@ class ChatController extends StateNotifier<ChatState> {
                 {String? messageId, ChatMessage? toolCallMessage}) async {
               final messageEntity = message.toMessageEntity(
                 sessionId: sessionId,
+                toolCallMessage: toolCallMessage,
               );
               streamingMessage = streamingMessage.copyWith(
                   messageKind: MessageKind.toolResult,
+                  toolCallsJson: Value(messageEntity.toolCallsJson),
                   toolResultsJson: Value(messageEntity.toolResultsJson),
                   isStreaming: false);
               await _messageDao

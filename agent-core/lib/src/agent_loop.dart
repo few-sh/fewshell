@@ -155,7 +155,9 @@ Future<void> _executeAndPersistToolResults({
   required ToolExecutionFunction executeToolCall,
   required ToolResultMessageCallback onToolResultMessage,
 }) async {
-  // Build approved tool calls and assistant message from approved list
+  final allOriginalToolCalls = toolUseMessage.toolCallsJson ?? [];
+
+  // Build approved tool calls
   final approvedToolCalls = approved.map((p) {
     return ToolCall(
       id: p.originalToolCall.id,
@@ -167,46 +169,51 @@ Future<void> _executeAndPersistToolResults({
     );
   }).toList();
 
+  // Execute approved tool calls and collect results keyed by tool call ID
+  final approvedResultsById = <String, String>{};
+  if (approvedToolCalls.isNotEmpty) {
+    List<String> resultStrings;
+    try {
+      resultStrings = await executeToolCall(toolUseMessage, approvedToolCalls);
+    } on AgentAbortException {
+      rethrow;
+    } catch (e) {
+      // Return error as result so LLM can reason about it
+      final errorResult = jsonEncode({
+        'error': 'Tool execution failed.',
+        'details': e.toString(),
+      });
+      resultStrings = List.filled(approvedToolCalls.length, errorResult);
+    }
+    for (var i = 0; i < approvedToolCalls.length; i++) {
+      approvedResultsById[approvedToolCalls[i].id] = i < resultStrings.length
+          ? resultStrings[i]
+          : jsonEncode({'error': 'Missing result for tool call'});
+    }
+  }
+
+  // The assistant message reflects all tool calls the LLM made.
   final toolCallMessage = ChatMessage.toolUse(
-    toolCalls: approved.map((p) => p.originalToolCall).toList(),
+    toolCalls: allOriginalToolCalls,
     content: toolUseMessage.content,
   );
 
-  // Execute all approved tool calls
-  List<String> resultStrings;
-  try {
-    resultStrings = await executeToolCall(toolUseMessage, approvedToolCalls);
-  } on AgentAbortException {
-    rethrow;
-  } catch (e) {
-    // Return error as result so LLM can reason about it
-    final errorResult = jsonEncode({
-      'error': 'Tool execution failed.',
-      'details': e.toString(),
-    });
-    resultStrings = List.filled(approvedToolCalls.length, errorResult);
-  }
-
-  // Build ToolCall results from execution
-  final results = <ToolCall>[];
-  for (var i = 0; i < approvedToolCalls.length; i++) {
-    final toolCall = approvedToolCalls[i];
-    final resultString = i < resultStrings.length
-        ? resultStrings[i]
-        : jsonEncode({
-            'error': 'Missing result for tool call',
-          });
-    results.add(
-      ToolCall(
-        id: toolCall.id,
-        callType: toolCall.callType,
-        function: FunctionCall(
-          name: toolCall.function.name,
-          arguments: resultString,
-        ),
+  // Build results for ALL original tool calls; non-approved ones are marked as skipped.
+  final approvedIds = approvedToolCalls.map((tc) => tc.id).toSet();
+  final results = allOriginalToolCalls.map((tc) {
+    final resultString = approvedIds.contains(tc.id)
+        ? (approvedResultsById[tc.id] ??
+            jsonEncode({'error': 'Missing result for tool call'}))
+        : '[skipped by the user]';
+    return ToolCall(
+      id: tc.id,
+      callType: tc.callType,
+      function: FunctionCall(
+        name: tc.function.name,
+        arguments: resultString,
       ),
     );
-  }
+  }).toList();
 
   // Tool results should flow through the canonical structured payload.
   final toolResultMessage = ChatMessage.toolResult(
