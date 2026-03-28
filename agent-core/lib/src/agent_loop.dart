@@ -15,14 +15,13 @@ final _log = Logger('AgentLoop');
 /// Parameters:
 /// - [llmStream]: Function to stream chat completion from LLM
 /// - [tools]: List of tools available to the LLM
-/// - [conversation]: Initial conversation messages (used if getConversation is null)
-/// - [getConversation]: Optional callback to get fresh conversation each iteration
+/// - [getConversation]: Callback to get fresh conversation each iteration
 ///   (useful when conversation is persisted to DB and needs to be reloaded)
 /// - [requestApproval]: Callback to request user approval for tool calls
 /// - [executeToolCall]: Callback to execute approved tool calls (receives all at once)
-/// - [onTextDelta]: Optional callback for streaming text deltas
-/// - [onAssistantMessage]: Optional callback when assistant message is complete
-/// - [onToolResultMessage]: Optional callback when tool results are ready
+/// - [onTextDelta]: Callback for streaming text deltas
+/// - [onAssistantMessage]: Callback when assistant message is complete
+/// - [onToolResultMessage]: Callback when tool results are ready
 ///
 /// Returns [AgentLoopResult] indicating how the loop terminated:
 /// - [AgentLoopCompleted]: No more tool calls, conversation complete
@@ -34,7 +33,7 @@ final _log = Logger('AgentLoop');
 /// final result = await runAgentLoop(
 ///   llmStream: (conv, tools) => llmService.streamChat(conv, tools: tools),
 ///   tools: shellTools,
-///   conversation: messages,
+///   getConversation: () => db.getConversation(),
 ///   requestApproval: (toolCalls) => showApprovalDialog(toolCalls),
 ///   executeToolCall: (tcs) => shellService.executeAll(tcs),
 ///   onTextDelta: (delta) => updateUI(delta),
@@ -45,30 +44,22 @@ final _log = Logger('AgentLoop');
 Future<AgentLoopResult> runAgentLoop({
   required LlmStreamFunction llmStream,
   required List<Tool> tools,
-  List<ChatMessage>? conversation,
-  ConversationProvider? getConversation,
+  required ConversationProvider getConversation,
   required ApprovalFunction requestApproval,
   required ToolExecutionFunction executeToolCall,
-  TextDeltaCallback? onTextDelta,
-  MessageCallback? onAssistantMessage,
-  ToolResultMessageCallback? onToolResultMessage,
-  CancelToken? cancelToken,
+  required TextDeltaCallback onTextDelta,
+  required MessageCallback onAssistantMessage,
+  required ToolResultMessageCallback onToolResultMessage,
+  required CancelToken cancelToken,
 }) async {
-  // Work with a mutable copy if using in-memory conversation
-  var messages = conversation != null
-      ? List<ChatMessage>.from(conversation)
-      : <ChatMessage>[];
-
   while (true) {
     // Check for cancellation at start of loop
-    if (cancelToken?.isCancelled ?? false) {
+    if (cancelToken.isCancelled) {
       return const AgentLoopCancelled();
     }
 
     // Get fresh conversation if provider is available (e.g., from database)
-    if (getConversation != null) {
-      messages = await getConversation();
-    }
+    List<ChatMessage> messages = await getConversation();
 
     // Stream from LLM
     final streamResult = await _streamFromLlm(
@@ -82,7 +73,7 @@ Future<AgentLoopResult> runAgentLoop({
     // If no tool calls, we're done
     if (streamResult.toolCalls.isEmpty) {
       // Notify about final text message if there is one
-      if (streamResult.text.isNotEmpty && onAssistantMessage != null) {
+      if (streamResult.text.isNotEmpty) {
         await onAssistantMessage(ChatMessage.assistant(streamResult.text));
       }
       return const AgentLoopCompleted();
@@ -97,10 +88,6 @@ Future<AgentLoopResult> runAgentLoop({
             ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
             : <String, dynamic>{};
       } catch (e) {
-        // This is a data error, not an execution error, so maybe we should throw?
-        // Or return AgentLoopError?
-        // The user said "remove most of the places".
-        // If we throw here, the caller handles it.
         throw Exception(
           'Failed to parse JSON arguments for tool ${tc.function.name}: $e',
         );
@@ -120,11 +107,7 @@ Future<AgentLoopResult> runAgentLoop({
       toolCalls: pendingCalls.map((p) => p.originalToolCall).toList(),
       content: streamResult.text,
     );
-    // Add to in-memory conversation (will be overwritten if using getConversation)
-    messages.add(assistantMessage);
-    if (onAssistantMessage != null) {
-      await onAssistantMessage(assistantMessage);
-    }
+    await onAssistantMessage(assistantMessage);
 
     // Request approval
     final approved = await requestApproval(pendingCalls);
@@ -189,12 +172,9 @@ Future<AgentLoopResult> runAgentLoop({
       results: results,
       content: combinedContent,
     );
-    // Add to in-memory conversation (will be overwritten if using getConversation)
-    messages.add(toolResultMessage);
-    if (onToolResultMessage != null) {
-      await onToolResultMessage(toolResultMessage,
-          toolCallMessage: assistantMessage);
-    }
+
+    await onToolResultMessage(toolResultMessage,
+        toolCallMessage: assistantMessage);
 
     // Loop continues with updated conversation
   }

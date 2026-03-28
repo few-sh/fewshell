@@ -412,7 +412,7 @@ class AgentSession {
             );
           },
           tools: shellTools,
-          cancelToken: _currentCancelToken,
+          cancelToken: _currentCancelToken!,
           requestApproval: (pendingCalls) {
             _currentPendingCalls = pendingCalls;
 

@@ -500,7 +500,7 @@ class ChatController extends StateNotifier<ChatState> {
               cancelToken: cancelToken,
             ),
             tools: shellTools,
-            cancelToken: _currentLlmCancelToken,
+            cancelToken: _currentLlmCancelToken!,
             requestApproval: handleRequestApproval,
             onTextDelta: (delta) async {
               streamingMessage = streamingMessage.copyWith(
