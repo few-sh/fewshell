@@ -64,6 +64,38 @@ Future<AgentLoopResult> runAgentLoop({
 
     // Build conversation from DB entities.
     final dbMessages = await getConversation();
+
+    if (dbMessages.isEmpty) {
+      return const AgentLoopError(
+          "Something is wrong: can't find conversation history. No messages found in database.");
+    }
+
+    // If the persisted tail is a tool-use message, resume from approval/execution.
+    final lastMessage = dbMessages.last;
+    if (lastMessage.messageKind == MessageKind.toolUse) {
+      final approved = await requestApproval(
+          _toPendingToolCalls(lastMessage.toolCallsJson ?? []));
+
+      // User cancelled
+      if (approved == null) {
+        return const AgentLoopCancelled();
+      }
+
+      try {
+        await _executeAndPersistToolResults(
+          approved: approved,
+          toolContent: lastMessage.content,
+          executeToolCall: executeToolCall,
+          onToolResultMessage: onToolResultMessage,
+        );
+      } on AgentAbortException {
+        return const AgentLoopCancelled();
+      }
+
+      // Tool result persisted; continue so next loop can call LLM with fresh context.
+      continue;
+    }
+
     final messages = _buildConversationHistory(dbMessages);
 
     // Stream from LLM
@@ -75,114 +107,119 @@ Future<AgentLoopResult> runAgentLoop({
       cancelToken: cancelToken,
     );
 
-    // If no tool calls, we're done
+    final assistantMessage = streamResult.toolCalls.isNotEmpty
+        ? ChatMessage.toolUse(
+            toolCalls: streamResult.toolCalls,
+            content: streamResult.text,
+          )
+        : ChatMessage.assistant(streamResult.text);
+
+    // Persist at the end of the iteration so we can resume from persisted tool use.
+    await onAssistantMessage(assistantMessage);
+
     if (streamResult.toolCalls.isEmpty) {
-      // Notify about final text message if there is one
-      if (streamResult.text.isNotEmpty) {
-        await onAssistantMessage(ChatMessage.assistant(streamResult.text));
-      }
       return const AgentLoopCompleted();
     }
 
-    // Convert to pending tool calls for approval
-    final pendingCalls = <PendingToolCall>[];
-    for (final tc in streamResult.toolCalls) {
-      Map<String, dynamic> args;
-      try {
-        args = tc.function.arguments.isNotEmpty
-            ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
-            : <String, dynamic>{};
-      } catch (e) {
-        throw Exception(
-          'Failed to parse JSON arguments for tool ${tc.function.name}: $e',
-        );
-      }
-      pendingCalls.add(
-        PendingToolCall(
-          id: tc.id,
-          name: tc.function.name,
-          arguments: args,
-          originalToolCall: tc,
-        ),
-      );
-    }
-
-    // Build and save assistant message with tool use
-    final assistantMessage = ChatMessage.toolUse(
-      toolCalls: pendingCalls.map((p) => p.originalToolCall).toList(),
-      content: streamResult.text,
-    );
-    await onAssistantMessage(assistantMessage);
-
-    // Request approval
-    final approved = await requestApproval(pendingCalls);
-
-    // User cancelled
-    if (approved == null) {
-      return const AgentLoopCancelled();
-    }
-
-    // Get the approved ToolCalls with potentially updated arguments
-    final approvedToolCalls = approved.map((p) {
-      return ToolCall(
-        id: p.originalToolCall.id,
-        callType: p.originalToolCall.callType,
-        function: FunctionCall(
-          name: p.name,
-          arguments: jsonEncode(p.arguments),
-        ),
-      );
-    }).toList();
-
-    // Execute all approved tool calls
-    List<String> resultStrings;
-    try {
-      resultStrings = await executeToolCall(approvedToolCalls);
-    } on AgentAbortException {
-      return const AgentLoopCancelled();
-    } catch (e) {
-      // Return error as result so LLM can reason about it
-      final errorResult = jsonEncode({
-        'error': 'Tool execution failed.',
-        'details': e.toString(),
-      });
-      resultStrings = List.filled(approvedToolCalls.length, errorResult);
-    }
-
-    // Build ToolCall results from execution
-    final results = <ToolCall>[];
-    for (var i = 0; i < approvedToolCalls.length; i++) {
-      final toolCall = approvedToolCalls[i];
-      final resultString = i < resultStrings.length
-          ? resultStrings[i]
-          : jsonEncode({
-              'error': 'Missing result for tool call',
-            });
-      results.add(
-        ToolCall(
-          id: toolCall.id,
-          callType: toolCall.callType,
-          function: FunctionCall(
-            name: toolCall.function.name,
-            arguments: resultString,
-          ),
-        ),
-      );
-    }
-
-    // Build tool result message
-    final combinedContent =
-        results.map((r) => r.function.arguments).join('\n---\n');
-    final toolResultMessage = ChatMessage.toolResult(
-      results: results,
-      content: combinedContent,
-    );
-
-    await onToolResultMessage(toolResultMessage,
-        toolCallMessage: assistantMessage);
-
-    // Loop continues with updated conversation
+    // Loop continues: next iteration sees the persisted tool-use and executes it.
   }
+}
+
+List<PendingToolCall> _toPendingToolCalls(List<ToolCall> toolCalls) {
+  final pendingCalls = <PendingToolCall>[];
+  for (final tc in toolCalls) {
+    Map<String, dynamic> args;
+    try {
+      args = tc.function.arguments.isNotEmpty
+          ? Map<String, dynamic>.from(jsonDecode(tc.function.arguments))
+          : <String, dynamic>{};
+    } catch (e) {
+      throw Exception(
+        'Failed to parse JSON arguments for tool ${tc.function.name}: $e',
+      );
+    }
+
+    pendingCalls.add(
+      PendingToolCall(
+        id: tc.id,
+        name: tc.function.name,
+        arguments: args,
+        originalToolCall: tc,
+      ),
+    );
+  }
+  return pendingCalls;
+}
+
+Future<void> _executeAndPersistToolResults({
+  required List<PendingToolCall> approved,
+  required String toolContent,
+  required ToolExecutionFunction executeToolCall,
+  required ToolResultMessageCallback onToolResultMessage,
+}) async {
+  // Build approved tool calls and assistant message from approved list
+  final approvedToolCalls = approved.map((p) {
+    return ToolCall(
+      id: p.originalToolCall.id,
+      callType: p.originalToolCall.callType,
+      function: FunctionCall(
+        name: p.name,
+        arguments: jsonEncode(p.arguments),
+      ),
+    );
+  }).toList();
+
+  final toolCallMessage = ChatMessage.toolUse(
+    toolCalls: approved.map((p) => p.originalToolCall).toList(),
+    content: toolContent,
+  );
+
+  // Execute all approved tool calls
+  List<String> resultStrings;
+  try {
+    resultStrings = await executeToolCall(approvedToolCalls);
+  } on AgentAbortException {
+    rethrow;
+  } catch (e) {
+    // Return error as result so LLM can reason about it
+    final errorResult = jsonEncode({
+      'error': 'Tool execution failed.',
+      'details': e.toString(),
+    });
+    resultStrings = List.filled(approvedToolCalls.length, errorResult);
+  }
+
+  // Build ToolCall results from execution
+  final results = <ToolCall>[];
+  for (var i = 0; i < approvedToolCalls.length; i++) {
+    final toolCall = approvedToolCalls[i];
+    final resultString = i < resultStrings.length
+        ? resultStrings[i]
+        : jsonEncode({
+            'error': 'Missing result for tool call',
+          });
+    results.add(
+      ToolCall(
+        id: toolCall.id,
+        callType: toolCall.callType,
+        function: FunctionCall(
+          name: toolCall.function.name,
+          arguments: resultString,
+        ),
+      ),
+    );
+  }
+
+  // Build tool result message
+  final combinedContent =
+      results.map((r) => r.function.arguments).join('\n---\n');
+  final toolResultMessage = ChatMessage.toolResult(
+    results: results,
+    content: combinedContent,
+  );
+
+  await onToolResultMessage(toolResultMessage,
+      toolCallMessage: toolCallMessage);
 }
 
 List<ChatMessage> _buildConversationHistory(List<MessageEntity> dbMessages) {
