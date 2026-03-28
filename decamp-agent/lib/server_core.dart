@@ -4,7 +4,7 @@ import 'package:agent_core/agent_core.dart';
 import 'package:logging/logging.dart';
 import 'package:shelf/shelf.dart' as shelf;
 
-import 'controllers/sync_controller.dart';
+import 'controllers/session_controller.dart';
 import 'router.dart';
 import 'services/database_manager.dart';
 import 'services/notification_dispatcher.dart';

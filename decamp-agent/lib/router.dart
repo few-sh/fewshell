@@ -1,7 +1,7 @@
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:fewshell_agent/handlers/health_handler.dart';
-import 'package:fewshell_agent/controllers/sync_controller.dart';
+import 'package:fewshell_agent/controllers/session_controller.dart';
 
 /// Creates the main router for the application
 Router createRouter(SessionController sessionController) {
