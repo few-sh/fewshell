@@ -19,14 +19,14 @@ class ServerCore {
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
   final SecretsService secretsService;
-  final SyncController syncController;
+  final SessionController sessionController;
   final shelf.Handler handler;
 
   ServerCore({
     required this.dbManager,
     required this.settingsService,
     required this.secretsService,
-    required this.syncController,
+    required this.sessionController,
     required this.handler,
   });
 }
@@ -64,8 +64,8 @@ Future<ServerCore> startServerCore({
     (projectId) async => MemoryStorageImpl(),
   );
 
-  // Initialize SyncController
-  final syncController = await SyncController.create(
+  // Initialize SessionController
+  final sessionController = await SessionController.create(
     dbManager,
     settingsService,
     secretsService,
@@ -86,13 +86,13 @@ Future<ServerCore> startServerCore({
         ),
       )
       .addMiddleware(_corsMiddleware())
-      .addHandler(createRouter(syncController).call);
+      .addHandler(createRouter(sessionController).call);
 
   return ServerCore(
     dbManager: dbManager,
     settingsService: settingsService,
     secretsService: secretsService,
-    syncController: syncController,
+    sessionController: sessionController,
     handler: handler,
   );
 }

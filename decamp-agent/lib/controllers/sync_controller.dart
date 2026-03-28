@@ -12,8 +12,8 @@ import 'package:fewshell_agent/version.dart';
 
 import 'agent_session.dart';
 
-class SyncController {
-  static final _log = Logger('SyncController');
+class SessionController {
+  static final _log = Logger('SessionController');
 
   final DatabaseManager dbManager;
   final CrdtSettingsService settingsService;
@@ -26,13 +26,13 @@ class SyncController {
   /// Track which sessionIds are associated with which channels for cleanup
   final Map<MultiplexedWebSocketChannel, Set<String>> _sessionIdsByChannel = {};
 
-  static Future<SyncController> create(
+  static Future<SessionController> create(
     DatabaseManager dbManager,
     CrdtSettingsService settingsService,
     SecretsService secretsService,
     NotificationDispatcher notificationDispatcher,
   ) async {
-    final controller = SyncController._(
+    final controller = SessionController._(
       dbManager,
       settingsService,
       secretsService,
@@ -42,7 +42,7 @@ class SyncController {
     return controller;
   }
 
-  SyncController._(
+  SessionController._(
     this.dbManager,
     this.settingsService,
     this.secretsService,

@@ -4,13 +4,13 @@ import 'package:fewshell_agent/handlers/health_handler.dart';
 import 'package:fewshell_agent/controllers/sync_controller.dart';
 
 /// Creates the main router for the application
-Router createRouter(SyncController syncController) {
+Router createRouter(SessionController sessionController) {
   final router = Router();
 
   // Health check endpoint
   router.get('/health', healthHandler);
   // Sync endpoint
-  router.mount('/sync/', syncController.handler);
+  router.mount('/sync/', sessionController.handler);
 
   // Catch-all for 404s
   router.all('/<ignored|.*>', (Request request) {
