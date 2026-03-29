@@ -25,6 +25,15 @@ Future<AgentLoopResult> runRemoteAgentLoop({
 
       if (type == 'request_approval') {
         final toolsJson = (data['tools'] as List).cast<Map<String, dynamic>>();
+        final msgSessionId = data['sessionId'] as String;
+
+        // FIXME: we have to get a fresh
+        if (msgSessionId != sessionId) {
+          _log.warning(
+              'Received approval request for session $msgSessionId but current session is $sessionId. Ignoring.');
+          return;
+        }
+
         final pendingCalls =
             toolsJson.map(PendingToolCall.fromApprovalRequestJson).toList();
 

@@ -312,18 +312,20 @@ class AgentSession {
 
   void _sendApprovalRequest(
     MultiplexedWebSocketChannel channel,
-    List<PendingToolCall> pendingCalls,
-  ) {
+    List<PendingToolCall> pendingCalls, {
+    required String sessionId,
+  }) {
     channel.safeSendCustomMessage({
       'type': 'request_approval',
       'tools':
           pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+      'sessionId': sessionId,
     });
   }
 
   Future<List<PendingToolCall>?> _requestApproval(
-    List<PendingToolCall> pendingCalls,
-  ) {
+      List<PendingToolCall> pendingCalls,
+      {required String sessionId}) {
     _currentPendingCalls = pendingCalls;
 
     final completer = Completer<List<PendingToolCall>?>();
@@ -332,12 +334,16 @@ class AgentSession {
       'type': 'request_approval',
       'tools':
           pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+      'sessionId': sessionId,
     });
 
     return completer.future;
   }
 
-  bool _resendPendingApprovalRequest(MultiplexedWebSocketChannel channel) {
+  bool _resendPendingApprovalRequest(
+    MultiplexedWebSocketChannel channel, {
+    required String sessionId,
+  }) {
     if (!_isAwaitingApproval) {
       return false;
     }
@@ -351,7 +357,7 @@ class AgentSession {
     }
 
     _log.info('Re-sending pending approval request to reconnected channel');
-    _sendApprovalRequest(channel, pendingCalls);
+    _sendApprovalRequest(channel, pendingCalls, sessionId: sessionId);
     return true;
   }
 
@@ -385,7 +391,7 @@ class AgentSession {
     if (sessionId != null) {
       final locked = await _lockSession(sessionId);
       if (!locked) {
-        if (_resendPendingApprovalRequest(channel)) {
+        if (_resendPendingApprovalRequest(channel, sessionId: sessionId)) {
           return;
         }
         _log.warning('Chat already in progress for session $sessionId');
@@ -473,7 +479,8 @@ class AgentSession {
           },
           tools: shellTools,
           cancelToken: _currentCancelToken!,
-          requestApproval: (pendingCalls) => _requestApproval(pendingCalls),
+          requestApproval: (pendingCalls) =>
+              _requestApproval(pendingCalls, sessionId: currentSessionId),
           executeToolCall: (toolUseMessage, approvedToolCalls) async {
             final results = <String>[];
             final completedToolResults = <ToolCall>[];
