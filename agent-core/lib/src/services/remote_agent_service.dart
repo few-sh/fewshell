@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:logging/logging.dart';
 
 import 'package:agent_core/agent_core.dart';
-import 'package:llm_dart/llm_dart.dart';
 
 final _log = Logger('RemoteAgentService');
 
@@ -27,36 +25,43 @@ Future<AgentLoopResult> runRemoteAgentLoop({
 
       if (type == 'request_approval') {
         final toolsJson = (data['tools'] as List).cast<Map<String, dynamic>>();
-        final pendingCalls = toolsJson
-            .map((j) => PendingToolCall(
-                id: j['id'],
-                name: j['name'],
-                arguments: j['arguments'],
-                originalToolCall: ToolCall(
-                    id: j['id'],
-                    callType: 'function',
-                    function: FunctionCall(
-                        name: j['name'],
-                        arguments: jsonEncode(j['arguments'])))))
-            .toList();
+        final msgSessionId = data['sessionId'] as String;
+
+        // Validate that this approval request is for the session this loop is
+        // handling. This is important because even if the app's active session
+        // changes while an approval is pending, we only process requests that
+        // belong to our session. This is enforced on the client side via
+        // session validation in the requestApproval callback, which returns null
+        // if the user has switched sessions (no response sent to server).
+        if (msgSessionId != sessionId) {
+          _log.warning(
+              'Received approval request for session $msgSessionId but this loop is for session $sessionId. Ignoring.');
+          return;
+        }
+
+        final pendingCalls =
+            toolsJson.map(PendingToolCall.fromApprovalRequestJson).toList();
 
         final approved = await requestApproval(pendingCalls);
 
         if (approved == null) {
+          // null = don't send a response (e.g., app was on wrong session)
+          _log.info(
+            'Approval request handled without response (approved was null)',
+          );
+        } else if (approved.isEmpty) {
+          // empty list = user cancelled/rejected all tools
           channel.sendCustomMessage({
             'type': 'approval_response',
-            'approvedCalls': null, // Explicitly null for cancellation,
+            'approvedCalls': [], // empty list signals user cancellation
             'sessionId': sessionId,
           });
         } else {
+          // non-empty list = tools were approved
           channel.sendCustomMessage({
             'type': 'approval_response',
-            'approvedCalls': approved
-                .map((c) => {
-                      'id': c.id,
-                      'arguments': c.arguments,
-                    })
-                .toList(),
+            'approvedCalls':
+                approved.map((c) => c.toApprovalResponseJson()).toList(),
             'sessionId': sessionId,
           });
         }

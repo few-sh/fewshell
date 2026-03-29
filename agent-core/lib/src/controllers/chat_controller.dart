@@ -336,8 +336,6 @@ class ChatController extends StateNotifier<ChatState> {
                 return null;
               }
               return PendingToolCall(
-                id: original.id,
-                name: original.name,
                 arguments: action.params,
                 originalToolCall: original.originalToolCall,
               );
@@ -421,17 +419,18 @@ class ChatController extends StateNotifier<ChatState> {
               await _messageDao
                   .insertMessage(streamingMessage.toCompanion(true));
             },
-            executeToolCall: (toolCalls) async {
+            executeToolCall: (toolUseMessage, approvedToolCalls) async {
               final results = <String>[];
               final completedToolResults = <ToolCall>[];
 
-              streamingMessage = streamingMessage.copyWith(
+              streamingMessage = toolUseMessage.copyWith(
                 messageKind: MessageKind.toolResult,
                 isStreaming: true,
-                toolCallsJson: Value(toolCalls),
+                // Keep the original full tool-use list for strict provider validation.
+                toolCallsJson: Value(toolUseMessage.toolCallsJson),
               );
               _activeMessageController.add(streamingMessage);
-              for (final toolCall in toolCalls) {
+              for (final toolCall in approvedToolCalls) {
                 final terminalBuffer = TerminalBuffer();
                 void onOutput(String data) {
                   terminalBuffer.write(data);
@@ -506,9 +505,11 @@ class ChatController extends StateNotifier<ChatState> {
                 {String? messageId, ChatMessage? toolCallMessage}) async {
               final messageEntity = message.toMessageEntity(
                 sessionId: sessionId,
+                toolCallMessage: toolCallMessage,
               );
               streamingMessage = streamingMessage.copyWith(
                   messageKind: MessageKind.toolResult,
+                  toolCallsJson: Value(messageEntity.toolCallsJson),
                   toolResultsJson: Value(messageEntity.toolResultsJson),
                   isStreaming: false);
               await _messageDao

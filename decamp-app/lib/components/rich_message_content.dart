@@ -355,6 +355,7 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
           highlights: codeData.highlights,
           activeColor: activeHighlightColor,
           inactiveColor: inactiveHighlightColor,
+          isStreaming: !closed,
         );
       },
     );

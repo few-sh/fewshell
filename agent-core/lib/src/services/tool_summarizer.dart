@@ -72,10 +72,10 @@ class ToolSummarizerConfig {
 /// Summarizes large tool result messages to keep the context window manageable.
 ///
 /// Operates on individual [MessageKind.toolResult] messages. When a message's
-/// combined content (content + toolCallsJson + toolResultsJson) exceeds the
-/// configured [ToolSummarizerConfig.tokenThreshold], the summarizer calls an
-/// LLM to produce a concise summary and stores it in the message's `summary`
-/// field.
+/// canonical tool payload ([MessageEntity.toolCallsJson] +
+/// [MessageEntity.toolResultsJson]) exceeds the configured
+/// [ToolSummarizerConfig.tokenThreshold], the summarizer calls an LLM to
+/// produce a concise summary and stores it in the message's `summary` field.
 ///
 /// If the combined content exceeds [ToolSummarizerConfig.maximumInputTokens],
 /// the content is split into batches and summarized via rolling updates:
@@ -163,13 +163,9 @@ class ToolSummarizer {
     return true;
   }
 
-  /// Build the combined content string from a message's fields.
+  /// Build the summarizer input from the canonical tool call/result fields.
   String _buildContent(MessageEntity message) {
     final buffer = StringBuffer();
-
-    if (message.content.isNotEmpty) {
-      buffer.writeln(message.content);
-    }
 
     if (message.toolCallsJson != null) {
       for (final tc in message.toolCallsJson!) {

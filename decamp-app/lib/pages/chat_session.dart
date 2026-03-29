@@ -239,6 +239,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
 
     // Get current username
     final userName = ref.read(userProvider);
+    final activeSessionId = ref.read(currentSessionIdProvider);
 
     // Send to AI (controller will handle saving user message and response)
     await controller.sendMessage(
@@ -247,6 +248,18 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       sessionId: currentSessionId,
       requestApproval: (actions) {
         if (!mounted) return Future.value(null);
+
+        // Check if we're still on the same session before showing approval UI.
+        // If the user switched sessions while this approval was pending,
+        // return null to signal we're not responding (not a cancellation).
+        // Returning null prevents sending any approval_response to the server.
+        if (activeSessionId != currentSessionId) {
+          _log.info(
+            'Approval request for wrong session: was for $currentSessionId but active is $activeSessionId. Not responding.',
+          );
+          return Future.value(null);
+        }
+
         return MultiCommandApprovalOverlay.show(context, actions);
       },
       onNoConfig: () {

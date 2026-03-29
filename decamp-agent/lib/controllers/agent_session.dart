@@ -90,6 +90,12 @@ class AgentSession {
   /// Check if this session has any active channels
   bool get hasActiveChannels => _channels.isNotEmpty;
 
+  void _broadcastCustomMessage(Map<String, dynamic> message) {
+    for (final channel in _channels) {
+      channel.safeSendCustomMessage(message);
+    }
+  }
+
   void dispose() {
     _currentCancelToken?.cancel('Session disposed');
     _currentCancelToken = null;
@@ -125,6 +131,14 @@ class AgentSession {
     _log.info('🛑 Received abort request');
     _currentCancelToken?.cancel('Aborted by user');
     _currentAbortController?.add(ProcessSignal.sigint);
+
+    // If there's a pending approval request, cancel it so the agent loop
+    // can unblock and terminate cleanly.
+    if (_approvalCompleter != null && !_approvalCompleter!.isCompleted) {
+      _log.info('Cancelling pending approval request due to abort');
+      _approvalCompleter!.complete(null);
+    }
+    _clearPendingApprovalState();
   }
 
   /// Handle terminal key input from the client
@@ -245,8 +259,11 @@ class AgentSession {
   void _handleApproval(Map<String, dynamic> data) {
     _log.info('✅ Received approval response');
 
-    if (_approvalCompleter != null && !_approvalCompleter!.isCompleted) {
-      if (data['approvedCalls'] != null) {
+    final completer = _approvalCompleter;
+    if (completer != null && !completer.isCompleted) {
+      if (data['approvedCalls'] != null &&
+          data['approvedCalls'] is List &&
+          data['approvedCalls'].isNotEmpty) {
         final approvedCalls =
             (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
         final pending = _currentPendingCalls ?? [];
@@ -264,20 +281,17 @@ class AgentSession {
               }
               final arguments = callData['arguments'] as Map<String, dynamic>;
 
-              return PendingToolCall(
-                id: id,
-                name: original.name,
-                arguments: arguments,
-                originalToolCall: original.originalToolCall,
-              );
+              return original.withArguments(arguments);
             })
             .whereType<PendingToolCall>()
             .toList();
 
-        _approvalCompleter!.complete(approved);
+        _clearPendingApprovalState();
+        completer.complete(approved);
       } else {
         // Cancelled
-        _approvalCompleter!.complete(null);
+        _clearPendingApprovalState();
+        completer.complete(null);
       }
     }
   }
@@ -296,6 +310,65 @@ class AgentSession {
     if (projectDb != null) {
       await projectDb!.sessionMutexDao.unlock(sessionId);
     }
+  }
+
+  void _clearPendingApprovalState() {
+    _approvalCompleter = null;
+    _currentPendingCalls = null;
+  }
+
+  bool get _isAwaitingApproval =>
+      _approvalCompleter != null && !_approvalCompleter!.isCompleted;
+
+  void _sendApprovalRequest(
+    MultiplexedWebSocketChannel channel,
+    List<PendingToolCall> pendingCalls, {
+    required String sessionId,
+  }) {
+    channel.safeSendCustomMessage({
+      'type': 'request_approval',
+      'tools':
+          pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+      'sessionId': sessionId,
+    });
+  }
+
+  Future<List<PendingToolCall>?> _requestApproval(
+      List<PendingToolCall> pendingCalls,
+      {required String sessionId}) {
+    _currentPendingCalls = pendingCalls;
+
+    final completer = Completer<List<PendingToolCall>?>();
+    _approvalCompleter = completer;
+    _broadcastCustomMessage({
+      'type': 'request_approval',
+      'tools':
+          pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+      'sessionId': sessionId,
+    });
+
+    return completer.future;
+  }
+
+  bool _resendPendingApprovalRequest(
+    MultiplexedWebSocketChannel channel, {
+    required String sessionId,
+  }) {
+    if (!_isAwaitingApproval) {
+      return false;
+    }
+
+    final pendingCalls = _currentPendingCalls;
+    if (pendingCalls == null || pendingCalls.isEmpty) {
+      _log.warning(
+        'Approval state exists, but there are no pending tool calls',
+      );
+      return false;
+    }
+
+    _log.info('Re-sending pending approval request to reconnected channel');
+    _sendApprovalRequest(channel, pendingCalls, sessionId: sessionId);
+    return true;
   }
 
   Future<void> _startChat(
@@ -328,6 +401,9 @@ class AgentSession {
     if (sessionId != null) {
       final locked = await _lockSession(sessionId);
       if (!locked) {
+        if (_resendPendingApprovalRequest(channel, sessionId: sessionId)) {
+          return;
+        }
         _log.warning('Chat already in progress for session $sessionId');
         channel.safeSendCustomMessage({
           'type': 'error',
@@ -413,34 +489,20 @@ class AgentSession {
           },
           tools: shellTools,
           cancelToken: _currentCancelToken!,
-          requestApproval: (pendingCalls) {
-            _currentPendingCalls = pendingCalls;
-
-            channel.safeSendCustomMessage({
-              'type': 'request_approval',
-              'tools': pendingCalls
-                  .map(
-                    (c) =>
-                        {'id': c.id, 'name': c.name, 'arguments': c.arguments},
-                  )
-                  .toList(),
-            });
-
-            final completer = Completer<List<PendingToolCall>?>();
-            _approvalCompleter = completer;
-            return completer.future;
-          },
-          executeToolCall: (toolCalls) async {
+          requestApproval: (pendingCalls) =>
+              _requestApproval(pendingCalls, sessionId: currentSessionId),
+          executeToolCall: (toolUseMessage, approvedToolCalls) async {
             final results = <String>[];
             final completedToolResults = <ToolCall>[];
 
-            streamingMessage = streamingMessage.copyWith(
+            streamingMessage = toolUseMessage.copyWith(
               messageKind: MessageKind.toolResult,
               isStreaming: true,
-              toolCallsJson: Value(toolCalls),
+              // Keep the full original tool-use list for provider validation.
+              toolCallsJson: Value(toolUseMessage.toolCallsJson),
             );
 
-            for (final toolCall in toolCalls) {
+            for (final toolCall in approvedToolCalls) {
               final argumentsJson = toolCall.function.arguments;
               final params = argumentsJson.isNotEmpty
                   ? Map<String, dynamic>.from(jsonDecode(argumentsJson))
@@ -586,9 +648,11 @@ class AgentSession {
 
             final messageEntity = message.toMessageEntity(
               sessionId: sessionId!,
+              toolCallMessage: toolCallMessage,
             );
             streamingMessage = streamingMessage.copyWith(
               messageKind: MessageKind.toolResult,
+              toolCallsJson: Value(messageEntity.toolCallsJson),
               toolResultsJson: Value(messageEntity.toolResultsJson),
               isStreaming: false,
             );
