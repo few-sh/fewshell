@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:decamp/themes/terminal_theme.dart';
@@ -10,6 +11,8 @@ import 'package:decamp/utils/highlight_injector.dart';
 /// Automatically truncates code content that exceeds [kTerminalMaxLines],
 /// showing first and last [kTerminalEllipsisHalfLines] with an ellipsis indicator.
 /// Provides an expand button to view full content in a full-screen modal.
+/// When opened while [isStreaming] is true, the full-screen view will
+/// continue receiving live updates as the code block is rebuilt.
 class ExpandableCodeBlock extends StatefulWidget {
   final String code;
   final String language;
@@ -19,6 +22,7 @@ class ExpandableCodeBlock extends StatefulWidget {
   final Color activeColor;
   final Color inactiveColor;
   final bool centered;
+  final bool isStreaming;
 
   const ExpandableCodeBlock({
     super.key,
@@ -30,6 +34,7 @@ class ExpandableCodeBlock extends StatefulWidget {
     this.activeColor = Colors.yellow,
     this.inactiveColor = Colors.yellow,
     this.centered = false,
+    this.isStreaming = false,
   });
 
   @override
@@ -37,15 +42,31 @@ class ExpandableCodeBlock extends StatefulWidget {
 }
 
 class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
+  // Owned stream that feeds the full-screen modal if it is open.
+  // Broadcast so the user can close/reopen the modal.
+  // Closed when this widget is disposed, which triggers onDone in the modal.
+  late final StreamController<(String, bool)> _codeController;
+
   @override
   void initState() {
     super.initState();
+    _codeController = StreamController.broadcast();
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
+  }
+
+  @override
+  void didUpdateWidget(ExpandableCodeBlock oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.code != oldWidget.code ||
+        widget.isStreaming != oldWidget.isStreaming) {
+      _codeController.add((widget.code, widget.isStreaming));
+    }
   }
 
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
+    _codeController.close();
     super.dispose();
   }
 
@@ -165,7 +186,7 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
                       ),
               ),
               // Expand button (only if truncated)
-              if (needsTruncation)
+              if (needsTruncation || true)
                 Positioned(
                   bottom: 8,
                   right: 8,
@@ -310,9 +331,11 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
         pageBuilder: (context, animation, secondaryAnimation) {
           return FullScreenCodeView(
             code: widget.code,
+            isStreaming: widget.isStreaming,
             language: widget.language,
             heroTag: widget.heroTag,
             terminalTheme: widget.terminalTheme,
+            codeStream: _codeController.stream,
           );
         },
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
