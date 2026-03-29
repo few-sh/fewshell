@@ -8,7 +8,7 @@ import '../themes/terminal_theme.dart';
 import '../utils/ui_utils.dart';
 
 /// Overlay widget that shows multiple tool action approvals in a scrollable list
-/// Returns selected actions when approved, null when cancelled
+/// Returns selected actions when approved, empty list when cancelled, null for other dismissals
 class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
   final List<ToolAction> actions;
 
@@ -19,11 +19,13 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
     BuildContext context,
     List<ToolAction> actions,
   ) async {
-    return await showShadSheet<List<ToolAction>>(
+    final result = await showShadSheet<List<ToolAction>>(
       context: context,
       side: ShadSheetSide.bottom,
       builder: (context) => MultiCommandApprovalOverlay(actions: actions),
     );
+    // Treat null (X button / swipe dismiss) the same as Cancel
+    return result ?? [];
   }
 
   /// Test method to show the overlay with placeholder data
@@ -179,7 +181,8 @@ class _MultiCommandApprovalOverlayState
   }
 
   void _handleCancel() {
-    Navigator.of(context).pop(null);
+    // Return empty list to signal user cancellation (not session mismatch)
+    Navigator.of(context).pop(<ToolAction>[]);
   }
 
   void _toggleSelectAll(bool value) {

@@ -253,7 +253,9 @@ class AgentSession {
 
     final completer = _approvalCompleter;
     if (completer != null && !completer.isCompleted) {
-      if (data['approvedCalls'] != null) {
+      if (data['approvedCalls'] != null &&
+          data['approvedCalls'] is List &&
+          data['approvedCalls'].isNotEmpty) {
         final approvedCalls =
             (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
         final pending = _currentPendingCalls ?? [];

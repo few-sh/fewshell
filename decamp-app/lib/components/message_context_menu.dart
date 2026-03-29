@@ -52,6 +52,7 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
 
     // Get sync channel
     final syncChannel = ref.read(syncServiceProvider).projectChannel;
+    final activeSessionId = ref.read(currentSessionIdProvider);
 
     await controller.resendMessage(
       messageId: widget.message.id,
@@ -59,6 +60,18 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
       requestApproval: (actions) {
         final overlayContext = navigatorKey.currentContext;
         if (overlayContext == null) return Future.value(null);
+
+        // Check if we're still on the same session before showing approval UI.
+        // If the user switched sessions while this approval was pending,
+        // return null to signal we're not responding (not a cancellation).
+        // Returning null prevents sending any approval_response to the server.
+        if (activeSessionId != widget.message.sessionId) {
+          _log.info(
+            'Approval request for wrong session: was for ${widget.message.sessionId} but active is $activeSessionId. Not responding.',
+          );
+          return Future.value(null);
+        }
+
         return MultiCommandApprovalOverlay.show(overlayContext, actions);
       },
       syncChannel: syncChannel,
