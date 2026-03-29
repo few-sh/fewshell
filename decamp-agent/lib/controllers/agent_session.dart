@@ -131,6 +131,14 @@ class AgentSession {
     _log.info('🛑 Received abort request');
     _currentCancelToken?.cancel('Aborted by user');
     _currentAbortController?.add(ProcessSignal.sigint);
+
+    // If there's a pending approval request, cancel it so the agent loop
+    // can unblock and terminate cleanly.
+    if (_approvalCompleter != null && !_approvalCompleter!.isCompleted) {
+      _log.info('Cancelling pending approval request due to abort');
+      _approvalCompleter!.complete(null);
+    }
+    _clearPendingApprovalState();
   }
 
   /// Handle terminal key input from the client
