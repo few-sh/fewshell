@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:math';
+import 'package:drift/drift.dart' show Value;
 import 'package:logging/logging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
@@ -205,8 +206,25 @@ class SyncService {
         throw Exception('Server did not provide a node ID.');
       }
 
-      // If the current project already belongs to this server, skip discovery.
       final currentProject = ref.read(currentProjectProvider);
+      // If the project has no serverNodeId, assign it now that we know the server's node ID.
+      if (currentProject != null && currentProject.serverNodeId == null) {
+        _log.info(
+          'Current project ${currentProject.id} has no serverNodeId, assigning $serverNodeId.',
+        );
+        final globalDb = ref.read(globalDatabaseProvider);
+        final updatedProject = currentProject.copyWith(
+          serverNodeId: Value(serverNodeId),
+        );
+        await globalDb.projectDao.updateProject(
+          updatedProject.toCompanion(true),
+        );
+        onStatus?.call('Syncing project data...');
+        await Future.delayed(const Duration(milliseconds: 200));
+        await waitForProjectSync();
+        return;
+      }
+      // If the current project already belongs to this server, skip discovery.
       if (currentProject != null &&
           currentProject.serverNodeId == serverNodeId) {
         _log.info(
