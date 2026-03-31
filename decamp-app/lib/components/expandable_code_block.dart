@@ -51,7 +51,6 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
   void initState() {
     super.initState();
     _codeController = StreamController.broadcast();
-    HardwareKeyboard.instance.addHandler(_handleKeyEvent);
   }
 
   @override
@@ -65,30 +64,8 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
 
   @override
   void dispose() {
-    HardwareKeyboard.instance.removeHandler(_handleKeyEvent);
     _codeController.close();
     super.dispose();
-  }
-
-  /// Intercepts Cmd+C / Ctrl+C to post-process the clipboard,
-  /// replacing the truncation ellipsis with the full hidden content.
-  bool _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return false;
-    if (event.logicalKey != LogicalKeyboardKey.keyC) return false;
-    if (!HardwareKeyboard.instance.isMetaPressed &&
-        !HardwareKeyboard.instance.isControlPressed) {
-      return false;
-    }
-
-    final lines = widget.code.split('\n');
-    if (lines.length <= kTerminalMaxLines) return false;
-
-    // Let the default copy happen, then replace the ellipsis in clipboard
-    Future.delayed(
-      const Duration(milliseconds: 100),
-      _replaceClipboardEllipsis,
-    );
-    return false;
   }
 
   Future<void> _replaceClipboardEllipsis() async {
@@ -185,32 +162,31 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
                         child: _buildHighlightedCode(displayedContent),
                       ),
               ),
-              // Expand button (only if truncated)
-              if (needsTruncation || true)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Material(
-                    color: widget.terminalTheme.backgroundColor.withValues(
-                      alpha: 0.9,
-                    ),
+              // Expand button
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Material(
+                  color: widget.terminalTheme.backgroundColor.withValues(
+                    alpha: 0.9,
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                  child: InkWell(
+                    onTap: () => _openFullScreen(context),
                     borderRadius: BorderRadius.circular(4),
-                    child: InkWell(
-                      onTap: () => _openFullScreen(context),
-                      borderRadius: BorderRadius.circular(4),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        child: Icon(
-                          Icons.fullscreen,
-                          size: 18,
-                          color: widget.terminalTheme.textColor.withValues(
-                            alpha: 0.7,
-                          ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.fullscreen,
+                        size: 18,
+                        color: widget.terminalTheme.textColor.withValues(
+                          alpha: 0.7,
                         ),
                       ),
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -317,9 +293,7 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
       spans.add(TextSpan(text: text.substring(lastIndex)));
     }
 
-    return RichText(
-      text: TextSpan(children: spans, style: baseStyle),
-    );
+    return Text.rich(TextSpan(children: spans, style: baseStyle));
   }
 
   /// Open full-screen code view with hero animation
