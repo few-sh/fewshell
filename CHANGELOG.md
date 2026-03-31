@@ -1,3 +1,11 @@
+
+# App 1.0.2+32
+
+- Streaming support for full screen bash/code block view
+- Better UX for renaming projects
+- Improved session control and approval handling
+- Android build and deployment support
+
 # Server 0.1.28
 
 - Support for tool call approval broadcast to all clients in a session
