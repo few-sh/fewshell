@@ -1,3 +1,9 @@
+# Server 0.1.28
+
+- Support for tool call approval broadcast to all clients in a session
+- Tool call request resend/resume functionality
+- Improved session handling with stop button support
+
 # Server 0.1.27
 
 - Add logging for CRDT merge failures to improve diagnostics
