@@ -79,8 +79,8 @@ Future<AgentLoopResult> runRemoteAgentLoop({
               AgentLoopError(data['message'], messageId: data['message_id']));
         }
       }
-    } catch (e) {
-      _log.warning('Error handling remote message: $e');
+    } catch (e, st) {
+      _log.severe('Error handling remote message', e, st);
       if (!completer.isCompleted) {
         completer.complete(AgentLoopError(e.toString()));
       }
@@ -132,8 +132,8 @@ Future<bool> runRemoteSummarize({
           );
         }
       }
-    } catch (e) {
-      _log.warning('Error handling remote summarize message: $e');
+    } catch (e, st) {
+      _log.severe('Error handling remote summarize message', e, st);
       if (!completer.isCompleted) {
         completer.completeError(e);
       }

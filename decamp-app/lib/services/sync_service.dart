@@ -872,8 +872,15 @@ class SyncService {
       final settingsService = ref.read(crdtSettingsServiceProvider);
       final settingsCrdt = await settingsService.getProjectCrdt(projectId);
       final settingsChannel = _projectChannel!.fork('\u001E');
-      _settingsSync = CrdtSync.client(
+      // Wrap in CrdtFlowAdapter with forceFullSync so the handshake reports
+      // Hlc.zero — forcing the server to send all settings even if we have
+      // stale HLCs from a previously-connected server's settings CRDT.
+      final settingsAdapter = CrdtFlowAdapter(
         settingsCrdt,
+        forceFullSync: true,
+      );
+      _settingsSync = CrdtSync.client(
+        settingsAdapter,
         settingsChannel,
         verbose: false,
       );
@@ -883,8 +890,10 @@ class SyncService {
       await secretsCrdt.ready;
       secretsCrdt.resetInitialChangeset();
       final secretsChannel = _projectChannel!.fork('\u001D');
+      // Same as settings: wrap to force the server to send its full changeset.
+      final secretsAdapter = CrdtFlowAdapter(secretsCrdt, forceFullSync: true);
       _secretsSync = CrdtSync.client(
-        secretsCrdt,
+        secretsAdapter,
         secretsChannel,
         verbose: false,
         changesetBuilder:

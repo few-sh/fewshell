@@ -17,7 +17,13 @@ class CrdtFlowAdapter implements Crdt {
   /// high HLC, making the new server skip its initial changeset.
   String? peerNodeId;
 
-  CrdtFlowAdapter(this._inner, {this.peerNodeId});
+  /// When true, the next [getLastModified] call with `exceptNodeId`
+  /// returns [Hlc.zero], forcing the remote to send its full changeset.
+  /// Auto-clears after use. This is for CRDTs where we don't know the
+  /// peer's nodeId before the handshake (e.g. SecretsCrdt, SettingsCrdt).
+  bool forceFullSync;
+
+  CrdtFlowAdapter(this._inner, {this.peerNodeId, this.forceFullSync = false});
 
   /// Returns a future that completes when the last merge operation finishes.
   Future<void> get onIdle => _lastMerge;
@@ -41,6 +47,12 @@ class CrdtFlowAdapter implements Crdt {
 
   @override
   FutureOr<Hlc> getLastModified({String? onlyNodeId, String? exceptNodeId}) {
+    // When forceFullSync is set, report zero so the remote sends everything.
+    // Auto-clears after use (only affects the handshake call).
+    if (forceFullSync && exceptNodeId != null && onlyNodeId == null) {
+      forceFullSync = false;
+      return Hlc.zero(nodeId);
+    }
     // When peerNodeId is set and CrdtSync asks for "everything except me",
     // rewrite to "only from the peer" so the handshake accurately reflects
     // what we know about this specific server, not the global max HLC.
