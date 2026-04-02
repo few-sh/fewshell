@@ -2,6 +2,11 @@
 
 **A self-hosted AI agent for sysadmins, on-calls, devops, MLOps, AI researchers and self-hosting enthusiasts.**
 
+<a href="https://apps.apple.com/us/app/fewshell/id6755896752"><img src="https://fewshell.com/app-store-badge.svg" alt="Download on the App Store" height="40"></a>
+<a href="https://release.few.sh/releases/latest/Fewshell-1.0.2.dmg"><img src="https://fewshell.com/macos-badge.png" alt="Download for macOS" height="40"></a>
+<a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz"><img src="https://fewshell.com/linux-badge.png" alt="Get it on Linux" height="40"></a>
+<a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz"><img src="https://fewshell.com/linux-badge-arm64.png" alt="Get it on Linux (ARM64)" height="40"></a>
+
 tl;dr - using ssh on a phone is painful. AI can help, but agents are risky and hard to configure for critical tasks.
 
 fewshell is an attempt to solve this *without sacrificing security, privacy and safety*.
