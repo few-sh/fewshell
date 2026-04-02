@@ -9,7 +9,15 @@ class CrdtFlowAdapter implements Crdt {
   final Crdt _inner;
   Future<void> _lastMerge = Future.value();
 
-  CrdtFlowAdapter(this._inner);
+  /// When set, [getLastModified] with `exceptNodeId` is rewritten to
+  /// `onlyNodeId: peerNodeId` so the CrdtSync handshake only reports
+  /// what we know about this specific peer — not the max HLC from all
+  /// non-local nodes. Without this, connecting to a new server after
+  /// syncing with another causes the handshake to report a misleadingly
+  /// high HLC, making the new server skip its initial changeset.
+  String? peerNodeId;
+
+  CrdtFlowAdapter(this._inner, {this.peerNodeId});
 
   /// Returns a future that completes when the last merge operation finishes.
   Future<void> get onIdle => _lastMerge;
@@ -32,9 +40,16 @@ class CrdtFlowAdapter implements Crdt {
       _inner.onTablesChanged;
 
   @override
-  FutureOr<Hlc> getLastModified({String? onlyNodeId, String? exceptNodeId}) =>
-      _inner.getLastModified(
-          onlyNodeId: onlyNodeId, exceptNodeId: exceptNodeId);
+  FutureOr<Hlc> getLastModified({String? onlyNodeId, String? exceptNodeId}) {
+    // When peerNodeId is set and CrdtSync asks for "everything except me",
+    // rewrite to "only from the peer" so the handshake accurately reflects
+    // what we know about this specific server, not the global max HLC.
+    if (peerNodeId != null && exceptNodeId != null && onlyNodeId == null) {
+      return _inner.getLastModified(onlyNodeId: peerNodeId);
+    }
+    return _inner.getLastModified(
+        onlyNodeId: onlyNodeId, exceptNodeId: exceptNodeId);
+  }
 
   @override
   FutureOr<CrdtChangeset> getChangeset({

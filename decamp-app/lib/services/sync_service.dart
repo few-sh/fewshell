@@ -409,6 +409,13 @@ class SyncService {
       _log.info('Discovered server node ID: $headerNodeId');
       _appEventBus.emit(GlobalSyncConnected(headerNodeId));
 
+      // Scope the adapter's handshake to this specific server so CrdtSync
+      // reports the correct last-modified HLC for *this* peer — not the
+      // global max from other servers.  Without this, connecting to a new
+      // server after syncing with another causes the new server to think
+      // the client already has its data and skip the initial changeset.
+      _globalAdapter!.peerNodeId = headerNodeId;
+
       _globalChannel = MultiplexedWebSocketChannel(
         channel,
         awaitSync: () => _globalAdapter!.onIdle,
