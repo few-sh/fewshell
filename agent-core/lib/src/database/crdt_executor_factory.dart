@@ -26,7 +26,14 @@ class CrdtExecutorFactory {
   ) async {
     _log.info('Opening SqliteCrdt at $path with nodeId: $nodeId');
     try {
-      final crdt = await SqliteCrdt.open(path);
+      // Use openInMemory() for in-memory databases to ensure each caller
+      // gets a unique SQLite instance (singleInstance defaults to false).
+      // SqliteCrdt.open(':memory:') with the default singleInstance=true
+      // would return the SAME handle for every caller, causing separate
+      // databases (e.g. global vs project) to share one SQLite file.
+      final crdt = path == ':memory:'
+          ? await SqliteCrdt.openInMemory()
+          : await SqliteCrdt.open(path);
 
       // For a brand-new (empty) DB, SqliteCrdt.open() auto-generated a random
       // node ID via init(). Override it to the requested one so the first

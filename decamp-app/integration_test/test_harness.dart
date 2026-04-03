@@ -151,6 +151,8 @@ class IntegrationTestHarness {
   late Directory _tempDir;
   late SecretsCrdt _secretsCrdt;
 
+  SecretsCrdt get secretsCrdt => _secretsCrdt;
+
   IntegrationTestHarness(this.server);
 
   /// Initialise databases, pump the app, and wait for the initial render.

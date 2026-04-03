@@ -129,12 +129,13 @@ class ProjectDao extends DatabaseAccessor<GlobalDatabase>
 
   /// Create a new project with all parameters
   Future<String> createProjectWithId({
+    String? id,
     required String name,
     String? description,
     String? serverNodeId,
   }) async {
     final now = DateTime.now();
-    final id = generateProjectId();
+    id ??= generateProjectId();
 
     final companion = ProjectEntityCompanion(
       id: Value(id),
