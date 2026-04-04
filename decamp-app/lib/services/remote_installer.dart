@@ -205,6 +205,7 @@ class RemoteInstaller {
 
   /// Executes [command] and returns the trimmed stdout.
   Future<String> _execStdout(String command) async {
+    _log.info("Executing command: $command");
     final session = await client.execute(command);
     final bytes = await session.stdout.fold<List<int>>(
       <int>[],
@@ -212,7 +213,9 @@ class RemoteInstaller {
     );
     await session.stderr.drain<void>();
     await session.done;
-    return utf8.decode(bytes).trim();
+    final result = utf8.decode(bytes).trim();
+    _log.info("Command result: $result");
+    return result;
   }
 
   void _emit(String message) {
