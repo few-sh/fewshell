@@ -149,58 +149,77 @@ class ToolSummarizer {
       return false;
     }
 
-    // Only oversized results are stored in the summary map.
-    final summaryMap = <String, String>{};
+    return _summarizeAndPersistResults(
+      message,
+      resultsToSummarize,
+      cancelToken: cancelToken,
+    );
+  }
 
-    // Index original tool calls by ID so each result can recover its inputs.
-    final originalToolCalls = {
-      for (final toolCall in message.toolCallsJson ?? const <ToolCall>[])
-        toolCall.id: toolCall,
-    };
-    for (final toolResult in resultsToSummarize) {
-      final originalContent = toolResult.function.arguments;
-      final estimatedTokens = originalContent.length ~/ config.bytesPerToken;
+  Future<bool> _summarizeAndPersistResults(
+    MessageEntity message,
+    List<ToolCall> resultsToSummarize, {
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      // Only oversized results are stored in the summary map.
+      final summaryMap = <String, String>{};
+
+      // Index original tool calls by ID so each result can recover its inputs.
+      final originalToolCalls = {
+        for (final toolCall in message.toolCallsJson ?? const <ToolCall>[])
+          toolCall.id: toolCall,
+      };
+      for (final toolResult in resultsToSummarize) {
+        final originalContent = toolResult.function.arguments;
+        final estimatedTokens = originalContent.length ~/ config.bytesPerToken;
+
+        _log.info(
+          'Summarizing tool result ${message.id}/${toolResult.id} '
+          '(~$estimatedTokens tokens, ${originalContent.length} bytes)',
+        );
+
+        final summarizerInput = _buildSummarizerInput(
+          toolResult,
+          originalToolCall: originalToolCalls[toolResult.id],
+        );
+
+        // Large individual results still use the existing rolling summarization path.
+        final summarizedContent = estimatedTokens <= config.maximumInputTokens
+            ? await _generateSummary(summarizerInput, cancelToken: cancelToken)
+            : await _generateRollingSummary(
+                summarizerInput,
+                cancelToken: cancelToken,
+              );
+
+        summaryMap[toolResult.id] = summarizedContent;
+      }
+
+      if (summaryMap.isEmpty) {
+        return false;
+      }
+
+      // Persist a JSON map of {toolCallId: summarizedContent} for oversized results only.
+      final summaryJson = jsonEncode(summaryMap);
 
       _log.info(
-        'Summarizing tool result ${message.id}/${toolResult.id} '
-        '(~$estimatedTokens tokens, ${originalContent.length} bytes)',
+        'Persisting summarized tool results for ${message.id}: '
+        '${summaryMap.length} result(s), ${summaryJson.length} chars',
       );
 
-      final summarizerInput = _buildSummarizerInput(
-        toolResult,
-        originalToolCall: originalToolCalls[toolResult.id],
+      // Keep messageKind as toolResult; the summary field signals which results were compressed.
+      final companion = message.toCompanion(true).copyWith(
+            summary: Value(summaryJson),
+          );
+      await _messageDao.updateMessage(companion);
+
+      return true;
+    } finally {
+      _log.fine(
+        'Finished tool result summarization for ${message.id} '
+        '(${resultsToSummarize.length} result(s))',
       );
-
-      // Large individual results still use the existing rolling summarization path.
-      final summarizedContent = estimatedTokens <= config.maximumInputTokens
-          ? await _generateSummary(summarizerInput, cancelToken: cancelToken)
-          : await _generateRollingSummary(
-              summarizerInput,
-              cancelToken: cancelToken,
-            );
-
-      summaryMap[toolResult.id] = summarizedContent;
     }
-
-    if (summaryMap.isEmpty) {
-      return false;
-    }
-
-    // Persist a JSON map of {toolCallId: summarizedContent} for oversized results only.
-    final summaryJson = jsonEncode(summaryMap);
-
-    _log.info(
-      'Persisting summarized tool results for ${message.id}: '
-      '${summaryMap.length} result(s), ${summaryJson.length} chars',
-    );
-
-    // Keep messageKind as toolResult; the summary field signals which results were compressed.
-    final companion = message.toCompanion(true).copyWith(
-          summary: Value(summaryJson),
-        );
-    await _messageDao.updateMessage(companion);
-
-    return true;
   }
 
   /// Build summarizer input for a single tool result.
