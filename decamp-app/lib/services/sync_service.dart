@@ -785,7 +785,8 @@ class SyncService {
           '_connectProject: connecting via direct WebSocket to $directUrl for $projectId.',
         );
         final uri = Uri.parse('$directUrl/sync/project/$projectId');
-        wsChannel = _connectWebSocket(uri);
+        final (ch, _) = await _connectWebSocketWithHeaders(uri);
+        wsChannel = ch;
       }
       final monitoredChannel = _ActivityMonitorWebSocketChannel(
         wsChannel,
@@ -1353,33 +1354,6 @@ class SyncService {
     } catch (e) {
       _log.severe('Error during certificate pinning check', e);
       return false;
-    }
-  }
-
-  WebSocketChannel _connectWebSocket(Uri uri, {Duration? timeout}) {
-    _log.info('_connectWebSocket called for $uri with timeout: $timeout');
-
-    try {
-      _log.info('Configuring mTLS with embedded certificates');
-      final client = _createMtlsClient();
-
-      _log.info('Connecting with mTLS to $uri');
-      return IOWebSocketChannel.connect(
-        uri,
-        customClient: client,
-        connectTimeout: timeout,
-        headers: _clientVersion != null
-            ? {kClientVersionHeader: _clientVersion!}
-            : null,
-        // Generous fallback ping for connections without activity-based
-        // keep-alive (e.g. global sync). Project connections use
-        // _ActivityMonitorWebSocketChannel which handles keep-alive
-        // based on actual data activity.
-        pingInterval: const Duration(seconds: 120),
-      );
-    } catch (e, st) {
-      _log.severe('Error configuring mTLS', e, st);
-      rethrow;
     }
   }
 
