@@ -136,22 +136,30 @@ class ToolSummarizer {
     final toolResults = message.toolResultsJson;
     if (toolResults == null || toolResults.isEmpty) return false;
 
+    final resultsToSummarize = force
+        ? toolResults
+        : toolResults.where((toolResult) {
+            final originalContent = toolResult.function.arguments;
+            final estimatedTokens =
+                originalContent.length ~/ config.bytesPerToken;
+            return estimatedTokens >= config.tokenThreshold;
+          }).toList();
+
+    if (resultsToSummarize.isEmpty) {
+      return false;
+    }
+
+    // Only oversized results are stored in the summary map.
+    final summaryMap = <String, String>{};
+
     // Index original tool calls by ID so each result can recover its inputs.
     final originalToolCalls = {
       for (final toolCall in message.toolCallsJson ?? const <ToolCall>[])
         toolCall.id: toolCall,
     };
-    // Only oversized results are stored in the summary map.
-    final summaryMap = <String, String>{};
-
-    for (final toolResult in toolResults) {
+    for (final toolResult in resultsToSummarize) {
       final originalContent = toolResult.function.arguments;
       final estimatedTokens = originalContent.length ~/ config.bytesPerToken;
-
-      // Skip small results — they stay in toolResultsJson unchanged.
-      if (!force && estimatedTokens < config.tokenThreshold) {
-        continue;
-      }
 
       _log.info(
         'Summarizing tool result ${message.id}/${toolResult.id} '
