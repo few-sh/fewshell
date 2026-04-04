@@ -149,11 +149,25 @@ class ToolSummarizer {
       return false;
     }
 
-    return _summarizeAndPersistResults(
-      message,
-      resultsToSummarize,
-      cancelToken: cancelToken,
+    final progressId = await _messageDao.insertMessageWithId(
+      sessionId: message.sessionId,
+      userId: 'system',
+      userName: 'System',
+      content: 'Summarizing tool results...',
+      isStreaming: true,
+      isVisibleToLlm: false,
+      messageKind: MessageKind.notification,
     );
+
+    try {
+      return _summarizeAndPersistResults(
+        message,
+        resultsToSummarize,
+        cancelToken: cancelToken,
+      );
+    } finally {
+      await _messageDao.deleteMessage(progressId);
+    }
   }
 
   Future<bool> _summarizeAndPersistResults(
