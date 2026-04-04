@@ -109,7 +109,7 @@ typedef TextDeltaCallback = Future<void> Function(String delta);
 typedef MessageCallback = Future<void> Function(ChatMessage message,
     {String? messageId});
 
-typedef ToolResultMessageCallback = Future<void> Function(
+typedef ToolResultMessageCallback = Future<MessageEntity> Function(
     ChatMessage toolResultMessage,
     {String? messageId,
     ChatMessage? toolCallMessage});

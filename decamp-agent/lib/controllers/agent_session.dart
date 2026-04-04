@@ -466,6 +466,11 @@ class AgentSession {
           llmStream: (conversation, {cancelToken}) =>
               provider.chatStream(conversation, cancelToken: cancelToken),
         );
+        final toolSummarizer = ToolSummarizer(
+          messageDao: projectDb!.messageDao,
+          llmStream: (conversation, {cancelToken}) =>
+              provider.chatStream(conversation, cancelToken: cancelToken),
+        );
         try {
           await summarizer.summarizeIfNeeded(
             currentSessionId,
@@ -489,6 +494,7 @@ class AgentSession {
           },
           tools: shellTools,
           cancelToken: _currentCancelToken!,
+          toolSummarizer: toolSummarizer,
           requestApproval: (pendingCalls) =>
               _requestApproval(pendingCalls, sessionId: currentSessionId),
           executeToolCall: (toolUseMessage, approvedToolCalls) async {
@@ -660,6 +666,8 @@ class AgentSession {
             await projectDb!.messageDao
                 .insertMessage(streamingMessage.toCompanion(true));
 
+            final persisted = streamingMessage;
+
             // Generate new ID for next message (only used if local or if server didn't provide one)
             streamingMessage = streamingMessage.copyWith(
               id: projectDb!.messageDao.generateMessageId(),
@@ -688,6 +696,8 @@ class AgentSession {
                 );
               }),
             );
+
+            return persisted;
           },
         );
 

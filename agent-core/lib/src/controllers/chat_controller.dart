@@ -396,6 +396,12 @@ class ChatController extends StateNotifier<ChatState> {
 
         _currentLlmCancelToken = CancelToken();
 
+        final toolSummarizer = ToolSummarizer(
+          messageDao: _messageDao,
+          llmStream: (conversation, {cancelToken}) =>
+              _llmService.streamChat(conversation, cancelToken: cancelToken),
+        );
+
         try {
           result = await runAgentLoop(
             getConversation: () async {
@@ -408,6 +414,7 @@ class ChatController extends StateNotifier<ChatState> {
             ),
             tools: shellTools,
             cancelToken: _currentLlmCancelToken!,
+            toolSummarizer: toolSummarizer,
             requestApproval: handleRequestApproval,
             onTextDelta: (delta) async {
               streamingMessage = streamingMessage.copyWith(
@@ -515,12 +522,16 @@ class ChatController extends StateNotifier<ChatState> {
               await _messageDao
                   .insertMessage(streamingMessage.toCompanion(true));
 
+              final persisted = streamingMessage;
+
               // Generate new ID for next message (only used if local or if server didn't provide one)
               streamingMessage = streamingMessage.copyWith(
                 id: _messageDao.generateMessageId(),
               );
 
               await _sessionDao.touchSession(sessionId);
+
+              return persisted;
             },
           );
         } finally {

@@ -7,6 +7,7 @@ import 'database/project_database.dart';
 import 'database/tables/messages_table.dart';
 import 'extensions/chat_message_extensions.dart';
 import 'services/conversation_summarizer.dart';
+import 'services/tool_summarizer.dart';
 import 'types.dart';
 
 final _log = Logger('AgentLoop');
@@ -54,6 +55,7 @@ Future<AgentLoopResult> runAgentLoop({
   required TextDeltaCallback onTextDelta,
   required MessageCallback onAssistantMessage,
   required ToolResultMessageCallback onToolResultMessage,
+  required ToolSummarizer toolSummarizer,
   required CancelToken cancelToken,
 }) async {
   while (true) {
@@ -87,6 +89,8 @@ Future<AgentLoopResult> runAgentLoop({
           toolUseMessage: lastMessage,
           executeToolCall: executeToolCall,
           onToolResultMessage: onToolResultMessage,
+          toolSummarizer: toolSummarizer,
+          cancelToken: cancelToken,
         );
       } on AgentAbortException {
         return const AgentLoopCancelled();
@@ -154,6 +158,8 @@ Future<void> _executeAndPersistToolResults({
   required MessageEntity toolUseMessage,
   required ToolExecutionFunction executeToolCall,
   required ToolResultMessageCallback onToolResultMessage,
+  required ToolSummarizer toolSummarizer,
+  required CancelToken cancelToken,
 }) async {
   final allOriginalToolCalls = toolUseMessage.toolCallsJson ?? [];
 
@@ -220,8 +226,18 @@ Future<void> _executeAndPersistToolResults({
     results: results,
   );
 
-  await onToolResultMessage(toolResultMessage,
+  final persistedEntity = await onToolResultMessage(toolResultMessage,
       toolCallMessage: toolCallMessage);
+
+  // Summarize large tool results to keep context window manageable
+  try {
+    await toolSummarizer.summarizeIfNeeded(
+      persistedEntity,
+      cancelToken: cancelToken,
+    );
+  } catch (e) {
+    _log.warning('Tool result summarization failed: $e');
+  }
 }
 
 List<ChatMessage> _buildConversationHistory(List<MessageEntity> dbMessages) {
