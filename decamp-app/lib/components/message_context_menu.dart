@@ -13,7 +13,6 @@ import 'package:decamp/components/new_snippet_card.dart';
 import 'package:decamp/components/saved_prompt_dialog.dart';
 
 import 'package:decamp/utils/globals.dart';
-import 'package:decamp/utils/message_formatter.dart';
 import 'package:logging/logging.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 

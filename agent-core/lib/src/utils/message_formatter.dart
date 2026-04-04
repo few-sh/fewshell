@@ -1,12 +1,13 @@
-import 'package:agent_core/agent_core.dart';
+import '../database/project_database.dart' show MessageEntity;
+import '../database/tables/messages_table.dart' show MessageKind;
+import 'tool_result_formatter.dart';
 
-/// Utility for formatting message content consistently
-/// Used by both search and rendering to ensure offset alignment
+/// Utility for formatting message content consistently.
+/// Used by both search and rendering to ensure offset alignment.
 class MessageFormatter {
-  /// Format message content based on message type
-  /// This is used both for searching and displaying to ensure consistency
+  /// Format message content based on message type.
+  /// This is used both for searching and displaying to ensure consistency.
   static String formatMessageContent(MessageEntity message) {
-    // For tool use messages, format the tool calls
     if (message.messageKind == MessageKind.toolUse &&
         message.toolCallsJson != null &&
         message.toolCallsJson!.isNotEmpty) {
@@ -16,13 +17,11 @@ class MessageFormatter {
       );
     }
 
-    // For tool result messages, use the formatter
     if (message.messageKind == MessageKind.toolResult &&
         message.toolResultsJson != null &&
         message.toolResultsJson!.isNotEmpty) {
       final buffer = StringBuffer();
 
-      // Format all tool results
       for (var i = 0; i < message.toolResultsJson!.length; i++) {
         final toolResult = message.toolResultsJson![i];
         final toolName = toolResult.function.name;
@@ -33,12 +32,10 @@ class MessageFormatter {
             ? message.toolCallsJson![i]
             : null;
 
-        // Add separator between multiple results
         if (i > 0) {
           buffer.writeln('\n');
         }
 
-        // Format using the tool result formatter
         buffer.write(
           ToolResultFormatter.format(
             toolName: toolName,
@@ -52,7 +49,6 @@ class MessageFormatter {
       return buffer.toString();
     }
 
-    // For all other messages, use the content as-is
     return message.content;
   }
 }
