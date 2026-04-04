@@ -7,6 +7,8 @@
 <a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-amd64.tar.gz"><img src="https://fewshell.com/linux-badge.png" alt="Get it on Linux" height="40"></a>
 <a href="https://release.few.sh/releases/1.0.2/fewshell-app-linux-arm64.tar.gz"><img src="https://fewshell.com/linux-badge-arm64.png" alt="Get it on Linux (ARM64)" height="40"></a>
 
+[Quick Start](https://fewshell.com/docs/getting-started/quick-start/)
+
 tl;dr - using ssh on a phone is painful. AI can help, but agents are risky and hard to configure for critical tasks.
 
 fewshell is an attempt to solve this *without sacrificing security, privacy and safety*.
@@ -16,8 +18,6 @@ It's designed around three core principles:
 1. Secure defaults: mandatory SSH and secrets management.
 2. Must be self-hosted: Eg, cloudless desktop-mobile sync.
 3. Human-first: AI will not run any command without your approval.
-
-[Quick Start](https://fewshell.com/docs/getting-started/quick-start/)
 
 ![Fewshell demo](https://release.few.sh/misc/github_anim_sm.gif)
 
