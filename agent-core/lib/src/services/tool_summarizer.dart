@@ -160,7 +160,7 @@ class ToolSummarizer {
     );
 
     try {
-      return _summarizeAndPersistResults(
+      return await _summarizeAndPersistResults(
         message,
         resultsToSummarize,
         cancelToken: cancelToken,
