@@ -8,7 +8,6 @@ enum MessageKind {
   toolUse,
   toolResult,
   conversationSummary,
-  toolResultSummary,
   notification
 }
 

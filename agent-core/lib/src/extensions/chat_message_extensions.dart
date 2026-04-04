@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
 
@@ -185,21 +187,7 @@ extension MessageEntityToChat on MessageEntity {
             content: content,
           )
         ],
-      MessageKind.toolResult => [
-          if (summary != null && summary!.isNotEmpty)
-            ChatMessage.user(
-              summary!,
-            )
-          else
-            ChatMessage.toolUse(
-              toolCalls: toolCallsJson ?? [],
-              content: content,
-            ),
-          ChatMessage.toolResult(
-            results: toolResultsJson ?? [],
-            content: content,
-          )
-        ],
+      MessageKind.toolResult => _buildToolResultMessages(),
       MessageKind.imageUrl => [
           ChatMessage.imageUrl(
             role: role,
@@ -216,11 +204,54 @@ extension MessageEntityToChat on MessageEntity {
           ChatMessage.user(
               summary ?? '[Unexpected Error: No summary available]'),
         ],
-      MessageKind.toolResultSummary => [
-          ChatMessage.user(content),
-        ],
       MessageKind.notification => [],
     };
+  }
+
+  /// Build tool result messages, substituting summarized content where available.
+  List<ChatMessage> _buildToolResultMessages() {
+    final results = toolResultsJson ?? [];
+
+    // Parse the summary map if present: {toolCallId: summarizedContent}.
+    final summaryMap = _parseSummaryMap();
+
+    // Replace oversized tool results with their summarized content.
+    final effectiveResults = results.map((toolResult) {
+      final summarized = summaryMap?[toolResult.id];
+      if (summarized == null) return toolResult;
+      // Swap in the summarized content, preserving the tool call metadata.
+      return ToolCall(
+        id: toolResult.id,
+        callType: toolResult.callType,
+        function: FunctionCall(
+          name: toolResult.function.name,
+          arguments: summarized,
+        ),
+      );
+    }).toList();
+
+    return [
+      ChatMessage.toolUse(
+        toolCalls: toolCallsJson ?? [],
+        content: content,
+      ),
+      ChatMessage.toolResult(
+        results: effectiveResults,
+        content: content,
+      ),
+    ];
+  }
+
+  /// Decode the summary field as a {toolCallId: summarizedContent} map.
+  Map<String, String>? _parseSummaryMap() {
+    if (summary == null) return null;
+    try {
+      final decoded = jsonDecode(summary!);
+      if (decoded is! Map) return null;
+      return Map<String, String>.from(decoded);
+    } catch (_) {
+      return null;
+    }
   }
 
   ChatRole _roleFromUserId(String userId) {

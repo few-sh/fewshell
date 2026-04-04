@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:drift/drift.dart';
@@ -12,12 +13,10 @@ import 'conversation_summarizer.dart' show SummarizationStreamFunction;
 final _log = Logger('ToolSummarizer');
 
 const _defaultToolSummarizationPrompt =
-    'Summarize the following tool interaction concisely. Include:\n'
-    '- What tool was called and with what arguments\n'
-    '- The key results or output\n'
-    '- Any errors or notable findings\n\n'
-    'Be concise and structured. Preserve critical data such as file paths, '
-    'numbers, error messages, and identifiers exactly as they appear.';
+    'Summarize the following individual tool result. Focus on the tool '
+    'output itself. Preserve critical data such as file paths, numbers, '
+    'commands, error messages, and identifiers exactly as they appear. '
+    'Keep the result concise while retaining the important outcome.';
 
 const _defaultRollingUpdatePrompt =
     'You have a previous summary of a tool interaction and a new chunk of '
@@ -60,7 +59,7 @@ class ToolSummarizerConfig {
   final int newlineScanWindow;
 
   const ToolSummarizerConfig({
-    this.tokenThreshold = 2000,
+    this.tokenThreshold = 70000,
     this.bytesPerToken = 4,
     this.maximumInputTokens = 80000,
     this.summarizationPrompt = _defaultToolSummarizationPrompt,
@@ -104,12 +103,11 @@ class ToolSummarizer {
     if (message.messageKind != MessageKind.toolResult) return false;
     if (message.summary != null) return false;
 
-    final content = _buildContent(message);
-    final estimatedTokens = content.length ~/ config.bytesPerToken;
-
-    if (estimatedTokens < config.tokenThreshold) return false;
-
-    return _summarize(message, content, cancelToken: cancelToken);
+    return _summarizeResultsIfNeeded(
+      message,
+      cancelToken: cancelToken,
+      force: false,
+    );
   }
 
   /// Force summarization of a tool result message regardless of threshold.
@@ -122,64 +120,99 @@ class ToolSummarizer {
   }) async {
     if (message.messageKind != MessageKind.toolResult) return false;
 
-    final content = _buildContent(message);
-    return _summarize(message, content, cancelToken: cancelToken);
+    return _summarizeResultsIfNeeded(
+      message,
+      cancelToken: cancelToken,
+      force: true,
+    );
   }
 
-  /// Core summarization logic.
-  Future<bool> _summarize(
-    MessageEntity message,
-    String content, {
+  /// Summarize oversized tool results individually and persist them as JSON.
+  Future<bool> _summarizeResultsIfNeeded(
+    MessageEntity message, {
     CancelToken? cancelToken,
+    required bool force,
   }) async {
-    final estimatedTokens = content.length ~/ config.bytesPerToken;
+    final toolResults = message.toolResultsJson;
+    if (toolResults == null || toolResults.isEmpty) return false;
 
-    _log.info(
-      'Summarizing tool result ${message.id} '
-      '(~$estimatedTokens tokens, ${content.length} bytes)',
-    );
+    // Index original tool calls by ID so each result can recover its inputs.
+    final originalToolCalls = {
+      for (final toolCall in message.toolCallsJson ?? const <ToolCall>[])
+        toolCall.id: toolCall,
+    };
+    // Only oversized results are stored in the summary map.
+    final summaryMap = <String, String>{};
 
-    String summary;
-    if (estimatedTokens <= config.maximumInputTokens) {
-      summary = await _generateSummary(content, cancelToken: cancelToken);
-    } else {
-      summary = await _generateRollingSummary(
-        content,
-        cancelToken: cancelToken,
+    for (final toolResult in toolResults) {
+      final originalContent = toolResult.function.arguments;
+      final estimatedTokens = originalContent.length ~/ config.bytesPerToken;
+
+      // Skip small results — they stay in toolResultsJson unchanged.
+      if (!force && estimatedTokens < config.tokenThreshold) {
+        continue;
+      }
+
+      _log.info(
+        'Summarizing tool result ${message.id}/${toolResult.id} '
+        '(~$estimatedTokens tokens, ${originalContent.length} bytes)',
       );
+
+      final summarizerInput = _buildSummarizerInput(
+        toolResult,
+        originalToolCall: originalToolCalls[toolResult.id],
+      );
+
+      // Large individual results still use the existing rolling summarization path.
+      final summarizedContent = estimatedTokens <= config.maximumInputTokens
+          ? await _generateSummary(summarizerInput, cancelToken: cancelToken)
+          : await _generateRollingSummary(
+              summarizerInput,
+              cancelToken: cancelToken,
+            );
+
+      summaryMap[toolResult.id] = summarizedContent;
     }
 
-    // Store the summary in the message's summary field.
-    final companion = message.toCompanion(true).copyWith(
-          summary: Value(summary),
-        );
-    await _messageDao.updateMessage(companion);
+    if (summaryMap.isEmpty) {
+      return false;
+    }
+
+    // Persist a JSON map of {toolCallId: summarizedContent} for oversized results only.
+    final summaryJson = jsonEncode(summaryMap);
 
     _log.info(
-      'Tool summary for ${message.id}: ${summary.length} chars '
-      '(~${summary.length ~/ config.bytesPerToken} tokens)',
+      'Persisting summarized tool results for ${message.id}: '
+      '${summaryMap.length} result(s), ${summaryJson.length} chars',
     );
+
+    // Keep messageKind as toolResult; the summary field signals which results were compressed.
+    final companion = message.toCompanion(true).copyWith(
+          summary: Value(summaryJson),
+        );
+    await _messageDao.updateMessage(companion);
 
     return true;
   }
 
-  /// Build the summarizer input from the canonical tool call/result fields.
-  String _buildContent(MessageEntity message) {
+  /// Build summarizer input for a single tool result.
+  String _buildSummarizerInput(
+    ToolCall toolResult, {
+    ToolCall? originalToolCall,
+  }) {
     final buffer = StringBuffer();
 
-    if (message.toolCallsJson != null) {
-      for (final tc in message.toolCallsJson!) {
-        buffer.writeln('[Tool Call] ${tc.function.name}'
-            '(${tc.function.arguments})');
-      }
+    // Include stable metadata so the summary stays anchored to the right tool call.
+    buffer.writeln('Tool: ${toolResult.function.name}');
+    buffer.writeln('Tool call ID: ${toolResult.id}');
+
+    if (originalToolCall != null) {
+      // Original arguments give the summarizer enough context to compress output safely.
+      buffer.writeln('Tool arguments: ${originalToolCall.function.arguments}');
     }
 
-    if (message.toolResultsJson != null) {
-      for (final tr in message.toolResultsJson!) {
-        buffer.writeln('[Tool Result] ${tr.function.name}: '
-            '${tr.function.arguments}');
-      }
-    }
+    buffer.writeln('Tool result:');
+    buffer.write(toolResult.function.arguments);
 
     return buffer.toString();
   }
