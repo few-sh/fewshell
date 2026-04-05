@@ -175,6 +175,13 @@ Future<void> _executeAndPersistToolResults({
     );
   }).toList();
 
+  // Merge approved (potentially user-edited) tool calls over the originals
+  // so the persisted tool-use message reflects what was actually executed.
+  final approvedById = {for (final tc in approvedToolCalls) tc.id: tc};
+  final mergedToolCalls = allOriginalToolCalls.map((tc) {
+    return approvedById[tc.id] ?? tc;
+  }).toList();
+
   // Execute approved tool calls and collect results keyed by tool call ID
   final approvedResultsById = <String, String>{};
   if (approvedToolCalls.isNotEmpty) {
@@ -198,15 +205,15 @@ Future<void> _executeAndPersistToolResults({
     }
   }
 
-  // The assistant message reflects all tool calls the LLM made.
+  // The assistant message reflects all tool calls (with user edits merged in).
   final toolCallMessage = ChatMessage.toolUse(
-    toolCalls: allOriginalToolCalls,
+    toolCalls: mergedToolCalls,
     content: toolUseMessage.content,
   );
 
-  // Build results for ALL original tool calls; non-approved ones are marked as skipped.
+  // Build results for ALL tool calls; non-approved ones are marked as skipped.
   final approvedIds = approvedToolCalls.map((tc) => tc.id).toSet();
-  final results = allOriginalToolCalls.map((tc) {
+  final results = mergedToolCalls.map((tc) {
     final resultString = approvedIds.contains(tc.id)
         ? (approvedResultsById[tc.id] ??
             jsonEncode({'error': 'Missing result for tool call'}))
