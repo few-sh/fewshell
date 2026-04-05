@@ -262,7 +262,7 @@ class InteractiveShellSession {
       // with unresolved $? (not matched by the regex above). Terminal control
       // characters (\r, \b) from line wrapping fracture the UUID, but the
       // __FEWSHELL_DONE_ prefix always appears intact in the raw line.
-      if (_activeCommandUuid != null && line.contains('__FEWSHELL_DONE_')) {
+      if (_activeCommandUuid != null && line.contains(_activeCommandUuid!)) {
         continue;
       }
       cleanedLines.add(line);
