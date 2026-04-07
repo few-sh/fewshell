@@ -25,7 +25,7 @@ class PendingToolCall {
   const PendingToolCall({
     required this.arguments,
     required this.originalToolCall,
-    this.isSelected = true,
+    this.isSelected = false,
   });
 
   factory PendingToolCall.fromJson(Map<String, dynamic> json) =>

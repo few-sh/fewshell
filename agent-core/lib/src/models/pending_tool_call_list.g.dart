@@ -11,7 +11,7 @@ PendingToolCall _$PendingToolCallFromJson(Map<String, dynamic> json) =>
       arguments: json['arguments'] as Map<String, dynamic>,
       originalToolCall:
           ToolCall.fromJson(json['originalToolCall'] as Map<String, dynamic>),
-      isSelected: json['isSelected'] as bool? ?? true,
+      isSelected: json['isSelected'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$PendingToolCallToJson(PendingToolCall instance) =>
