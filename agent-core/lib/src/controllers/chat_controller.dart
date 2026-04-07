@@ -233,13 +233,6 @@ class ChatController extends StateNotifier<ChatState> {
     return _messageDao.getMessage(messageId);
   }
 
-  /// Convert PendingToolCall to ToolAction for UI approval
-  List<ToolAction> _pendingToolCallsToActions(PendingToolCallList toolCalls) {
-    return toolCalls.items.map((tc) {
-      return ToolAction(id: tc.id, toolName: tc.name, params: tc.arguments);
-    }).toList();
-  }
-
   /// Send a message to the AI
   /// Handles saving to database, getting AI response, and managing tool calls
   ///
@@ -253,7 +246,7 @@ class ChatController extends StateNotifier<ChatState> {
     String? userName,
     MessageEntity? triggerMessage,
     required String sessionId,
-    required Future<List<ToolAction>?> Function(List<ToolAction>)
+    required Future<PendingToolCallList?> Function(PendingToolCallList)
         requestApproval,
     void Function()? onNoConfig,
     MultiplexedWebSocketChannel? syncChannel,
@@ -312,36 +305,17 @@ class ChatController extends StateNotifier<ChatState> {
       // Define callbacks to be used by both local and remote loops
       Future<PendingToolCallList?> handleRequestApproval(
           PendingToolCallList pendingCalls) async {
-        // Convert to UI's ToolAction format
-        final actions = _pendingToolCallsToActions(pendingCalls);
-        final selectedActions = await requestApproval(actions);
+        final approvedCalls = await requestApproval(pendingCalls);
 
-        if (selectedActions == null) {
+        if (approvedCalls == null) {
           return null; // User cancelled
         }
 
         _log.info(
-          '✅ User approved ${selectedActions.length} tool calls',
+          '✅ User approved ${approvedCalls.items.length} tool calls',
         );
 
-        // Return the approved subset of PendingToolCalls with updated arguments
-        final pendingCallsById = {for (var pc in pendingCalls.items) pc.id: pc};
-        return PendingToolCallList(selectedActions
-            .map((action) {
-              final original = pendingCallsById[action.id];
-              if (original == null) {
-                _log.warning(
-                  'Could not find original pending call for action id: ${action.id}',
-                );
-                return null;
-              }
-              return PendingToolCall(
-                arguments: action.params,
-                originalToolCall: original.originalToolCall,
-              );
-            })
-            .whereType<PendingToolCall>()
-            .toList());
+        return approvedCalls;
       }
 
       final AgentLoopResult result;
@@ -723,7 +697,7 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> resendMessage({
     required String messageId,
     required String sessionId,
-    required Future<List<ToolAction>?> Function(List<ToolAction>)
+    required Future<PendingToolCallList?> Function(PendingToolCallList)
         requestApproval,
     MultiplexedWebSocketChannel? syncChannel,
   }) async {

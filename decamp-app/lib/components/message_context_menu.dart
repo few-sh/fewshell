@@ -56,7 +56,7 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
     await controller.resendMessage(
       messageId: widget.message.id,
       sessionId: widget.message.sessionId,
-      requestApproval: (actions) {
+      requestApproval: (pendingCalls) {
         final overlayContext = navigatorKey.currentContext;
         if (overlayContext == null) return Future.value(null);
 
@@ -71,7 +71,12 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           return Future.value(null);
         }
 
-        return MultiCommandApprovalOverlay.show(overlayContext, actions);
+        return MultiCommandApprovalOverlay.show(
+          overlayContext,
+          pendingCalls,
+          sessionId: widget.message.sessionId,
+          channel: syncChannel,
+        );
       },
       syncChannel: syncChannel,
     );

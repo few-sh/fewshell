@@ -1,87 +1,97 @@
 import 'dart:convert';
+
 import 'package:decamp/providers/providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
+
+import '../providers/pending_tool_call_approval_provider.dart';
 import '../themes/terminal_theme.dart';
 import '../utils/ui_utils.dart';
 
 /// Overlay widget that shows multiple tool action approvals in a scrollable list
 /// Returns selected actions when approved, empty list when cancelled, null for other dismissals
 class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
-  final List<ToolAction> actions;
-
-  const MultiCommandApprovalOverlay({super.key, required this.actions});
+  const MultiCommandApprovalOverlay({super.key});
 
   /// Show the overlay and await user selection
-  static Future<List<ToolAction>?> show(
+  static Future<PendingToolCallList?> show(
     BuildContext context,
-    List<ToolAction> actions,
-  ) async {
-    final result = await showShadSheet<List<ToolAction>>(
+    PendingToolCallList pendingCalls, {
+    required String sessionId,
+    MultiplexedWebSocketChannel? channel,
+  }) async {
+    final result = await showShadSheet<PendingToolCallList>(
       context: context,
       side: ShadSheetSide.bottom,
-      builder: (context) => MultiCommandApprovalOverlay(actions: actions),
+      builder: (context) => ProviderScope(
+        overrides: [
+          pendingToolCallApprovalBindingProvider.overrideWithValue(
+            PendingToolCallApprovalBinding(
+              sessionId: sessionId,
+              channel: channel,
+              initialState: pendingCalls,
+            ),
+          ),
+        ],
+        child: const MultiCommandApprovalOverlay(),
+      ),
     );
     // Treat null (X button / swipe dismiss) the same as Cancel
-    return result ?? [];
+    return result ?? const PendingToolCallList([]);
   }
 
   /// Test method to show the overlay with placeholder data
   static Future<void> showTest(BuildContext context) async {
-    final actions = [
-      ToolAction(
-        id: '1',
-        toolName: 'execute_shell_command',
-        params: {
+    final pendingCalls = PendingToolCallList([
+      PendingToolCall.fromApprovalRequestJson({
+        'id': '1',
+        'name': 'execute_shell_command',
+        'arguments': {
           'command': 'df -h',
           'explanation': 'Check available disk space on the server',
           'sudo_required': false,
         },
-        isSelected: true,
-      ),
-      ToolAction(
-        id: '2',
-        toolName: 'execute_shell_command',
-        params: {
+      }),
+      PendingToolCall.fromApprovalRequestJson({
+        'id': '2',
+        'name': 'execute_shell_command',
+        'arguments': {
           'command': 'systemctl restart nginx',
           'explanation': 'Restart the Nginx web server to apply changes',
           'sudo_required': true,
           'secrets': ['NGINX_API_KEY', 'SSL_CERT_PASSWORD'],
         },
-        isSelected: true,
-      ),
-      ToolAction(
-        id: '3',
-        toolName: 'fetch',
-        params: {
+      }),
+      PendingToolCall.fromApprovalRequestJson({
+        'id': '3',
+        'name': 'fetch',
+        'arguments': {
           'url': 'http://localhost:8080/health',
           'method': 'GET',
           'explanation': 'Check the health status of the local service',
           'secrets': ['HEALTH_CHECK_TOKEN'],
         },
-        isSelected: true,
-      ),
-      ToolAction(
-        id: '4',
-        toolName: 'execute_shell_command',
-        params: {
+      }),
+      PendingToolCall.fromApprovalRequestJson({
+        'id': '4',
+        'name': 'execute_shell_command',
+        'arguments': {
           'command': 'tail -n 50 /var/log/syslog',
           'explanation': 'Read the last 50 lines of the system log',
           'sudo_required': true,
         },
-        isSelected: false,
-      ),
-    ];
+      }).copyWith(isSelected: false),
+    ]);
 
-    final result = await show(context, actions);
+    final result = await show(context, pendingCalls, sessionId: 'test-session');
     if (context.mounted) {
       if (result != null) {
         final encoder = const JsonEncoder.withIndent('  ');
-        final resultString = result
-            .map((action) {
-              return 'Tool: ${action.toolName}\nParams: ${encoder.convert(action.params)}';
+        final resultString = result.items
+            .map((call) {
+              return 'Tool: ${call.name}\nParams: ${encoder.convert(call.arguments)}';
             })
             .join('\n\n');
 
@@ -120,51 +130,57 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
 
 class _MultiCommandApprovalOverlayState
     extends ConsumerState<MultiCommandApprovalOverlay> {
-  late List<TextEditingController> _controllers;
-  final Map<String, Set<String>> _selectedSecrets = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _controllers = widget.actions.map((action) {
-      return TextEditingController(text: action.primaryDisplay);
-    }).toList();
-
-    // Initialize selected secrets from action params
-    for (final action in widget.actions) {
-      final secrets = (action.params['secrets'] as List?)?.cast<String>() ?? [];
-      _selectedSecrets[action.id] = secrets.toSet();
-    }
-  }
+  final Map<String, TextEditingController> _controllers = {};
 
   @override
   void dispose() {
-    for (final controller in _controllers) {
+    for (final controller in _controllers.values) {
       controller.dispose();
     }
     super.dispose();
   }
 
+  TextEditingController _controllerFor(PendingToolCall call) {
+    final display = _primaryDisplay(call);
+    final controller = _controllers.putIfAbsent(
+      call.id,
+      () => TextEditingController(text: display),
+    );
+    if (controller.text != display) {
+      controller.value = controller.value.copyWith(
+        text: display,
+        selection: TextSelection.collapsed(offset: display.length),
+        composing: TextRange.empty,
+      );
+    }
+    return controller;
+  }
+
+  String _primaryDisplay(PendingToolCall call) {
+    if (call.arguments['command'] != null) {
+      return call.arguments['command'].toString();
+    }
+    if (call.arguments['url'] != null) {
+      final method =
+          call.arguments['method']?.toString().toUpperCase() ?? 'GET';
+      return '$method ${call.arguments['url']}';
+    }
+    return call.name;
+  }
+
+  bool _requiresPrivileges(PendingToolCall call) {
+    return call.arguments['sudo_required'] as bool? ?? false;
+  }
+
+  String _explanation(PendingToolCall call) {
+    return call.arguments['explanation']?.toString() ?? '';
+  }
+
   void _handleApprove() {
-    final selectedActions = widget.actions
-        .where((action) => action.isSelected)
-        .map((action) {
-          final selected = _selectedSecrets[action.id] ?? {};
+    final pending = ref.read(pendingToolCallApprovalProvider);
+    final approvedCalls = pending.copyWith(items: pending.selectedOnly);
 
-          // Create a deep copy of params to avoid side effects
-          final newParams = Map<String, dynamic>.from(action.params);
-          newParams['secrets'] = selected.toList();
-
-          return ToolAction(
-            id: action.id,
-            toolName: action.toolName,
-            params: newParams,
-            isSelected: action.isSelected,
-          );
-        })
-        .toList();
-
-    if (selectedActions.isEmpty) {
+    if (approvedCalls.items.isEmpty) {
       if (mounted) {
         ShadToaster.of(context).show(
           const ShadToast(
@@ -177,34 +193,32 @@ class _MultiCommandApprovalOverlayState
       return;
     }
 
-    Navigator.of(context).pop(selectedActions);
+    Navigator.of(context).pop(approvedCalls);
   }
 
   void _handleCancel() {
     // Return empty list to signal user cancellation (not session mismatch)
-    Navigator.of(context).pop(<ToolAction>[]);
+    Navigator.of(context).pop(const PendingToolCallList([]));
   }
 
   void _toggleSelectAll(bool value) {
-    if (!mounted) return;
-    setState(() {
-      for (final action in widget.actions) {
-        action.isSelected = value;
-      }
-    });
+    ref.read(pendingToolCallApprovalProvider.notifier).toggleSelectAll(value);
   }
-
-  int get _selectedCount => widget.actions.where((a) => a.isSelected).length;
-  int get _privilegedCount =>
-      widget.actions.where((a) => a.requiresPrivileges).length;
 
   @override
   Widget build(BuildContext context) {
+    final pending = ref.watch(pendingToolCallApprovalProvider);
+    final notifier = ref.read(pendingToolCallApprovalProvider.notifier);
+    final items = pending.items;
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
-    final allSelected = widget.actions.every((a) => a.isSelected);
+    final allSelected = pending.allSelected;
     final projectId = ref.watch(currentProjectIdProvider);
     final keychain = ref.watch(keychainServiceProvider);
+    final selectedCount = pending.selectedCount;
+    final privilegedCount = items
+        .where((call) => _requiresPrivileges(call))
+        .length;
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
@@ -224,9 +238,9 @@ class _MultiCommandApprovalOverlayState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Review and approve actions ($_selectedCount of ${widget.actions.length} selected)',
+              'Review and approve actions ($selectedCount of ${items.length} selected)',
             ),
-            if (_privilegedCount > 0) ...[
+            if (privilegedCount > 0) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
@@ -237,7 +251,7 @@ class _MultiCommandApprovalOverlayState
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '$_privilegedCount ${_privilegedCount == 1 ? 'action requires' : 'actions require'} elevated privileges',
+                    '$privilegedCount ${privilegedCount == 1 ? 'action requires' : 'actions require'} elevated privileges',
                     style: TextStyle(
                       color: theme.colorScheme.destructive,
                       fontWeight: FontWeight.bold,
@@ -285,16 +299,16 @@ class _MultiCommandApprovalOverlayState
                     return ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: widget.actions.length,
+                      itemCount: items.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final action = widget.actions[index];
-                        final controller = _controllers[index];
+                        final call = items[index];
+                        final controller = _controllerFor(call);
 
                         // Combine available secrets with any pre-selected ones that might not be in keychain
                         final actionSecrets =
-                            (action.params['secrets'] as List?)
+                            (call.arguments['secrets'] as List?)
                                 ?.cast<String>() ??
                             [];
                         final allOptions = {
@@ -304,10 +318,8 @@ class _MultiCommandApprovalOverlayState
 
                         return GestureDetector(
                           onTap: () {
-                            setState(() {
-                              action.isSelected = !action.isSelected;
-                              FocusScope.of(context).unfocus();
-                            });
+                            notifier.setSelected(call.id, !call.isSelected);
+                            FocusScope.of(context).unfocus();
                           },
                           child: Container(
                             padding: const EdgeInsets.all(12),
@@ -316,7 +328,7 @@ class _MultiCommandApprovalOverlayState
                                 color: theme.colorScheme.border,
                               ),
                               borderRadius: BorderRadius.circular(8),
-                              color: action.requiresPrivileges
+                              color: _requiresPrivileges(call)
                                   ? theme.colorScheme.destructive.withValues(
                                       alpha: 0.05,
                                     )
@@ -328,11 +340,9 @@ class _MultiCommandApprovalOverlayState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 ShadCheckbox(
-                                  value: action.isSelected,
+                                  value: call.isSelected,
                                   onChanged: (value) {
-                                    setState(() {
-                                      action.isSelected = value;
-                                    });
+                                    notifier.setSelected(call.id, value);
                                   },
                                 ),
                                 const SizedBox(width: 12),
@@ -345,7 +355,7 @@ class _MultiCommandApprovalOverlayState
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          if (action.requiresPrivileges) ...[
+                                          if (_requiresPrivileges(call)) ...[
                                             Padding(
                                               padding: const EdgeInsets.only(
                                                 top: 10,
@@ -360,20 +370,20 @@ class _MultiCommandApprovalOverlayState
                                             ),
                                             const SizedBox(width: 4),
                                           ],
-                                          if (action.params['command'] != null)
+                                          if (call.arguments['command'] != null)
                                             Padding(
                                               padding: const EdgeInsets.only(
                                                 top: 10,
                                               ),
                                               child: Text(
-                                                action.requiresPrivileges
+                                                _requiresPrivileges(call)
                                                     ? 'sudo \$ '
                                                     : '\$ ',
                                                 style: TextStyle(
                                                   fontFamily: 'monospace',
                                                   fontSize: 14,
                                                   color:
-                                                      action.requiresPrivileges
+                                                      _requiresPrivileges(call)
                                                       ? theme
                                                             .colorScheme
                                                             .destructive
@@ -402,8 +412,7 @@ class _MultiCommandApprovalOverlayState
                                                 ),
                                               ),
                                               child: ShadInput(
-                                                readOnly:
-                                                    action.toolName == 'fetch',
+                                                readOnly: call.name == 'fetch',
                                                 contextMenuBuilder:
                                                     adaptiveContextMenuBuilder,
                                                 controller: controller,
@@ -426,11 +435,12 @@ class _MultiCommandApprovalOverlayState
                                                   height: 1.5,
                                                 ),
                                                 onChanged: (value) {
-                                                  if (action.params.containsKey(
-                                                    'command',
-                                                  )) {
-                                                    action.params['command'] =
-                                                        value;
+                                                  if (call.arguments
+                                                      .containsKey('command')) {
+                                                    notifier.setCommand(
+                                                      call.id,
+                                                      value,
+                                                    );
                                                   }
                                                 },
                                               ),
@@ -438,23 +448,23 @@ class _MultiCommandApprovalOverlayState
                                           ),
                                         ],
                                       ),
-                                      if (action.explanation.isNotEmpty) ...[
+                                      if (_explanation(call).isNotEmpty) ...[
                                         const SizedBox(height: 4),
                                         Text(
-                                          action.explanation,
+                                          _explanation(call),
                                           style: theme.textTheme.muted,
                                         ),
                                       ],
-                                      if (action.toolName ==
+                                      if (call.name ==
                                           'execute_shell_command') ...[
                                         const SizedBox(height: 8),
                                         ShadSwitch(
-                                          value: action.requiresPrivileges,
+                                          value: _requiresPrivileges(call),
                                           onChanged: (value) {
-                                            setState(() {
-                                              action.params['sudo_required'] =
-                                                  value;
-                                            });
+                                            notifier.setSudoRequired(
+                                              call.id,
+                                              value,
+                                            );
                                           },
                                           label: const Text('Run as sudo'),
                                         ),
@@ -472,14 +482,13 @@ class _MultiCommandApprovalOverlayState
                                                 style: TextStyle(fontSize: 12),
                                               ),
                                               closeOnSelect: false,
-                                              initialValues:
-                                                  _selectedSecrets[action.id] ??
-                                                  {},
+                                              initialValues: actionSecrets
+                                                  .toSet(),
                                               onChanged: (selected) {
-                                                setState(() {
-                                                  _selectedSecrets[action.id] =
-                                                      selected.toSet();
-                                                });
+                                                notifier.setSecrets(
+                                                  call.id,
+                                                  selected.toSet(),
+                                                );
                                               },
                                               options: allOptions
                                                   .map(
@@ -543,7 +552,7 @@ class _MultiCommandApprovalOverlayState
                           const Icon(LucideIcons.play, size: 16),
                           const SizedBox(width: 8),
                           Text(
-                            'Run ${_selectedCount > 1 ? '$_selectedCount Actions' : 'Action'}',
+                            'Run ${selectedCount > 1 ? '$selectedCount Actions' : 'Action'}',
                           ),
                         ],
                       ),

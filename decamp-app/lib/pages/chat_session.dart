@@ -246,7 +246,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       content: content,
       userName: userName,
       sessionId: currentSessionId,
-      requestApproval: (actions) {
+      requestApproval: (pendingCalls) {
         if (!mounted) return Future.value(null);
 
         // Check if we're still on the same session before showing approval UI.
@@ -260,7 +260,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           return Future.value(null);
         }
 
-        return MultiCommandApprovalOverlay.show(context, actions);
+        return MultiCommandApprovalOverlay.show(
+          context,
+          pendingCalls,
+          sessionId: currentSessionId,
+          channel: syncChannel,
+        );
       },
       onNoConfig: () {
         if (mounted) NoLlmConfiguredOverlay.show(context);
