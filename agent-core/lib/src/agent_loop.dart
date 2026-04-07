@@ -129,7 +129,7 @@ Future<AgentLoopResult> runAgentLoop({
   }
 }
 
-List<PendingToolCall> _toPendingToolCalls(List<ToolCall> toolCalls) {
+PendingToolCallList _toPendingToolCalls(List<ToolCall> toolCalls) {
   final pendingCalls = <PendingToolCall>[];
   for (final tc in toolCalls) {
     Map<String, dynamic> args;
@@ -150,11 +150,11 @@ List<PendingToolCall> _toPendingToolCalls(List<ToolCall> toolCalls) {
       ),
     );
   }
-  return pendingCalls;
+  return PendingToolCallList(pendingCalls);
 }
 
 Future<void> _executeAndPersistToolResults({
-  required List<PendingToolCall> approved,
+  required PendingToolCallList approved,
   required MessageEntity toolUseMessage,
   required ToolExecutionFunction executeToolCall,
   required ToolResultMessageCallback onToolResultMessage,
@@ -164,7 +164,7 @@ Future<void> _executeAndPersistToolResults({
   final allOriginalToolCalls = toolUseMessage.toolCallsJson ?? [];
 
   // Build approved tool calls
-  final approvedToolCalls = approved.map((p) {
+  final approvedToolCalls = approved.items.map((p) {
     return ToolCall(
       id: p.originalToolCall.id,
       callType: p.originalToolCall.callType,

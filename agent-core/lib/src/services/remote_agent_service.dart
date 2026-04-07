@@ -39,8 +39,9 @@ Future<AgentLoopResult> runRemoteAgentLoop({
           return;
         }
 
-        final pendingCalls =
-            toolsJson.map(PendingToolCall.fromApprovalRequestJson).toList();
+        final pendingCalls = PendingToolCallList(
+          toolsJson.map(PendingToolCall.fromApprovalRequestJson).toList(),
+        );
 
         final approved = await requestApproval(pendingCalls);
 
@@ -49,7 +50,7 @@ Future<AgentLoopResult> runRemoteAgentLoop({
           _log.info(
             'Approval request handled without response (approved was null)',
           );
-        } else if (approved.isEmpty) {
+        } else if (approved.items.isEmpty) {
           // empty list = user cancelled/rejected all tools
           channel.sendCustomMessage({
             'type': 'approval_response',
@@ -61,7 +62,7 @@ Future<AgentLoopResult> runRemoteAgentLoop({
           channel.sendCustomMessage({
             'type': 'approval_response',
             'approvedCalls':
-                approved.map((c) => c.toApprovalResponseJson()).toList(),
+                approved.items.map((c) => c.toApprovalResponseJson()).toList(),
             'sessionId': sessionId,
           });
         }

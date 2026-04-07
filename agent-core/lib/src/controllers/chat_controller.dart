@@ -234,8 +234,8 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   /// Convert PendingToolCall to ToolAction for UI approval
-  List<ToolAction> _pendingToolCallsToActions(List<PendingToolCall> toolCalls) {
-    return toolCalls.map((tc) {
+  List<ToolAction> _pendingToolCallsToActions(PendingToolCallList toolCalls) {
+    return toolCalls.items.map((tc) {
       return ToolAction(id: tc.id, toolName: tc.name, params: tc.arguments);
     }).toList();
   }
@@ -310,8 +310,8 @@ class ChatController extends StateNotifier<ChatState> {
       }
 
       // Define callbacks to be used by both local and remote loops
-      Future<List<PendingToolCall>?> handleRequestApproval(
-          List<PendingToolCall> pendingCalls) async {
+      Future<PendingToolCallList?> handleRequestApproval(
+          PendingToolCallList pendingCalls) async {
         // Convert to UI's ToolAction format
         final actions = _pendingToolCallsToActions(pendingCalls);
         final selectedActions = await requestApproval(actions);
@@ -325,8 +325,8 @@ class ChatController extends StateNotifier<ChatState> {
         );
 
         // Return the approved subset of PendingToolCalls with updated arguments
-        final pendingCallsById = {for (var pc in pendingCalls) pc.id: pc};
-        return selectedActions
+        final pendingCallsById = {for (var pc in pendingCalls.items) pc.id: pc};
+        return PendingToolCallList(selectedActions
             .map((action) {
               final original = pendingCallsById[action.id];
               if (original == null) {
@@ -341,7 +341,7 @@ class ChatController extends StateNotifier<ChatState> {
               );
             })
             .whereType<PendingToolCall>()
-            .toList();
+            .toList());
       }
 
       final AgentLoopResult result;

@@ -23,8 +23,8 @@ class AgentSession {
   final KeychainService _keychainService;
   final NotificationDispatcher _notificationDispatcher;
   final void Function() onComplete;
-  Completer<List<PendingToolCall>?>? _approvalCompleter;
-  List<PendingToolCall>? _currentPendingCalls;
+  Completer<PendingToolCallList?>? _approvalCompleter;
+  PendingToolCallList? _currentPendingCalls;
   CancelToken? _currentCancelToken;
   StreamController<ProcessSignal>? _currentAbortController;
 
@@ -266,7 +266,7 @@ class AgentSession {
           data['approvedCalls'].isNotEmpty) {
         final approvedCalls =
             (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
-        final pending = _currentPendingCalls ?? [];
+        final pending = _currentPendingCalls?.items ?? [];
         final pendingById = {for (var p in pending) p.id: p};
 
         final approved = approvedCalls
@@ -287,7 +287,7 @@ class AgentSession {
             .toList();
 
         _clearPendingApprovalState();
-        completer.complete(approved);
+        completer.complete(PendingToolCallList(approved));
       } else {
         // Cancelled
         _clearPendingApprovalState();
@@ -322,28 +322,31 @@ class AgentSession {
 
   void _sendApprovalRequest(
     MultiplexedWebSocketChannel channel,
-    List<PendingToolCall> pendingCalls, {
+    PendingToolCallList pendingCalls, {
     required String sessionId,
   }) {
     channel.safeSendCustomMessage({
       'type': 'request_approval',
-      'tools':
-          pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+      'tools': pendingCalls.items
+          .map((call) => call.toApprovalRequestJson())
+          .toList(),
       'sessionId': sessionId,
     });
   }
 
-  Future<List<PendingToolCall>?> _requestApproval(
-      List<PendingToolCall> pendingCalls,
-      {required String sessionId}) {
+  Future<PendingToolCallList?> _requestApproval(
+    PendingToolCallList pendingCalls, {
+    required String sessionId,
+  }) {
     _currentPendingCalls = pendingCalls;
 
-    final completer = Completer<List<PendingToolCall>?>();
+    final completer = Completer<PendingToolCallList?>();
     _approvalCompleter = completer;
     _broadcastCustomMessage({
       'type': 'request_approval',
-      'tools':
-          pendingCalls.map((call) => call.toApprovalRequestJson()).toList(),
+      'tools': pendingCalls.items
+          .map((call) => call.toApprovalRequestJson())
+          .toList(),
       'sessionId': sessionId,
     });
 
@@ -359,7 +362,7 @@ class AgentSession {
     }
 
     final pendingCalls = _currentPendingCalls;
-    if (pendingCalls == null || pendingCalls.isEmpty) {
+    if (pendingCalls == null || pendingCalls.items.isEmpty) {
       _log.warning(
         'Approval state exists, but there are no pending tool calls',
       );

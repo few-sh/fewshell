@@ -3,7 +3,8 @@ import 'package:llm_dart/llm_dart.dart';
 import 'database/project_database.dart';
 import 'models/pending_tool_call_list.dart';
 
-export 'models/pending_tool_call_list.dart' show PendingToolCall;
+export 'models/pending_tool_call_list.dart'
+    show PendingToolCall, PendingToolCallList;
 
 /// Result of the agent loop
 sealed class AgentLoopResult {
@@ -42,8 +43,8 @@ typedef LlmStreamFunction = Stream<ChatStreamEvent> Function(
   CancelToken? cancelToken,
 });
 
-typedef ApprovalFunction = Future<List<PendingToolCall>?> Function(
-  List<PendingToolCall> toolCalls,
+typedef ApprovalFunction = Future<PendingToolCallList?> Function(
+  PendingToolCallList toolCalls,
 );
 
 typedef ToolExecutionFunction = Future<List<String>> Function(
