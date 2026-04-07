@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import '../utils/multiplexed_websocket_channel.dart';
-import 'session_replicated_codec.dart';
 import 'session_replication_envelope.dart';
 
 /// Callback signature for high-level replicated value changes.
@@ -9,6 +8,15 @@ typedef SessionReplicatedValueListener<TState> = void Function(
   TState? next,
   TState? previous,
 );
+
+/// Contract for state objects that can be carried by the replication envelope.
+abstract interface class SessionReplicatedState {
+  /// Serializes the state into the JSON payload carried by the envelope.
+  JsonMap toJson();
+}
+
+/// Recreates a typed replicated object from an envelope payload.
+typedef SessionReplicatedDecoder<TState> = TState Function(JsonMap payload);
 
 /// Callback used to send envelopes to the remote peer or peers.
 typedef SessionReplicatedEnvelopeSender = FutureOr<void> Function(
@@ -52,9 +60,10 @@ class SessionReplicatedValue<TState> {
 /// envelope stream, register `onChanged` listeners, and call `update()` or
 /// `sendAction()` to participate in replication.
 ///
-/// Riverpod can still wrap this class for UI consumption, but the core API is
-/// plain Dart and can therefore be reused inside AgentSession as well.
-class SessionReplicator<TState> {
+/// The replicated business object itself stays free of replication metadata.
+/// Session id, object kind, object key, revision, and action all live in this
+/// container and in the outer envelope.
+class SessionReplicator<TState extends SessionReplicatedState> {
   /// The session this replicator instance is scoped to.
   final String sessionId;
 
@@ -64,8 +73,8 @@ class SessionReplicator<TState> {
   /// The replicated object identity within the session.
   final String objectKey;
 
-  /// Codec that converts between typed state and JSON payload maps.
-  final SessionReplicatedCodec<TState> codec;
+  /// Recreates a typed value from the payload carried by the envelope.
+  final SessionReplicatedDecoder<TState> decode;
 
   /// Outbound envelope sender used for two-way communication.
   final SessionReplicatedEnvelopeSender sendEnvelope;
@@ -74,26 +83,12 @@ class SessionReplicator<TState> {
   final void Function(Object error, StackTrace stackTrace)? errorHandler;
 
   /// Registered high-level value listeners added via [onChanged].
-  ///
-  /// These are local callbacks owned by this replicator instance. They are not
-  /// tied to the transport itself. Whenever this replicator accepts a new
-  /// canonical value, each listener is notified with the new and previous typed
-  /// values.
   final List<SessionReplicatedValueListener<TState>> _listeners = [];
 
   /// Active subscription to the inbound envelope stream passed to [attach].
-  ///
-  /// This represents the transport-side connection for incoming replication
-  /// events. In contrast to [_listeners], there is only one subscription,
-  /// because the replicator consumes one stream of envelopes and then fans out
-  /// accepted changes to any number of local listeners.
   StreamSubscription<SessionReplicatedEnvelope>? _subscription;
 
   /// The latest accepted canonical value together with replication metadata.
-  ///
-  /// This is the replicator's local cache of the authoritative state most
-  /// recently received from the transport. It is what powers [current],
-  /// [revision], and listener notifications.
   SessionReplicatedValue<TState>? _currentValue;
 
   /// Whether the replicator is currently subscribed to inbound updates.
@@ -109,7 +104,7 @@ class SessionReplicator<TState> {
     required this.sessionId,
     required this.objectKind,
     required this.objectKey,
-    required this.codec,
+    required this.decode,
     required this.sendEnvelope,
     this.errorHandler,
   });
@@ -119,7 +114,7 @@ class SessionReplicator<TState> {
     required String sessionId,
     required String objectKind,
     required String objectKey,
-    required SessionReplicatedCodec<TState> codec,
+    required SessionReplicatedDecoder<TState> decode,
     required MultiplexedWebSocketChannel channel,
     void Function(Object error, StackTrace stackTrace)? errorHandler,
   }) {
@@ -127,7 +122,7 @@ class SessionReplicator<TState> {
       sessionId: sessionId,
       objectKind: objectKind,
       objectKey: objectKey,
-      codec: codec,
+      decode: decode,
       sendEnvelope: (envelope) => channel.sendCustomMessage(envelope.toJson()),
       errorHandler: errorHandler,
     );
@@ -212,7 +207,7 @@ class SessionReplicator<TState> {
         objectKey: objectKey,
         revision: revision ?? 0,
         action: action,
-        payload: codec.encodePayload(next),
+        payload: next.toJson(),
       ),
     );
   }
@@ -263,7 +258,7 @@ class SessionReplicator<TState> {
       return;
     }
 
-    final decoded = codec.decodePayload(envelope.payload);
+    final decoded = decode(envelope.payload);
     _currentValue = SessionReplicatedValue<TState>(
       sessionId: envelope.sessionId,
       objectKind: envelope.objectKind,
