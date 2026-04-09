@@ -49,6 +49,26 @@ class PendingToolCall {
     return copyWith(arguments: newArguments);
   }
 
+  PendingToolCall withSelected(bool selected) {
+    return copyWith(isSelected: selected);
+  }
+
+  PendingToolCall withArgument(String key, dynamic value) {
+    return copyWith(arguments: {...arguments, key: value});
+  }
+
+  PendingToolCall withSecrets(Set<String> secrets) {
+    return withArgument('secrets', secrets.toList());
+  }
+
+  PendingToolCall withSudoRequired(bool sudoRequired) {
+    return withArgument('sudo_required', sudoRequired);
+  }
+
+  PendingToolCall withCommand(String command) {
+    return withArgument('command', command);
+  }
+
   Map<String, dynamic> toApprovalRequestJson() {
     return {
       'id': id,
@@ -105,6 +125,21 @@ class PendingToolCallList implements SessionReplicatedState {
   /// Creates a shallow copy with optional replacement of the contained items.
   PendingToolCallList copyWith({List<PendingToolCall>? items}) {
     return PendingToolCallList(items ?? this.items);
+  }
+
+  PendingToolCallList updateAll(
+    PendingToolCall Function(PendingToolCall item) transform,
+  ) {
+    return PendingToolCallList(items.map(transform).toList());
+  }
+
+  PendingToolCallList updateById(
+    String id,
+    PendingToolCall Function(PendingToolCall item) transform,
+  ) {
+    return PendingToolCallList(
+      items.map((item) => item.id == id ? transform(item) : item).toList(),
+    );
   }
 
   /// Returns only the selected tool calls for final approval or execution.

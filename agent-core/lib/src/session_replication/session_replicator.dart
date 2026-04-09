@@ -106,8 +106,22 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     required this.objectKey,
     required this.decode,
     required this.sendEnvelope,
+    TState? initialState,
+    int initialRevision = 0,
+    SessionReplicatedAction initialAction = SessionReplicatedAction.snapshot,
     this.errorHandler,
-  });
+  }) {
+    if (initialState != null) {
+      _currentValue = SessionReplicatedValue<TState>(
+        sessionId: sessionId,
+        objectKind: objectKind,
+        objectKey: objectKey,
+        revision: initialRevision,
+        state: initialState,
+        action: initialAction,
+      );
+    }
+  }
 
   /// Convenience factory for the common case of using one multiplexed channel.
   factory SessionReplicator.forChannel({
@@ -116,6 +130,9 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     required String objectKey,
     required SessionReplicatedDecoder<TState> decode,
     required MultiplexedWebSocketChannel channel,
+    TState? initialState,
+    int initialRevision = 0,
+    SessionReplicatedAction initialAction = SessionReplicatedAction.snapshot,
     void Function(Object error, StackTrace stackTrace)? errorHandler,
   }) {
     return SessionReplicator<TState>(
@@ -124,6 +141,9 @@ class SessionReplicator<TState extends SessionReplicatedState> {
       objectKey: objectKey,
       decode: decode,
       sendEnvelope: (envelope) => channel.sendCustomMessage(envelope.toJson()),
+      initialState: initialState,
+      initialRevision: initialRevision,
+      initialAction: initialAction,
       errorHandler: errorHandler,
     );
   }
@@ -150,6 +170,18 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     error = null;
     _subscription =
         envelopes.listen(_applyEnvelope, onError: _handleStreamError);
+  }
+
+  /// Convenience helper for attaching directly to a multiplexed channel.
+  Future<void> attachToChannel(MultiplexedWebSocketChannel channel) {
+    return attach(
+      channel.onCustomMessage
+          .where(
+            (message) =>
+                message['type'] == SessionReplicatedEnvelope.messageType,
+          )
+          .map(SessionReplicatedEnvelope.fromJson),
+    );
   }
 
   /// Stops listening to inbound envelopes.
@@ -183,6 +215,19 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     await submit(next, action: SessionReplicatedAction.update);
   }
 
+  /// Updates local current state immediately and then sends the envelope.
+  Future<void> optimisticUpdate(
+    TState next, {
+    SessionReplicatedAction action = SessionReplicatedAction.update,
+  }) async {
+    _setCurrent(
+      next,
+      revision: revision ?? 0,
+      action: action,
+    );
+    await submit(next, action: action);
+  }
+
   /// Applies a transformation to the current value and submits the result.
   Future<void> updateWith(TState Function(TState current) transform) async {
     final currentState = current;
@@ -193,6 +238,20 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     }
 
     await update(transform(currentState));
+  }
+
+  /// Applies a transformation locally first and then sends the result.
+  Future<void> optimisticUpdateWith(
+    TState Function(TState current) transform,
+  ) async {
+    final currentState = current;
+    if (currentState == null) {
+      throw StateError(
+        'Cannot update replicated object before a canonical value exists.',
+      );
+    }
+
+    await optimisticUpdate(transform(currentState));
   }
 
   /// Submits a typed state update with a caller-provided envelope action.
@@ -243,7 +302,6 @@ class SessionReplicator<TState extends SessionReplicatedState> {
   }
 
   void _applyEnvelope(SessionReplicatedEnvelope envelope) {
-    final previous = current;
     final currentRevision = revision;
 
     if (currentRevision != null && envelope.revision < currentRevision) {
@@ -254,22 +312,41 @@ class SessionReplicator<TState extends SessionReplicatedState> {
       _currentValue = null;
       isSubmitting = false;
       error = null;
-      _notifyListeners(null, previous);
+      _notifyListeners(null, current);
       return;
     }
 
     final decoded = decode(envelope.payload);
-    _currentValue = SessionReplicatedValue<TState>(
+    _setCurrent(
+      decoded,
+      revision: envelope.revision,
+      action: envelope.action,
       sessionId: envelope.sessionId,
       objectKind: envelope.objectKind,
       objectKey: envelope.objectKey,
-      revision: envelope.revision,
-      state: decoded,
-      action: envelope.action,
     );
     isSubmitting = false;
     error = null;
-    _notifyListeners(decoded, previous);
+  }
+
+  void _setCurrent(
+    TState next, {
+    required int revision,
+    required SessionReplicatedAction action,
+    String? sessionId,
+    String? objectKind,
+    String? objectKey,
+  }) {
+    final previous = current;
+    _currentValue = SessionReplicatedValue<TState>(
+      sessionId: sessionId ?? this.sessionId,
+      objectKind: objectKind ?? this.objectKind,
+      objectKey: objectKey ?? this.objectKey,
+      revision: revision,
+      state: next,
+      action: action,
+    );
+    _notifyListeners(next, previous);
   }
 
   Future<void> _send(SessionReplicatedEnvelope envelope) async {

@@ -60,6 +60,7 @@ class PendingToolCallApprovalNotifier
       objectKey: _objectKey,
       decode: PendingToolCallList.fromJson,
       channel: channel,
+      initialState: _binding.initialState,
       errorHandler: (error, stackTrace) {
         _log.warning('Pending tool call replication error', error, stackTrace);
       },
@@ -71,16 +72,7 @@ class PendingToolCallApprovalNotifier
       }
     });
 
-    unawaited(
-      replicator.attach(
-        channel.onCustomMessage
-            .where(
-              (message) =>
-                  message['type'] == SessionReplicatedEnvelope.messageType,
-            )
-            .map(SessionReplicatedEnvelope.fromJson),
-      ),
-    );
+    unawaited(replicator.attachToChannel(channel));
   }
 
   Future<void> close() async {
@@ -93,89 +85,61 @@ class PendingToolCallApprovalNotifier
     }
   }
 
+  void update(
+    PendingToolCallList Function(PendingToolCallList current) change,
+  ) {
+    _apply(change(state));
+  }
+
   void toggleSelectAll(bool isSelected) {
-    _apply(
-      state.copyWith(
-        items: state.items
-            .map((item) => item.copyWith(isSelected: isSelected))
-            .toList(),
-      ),
-    );
+    update((current) {
+      return current.updateAll((item) => item.withSelected(isSelected));
+    });
   }
 
   void setSelected(String toolCallId, bool isSelected) {
-    _apply(
-      state.copyWith(
-        items: state.items
-            .map(
-              (item) => item.id == toolCallId
-                  ? item.copyWith(isSelected: isSelected)
-                  : item,
-            )
-            .toList(),
-      ),
-    );
+    update((current) {
+      return current.updateById(
+        toolCallId,
+        (item) => item.withSelected(isSelected),
+      );
+    });
   }
 
   void setCommand(String toolCallId, String command) {
-    _apply(
-      state.copyWith(
-        items: state.items
-            .map(
-              (item) => item.id == toolCallId
-                  ? item.copyWith(
-                      arguments: {...item.arguments, 'command': command},
-                    )
-                  : item,
-            )
-            .toList(),
-      ),
-    );
+    update((current) {
+      return current.updateById(
+        toolCallId,
+        (item) => item.withCommand(command),
+      );
+    });
   }
 
   void setSudoRequired(String toolCallId, bool sudoRequired) {
-    _apply(
-      state.copyWith(
-        items: state.items
-            .map(
-              (item) => item.id == toolCallId
-                  ? item.copyWith(
-                      arguments: {
-                        ...item.arguments,
-                        'sudo_required': sudoRequired,
-                      },
-                    )
-                  : item,
-            )
-            .toList(),
-      ),
-    );
+    update((current) {
+      return current.updateById(
+        toolCallId,
+        (item) => item.withSudoRequired(sudoRequired),
+      );
+    });
   }
 
   void setSecrets(String toolCallId, Set<String> secrets) {
-    _apply(
-      state.copyWith(
-        items: state.items
-            .map(
-              (item) => item.id == toolCallId
-                  ? item.copyWith(
-                      arguments: {
-                        ...item.arguments,
-                        'secrets': secrets.toList(),
-                      },
-                    )
-                  : item,
-            )
-            .toList(),
-      ),
-    );
+    update((current) {
+      return current.updateById(
+        toolCallId,
+        (item) => item.withSecrets(secrets),
+      );
+    });
   }
 
   void _apply(PendingToolCallList next) {
-    state = next;
     final replicator = _replicator;
     if (replicator != null) {
-      unawaited(replicator.update(next));
+      unawaited(replicator.optimisticUpdate(next));
+      return;
     }
+
+    state = next;
   }
 }
