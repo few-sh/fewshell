@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:agent_core/agent_core.dart';
+import 'package:agent_core/session_replication.dart';
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:logging/logging.dart';
@@ -13,6 +14,8 @@ import '../services/notification_dispatcher.dart';
 
 class AgentSession {
   static final _log = Logger('AgentSession');
+  static const _pendingToolCallsObjectKind = 'pending_tool_calls';
+  static const _pendingToolCallsObjectKey = 'active';
 
   /// Set of active channels for this session (supports reconnections)
   final Set<MultiplexedWebSocketChannel> _channels = {};
@@ -25,6 +28,8 @@ class AgentSession {
   final void Function() onComplete;
   Completer<PendingToolCallList?>? _approvalCompleter;
   PendingToolCallList? _currentPendingCalls;
+  SessionReplicator<PendingToolCallList>? _pendingToolCallsReplicator;
+  void Function()? _removePendingToolCallsListener;
   CancelToken? _currentCancelToken;
   StreamController<ProcessSignal>? _currentAbortController;
 
@@ -101,6 +106,7 @@ class AgentSession {
     _currentCancelToken = null;
     unawaited(_currentAbortController?.close());
     _currentAbortController = null;
+    unawaited(_disposePendingToolCallsReplicator());
     _interactiveSession.close();
   }
 
@@ -120,6 +126,8 @@ class AgentSession {
       });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
+    } else if (msg['type'] == SessionReplicatedEnvelope.messageType) {
+      _handleReplicatedState(msg);
     } else if (msg['type'] == 'abort_chat') {
       _handleAbort(msg);
     } else if (msg['type'] == 'terminal_keys') {
@@ -312,7 +320,16 @@ class AgentSession {
     }
   }
 
+  void _handleReplicatedState(Map<String, dynamic> message) {
+    _pendingToolCallsReplicator?.tryApplyMessage(message);
+  }
+
   void _clearPendingApprovalState() {
+    final replicator = _pendingToolCallsReplicator;
+    if (replicator != null) {
+      unawaited(replicator.sendAction(SessionReplicatedAction.closed));
+    }
+    unawaited(_disposePendingToolCallsReplicator());
     _approvalCompleter = null;
     _currentPendingCalls = null;
   }
@@ -339,9 +356,17 @@ class AgentSession {
     required String sessionId,
   }) {
     _currentPendingCalls = pendingCalls;
+    _createPendingToolCallsReplicator(
+      sessionId: sessionId,
+      pendingCalls: pendingCalls,
+    );
 
     final completer = Completer<PendingToolCallList?>();
     _approvalCompleter = completer;
+    final replicator = _pendingToolCallsReplicator;
+    if (replicator != null) {
+      unawaited(replicator.syncCurrent());
+    }
     _broadcastCustomMessage({
       'type': 'request_approval',
       'tools': pendingCalls.items
@@ -370,8 +395,54 @@ class AgentSession {
     }
 
     _log.info('Re-sending pending approval request to reconnected channel');
+    final replicator = _pendingToolCallsReplicator;
+    if (replicator != null) {
+      unawaited(replicator.syncCurrent());
+    }
     _sendApprovalRequest(channel, pendingCalls, sessionId: sessionId);
     return true;
+  }
+
+  void _createPendingToolCallsReplicator({
+    required String sessionId,
+    required PendingToolCallList pendingCalls,
+  }) {
+    _removePendingToolCallsListener?.call();
+    _removePendingToolCallsListener = null;
+    unawaited(_pendingToolCallsReplicator?.dispose());
+
+    final replicator = SessionReplicator<PendingToolCallList>(
+      sessionId: sessionId,
+      objectKind: _pendingToolCallsObjectKind,
+      objectKey: _pendingToolCallsObjectKey,
+      decode: PendingToolCallList.fromJson,
+      initialState: pendingCalls,
+      sendEnvelope: (envelope) => _broadcastCustomMessage(envelope.toJson()),
+      errorHandler: (error, stackTrace) {
+        _log.warning(
+          'Pending tool call replication error',
+          error,
+          stackTrace,
+        );
+      },
+    );
+    _pendingToolCallsReplicator = replicator;
+    _removePendingToolCallsListener = replicator.onChanged(
+      (next, previous) {
+        _currentPendingCalls = next;
+      },
+      fireImmediately: true,
+    );
+  }
+
+  Future<void> _disposePendingToolCallsReplicator() async {
+    _removePendingToolCallsListener?.call();
+    _removePendingToolCallsListener = null;
+    final replicator = _pendingToolCallsReplicator;
+    _pendingToolCallsReplicator = null;
+    if (replicator != null) {
+      await replicator.dispose();
+    }
   }
 
   Future<void> _startChat(

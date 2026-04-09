@@ -301,6 +301,37 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     _applyEnvelope(envelope);
   }
 
+  /// Parses and applies a raw custom message when it is a matching envelope.
+  bool tryApplyMessage(Map<String, dynamic> message) {
+    if (message['type'] != SessionReplicatedEnvelope.messageType) {
+      return false;
+    }
+
+    final envelope = SessionReplicatedEnvelope.fromJson(message);
+    if (!envelope.matchesObject(
+      sessionId: sessionId,
+      objectKind: objectKind,
+      objectKey: objectKey,
+    )) {
+      return false;
+    }
+
+    _applyEnvelope(envelope);
+    return true;
+  }
+
+  /// Re-sends the current value using the provided action.
+  Future<void> syncCurrent({
+    SessionReplicatedAction action = SessionReplicatedAction.snapshot,
+  }) async {
+    final currentState = current;
+    if (currentState == null) {
+      return;
+    }
+
+    await submit(currentState, action: action);
+  }
+
   void _applyEnvelope(SessionReplicatedEnvelope envelope) {
     final currentRevision = revision;
 
