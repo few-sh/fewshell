@@ -1,4 +1,17 @@
 
+
+# App 1.0.3+33
+
+- Fix keyboard input issues on macOS and with hardware keyboards
+- Add tool result summarization progress feedback
+- Fix tool call edit history persistence
+
+# Server 0.1.29
+
+- Add tool result summarization support
+- Fix tool call edit history persistence
+- Fix command sentinel output leaking into session output
+
 # App 1.0.2+32
 
 - Streaming support for full screen bash/code block view
