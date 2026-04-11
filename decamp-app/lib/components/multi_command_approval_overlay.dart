@@ -131,11 +131,15 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
 class _MultiCommandApprovalOverlayState
     extends ConsumerState<MultiCommandApprovalOverlay> {
   final Map<String, TextEditingController> _controllers = {};
+  final Map<String, FocusNode> _focusNodes = {};
 
   @override
   void dispose() {
     for (final controller in _controllers.values) {
       controller.dispose();
+    }
+    for (final focusNode in _focusNodes.values) {
+      focusNode.dispose();
     }
     super.dispose();
   }
@@ -146,14 +150,53 @@ class _MultiCommandApprovalOverlayState
       call.id,
       () => TextEditingController(text: display),
     );
-    if (controller.text != display) {
-      controller.value = controller.value.copyWith(
-        text: display,
-        selection: TextSelection.collapsed(offset: display.length),
-        composing: TextRange.empty,
-      );
-    }
+    _syncControllerText(call.id, fallbackCall: call);
     return controller;
+  }
+
+  FocusNode _focusNodeFor(String callId) {
+    return _focusNodes.putIfAbsent(callId, () {
+      final focusNode = FocusNode();
+      focusNode.addListener(() {
+        if (!focusNode.hasFocus) {
+          _syncControllerText(callId);
+        }
+      });
+      return focusNode;
+    });
+  }
+
+  void _syncControllerText(String callId, {PendingToolCall? fallbackCall}) {
+    final controller = _controllers[callId];
+    if (controller == null) {
+      return;
+    }
+
+    final focusNode = _focusNodeFor(callId);
+    if (focusNode.hasFocus) {
+      return;
+    }
+
+    final currentCall = ref
+        .read(pendingToolCallApprovalProvider)
+        .items
+        .where((item) => item.id == callId)
+        .cast<PendingToolCall?>()
+        .firstWhere((item) => item != null, orElse: () => fallbackCall);
+    if (currentCall == null) {
+      return;
+    }
+
+    final display = _primaryDisplay(currentCall);
+    if (controller.text == display) {
+      return;
+    }
+
+    controller.value = controller.value.copyWith(
+      text: display,
+      selection: TextSelection.collapsed(offset: display.length),
+      composing: TextRange.empty,
+    );
   }
 
   String _primaryDisplay(PendingToolCall call) {
@@ -305,6 +348,7 @@ class _MultiCommandApprovalOverlayState
                       itemBuilder: (context, index) {
                         final call = items[index];
                         final controller = _controllerFor(call);
+                        final focusNode = _focusNodeFor(call.id);
 
                         // Combine available secrets with any pre-selected ones that might not be in keychain
                         final actionSecrets =
@@ -416,6 +460,7 @@ class _MultiCommandApprovalOverlayState
                                                 contextMenuBuilder:
                                                     adaptiveContextMenuBuilder,
                                                 controller: controller,
+                                                focusNode: focusNode,
                                                 autocorrect: false,
                                                 minLines: 1,
                                                 maxLines: null,
