@@ -23,36 +23,6 @@ typedef SessionReplicatedEnvelopeSender = FutureOr<void> Function(
   SessionReplicatedEnvelope envelope,
 );
 
-/// Lightweight snapshot of the currently known canonical state.
-class SessionReplicatedValue<TState> {
-  /// The owning session for this replicated value.
-  final String sessionId;
-
-  /// The category of replicated object represented by this value.
-  final String objectKind;
-
-  /// The unique object identity within the session.
-  final String objectKey;
-
-  /// The authoritative revision currently associated with this value.
-  final int revision;
-
-  /// The decoded object state.
-  final TState state;
-
-  /// The last envelope action that produced this value.
-  final SessionReplicatedAction action;
-
-  const SessionReplicatedValue({
-    required this.sessionId,
-    required this.objectKind,
-    required this.objectKey,
-    required this.revision,
-    required this.state,
-    required this.action,
-  });
-}
-
 /// A simple, transport-driven replicated object controller.
 ///
 /// This is the intended low-level primitive for both client and server code.
@@ -88,8 +58,11 @@ class SessionReplicator<TState extends SessionReplicatedState> {
   /// Active subscription to the inbound envelope stream passed to [attach].
   StreamSubscription<SessionReplicatedEnvelope>? _subscription;
 
-  /// The latest accepted canonical value together with replication metadata.
-  SessionReplicatedValue<TState>? _currentValue;
+  /// The latest accepted canonical envelope.
+  SessionReplicatedEnvelope? _currentEnvelope;
+
+  /// The latest decoded canonical state.
+  TState? _currentState;
 
   /// Whether the replicator is currently subscribed to inbound updates.
   bool isAttached = false;
@@ -112,14 +85,15 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     this.errorHandler,
   }) {
     if (initialState != null) {
-      _currentValue = SessionReplicatedValue<TState>(
+      _currentEnvelope = SessionReplicatedEnvelope(
         sessionId: sessionId,
         objectKind: objectKind,
         objectKey: objectKey,
         revision: initialRevision,
-        state: initialState,
         action: initialAction,
+        payload: initialState.toJson(),
       );
+      _currentState = initialState;
     }
   }
 
@@ -149,16 +123,16 @@ class SessionReplicator<TState extends SessionReplicatedState> {
   }
 
   /// The latest decoded canonical value, if one has been received.
-  TState? get current => _currentValue?.state;
+  TState? get current => _currentState;
 
   /// The latest accepted revision, if any.
-  int? get revision => _currentValue?.revision;
+  int? get revision => _currentEnvelope?.revision;
 
   /// Whether a canonical value has been received.
-  bool get hasCurrent => _currentValue != null;
+  bool get hasCurrent => _currentEnvelope != null;
 
-  /// The latest accepted typed value together with its replication metadata.
-  SessionReplicatedValue<TState>? get currentValue => _currentValue;
+  /// The latest accepted envelope together with replication metadata.
+  SessionReplicatedEnvelope? get currentEnvelope => _currentEnvelope;
 
   /// Starts listening to an inbound stream of envelopes.
   Future<void> attach(Stream<SessionReplicatedEnvelope> envelopes) async {
@@ -340,7 +314,8 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     }
 
     if (envelope.action == SessionReplicatedAction.closed) {
-      _currentValue = null;
+      _currentEnvelope = null;
+      _currentState = null;
       isSubmitting = false;
       error = null;
       _notifyListeners(null, current);
@@ -369,14 +344,15 @@ class SessionReplicator<TState extends SessionReplicatedState> {
     String? objectKey,
   }) {
     final previous = current;
-    _currentValue = SessionReplicatedValue<TState>(
+    _currentEnvelope = SessionReplicatedEnvelope(
       sessionId: sessionId ?? this.sessionId,
       objectKind: objectKind ?? this.objectKind,
       objectKey: objectKey ?? this.objectKey,
       revision: revision,
-      state: next,
       action: action,
+      payload: next.toJson(),
     );
+    _currentState = next;
     _notifyListeners(next, previous);
   }
 
