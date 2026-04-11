@@ -18,11 +18,6 @@ abstract interface class ReplicatedState {
 /// Recreates a typed replicated object from an envelope payload.
 typedef StateReplicatedDecoder<TState> = TState Function(JsonMap payload);
 
-/// Callback used to send envelopes to the remote peer or peers.
-typedef StateReplicatedEnvelopeSender = FutureOr<void> Function(
-  StateReplicatedEnvelope envelope,
-);
-
 /// A simple, transport-driven replicated object controller.
 ///
 /// This is the intended low-level primitive for both client and server code.
@@ -46,17 +41,15 @@ class StateReplicator<TState extends ReplicatedState> {
   /// Recreates a typed value from the payload carried by the envelope.
   final StateReplicatedDecoder<TState> decode;
 
-  /// Outbound envelope sender used for two-way communication.
-  final StateReplicatedEnvelopeSender sendEnvelope;
-
   /// Optional observer for stream and send failures.
   final void Function(Object error, StackTrace stackTrace)? errorHandler;
 
   /// Registered high-level value listeners added via [onChanged].
   final List<StateReplicatedValueListener<TState>> _listeners = [];
 
-  /// Active subscription to the inbound envelope stream passed to [attach].
-  StreamSubscription<StateReplicatedEnvelope>? _subscription;
+  /// Active per-channel subscriptions attached via [attachChannel].
+  final Map<MultiplexedWebSocketChannel,
+      StreamSubscription<Map<String, dynamic>>> _channelSubscriptions = {};
 
   /// The latest accepted canonical envelope.
   StateReplicatedEnvelope? _currentEnvelope;
@@ -65,7 +58,7 @@ class StateReplicator<TState extends ReplicatedState> {
   TState? _currentState;
 
   /// Whether the replicator is currently subscribed to inbound updates.
-  bool isAttached = false;
+  bool get isAttached => _channelSubscriptions.isNotEmpty;
 
   /// Whether an outbound message is currently being sent.
   bool isSubmitting = false;
@@ -78,7 +71,6 @@ class StateReplicator<TState extends ReplicatedState> {
     required this.objectKind,
     required this.objectKey,
     required this.decode,
-    required this.sendEnvelope,
     TState? initialState,
     int initialRevision = 0,
     StateReplicatedAction initialAction = StateReplicatedAction.snapshot,
@@ -114,12 +106,11 @@ class StateReplicator<TState extends ReplicatedState> {
       objectKind: objectKind,
       objectKey: objectKey,
       decode: decode,
-      sendEnvelope: (envelope) => channel.sendCustomMessage(envelope.toJson()),
       initialState: initialState,
       initialRevision: initialRevision,
       initialAction: initialAction,
       errorHandler: errorHandler,
-    );
+    )..attachChannel(channel);
   }
 
   /// The latest decoded canonical value, if one has been received.
@@ -134,34 +125,46 @@ class StateReplicator<TState extends ReplicatedState> {
   /// The latest accepted envelope together with replication metadata.
   StateReplicatedEnvelope? get currentEnvelope => _currentEnvelope;
 
-  /// Starts listening to an inbound stream of envelopes.
-  Future<void> attach(Stream<StateReplicatedEnvelope> envelopes) async {
-    if (_subscription != null) {
+  /// Starts listening to replication messages from a channel.
+  void attachChannel(MultiplexedWebSocketChannel channel) {
+    if (_channelSubscriptions.containsKey(channel)) {
       return;
     }
 
-    isAttached = true;
     error = null;
-    _subscription =
-        envelopes.listen(_applyEnvelope, onError: _handleStreamError);
+    _channelSubscriptions[channel] = channel.onCustomMessage.listen(
+      (message) {
+        if (!_tryApplyMessage(message)) {
+          return;
+        }
+
+        // Re-broadcast canonical state to other peers after accepting an update.
+        unawaited(syncCurrent(exceptChannel: channel));
+      },
+      onError: (err, stackTrace) {
+        _handleChannelError(
+          channel,
+          err,
+          stackTrace is StackTrace ? stackTrace : StackTrace.current,
+        );
+      },
+    );
   }
 
-  /// Convenience helper for attaching directly to a multiplexed channel.
-  Future<void> attachToChannel(MultiplexedWebSocketChannel channel) {
-    return attach(
-      channel.onCustomMessage
-          .where(
-            (message) => message['type'] == StateReplicatedEnvelope.messageType,
-          )
-          .map(StateReplicatedEnvelope.fromJson),
-    );
+  /// Stops listening to replication messages from a channel.
+  Future<void> detachChannel(MultiplexedWebSocketChannel channel) async {
+    final subscription = _channelSubscriptions.remove(channel);
+    if (subscription != null) {
+      await subscription.cancel();
+    }
   }
 
   /// Stops listening to inbound envelopes.
   Future<void> detach() async {
-    await _subscription?.cancel();
-    _subscription = null;
-    isAttached = false;
+    for (final subscription in _channelSubscriptions.values) {
+      await subscription.cancel();
+    }
+    _channelSubscriptions.clear();
     isSubmitting = false;
   }
 
@@ -275,6 +278,10 @@ class StateReplicator<TState extends ReplicatedState> {
 
   /// Parses and applies a raw custom message when it is a matching envelope.
   bool tryApplyMessage(Map<String, dynamic> message) {
+    return _tryApplyMessage(message);
+  }
+
+  bool _tryApplyMessage(Map<String, dynamic> message) {
     if (message['type'] != StateReplicatedEnvelope.messageType) {
       return false;
     }
@@ -294,13 +301,17 @@ class StateReplicator<TState extends ReplicatedState> {
   /// Re-sends the current value using the provided action.
   Future<void> syncCurrent({
     StateReplicatedAction action = StateReplicatedAction.snapshot,
+    MultiplexedWebSocketChannel? exceptChannel,
   }) async {
     final envelope = currentEnvelope;
     if (envelope == null || current == null) {
       return;
     }
 
-    await _send(envelope.copyWith(action: action));
+    await _send(
+      envelope.copyWith(action: action),
+      exceptChannel: exceptChannel,
+    );
   }
 
   bool _applyEnvelope(StateReplicatedEnvelope envelope) {
@@ -355,11 +366,19 @@ class StateReplicator<TState extends ReplicatedState> {
     _notifyListeners(next, previous);
   }
 
-  Future<void> _send(StateReplicatedEnvelope envelope) async {
+  Future<void> _send(
+    StateReplicatedEnvelope envelope, {
+    MultiplexedWebSocketChannel? exceptChannel,
+  }) async {
     isSubmitting = true;
     error = null;
     try {
-      await sendEnvelope(envelope);
+      for (final channel in _channelSubscriptions.keys) {
+        if (channel == exceptChannel) {
+          continue;
+        }
+        channel.sendCustomMessage(envelope.toJson());
+      }
       isSubmitting = false;
     } catch (err, stackTrace) {
       isSubmitting = false;
@@ -369,14 +388,13 @@ class StateReplicator<TState extends ReplicatedState> {
     }
   }
 
-  void _handleStreamError(Object err, StackTrace stackTrace) {
-    final subscription = _subscription;
-    _subscription = null;
+  void _handleChannelError(
+    MultiplexedWebSocketChannel channel,
+    Object err,
+    StackTrace stackTrace,
+  ) {
     error = err;
-    isAttached = false;
-    if (subscription != null) {
-      unawaited(subscription.cancel());
-    }
+    unawaited(detachChannel(channel));
     errorHandler?.call(err, stackTrace);
   }
 

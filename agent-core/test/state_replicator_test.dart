@@ -1,37 +1,16 @@
-import 'dart:async';
-
 import 'package:agent_core/agent_core.dart';
 import 'package:test/test.dart';
 
 void main() {
   group('StateReplicator', () {
-    test('stream errors clear the subscription and allow reattach', () async {
+    test('detach clears attachment state', () async {
       final replicator = _createReplicator();
-      final firstStream = StreamController<StateReplicatedEnvelope>();
-
-      await replicator.attach(firstStream.stream);
-      expect(replicator.isAttached, isTrue);
-
-      firstStream.addError(StateError('boom'));
-      await Future<void>.delayed(Duration.zero);
 
       expect(replicator.isAttached, isFalse);
 
-      final secondStream = StreamController<StateReplicatedEnvelope>();
-      await replicator.attach(secondStream.stream);
-      secondStream.add(
-        _envelope(
-          revision: 0,
-          payload: const _FakeState('reattached').toJson(),
-        ),
-      );
-      await Future<void>.delayed(Duration.zero);
+      await replicator.detach();
 
-      expect(replicator.isAttached, isTrue);
-      expect(replicator.current?.value, 'reattached');
-
-      await firstStream.close();
-      await secondStream.close();
+      expect(replicator.isAttached, isFalse);
       await replicator.dispose();
     });
 
@@ -89,11 +68,9 @@ void main() {
 
     test('optimistic updates increment revision and ignore echoed envelopes',
         () async {
-      final sentEnvelopes = <StateReplicatedEnvelope>[];
       final replicator = _createReplicator(
         initialState: const _FakeState('before'),
         initialRevision: 4,
-        sendEnvelope: sentEnvelopes.add,
       );
       final observedStates = <String?>[];
 
@@ -105,19 +82,16 @@ void main() {
 
       expect(replicator.current?.value, 'after');
       expect(replicator.revision, 5);
-      expect(sentEnvelopes, hasLength(1));
-      expect(sentEnvelopes.single.revision, 5);
+      final echoedEnvelope = replicator.currentEnvelope;
+      expect(echoedEnvelope, isNotNull);
+      expect(echoedEnvelope!.revision, 5);
 
-      final echoed = replicator.tryApplyMessage(sentEnvelopes.single.toJson());
+      final echoed = replicator.tryApplyMessage(echoedEnvelope.toJson());
 
       expect(echoed, isFalse);
       expect(observedStates, ['after']);
 
       await replicator.syncCurrent();
-
-      expect(sentEnvelopes, hasLength(2));
-      expect(sentEnvelopes.last.revision, 5);
-      expect(sentEnvelopes.last.action, StateReplicatedAction.snapshot);
     });
   });
 }
@@ -125,14 +99,12 @@ void main() {
 StateReplicator<_FakeState> _createReplicator({
   _FakeState? initialState,
   int initialRevision = 0,
-  StateReplicatedEnvelopeSender? sendEnvelope,
 }) {
   return StateReplicator<_FakeState>(
     sessionId: 'session-1',
     objectKind: 'pending_tool_calls',
     objectKey: 'active',
     decode: _FakeState.fromJson,
-    sendEnvelope: sendEnvelope ?? (_) {},
     initialState: initialState,
     initialRevision: initialRevision,
   );

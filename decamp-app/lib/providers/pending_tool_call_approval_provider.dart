@@ -74,8 +74,6 @@ class PendingToolCallApprovalNotifier
 
       state = next;
     });
-
-    unawaited(replicator.attachToChannel(channel));
   }
 
   Future<void> close() async {

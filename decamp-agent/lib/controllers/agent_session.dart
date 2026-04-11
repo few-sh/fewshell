@@ -74,6 +74,7 @@ class AgentSession {
   /// Register a new channel with this session (handles reconnections)
   void registerChannel(MultiplexedWebSocketChannel channel) {
     _channels.add(channel);
+    _pendingToolCallsReplicator?.attachChannel(channel);
     _log.info(
       'Registered channel with session. Total channels: ${_channels.length}',
     );
@@ -84,6 +85,7 @@ class AgentSession {
   bool unregisterChannel(MultiplexedWebSocketChannel channel) {
     final wasRegistered = _channels.remove(channel);
     if (wasRegistered) {
+      unawaited(_pendingToolCallsReplicator?.detachChannel(channel));
       _log.info(
         'Unregistered channel from session. Remaining channels: ${_channels.length}',
       );
@@ -125,8 +127,6 @@ class AgentSession {
       });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
-    } else if (msg['type'] == StateReplicatedEnvelope.messageType) {
-      _handleReplicatedState(msg);
     } else if (msg['type'] == 'abort_chat') {
       _handleAbort(msg);
     } else if (msg['type'] == 'terminal_keys') {
@@ -319,17 +319,6 @@ class AgentSession {
     }
   }
 
-  void _handleReplicatedState(Map<String, dynamic> message) {
-    final replicator = _pendingToolCallsReplicator;
-    if (replicator == null) {
-      return;
-    }
-
-    if (replicator.tryApplyMessage(message)) {
-      unawaited(replicator.syncCurrent());
-    }
-  }
-
   void _clearPendingApprovalState() {
     final replicator = _pendingToolCallsReplicator;
     if (replicator != null) {
@@ -423,7 +412,6 @@ class AgentSession {
       objectKey: _pendingToolCallsObjectKey,
       decode: PendingToolCallList.fromJson,
       initialState: pendingCalls,
-      sendEnvelope: (envelope) => _broadcastCustomMessage(envelope.toJson()),
       errorHandler: (error, stackTrace) {
         _log.warning(
           'Pending tool call replication error',
@@ -432,6 +420,9 @@ class AgentSession {
         );
       },
     );
+    for (final channel in _channels) {
+      replicator.attachChannel(channel);
+    }
     _pendingToolCallsReplicator = replicator;
     _removePendingToolCallsListener = replicator.onChanged(
       (next, previous) {
