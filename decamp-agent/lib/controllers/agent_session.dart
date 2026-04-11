@@ -320,7 +320,14 @@ class AgentSession {
   }
 
   void _handleReplicatedState(Map<String, dynamic> message) {
-    _pendingToolCallsReplicator?.tryApplyMessage(message);
+    final replicator = _pendingToolCallsReplicator;
+    if (replicator == null) {
+      return;
+    }
+
+    if (replicator.tryApplyMessage(message)) {
+      unawaited(replicator.syncCurrent());
+    }
   }
 
   void _clearPendingApprovalState() {

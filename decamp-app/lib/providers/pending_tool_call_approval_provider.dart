@@ -66,9 +66,13 @@ class PendingToolCallApprovalNotifier
     );
     _replicator = replicator;
     _removeListener = replicator.onChanged((next, previous) {
-      if (next != null) {
-        state = next;
+      if (next == null) {
+        state = const PendingToolCallList([]);
+        unawaited(close());
+        return;
       }
+
+      state = next;
     });
 
     unawaited(replicator.attachToChannel(channel));

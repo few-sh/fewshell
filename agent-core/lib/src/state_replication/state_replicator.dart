@@ -129,7 +129,7 @@ class StateReplicator<TState extends ReplicatedState> {
   int? get revision => _currentEnvelope?.revision;
 
   /// Whether a canonical value has been received.
-  bool get hasCurrent => _currentEnvelope != null;
+  bool get hasCurrent => _currentState != null;
 
   /// The latest accepted envelope together with replication metadata.
   StateReplicatedEnvelope? get currentEnvelope => _currentEnvelope;
@@ -193,12 +193,19 @@ class StateReplicator<TState extends ReplicatedState> {
     TState next, {
     StateReplicatedAction action = StateReplicatedAction.update,
   }) async {
+    final envelope = _createNextEnvelope(
+      action: action,
+      payload: next.toJson(),
+    );
     _setCurrent(
       next,
-      revision: revision ?? 0,
-      action: action,
+      revision: envelope.revision,
+      action: envelope.action,
+      sessionId: envelope.sessionId,
+      objectKind: envelope.objectKind,
+      objectKey: envelope.objectKey,
     );
-    await submit(next, action: action);
+    await _send(envelope);
   }
 
   /// Applies a transformation to the current value and submits the result.
@@ -233,11 +240,7 @@ class StateReplicator<TState extends ReplicatedState> {
     StateReplicatedAction action = StateReplicatedAction.update,
   }) async {
     await _send(
-      StateReplicatedEnvelope(
-        sessionId: sessionId,
-        objectKind: objectKind,
-        objectKey: objectKey,
-        revision: revision ?? 0,
+      _createNextEnvelope(
         action: action,
         payload: next.toJson(),
       ),
@@ -250,11 +253,7 @@ class StateReplicator<TState extends ReplicatedState> {
     JsonMap payload = const {},
   }) async {
     await _send(
-      StateReplicatedEnvelope(
-        sessionId: sessionId,
-        objectKind: objectKind,
-        objectKey: objectKey,
-        revision: revision ?? 0,
+      _createNextEnvelope(
         action: action,
         payload: payload,
       ),
@@ -262,16 +261,16 @@ class StateReplicator<TState extends ReplicatedState> {
   }
 
   /// Accepts an inbound envelope if it matches this object and is not stale.
-  void applyEnvelope(StateReplicatedEnvelope envelope) {
+  bool applyEnvelope(StateReplicatedEnvelope envelope) {
     if (!envelope.matchesObject(
       sessionId: sessionId,
       objectKind: objectKind,
       objectKey: objectKey,
     )) {
-      return;
+      return false;
     }
 
-    _applyEnvelope(envelope);
+    return _applyEnvelope(envelope);
   }
 
   /// Parses and applies a raw custom message when it is a matching envelope.
@@ -289,36 +288,36 @@ class StateReplicator<TState extends ReplicatedState> {
       return false;
     }
 
-    _applyEnvelope(envelope);
-    return true;
+    return _applyEnvelope(envelope);
   }
 
   /// Re-sends the current value using the provided action.
   Future<void> syncCurrent({
     StateReplicatedAction action = StateReplicatedAction.snapshot,
   }) async {
-    final currentState = current;
-    if (currentState == null) {
+    final envelope = currentEnvelope;
+    if (envelope == null || current == null) {
       return;
     }
 
-    await submit(currentState, action: action);
+    await _send(envelope.copyWith(action: action));
   }
 
-  void _applyEnvelope(StateReplicatedEnvelope envelope) {
+  bool _applyEnvelope(StateReplicatedEnvelope envelope) {
     final currentRevision = revision;
 
-    if (currentRevision != null && envelope.revision < currentRevision) {
-      return;
+    if (currentRevision != null && envelope.revision <= currentRevision) {
+      return false;
     }
 
     if (envelope.action == StateReplicatedAction.closed) {
-      _currentEnvelope = null;
+      final previous = _currentState;
+      _currentEnvelope = envelope;
       _currentState = null;
       isSubmitting = false;
       error = null;
-      _notifyListeners(null, current);
-      return;
+      _notifyListeners(null, previous);
+      return true;
     }
 
     final decoded = decode(envelope.payload);
@@ -332,6 +331,7 @@ class StateReplicator<TState extends ReplicatedState> {
     );
     isSubmitting = false;
     error = null;
+    return true;
   }
 
   void _setCurrent(
@@ -370,9 +370,36 @@ class StateReplicator<TState extends ReplicatedState> {
   }
 
   void _handleStreamError(Object err, StackTrace stackTrace) {
+    final subscription = _subscription;
+    _subscription = null;
     error = err;
     isAttached = false;
+    if (subscription != null) {
+      unawaited(subscription.cancel());
+    }
     errorHandler?.call(err, stackTrace);
+  }
+
+  int _nextRevision() {
+    final currentRevision = revision;
+    if (currentRevision == null) {
+      return 0;
+    }
+    return currentRevision + 1;
+  }
+
+  StateReplicatedEnvelope _createNextEnvelope({
+    required StateReplicatedAction action,
+    required JsonMap payload,
+  }) {
+    return StateReplicatedEnvelope(
+      sessionId: sessionId,
+      objectKind: objectKind,
+      objectKey: objectKey,
+      revision: _nextRevision(),
+      action: action,
+      payload: payload,
+    );
   }
 
   void _notifyListeners(TState? next, TState? previous) {
