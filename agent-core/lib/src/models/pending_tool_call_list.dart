@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:llm_dart/llm_dart.dart';
 
-import '../session_replication/session_replicator.dart';
+import '../state_replication/state_replicator.dart';
 
 part 'pending_tool_call_list.g.dart';
 
@@ -110,7 +110,7 @@ class PendingToolCall {
 /// and envelope. As far as this class is concerned, it is just a plain JSON
 /// serializable model used by both client and server.
 @JsonSerializable(explicitToJson: true)
-class PendingToolCallList implements SessionReplicatedState {
+class PendingToolCallList implements ReplicatedState {
   /// The current collaboratively editable tool calls.
   final List<PendingToolCall> items;
 

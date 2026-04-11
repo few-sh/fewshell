@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:agent_core/agent_core.dart';
-import 'package:agent_core/session_replication.dart';
 import 'package:drift/drift.dart';
 import 'package:llm_dart/llm_dart.dart';
 import 'package:logging/logging.dart';
@@ -28,7 +27,7 @@ class AgentSession {
   final void Function() onComplete;
   Completer<PendingToolCallList?>? _approvalCompleter;
   PendingToolCallList? _currentPendingCalls;
-  SessionReplicator<PendingToolCallList>? _pendingToolCallsReplicator;
+  StateReplicator<PendingToolCallList>? _pendingToolCallsReplicator;
   void Function()? _removePendingToolCallsListener;
   CancelToken? _currentCancelToken;
   StreamController<ProcessSignal>? _currentAbortController;
@@ -126,7 +125,7 @@ class AgentSession {
       });
     } else if (msg['type'] == 'approval_response') {
       _handleApproval(msg);
-    } else if (msg['type'] == SessionReplicatedEnvelope.messageType) {
+    } else if (msg['type'] == StateReplicatedEnvelope.messageType) {
       _handleReplicatedState(msg);
     } else if (msg['type'] == 'abort_chat') {
       _handleAbort(msg);
@@ -327,7 +326,7 @@ class AgentSession {
   void _clearPendingApprovalState() {
     final replicator = _pendingToolCallsReplicator;
     if (replicator != null) {
-      unawaited(replicator.sendAction(SessionReplicatedAction.closed));
+      unawaited(replicator.sendAction(StateReplicatedAction.closed));
     }
     unawaited(_disposePendingToolCallsReplicator());
     _approvalCompleter = null;
@@ -411,7 +410,7 @@ class AgentSession {
     _removePendingToolCallsListener = null;
     unawaited(_pendingToolCallsReplicator?.dispose());
 
-    final replicator = SessionReplicator<PendingToolCallList>(
+    final replicator = StateReplicator<PendingToolCallList>(
       sessionId: sessionId,
       objectKind: _pendingToolCallsObjectKind,
       objectKey: _pendingToolCallsObjectKey,

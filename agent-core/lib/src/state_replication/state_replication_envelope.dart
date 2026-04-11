@@ -7,7 +7,7 @@ typedef JsonMap = Map<String, dynamic>;
 /// the envelope level, not domain-specific behavior. That keeps the outer wire
 /// format generic while allowing each replicated object kind to decide how to
 /// interpret the payload.
-enum SessionReplicatedAction {
+enum StateReplicatedAction {
   /// A canonical snapshot broadcast from the authoritative source of truth.
   snapshot,
 
@@ -24,8 +24,8 @@ enum SessionReplicatedAction {
   closed;
 
   /// Parses an action name received from the wire format.
-  static SessionReplicatedAction fromWireValue(String value) {
-    return SessionReplicatedAction.values.firstWhere(
+  static StateReplicatedAction fromWireValue(String value) {
+    return StateReplicatedAction.values.firstWhere(
       (candidate) => candidate.name == value,
       orElse: () => throw FormatException(
         'Unknown session replicated action: $value',
@@ -39,14 +39,14 @@ enum SessionReplicatedAction {
 /// `objectKind` names the category of replicated state, such as
 /// `pending_tool_calls`. `objectKey` distinguishes multiple instances of the
 /// same category if a session ever needs more than one.
-class SessionReplicatedObjectRef {
+class StateReplicatedObjectRef {
   /// The category of replicated object, for example `pending_tool_calls`.
   final String objectKind;
 
   /// The unique object identity within the session for the given kind.
   final String objectKey;
 
-  const SessionReplicatedObjectRef({
+  const StateReplicatedObjectRef({
     required this.objectKind,
     required this.objectKey,
   });
@@ -68,7 +68,7 @@ class SessionReplicatedObjectRef {
 /// The payload is intentionally untyped here. Concrete object kinds provide
 /// their own codecs on top of this envelope so the outer protocol can remain
 /// reusable.
-class SessionReplicatedEnvelope {
+class StateReplicatedEnvelope {
   /// The custom message type placed on the multiplexed WebSocket channel.
   static const String messageType = 'replicated_state';
 
@@ -85,7 +85,7 @@ class SessionReplicatedEnvelope {
   final int revision;
 
   /// The operation represented by this envelope.
-  final SessionReplicatedAction action;
+  final StateReplicatedAction action;
 
   /// Object-specific data encoded as a JSON-compatible map.
   ///
@@ -93,7 +93,7 @@ class SessionReplicatedEnvelope {
   /// envelope stays generic while codecs interpret this map as typed state.
   final JsonMap payload;
 
-  const SessionReplicatedEnvelope({
+  const StateReplicatedEnvelope({
     required this.sessionId,
     required this.objectKind,
     required this.objectKey,
@@ -103,8 +103,8 @@ class SessionReplicatedEnvelope {
   });
 
   /// Returns the object identity portion of this envelope.
-  SessionReplicatedObjectRef get objectRef {
-    return SessionReplicatedObjectRef(
+  StateReplicatedObjectRef get objectRef {
+    return StateReplicatedObjectRef(
       objectKind: objectKind,
       objectKey: objectKey,
     );
@@ -122,15 +122,15 @@ class SessionReplicatedEnvelope {
   }
 
   /// Creates a new envelope by replacing selected fields.
-  SessionReplicatedEnvelope copyWith({
+  StateReplicatedEnvelope copyWith({
     String? sessionId,
     String? objectKind,
     String? objectKey,
     int? revision,
-    SessionReplicatedAction? action,
+    StateReplicatedAction? action,
     JsonMap? payload,
   }) {
-    return SessionReplicatedEnvelope(
+    return StateReplicatedEnvelope(
       sessionId: sessionId ?? this.sessionId,
       objectKind: objectKind ?? this.objectKind,
       objectKey: objectKey ?? this.objectKey,
@@ -154,7 +154,7 @@ class SessionReplicatedEnvelope {
   }
 
   /// Deserializes an envelope from the custom message wire format.
-  factory SessionReplicatedEnvelope.fromJson(Map<String, dynamic> json) {
+  factory StateReplicatedEnvelope.fromJson(Map<String, dynamic> json) {
     final type = json['type'] as String?;
     if (type != messageType) {
       throw FormatException(
@@ -167,12 +167,12 @@ class SessionReplicatedEnvelope {
         ? <String, dynamic>{}
         : Map<String, dynamic>.from(rawPayload as Map);
 
-    return SessionReplicatedEnvelope(
+    return StateReplicatedEnvelope(
       sessionId: json['sessionId'] as String,
       objectKind: json['objectKind'] as String,
       objectKey: json['objectKey'] as String,
       revision: json['revision'] as int,
-      action: SessionReplicatedAction.fromWireValue(
+      action: StateReplicatedAction.fromWireValue(
         json['action'] as String,
       ),
       payload: payload,

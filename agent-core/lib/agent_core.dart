@@ -17,6 +17,10 @@ export 'src/models/pending_tool_call_list.dart';
 export 'src/models/settings.dart';
 export 'src/models/ssh_settings.dart';
 
+// State Replication
+export 'src/state_replication/state_replicator.dart';
+export 'src/state_replication/state_replication_envelope.dart';
+
 // Utils
 export 'src/utils/constants.dart';
 export 'src/utils/settings_flattener.dart';

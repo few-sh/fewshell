@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:agent_core/agent_core.dart';
-import 'package:agent_core/session_replication.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 
@@ -44,7 +43,7 @@ class PendingToolCallApprovalNotifier
   static const _objectKey = 'active';
 
   final PendingToolCallApprovalBinding _binding;
-  SessionReplicator<PendingToolCallList>? _replicator;
+  StateReplicator<PendingToolCallList>? _replicator;
   void Function()? _removeListener;
 
   PendingToolCallApprovalNotifier(this._binding)
@@ -54,7 +53,7 @@ class PendingToolCallApprovalNotifier
       return;
     }
 
-    final replicator = SessionReplicator<PendingToolCallList>.forChannel(
+    final replicator = StateReplicator<PendingToolCallList>.forChannel(
       sessionId: _binding.sessionId,
       objectKind: _objectKind,
       objectKey: _objectKey,
