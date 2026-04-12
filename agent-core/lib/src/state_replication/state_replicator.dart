@@ -14,7 +14,8 @@ abstract interface class ReplicatedState {
 }
 
 /// Recreates a typed replicated object from an envelope payload.
-typedef StateReplicatedDecoder<TState> = TState Function(JsonMap payload);
+/// Recreates a typed replicated object from an envelope payload (which may be null).
+typedef StateReplicatedDecoder<TState> = TState? Function(JsonMap? payload);
 
 String _defaultObjectKindFor<TState>() => TState.toString();
 
@@ -169,18 +170,18 @@ class StateReplicator<TState extends ReplicatedState> {
   }
 
   /// Submits a typed state update using the standard update action.
-  Future<void> update(TState next) async {
+  Future<void> update(TState? next) async {
     await submit(next, action: StateReplicatedAction.update);
   }
 
   /// Updates local current state immediately and then sends the envelope.
   Future<void> optimisticUpdate(
-    TState next, {
+    TState? next, {
     StateReplicatedAction action = StateReplicatedAction.update,
   }) async {
     final envelope = _createNextEnvelope(
       action: action,
-      payload: next.toJson(),
+      payload: next?.toJson(),
     );
     _setCurrent(
       next,
@@ -194,40 +195,29 @@ class StateReplicator<TState extends ReplicatedState> {
   }
 
   /// Applies a transformation to the current value and submits the result.
-  Future<void> updateWith(TState Function(TState current) transform) async {
+  Future<void> updateWith(TState? Function(TState? current) transform) async {
     final currentState = current;
-    if (currentState == null) {
-      throw StateError(
-        'Cannot update replicated object before a canonical value exists.',
-      );
-    }
-
     await update(transform(currentState));
   }
 
   /// Applies a transformation locally first and then sends the result.
   Future<void> optimisticUpdateWith(
-    TState Function(TState current) transform,
+    TState? Function(TState? current) transform,
   ) async {
     final currentState = current;
-    if (currentState == null) {
-      throw StateError(
-        'Cannot update replicated object before a canonical value exists.',
-      );
-    }
 
     await optimisticUpdate(transform(currentState));
   }
 
   /// Submits a typed state update with a caller-provided envelope action.
   Future<void> submit(
-    TState next, {
+    TState? next, {
     StateReplicatedAction action = StateReplicatedAction.update,
   }) async {
     await _send(
       _createNextEnvelope(
         action: action,
-        payload: next.toJson(),
+        payload: next?.toJson(),
       ),
     );
   }
@@ -328,7 +318,7 @@ class StateReplicator<TState extends ReplicatedState> {
   }
 
   void _setCurrent(
-    TState next, {
+    TState? next, {
     required int revision,
     required StateReplicatedAction action,
     String? sessionId,
@@ -342,7 +332,7 @@ class StateReplicator<TState extends ReplicatedState> {
       objectKey: objectKey ?? this.objectKey,
       revision: revision,
       action: action,
-      payload: next.toJson(),
+      payload: next?.toJson(),
     );
     _currentState = next;
     _notifyListeners(next, previous);
@@ -380,7 +370,7 @@ class StateReplicator<TState extends ReplicatedState> {
 
   StateReplicatedEnvelope _createNextEnvelope({
     required StateReplicatedAction action,
-    required JsonMap payload,
+    required JsonMap? payload,
   }) {
     return StateReplicatedEnvelope(
       sessionId: sessionId,

@@ -414,7 +414,7 @@ class AgentSession {
     final replicator =
         _stateReplicationManager.createReplicator<PendingToolCallList>(
       sessionId: sessionId,
-      decode: PendingToolCallList.fromJson,
+      decode: PendingToolCallList.decode,
       initialState: pendingCalls,
       errorHandler: (error, stackTrace) {
         _log.warning(

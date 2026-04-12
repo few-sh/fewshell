@@ -102,7 +102,7 @@ StateReplicator<_FakeState> _createReplicator({
 }) {
   return StateReplicator<_FakeState>(
     sessionId: 'session-1',
-    decode: _FakeState.fromJson,
+    decode: _FakeState.decode,
     initialState: initialState,
     initialRevision: initialRevision,
   );
@@ -128,7 +128,8 @@ class _FakeState implements ReplicatedState {
 
   const _FakeState(this.value);
 
-  factory _FakeState.fromJson(Map<String, dynamic> json) {
+  static _FakeState? decode(Map<String, dynamic>? json) {
+    if (json == null) return null;
     return _FakeState(json['value'] as String);
   }
 

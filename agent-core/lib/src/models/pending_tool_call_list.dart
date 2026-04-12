@@ -119,6 +119,11 @@ class PendingToolCallList implements ReplicatedState {
   factory PendingToolCallList.fromJson(Map<String, dynamic> json) =>
       _$PendingToolCallListFromJson(json);
 
+  static PendingToolCallList? decode(Map<String, dynamic>? json) {
+    if (json == null) return null;
+    return PendingToolCallList.fromJson(json);
+  }
+
   @override
   Map<String, dynamic> toJson() => _$PendingToolCallListToJson(this);
 

@@ -65,7 +65,7 @@ class PendingToolCallApprovalNotifier
     final replicator = _stateReplicationManager
         .createReplicator<PendingToolCallList>(
           sessionId: args.sessionId,
-          decode: PendingToolCallList.fromJson,
+          decode: PendingToolCallList.decode,
           errorHandler: (error, stackTrace) {
             _log.warning(
               'Pending tool call replication error',

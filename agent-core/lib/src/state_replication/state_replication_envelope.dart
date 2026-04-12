@@ -91,7 +91,7 @@ class StateReplicatedEnvelope {
   ///
   /// This contains the domain payload for the replicated object. The outer
   /// envelope stays generic while codecs interpret this map as typed state.
-  final JsonMap payload;
+  final JsonMap? payload;
 
   const StateReplicatedEnvelope({
     required this.sessionId,
@@ -99,7 +99,7 @@ class StateReplicatedEnvelope {
     required this.objectKey,
     required this.revision,
     required this.action,
-    this.payload = const {},
+    this.payload,
   });
 
   /// Returns the object identity portion of this envelope.
@@ -136,7 +136,7 @@ class StateReplicatedEnvelope {
       objectKey: objectKey ?? this.objectKey,
       revision: revision ?? this.revision,
       action: action ?? this.action,
-      payload: payload ?? this.payload,
+      payload: payload,
     );
   }
 
@@ -163,9 +163,14 @@ class StateReplicatedEnvelope {
     }
 
     final rawPayload = json['payload'];
-    final payload = rawPayload == null
-        ? <String, dynamic>{}
-        : Map<String, dynamic>.from(rawPayload as Map);
+    final JsonMap? payload;
+    if (rawPayload == null) {
+      payload = null;
+    } else if (rawPayload is Map) {
+      payload = Map<String, dynamic>.from(rawPayload);
+    } else {
+      payload = null;
+    }
 
     return StateReplicatedEnvelope(
       sessionId: json['sessionId'] as String,
