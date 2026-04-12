@@ -13,7 +13,6 @@ abstract interface class ReplicatedState {
   JsonMap toJson();
 }
 
-/// Recreates a typed replicated object from an envelope payload.
 /// Recreates a typed replicated object from an envelope payload (which may be null).
 typedef StateReplicatedDecoder<TState> = TState? Function(JsonMap? payload);
 
@@ -349,7 +348,7 @@ class StateReplicator<TState extends ReplicatedState> {
         if (channel == exceptChannel) {
           continue;
         }
-        channel.sendCustomMessage(envelope.toJson());
+        channel.safeSendCustomMessage(envelope.toJson());
       }
       isSubmitting = false;
     } catch (err, stackTrace) {

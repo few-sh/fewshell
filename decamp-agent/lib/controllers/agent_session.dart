@@ -323,11 +323,10 @@ class AgentSession {
   void _clearPendingApprovalState() {
     final replicator = _pendingToolCallsReplicator;
     if (replicator != null) {
-      unawaited(replicator.sendAction(StateReplicatedAction.closed));
+      unawaited(replicator.optimisticUpdate(null));
     }
-    unawaited(_disposePendingToolCallsReplicator());
     _approvalCompleter = null;
-    _currentPendingCalls = null;
+    // _currentPendingCalls is cleared by the replicator onChanged listener.
   }
 
   bool get _isAwaitingApproval =>
@@ -351,18 +350,16 @@ class AgentSession {
     PendingToolCallList pendingCalls, {
     required String sessionId,
   }) {
-    _currentPendingCalls = pendingCalls;
-    _createPendingToolCallsReplicator(
-      sessionId: sessionId,
-      pendingCalls: pendingCalls,
-    );
+    // Create the replicator once per session; recreate only if the session ID
+    // changes (i.e. a new chat session starts).
+    final existing = _pendingToolCallsReplicator;
+    if (existing == null || existing.sessionId != sessionId) {
+      _initPendingToolCallsReplicator(sessionId: sessionId);
+    }
+    unawaited(_pendingToolCallsReplicator!.optimisticUpdate(pendingCalls));
 
     final completer = Completer<PendingToolCallList?>();
     _approvalCompleter = completer;
-    final replicator = _pendingToolCallsReplicator;
-    if (replicator != null) {
-      unawaited(replicator.syncCurrent());
-    }
     _broadcastCustomMessage({
       'type': 'request_approval',
       'tools': pendingCalls.items
@@ -399,23 +396,26 @@ class AgentSession {
     return true;
   }
 
-  void _createPendingToolCallsReplicator({
-    required String sessionId,
-    required PendingToolCallList pendingCalls,
-  }) {
+  void _initPendingToolCallsReplicator({required String sessionId}) {
     _removePendingToolCallsListener?.call();
     _removePendingToolCallsListener = null;
-    unawaited(
-      _stateReplicationManager.disposeReplicator<PendingToolCallList>(
-        sessionId: sessionId,
-      ),
-    );
+    // Dispose any existing replicator for a previous session ID.
+    final existing = _pendingToolCallsReplicator;
+    if (existing != null) {
+      unawaited(
+        _stateReplicationManager.disposeReplicator<PendingToolCallList>(
+          sessionId: existing.sessionId,
+          objectKind: existing.objectKind,
+          objectKey: existing.objectKey,
+        ),
+      );
+      _pendingToolCallsReplicator = null;
+    }
 
     final replicator =
         _stateReplicationManager.createReplicator<PendingToolCallList>(
       sessionId: sessionId,
       decode: PendingToolCallList.decode,
-      initialState: pendingCalls,
       errorHandler: (error, stackTrace) {
         _log.warning(
           'Pending tool call replication error',
@@ -429,7 +429,6 @@ class AgentSession {
       (next, previous) {
         _currentPendingCalls = next;
       },
-      fireImmediately: true,
     );
   }
 

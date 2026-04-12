@@ -76,13 +76,8 @@ class PendingToolCallApprovalNotifier
         );
     _replicator = replicator;
     _removeListener = replicator.onChanged((next, previous) {
-      if (next == null) {
-        state = const PendingToolCallList([]);
-        unawaited(close());
-        return;
-      }
-
-      state = next;
+      // null means no pending calls; keep the replicator alive for future rounds.
+      state = next ?? const PendingToolCallList([]);
     });
   }
 
