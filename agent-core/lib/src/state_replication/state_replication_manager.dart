@@ -12,9 +12,12 @@ import 'state_replicator.dart';
 /// - attaching active channels to newly created replicators
 class StateReplicationManager {
   final Set<MultiplexedWebSocketChannel> _channels = {};
+  final Map<MultiplexedWebSocketChannel,
+      StreamSubscription<Map<String, dynamic>>> _channelSubscriptions = {};
   final Map<String, StateReplicator<dynamic>> _replicators = {};
 
-  /// Registers a channel and attaches it to all active replicators.
+  /// Registers a channel, attaches it to all active replicators, and begins
+  /// routing inbound messages and fanning out accepted updates.
   void registerChannel(MultiplexedWebSocketChannel channel) {
     if (!_channels.add(channel)) {
       return;
@@ -23,6 +26,21 @@ class StateReplicationManager {
     for (final replicator in _replicators.values) {
       replicator.attachChannel(channel);
     }
+
+    _channelSubscriptions[channel] = channel.onCustomMessage.listen(
+      (message) {
+        for (final replicator in _replicators.values) {
+          if (replicator.tryApplyMessage(message)) {
+            // Fan out the canonical state to all other attached channels.
+            unawaited(replicator.syncCurrent(exceptChannel: channel));
+            break;
+          }
+        }
+      },
+      onError: (err, stackTrace) {
+        unawaited(unregisterChannel(channel));
+      },
+    );
   }
 
   /// Unregisters a channel and detaches it from all active replicators.
@@ -30,6 +48,9 @@ class StateReplicationManager {
     if (!_channels.remove(channel)) {
       return;
     }
+
+    final subscription = _channelSubscriptions.remove(channel);
+    await subscription?.cancel();
 
     for (final replicator in _replicators.values) {
       await replicator.detachChannel(channel);
@@ -115,6 +136,10 @@ class StateReplicationManager {
   }
 
   Future<void> dispose() async {
+    for (final subscription in _channelSubscriptions.values) {
+      await subscription.cancel();
+    }
+    _channelSubscriptions.clear();
     for (final replicator in _replicators.values) {
       await replicator.dispose();
     }

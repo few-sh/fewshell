@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../utils/multiplexed_websocket_channel.dart';
 import 'state_replication_envelope.dart';
 
@@ -56,9 +54,8 @@ class StateReplicator<TState extends ReplicatedState> {
   /// Registered high-level value listeners added via [onChanged].
   final List<StateReplicatedValueListener<TState>> _listeners = [];
 
-  /// Active per-channel subscriptions attached via [attachChannel].
-  final Map<MultiplexedWebSocketChannel,
-      StreamSubscription<Map<String, dynamic>>> _channelSubscriptions = {};
+  /// Channels attached for outbound sends via [attachChannel].
+  final Set<MultiplexedWebSocketChannel> _channels = {};
 
   /// The latest accepted canonical envelope.
   StateReplicatedEnvelope? _currentEnvelope;
@@ -66,8 +63,8 @@ class StateReplicator<TState extends ReplicatedState> {
   /// The latest decoded canonical state.
   TState? _currentState;
 
-  /// Whether the replicator is currently subscribed to inbound updates.
-  bool get isAttached => _channelSubscriptions.isNotEmpty;
+  /// Whether the replicator has any channels attached for outbound sends.
+  bool get isAttached => _channels.isNotEmpty;
 
   /// Whether an outbound message is currently being sent.
   bool isSubmitting = false;
@@ -134,46 +131,22 @@ class StateReplicator<TState extends ReplicatedState> {
   /// The latest accepted envelope together with replication metadata.
   StateReplicatedEnvelope? get currentEnvelope => _currentEnvelope;
 
-  /// Starts listening to replication messages from a channel.
+  /// Attaches a channel for outbound sends.
+  ///
+  /// Inbound routing and fan-out are the responsibility of the caller
+  /// (typically [StateReplicationManager]).
   void attachChannel(MultiplexedWebSocketChannel channel) {
-    if (_channelSubscriptions.containsKey(channel)) {
-      return;
-    }
-
-    error = null;
-    _channelSubscriptions[channel] = channel.onCustomMessage.listen(
-      (message) {
-        if (!_tryApplyMessage(message)) {
-          return;
-        }
-
-        // Re-broadcast canonical state to other peers after accepting an update.
-        unawaited(syncCurrent(exceptChannel: channel));
-      },
-      onError: (err, stackTrace) {
-        _handleChannelError(
-          channel,
-          err,
-          stackTrace is StackTrace ? stackTrace : StackTrace.current,
-        );
-      },
-    );
+    _channels.add(channel);
   }
 
-  /// Stops listening to replication messages from a channel.
+  /// Removes a previously attached channel.
   Future<void> detachChannel(MultiplexedWebSocketChannel channel) async {
-    final subscription = _channelSubscriptions.remove(channel);
-    if (subscription != null) {
-      await subscription.cancel();
-    }
+    _channels.remove(channel);
   }
 
-  /// Stops listening to inbound envelopes.
+  /// Removes all attached channels.
   Future<void> detach() async {
-    for (final subscription in _channelSubscriptions.values) {
-      await subscription.cancel();
-    }
-    _channelSubscriptions.clear();
+    _channels.clear();
     isSubmitting = false;
   }
 
@@ -382,7 +355,7 @@ class StateReplicator<TState extends ReplicatedState> {
     isSubmitting = true;
     error = null;
     try {
-      for (final channel in _channelSubscriptions.keys) {
+      for (final channel in _channels) {
         if (channel == exceptChannel) {
           continue;
         }
@@ -395,16 +368,6 @@ class StateReplicator<TState extends ReplicatedState> {
       errorHandler?.call(err, stackTrace);
       rethrow;
     }
-  }
-
-  void _handleChannelError(
-    MultiplexedWebSocketChannel channel,
-    Object err,
-    StackTrace stackTrace,
-  ) {
-    error = err;
-    unawaited(detachChannel(channel));
-    errorHandler?.call(err, stackTrace);
   }
 
   int _nextRevision() {
