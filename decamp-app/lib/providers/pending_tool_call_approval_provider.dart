@@ -4,9 +4,11 @@ import 'package:agent_core/agent_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 
+import '../services/sync_service.dart';
+import 'providers.dart';
+
 typedef PendingToolCallApprovalArgs = ({
   String sessionId,
-  PendingToolCallList initialState,
   MultiplexedWebSocketChannel? channel,
 });
 
@@ -23,6 +25,25 @@ final pendingToolCallApprovalProvider = StateNotifierProvider.autoDispose
       return notifier;
     });
 
+/// Eagerly initializes pending tool call replication for the active session.
+/// This avoids missing early updates before the approval UI is shown.
+final pendingToolCallApprovalBootstrapProvider = Provider<void>((ref) {
+  final sessionId = ref.watch(currentSessionIdProvider);
+  final projectConnectionState = ref.watch(
+    connectionStateProvider.select((state) => state.project),
+  );
+
+  if (sessionId == null ||
+      projectConnectionState != LayerConnectionState.connected) {
+    return;
+  }
+
+  final channel = ref.read(syncServiceProvider).projectChannel;
+  ref.watch(
+    pendingToolCallApprovalProvider((sessionId: sessionId, channel: channel)),
+  );
+});
+
 class PendingToolCallApprovalNotifier
     extends StateNotifier<PendingToolCallList> {
   static final _log = Logger('PendingToolCallApprovalNotifier');
@@ -33,7 +54,7 @@ class PendingToolCallApprovalNotifier
   void Function()? _removeListener;
 
   PendingToolCallApprovalNotifier(PendingToolCallApprovalArgs args)
-    : super(args.initialState) {
+    : super(const PendingToolCallList([])) {
     final channel = args.channel;
     if (channel == null) {
       return;
@@ -45,7 +66,6 @@ class PendingToolCallApprovalNotifier
         .createReplicator<PendingToolCallList>(
           sessionId: args.sessionId,
           decode: PendingToolCallList.fromJson,
-          initialState: args.initialState,
           errorHandler: (error, stackTrace) {
             _log.warning(
               'Pending tool call replication error',

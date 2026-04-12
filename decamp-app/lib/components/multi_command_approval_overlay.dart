@@ -16,12 +16,12 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
   const MultiCommandApprovalOverlay({
     super.key,
     required this.sessionId,
-    required this.initialState,
+    required this.pendingCalls,
     this.channel,
   });
 
   final String sessionId;
-  final PendingToolCallList initialState;
+  final PendingToolCallList pendingCalls;
   final MultiplexedWebSocketChannel? channel;
 
   /// Show the overlay and await user selection
@@ -36,7 +36,7 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
       side: ShadSheetSide.bottom,
       builder: (context) => MultiCommandApprovalOverlay(
         sessionId: sessionId,
-        initialState: pendingCalls,
+        pendingCalls: pendingCalls,
         channel: channel,
       ),
     );
@@ -132,11 +132,8 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
 
 class _MultiCommandApprovalOverlayState
     extends ConsumerState<MultiCommandApprovalOverlay> {
-  PendingToolCallApprovalArgs get _args => (
-    sessionId: widget.sessionId,
-    initialState: widget.initialState,
-    channel: widget.channel,
-  );
+  PendingToolCallApprovalArgs get _args =>
+      (sessionId: widget.sessionId, channel: widget.channel);
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, FocusNode> _focusNodes = {};
 
@@ -261,7 +258,10 @@ class _MultiCommandApprovalOverlayState
   Widget build(BuildContext context) {
     final pending = ref.watch(pendingToolCallApprovalProvider(_args));
     final notifier = ref.read(pendingToolCallApprovalProvider(_args).notifier);
-    final items = pending.items;
+    // Use replicated state; fall back to request payload if replication hasn't arrived yet
+    final items = pending.items.isNotEmpty
+        ? pending.items
+        : widget.pendingCalls.items;
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
     final allSelected = pending.allSelected;
