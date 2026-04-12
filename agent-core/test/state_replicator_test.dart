@@ -102,8 +102,6 @@ StateReplicator<_FakeState> _createReplicator({
 }) {
   return StateReplicator<_FakeState>(
     sessionId: 'session-1',
-    objectKind: 'pending_tool_calls',
-    objectKey: 'active',
     decode: _FakeState.fromJson,
     initialState: initialState,
     initialRevision: initialRevision,
@@ -117,8 +115,8 @@ StateReplicatedEnvelope _envelope({
 }) {
   return StateReplicatedEnvelope(
     sessionId: 'session-1',
-    objectKind: 'pending_tool_calls',
-    objectKey: 'active',
+    objectKind: StateReplicator.defaultObjectKindFor<_FakeState>(),
+    objectKey: StateReplicator.defaultObjectKey,
     revision: revision,
     action: action,
     payload: payload,

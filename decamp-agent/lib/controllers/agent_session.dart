@@ -13,8 +13,6 @@ import '../services/notification_dispatcher.dart';
 
 class AgentSession {
   static final _log = Logger('AgentSession');
-  static const _pendingToolCallsObjectKind = 'pending_tool_calls';
-  static const _pendingToolCallsObjectKey = 'active';
 
   /// Set of active channels for this session (supports reconnections)
   final Set<MultiplexedWebSocketChannel> _channels = {};
@@ -408,8 +406,6 @@ class AgentSession {
 
     final replicator = StateReplicator<PendingToolCallList>(
       sessionId: sessionId,
-      objectKind: _pendingToolCallsObjectKind,
-      objectKey: _pendingToolCallsObjectKey,
       decode: PendingToolCallList.fromJson,
       initialState: pendingCalls,
       errorHandler: (error, stackTrace) {

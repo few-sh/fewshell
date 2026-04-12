@@ -39,8 +39,6 @@ final pendingToolCallApprovalProvider =
 class PendingToolCallApprovalNotifier
     extends StateNotifier<PendingToolCallList> {
   static final _log = Logger('PendingToolCallApprovalNotifier');
-  static const _objectKind = 'pending_tool_calls';
-  static const _objectKey = 'active';
 
   final PendingToolCallApprovalBinding _binding;
   StateReplicator<PendingToolCallList>? _replicator;
@@ -55,8 +53,6 @@ class PendingToolCallApprovalNotifier
 
     final replicator = StateReplicator<PendingToolCallList>.forChannel(
       sessionId: _binding.sessionId,
-      objectKind: _objectKind,
-      objectKey: _objectKey,
       decode: PendingToolCallList.fromJson,
       channel: channel,
       initialState: _binding.initialState,

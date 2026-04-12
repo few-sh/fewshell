@@ -18,6 +18,8 @@ abstract interface class ReplicatedState {
 /// Recreates a typed replicated object from an envelope payload.
 typedef StateReplicatedDecoder<TState> = TState Function(JsonMap payload);
 
+String _defaultObjectKindFor<TState>() => TState.toString();
+
 /// A simple, transport-driven replicated object controller.
 ///
 /// This is the intended low-level primitive for both client and server code.
@@ -29,6 +31,13 @@ typedef StateReplicatedDecoder<TState> = TState Function(JsonMap payload);
 /// State id, object kind, object key, revision, and action all live in this
 /// container and in the outer envelope.
 class StateReplicator<TState extends ReplicatedState> {
+  /// Default object key used by the common one-object-per-session case.
+  static const String defaultObjectKey = 'active';
+
+  /// Returns the default replicated object kind for a given state type.
+  static String defaultObjectKindFor<TState>() =>
+      _defaultObjectKindFor<TState>();
+
   /// The state this replicator instance is scoped to.
   final String sessionId;
 
@@ -68,18 +77,18 @@ class StateReplicator<TState extends ReplicatedState> {
 
   StateReplicator({
     required this.sessionId,
-    required this.objectKind,
-    required this.objectKey,
+    String? objectKind,
+    this.objectKey = defaultObjectKey,
     required this.decode,
     TState? initialState,
     int initialRevision = 0,
     StateReplicatedAction initialAction = StateReplicatedAction.snapshot,
     this.errorHandler,
-  }) {
+  }) : objectKind = objectKind ?? _defaultObjectKindFor<TState>() {
     if (initialState != null) {
       _currentEnvelope = StateReplicatedEnvelope(
         sessionId: sessionId,
-        objectKind: objectKind,
+        objectKind: this.objectKind,
         objectKey: objectKey,
         revision: initialRevision,
         action: initialAction,
@@ -92,8 +101,8 @@ class StateReplicator<TState extends ReplicatedState> {
   /// Convenience factory for the common case of using one multiplexed channel.
   factory StateReplicator.forChannel({
     required String sessionId,
-    required String objectKind,
-    required String objectKey,
+    String? objectKind,
+    String objectKey = defaultObjectKey,
     required StateReplicatedDecoder<TState> decode,
     required MultiplexedWebSocketChannel channel,
     TState? initialState,
