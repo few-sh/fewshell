@@ -4,51 +4,37 @@ import 'package:agent_core/agent_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 
-class PendingToolCallApprovalBinding {
-  final String sessionId;
-  final PendingToolCallList initialState;
-  final MultiplexedWebSocketChannel? channel;
+typedef PendingToolCallApprovalArgs = ({
+  String sessionId,
+  PendingToolCallList initialState,
+  MultiplexedWebSocketChannel? channel,
+});
 
-  const PendingToolCallApprovalBinding({
-    required this.sessionId,
-    required this.initialState,
-    required this.channel,
-  });
-}
-
-final pendingToolCallApprovalBindingProvider =
-    Provider<PendingToolCallApprovalBinding>((ref) {
-      throw UnimplementedError(
-        'pendingToolCallApprovalBindingProvider must be overridden',
-      );
-    });
-
-final pendingToolCallApprovalProvider =
-    StateNotifierProvider.autoDispose<
+final pendingToolCallApprovalProvider = StateNotifierProvider.autoDispose
+    .family<
       PendingToolCallApprovalNotifier,
-      PendingToolCallList
-    >((ref) {
-      final binding = ref.watch(pendingToolCallApprovalBindingProvider);
-      final notifier = PendingToolCallApprovalNotifier(binding);
+      PendingToolCallList,
+      PendingToolCallApprovalArgs
+    >((ref, args) {
+      final notifier = PendingToolCallApprovalNotifier(args);
       ref.onDispose(() {
         unawaited(notifier.close());
       });
       return notifier;
-    }, dependencies: [pendingToolCallApprovalBindingProvider]);
+    });
 
 class PendingToolCallApprovalNotifier
     extends StateNotifier<PendingToolCallList> {
   static final _log = Logger('PendingToolCallApprovalNotifier');
 
-  final PendingToolCallApprovalBinding _binding;
   final StateReplicationManager _stateReplicationManager =
       StateReplicationManager();
   StateReplicator<PendingToolCallList>? _replicator;
   void Function()? _removeListener;
 
-  PendingToolCallApprovalNotifier(this._binding)
-    : super(_binding.initialState) {
-    final channel = _binding.channel;
+  PendingToolCallApprovalNotifier(PendingToolCallApprovalArgs args)
+    : super(args.initialState) {
+    final channel = args.channel;
     if (channel == null) {
       return;
     }
@@ -57,9 +43,9 @@ class PendingToolCallApprovalNotifier
 
     final replicator = _stateReplicationManager
         .createReplicator<PendingToolCallList>(
-          sessionId: _binding.sessionId,
+          sessionId: args.sessionId,
           decode: PendingToolCallList.fromJson,
-          initialState: _binding.initialState,
+          initialState: args.initialState,
           errorHandler: (error, stackTrace) {
             _log.warning(
               'Pending tool call replication error',

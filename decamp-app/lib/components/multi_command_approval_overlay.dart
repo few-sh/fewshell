@@ -13,7 +13,16 @@ import '../utils/ui_utils.dart';
 /// Overlay widget that shows multiple tool action approvals in a scrollable list
 /// Returns selected actions when approved, empty list when cancelled, null for other dismissals
 class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
-  const MultiCommandApprovalOverlay({super.key});
+  const MultiCommandApprovalOverlay({
+    super.key,
+    required this.sessionId,
+    required this.initialState,
+    this.channel,
+  });
+
+  final String sessionId;
+  final PendingToolCallList initialState;
+  final MultiplexedWebSocketChannel? channel;
 
   /// Show the overlay and await user selection
   static Future<PendingToolCallList?> show(
@@ -25,17 +34,10 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
     final result = await showShadSheet<PendingToolCallList>(
       context: context,
       side: ShadSheetSide.bottom,
-      builder: (context) => ProviderScope(
-        overrides: [
-          pendingToolCallApprovalBindingProvider.overrideWithValue(
-            PendingToolCallApprovalBinding(
-              sessionId: sessionId,
-              channel: channel,
-              initialState: pendingCalls,
-            ),
-          ),
-        ],
-        child: const MultiCommandApprovalOverlay(),
+      builder: (context) => MultiCommandApprovalOverlay(
+        sessionId: sessionId,
+        initialState: pendingCalls,
+        channel: channel,
       ),
     );
     // Treat null (X button / swipe dismiss) the same as Cancel
@@ -130,6 +132,11 @@ class MultiCommandApprovalOverlay extends ConsumerStatefulWidget {
 
 class _MultiCommandApprovalOverlayState
     extends ConsumerState<MultiCommandApprovalOverlay> {
+  PendingToolCallApprovalArgs get _args => (
+    sessionId: widget.sessionId,
+    initialState: widget.initialState,
+    channel: widget.channel,
+  );
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, FocusNode> _focusNodes = {};
 
@@ -178,7 +185,7 @@ class _MultiCommandApprovalOverlayState
     }
 
     final currentCall = ref
-        .read(pendingToolCallApprovalProvider)
+        .read(pendingToolCallApprovalProvider(_args))
         .items
         .where((item) => item.id == callId)
         .cast<PendingToolCall?>()
@@ -220,7 +227,7 @@ class _MultiCommandApprovalOverlayState
   }
 
   void _handleApprove() {
-    final pending = ref.read(pendingToolCallApprovalProvider);
+    final pending = ref.read(pendingToolCallApprovalProvider(_args));
     final approvedCalls = pending.copyWith(items: pending.selectedOnly);
 
     if (approvedCalls.items.isEmpty) {
@@ -245,13 +252,15 @@ class _MultiCommandApprovalOverlayState
   }
 
   void _toggleSelectAll(bool value) {
-    ref.read(pendingToolCallApprovalProvider.notifier).toggleSelectAll(value);
+    ref
+        .read(pendingToolCallApprovalProvider(_args).notifier)
+        .toggleSelectAll(value);
   }
 
   @override
   Widget build(BuildContext context) {
-    final pending = ref.watch(pendingToolCallApprovalProvider);
-    final notifier = ref.read(pendingToolCallApprovalProvider.notifier);
+    final pending = ref.watch(pendingToolCallApprovalProvider(_args));
+    final notifier = ref.read(pendingToolCallApprovalProvider(_args).notifier);
     final items = pending.items;
     final theme = ShadTheme.of(context);
     final terminalTheme = Theme.of(context).extension<TerminalTheme>();
