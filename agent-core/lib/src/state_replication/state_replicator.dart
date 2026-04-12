@@ -135,8 +135,22 @@ class StateReplicator<TState extends ReplicatedState> {
   ///
   /// Inbound routing and fan-out are the responsibility of the caller
   /// (typically [StateReplicationManager]).
-  void attachChannel(MultiplexedWebSocketChannel channel) {
+  /// If [sendInitialState] is true and there is a current canonical state,
+  /// it is immediately sent to [channel] so it can catch up on reconnection.
+  ///
+  /// Inbound routing and fan-out are the responsibility of the caller
+  /// (typically [StateReplicationManager]).
+  void attachChannel(
+    MultiplexedWebSocketChannel channel, {
+    bool sendInitialState = false,
+  }) {
     _channels.add(channel);
+    if (sendInitialState) {
+      final envelope = _currentEnvelope;
+      if (envelope != null) {
+        channel.safeSendCustomMessage(envelope.toJson());
+      }
+    }
   }
 
   /// Removes a previously attached channel.

@@ -74,7 +74,7 @@ class AgentSession {
   /// Register a new channel with this session (handles reconnections)
   void registerChannel(MultiplexedWebSocketChannel channel) {
     _channels.add(channel);
-    _stateReplicationManager.registerChannel(channel);
+    _stateReplicationManager.registerChannel(channel, sendInitialState: true);
     _log.info(
       'Registered channel with session. Total channels: ${_channels.length}',
     );

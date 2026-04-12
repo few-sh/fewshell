@@ -18,13 +18,20 @@ class StateReplicationManager {
 
   /// Registers a channel, attaches it to all active replicators, and begins
   /// routing inbound messages and fanning out accepted updates.
-  void registerChannel(MultiplexedWebSocketChannel channel) {
+  ///
+  /// If [sendInitialState] is true, each replicator immediately sends its
+  /// current state to the newly registered channel, allowing a reconnecting
+  /// client to catch up without a separate sync round-trip.
+  void registerChannel(
+    MultiplexedWebSocketChannel channel, {
+    bool sendInitialState = false,
+  }) {
     if (!_channels.add(channel)) {
       return;
     }
 
     for (final replicator in _replicators.values) {
-      replicator.attachChannel(channel);
+      replicator.attachChannel(channel, sendInitialState: sendInitialState);
     }
 
     _channelSubscriptions[channel] = channel.onCustomMessage.listen(
@@ -92,7 +99,7 @@ class StateReplicationManager {
     );
 
     for (final channel in _channels) {
-      replicator.attachChannel(channel);
+      replicator.attachChannel(channel, sendInitialState: false);
     }
 
     _replicators[key] = replicator;
