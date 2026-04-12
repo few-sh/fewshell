@@ -16,6 +16,8 @@ class AgentSession {
 
   /// Set of active channels for this session (supports reconnections)
   final Set<MultiplexedWebSocketChannel> _channels = {};
+  final StateReplicationManager _stateReplicationManager =
+      StateReplicationManager();
 
   final GlobalDatabase globalDb;
   final ProjectDatabase? projectDb;
@@ -72,7 +74,7 @@ class AgentSession {
   /// Register a new channel with this session (handles reconnections)
   void registerChannel(MultiplexedWebSocketChannel channel) {
     _channels.add(channel);
-    _pendingToolCallsReplicator?.attachChannel(channel);
+    _stateReplicationManager.registerChannel(channel);
     _log.info(
       'Registered channel with session. Total channels: ${_channels.length}',
     );
@@ -83,7 +85,7 @@ class AgentSession {
   bool unregisterChannel(MultiplexedWebSocketChannel channel) {
     final wasRegistered = _channels.remove(channel);
     if (wasRegistered) {
-      unawaited(_pendingToolCallsReplicator?.detachChannel(channel));
+      unawaited(_stateReplicationManager.unregisterChannel(channel));
       _log.info(
         'Unregistered channel from session. Remaining channels: ${_channels.length}',
       );
@@ -106,6 +108,7 @@ class AgentSession {
     unawaited(_currentAbortController?.close());
     _currentAbortController = null;
     unawaited(_disposePendingToolCallsReplicator());
+    unawaited(_stateReplicationManager.dispose());
     _interactiveSession.close();
   }
 
@@ -402,9 +405,14 @@ class AgentSession {
   }) {
     _removePendingToolCallsListener?.call();
     _removePendingToolCallsListener = null;
-    unawaited(_pendingToolCallsReplicator?.dispose());
+    unawaited(
+      _stateReplicationManager.disposeReplicator<PendingToolCallList>(
+        sessionId: sessionId,
+      ),
+    );
 
-    final replicator = StateReplicator<PendingToolCallList>(
+    final replicator =
+        _stateReplicationManager.createReplicator<PendingToolCallList>(
       sessionId: sessionId,
       decode: PendingToolCallList.fromJson,
       initialState: pendingCalls,
@@ -416,9 +424,6 @@ class AgentSession {
         );
       },
     );
-    for (final channel in _channels) {
-      replicator.attachChannel(channel);
-    }
     _pendingToolCallsReplicator = replicator;
     _removePendingToolCallsListener = replicator.onChanged(
       (next, previous) {
@@ -434,7 +439,11 @@ class AgentSession {
     final replicator = _pendingToolCallsReplicator;
     _pendingToolCallsReplicator = null;
     if (replicator != null) {
-      await replicator.dispose();
+      await _stateReplicationManager.disposeReplicator<PendingToolCallList>(
+        sessionId: replicator.sessionId,
+        objectKind: replicator.objectKind,
+        objectKey: replicator.objectKey,
+      );
     }
   }
 

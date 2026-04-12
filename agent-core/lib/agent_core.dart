@@ -19,6 +19,7 @@ export 'src/models/ssh_settings.dart';
 
 // State Replication
 export 'src/state_replication/state_replicator.dart';
+export 'src/state_replication/state_replication_manager.dart';
 export 'src/state_replication/state_replication_envelope.dart';
 
 // Utils

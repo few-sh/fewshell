@@ -41,6 +41,8 @@ class PendingToolCallApprovalNotifier
   static final _log = Logger('PendingToolCallApprovalNotifier');
 
   final PendingToolCallApprovalBinding _binding;
+  final StateReplicationManager _stateReplicationManager =
+      StateReplicationManager();
   StateReplicator<PendingToolCallList>? _replicator;
   void Function()? _removeListener;
 
@@ -51,15 +53,21 @@ class PendingToolCallApprovalNotifier
       return;
     }
 
-    final replicator = StateReplicator<PendingToolCallList>.forChannel(
-      sessionId: _binding.sessionId,
-      decode: PendingToolCallList.fromJson,
-      channel: channel,
-      initialState: _binding.initialState,
-      errorHandler: (error, stackTrace) {
-        _log.warning('Pending tool call replication error', error, stackTrace);
-      },
-    );
+    _stateReplicationManager.registerChannel(channel);
+
+    final replicator = _stateReplicationManager
+        .createReplicator<PendingToolCallList>(
+          sessionId: _binding.sessionId,
+          decode: PendingToolCallList.fromJson,
+          initialState: _binding.initialState,
+          errorHandler: (error, stackTrace) {
+            _log.warning(
+              'Pending tool call replication error',
+              error,
+              stackTrace,
+            );
+          },
+        );
     _replicator = replicator;
     _removeListener = replicator.onChanged((next, previous) {
       if (next == null) {
@@ -78,8 +86,13 @@ class PendingToolCallApprovalNotifier
     final replicator = _replicator;
     _replicator = null;
     if (replicator != null) {
-      await replicator.dispose();
+      await _stateReplicationManager.disposeReplicator<PendingToolCallList>(
+        sessionId: replicator.sessionId,
+        objectKind: replicator.objectKind,
+        objectKey: replicator.objectKey,
+      );
     }
+    await _stateReplicationManager.dispose();
   }
 
   void update(
