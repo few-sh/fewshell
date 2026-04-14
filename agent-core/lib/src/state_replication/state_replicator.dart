@@ -191,14 +191,35 @@ class StateReplicator<TState extends ReplicatedState> {
   Future<void> optimisticUpdate(
     TState? next, {
     StateReplicatedAction action = StateReplicatedAction.update,
-    JsonMap? payload,
   }) async {
     final envelope = _createNextEnvelope(
       action: action,
-      payload: payload ?? next?.toJson(),
+      payload: next?.toJson(),
     );
     _setCurrent(
       next,
+      revision: envelope.revision,
+      action: envelope.action,
+      sessionId: envelope.sessionId,
+      objectKind: envelope.objectKind,
+      objectKey: envelope.objectKey,
+      payload: envelope.payload,
+    );
+    await _send(envelope);
+  }
+
+  /// Clears the current value and sends a closed envelope.
+  ///
+  /// If [resolved] is provided, it is serialized into the envelope payload so
+  /// the receiver can inspect the final resolved state while the canonical
+  /// current value becomes null.
+  Future<void> optimisticClose([TState? resolved]) async {
+    final envelope = _createNextEnvelope(
+      action: StateReplicatedAction.closed,
+      payload: resolved?.toJson(),
+    );
+    _setCurrent(
+      null,
       revision: envelope.revision,
       action: envelope.action,
       sessionId: envelope.sessionId,
@@ -228,12 +249,21 @@ class StateReplicator<TState extends ReplicatedState> {
   Future<void> submit(
     TState? next, {
     StateReplicatedAction action = StateReplicatedAction.update,
-    JsonMap? payload,
   }) async {
     await _send(
       _createNextEnvelope(
         action: action,
-        payload: payload ?? next?.toJson(),
+        payload: next?.toJson(),
+      ),
+    );
+  }
+
+  /// Sends a closed envelope with an optional final resolved state payload.
+  Future<void> close([TState? resolved]) async {
+    await _send(
+      _createNextEnvelope(
+        action: StateReplicatedAction.closed,
+        payload: resolved?.toJson(),
       ),
     );
   }

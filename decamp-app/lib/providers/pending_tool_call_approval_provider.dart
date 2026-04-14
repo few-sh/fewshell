@@ -139,13 +139,7 @@ class PendingToolCallApprovalNotifier
 
     final replicator = _replicator;
     if (replicator != null) {
-      unawaited(
-        replicator.optimisticUpdate(
-          null,
-          action: StateReplicatedAction.closed,
-          payload: approved.toJson(),
-        ),
-      );
+      unawaited(replicator.optimisticClose(approved));
     }
 
     state = const PendingToolCallList([]);
@@ -154,13 +148,7 @@ class PendingToolCallApprovalNotifier
   void cancelApproval() {
     final replicator = _replicator;
     if (replicator != null) {
-      unawaited(
-        replicator.optimisticUpdate(
-          null,
-          action: StateReplicatedAction.closed,
-          payload: const PendingToolCallList([]).toJson(),
-        ),
-      );
+      unawaited(replicator.optimisticClose(const PendingToolCallList([])));
     }
 
     state = const PendingToolCallList([]);
