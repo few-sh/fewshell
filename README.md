@@ -54,52 +54,39 @@ Constrained by-design to allow easy setup and reduce the risk of accidental misc
 
 ## Architecture overview
 
-Fewshell has four components:
-
-```
-┌──────────────────┐       SSH tunnel         ┌──────────────────┐
-│                  │                          │                  │
-│   Client App     │◄────────────────────────►│   Agent Server   │
-│  (mobile/desktop)│                          │  (self-hosted)   │
-│                  │                          │                  │
-│  • Keychain      │                          │  • Shell (PTY)   │
-│  • CRDT sync     │                          │  • CRDT sync     │
-│  • Chat UI       │                          │  • Secret redact │
-│  • SSH client    │                          │  • Agent loop    │
-└──────────────────┘                          └────────┬─────────┘
-                                                       │
-                                                       │ API call
-                                                       ▼
-┌──────────────────┐                          ┌──────────────────────┐
-│                  │                          │                      │
-│ Relay (optional) │                          │   LLM Provider       │
-│                  │                          │  (user-provided)     │
-│ • Push notifs    │                          │                      │
-│ • SSH public key │                          │  • Observes session  │
-│                  │                          │  • Suggests commands │
-└──────────────────┘                          └──────────────────────┘
-```
-
-**Client** (mobile / desktop)
+**fewshell client app** (mobile / desktop)
 - Stores secrets in system keychain
 - Optionally generates SSH keypair during setup (private key never leaves device)
 - Sends user input and command approvals
 - Displays terminal output and AI interaction
 
-**Agent Server** (self-hosted)
+**fewshell server** (self-hosted)
 - Executes approved shell commands in a PTY
 - Streams command output to all connected clients
+- Keeps persistent sessions and synchronizes them across multiple authenticated clients
 - Holds secrets in memory for command use and replication across authenticated devices
 - Redacts secret values before sending context to the LLM
 - Calls the LLM API with redacted context
 
-**LLM Provider** (user-provided)
+**LLM Provider** (self-hosted or third-party)
 - Receives context, command input and output (secrets redacted)
 - Requests command execution for human approval
 
-**Relay** (optional)
+**Notification Relay** (optional)
 - Sends push notifications for long-running commands (APNs)
 - Facilitates SSH public key provisioning during initial device pairing (optional)
+
+
+![Fewshell architecture](fewshell-arch-diagram.png)
+
+1. SSH Tunnel is the only communication link between client and server.
+2. Domain socket: client connection is forwarded to the local domain socket on the host to communicate with the server. This provides additional access controls for host accounts. Eg, non-privilege users will only have access to their server instance.
+3. OS Keychain stores the secrets (API keys, passwords) on the trusted client device.
+4. SQLite is used on the client side for storage of sessions and offline support.
+5. SQLite on the server side stores and replicates the authoritative session, chat history and project data. It is replicated to the connected clients in real time.
+6. External API connection for LLM and relay over an untrusted network (HTTPS).
+7. bash sessions are spawned by the server for executing commands.
+
 
 ## Security model
 
