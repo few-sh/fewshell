@@ -13,7 +13,6 @@ import 'package:agent_core/agent_core.dart';
 import 'pages/chat_session.dart';
 import 'pages/projects_page.dart';
 import 'package:decamp/providers/providers.dart';
-import 'package:decamp/providers/pending_tool_call_approval_provider.dart';
 import 'components/app_event_listener.dart';
 import 'services/sync_service.dart';
 import 'themes/neon_dark.dart';
@@ -113,9 +112,6 @@ class DecampApp extends ConsumerWidget {
       // Initialize SyncService
       ref.watch(syncServiceProvider);
       _log.info('SyncService initialized');
-
-      // Eagerly initialize session-scoped pending tool call replication.
-      ref.watch(pendingToolCallApprovalBootstrapProvider);
 
       // Initialize NotificationService
       ref.watch(notificationServiceProvider);

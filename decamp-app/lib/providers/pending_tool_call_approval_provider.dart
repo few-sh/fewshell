@@ -7,42 +7,28 @@ import 'package:logging/logging.dart';
 import '../services/sync_service.dart';
 import 'providers.dart';
 
-typedef PendingToolCallApprovalArgs = ({
-  String sessionId,
-  MultiplexedWebSocketChannel? channel,
-});
-
-final pendingToolCallApprovalProvider = StateNotifierProvider.autoDispose
-    .family<
+final pendingToolCallApprovalProvider =
+    StateNotifierProvider.autoDispose<
       PendingToolCallApprovalNotifier,
-      PendingToolCallList,
-      PendingToolCallApprovalArgs
-    >((ref, args) {
-      final notifier = PendingToolCallApprovalNotifier(args);
+      PendingToolCallList
+    >((ref) {
+      final sessionId = ref.watch(currentSessionIdProvider);
+      final projectConnectionState = ref.watch(
+        connectionStateProvider.select((state) => state.project),
+      );
+      final channel = ref.read(syncServiceProvider).projectChannel;
+
+      final notifier = PendingToolCallApprovalNotifier(
+        sessionId: sessionId,
+        channel: projectConnectionState == LayerConnectionState.connected
+            ? channel
+            : null,
+      );
       ref.onDispose(() {
         unawaited(notifier.close());
       });
       return notifier;
     });
-
-/// Eagerly initializes pending tool call replication for the active session.
-/// This avoids missing early updates before the approval UI is shown.
-final pendingToolCallApprovalBootstrapProvider = Provider<void>((ref) {
-  final sessionId = ref.watch(currentSessionIdProvider);
-  final projectConnectionState = ref.watch(
-    connectionStateProvider.select((state) => state.project),
-  );
-
-  if (sessionId == null ||
-      projectConnectionState != LayerConnectionState.connected) {
-    return;
-  }
-
-  final channel = ref.read(syncServiceProvider).projectChannel;
-  ref.watch(
-    pendingToolCallApprovalProvider((sessionId: sessionId, channel: channel)),
-  );
-});
 
 class PendingToolCallApprovalNotifier
     extends StateNotifier<PendingToolCallList> {
@@ -53,10 +39,11 @@ class PendingToolCallApprovalNotifier
   StateReplicator<PendingToolCallList>? _replicator;
   void Function()? _removeListener;
 
-  PendingToolCallApprovalNotifier(PendingToolCallApprovalArgs args)
-    : super(const PendingToolCallList([])) {
-    final channel = args.channel;
-    if (channel == null) {
+  PendingToolCallApprovalNotifier({
+    required String? sessionId,
+    required MultiplexedWebSocketChannel? channel,
+  }) : super(const PendingToolCallList([])) {
+    if (sessionId == null || channel == null) {
       return;
     }
 
@@ -64,7 +51,7 @@ class PendingToolCallApprovalNotifier
 
     final replicator = _stateReplicationManager
         .createReplicator<PendingToolCallList>(
-          sessionId: args.sessionId,
+          sessionId: sessionId,
           decode: PendingToolCallList.decode,
           errorHandler: (error, stackTrace) {
             _log.warning(
@@ -142,6 +129,41 @@ class PendingToolCallApprovalNotifier
         (item) => item.withSecrets(secrets),
       );
     });
+  }
+
+  void approveSelected() {
+    final approved = state.copyWith(items: state.selectedOnly);
+    if (approved.items.isEmpty) {
+      return;
+    }
+
+    final replicator = _replicator;
+    if (replicator != null) {
+      unawaited(
+        replicator.optimisticUpdate(
+          null,
+          action: StateReplicatedAction.closed,
+          payload: approved.toJson(),
+        ),
+      );
+    }
+
+    state = const PendingToolCallList([]);
+  }
+
+  void cancelApproval() {
+    final replicator = _replicator;
+    if (replicator != null) {
+      unawaited(
+        replicator.optimisticUpdate(
+          null,
+          action: StateReplicatedAction.closed,
+          payload: const PendingToolCallList([]).toJson(),
+        ),
+      );
+    }
+
+    state = const PendingToolCallList([]);
   }
 
   void _apply(PendingToolCallList next) {

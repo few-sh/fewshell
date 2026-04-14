@@ -96,12 +96,6 @@ class AgentSession {
   /// Check if this session has any active channels
   bool get hasActiveChannels => _channels.isNotEmpty;
 
-  void _broadcastCustomMessage(Map<String, dynamic> message) {
-    for (final channel in _channels) {
-      channel.safeSendCustomMessage(message);
-    }
-  }
-
   void dispose() {
     _currentCancelToken?.cancel('Session disposed');
     _currentCancelToken = null;
@@ -126,8 +120,6 @@ class AgentSession {
       Future.delayed(const Duration(milliseconds: 500), () {
         _handleSummarize(msg, channel);
       });
-    } else if (msg['type'] == 'approval_response') {
-      _handleApproval(msg);
     } else if (msg['type'] == 'abort_chat') {
       _handleAbort(msg);
     } else if (msg['type'] == 'terminal_keys') {
@@ -264,46 +256,6 @@ class AgentSession {
     }
   }
 
-  void _handleApproval(Map<String, dynamic> data) {
-    _log.info('✅ Received approval response');
-
-    final completer = _approvalCompleter;
-    if (completer != null && !completer.isCompleted) {
-      if (data['approvedCalls'] != null &&
-          data['approvedCalls'] is List &&
-          data['approvedCalls'].isNotEmpty) {
-        final approvedCalls =
-            (data['approvedCalls'] as List).cast<Map<String, dynamic>>();
-        final pending = _currentPendingCalls?.items ?? [];
-        final pendingById = {for (var p in pending) p.id: p};
-
-        final approved = approvedCalls
-            .map((callData) {
-              final id = callData['id'] as String;
-              final original = pendingById[id];
-              if (original == null) {
-                _log.warning(
-                  'Could not find original pending call for id: $id',
-                );
-                return null;
-              }
-              final arguments = callData['arguments'] as Map<String, dynamic>;
-
-              return original.withArguments(arguments);
-            })
-            .whereType<PendingToolCall>()
-            .toList();
-
-        _clearPendingApprovalState();
-        completer.complete(PendingToolCallList(approved));
-      } else {
-        // Cancelled
-        _clearPendingApprovalState();
-        completer.complete(null);
-      }
-    }
-  }
-
   Future<bool> _lockSession(String sessionId) async {
     if (projectDb != null) {
       final acquired = await projectDb!.sessionMutexDao.acquireLock(sessionId);
@@ -332,20 +284,6 @@ class AgentSession {
   bool get _isAwaitingApproval =>
       _approvalCompleter != null && !_approvalCompleter!.isCompleted;
 
-  void _sendApprovalRequest(
-    MultiplexedWebSocketChannel channel,
-    PendingToolCallList pendingCalls, {
-    required String sessionId,
-  }) {
-    channel.safeSendCustomMessage({
-      'type': 'request_approval',
-      'tools': pendingCalls.items
-          .map((call) => call.toApprovalRequestJson())
-          .toList(),
-      'sessionId': sessionId,
-    });
-  }
-
   Future<PendingToolCallList?> _requestApproval(
     PendingToolCallList pendingCalls, {
     required String sessionId,
@@ -356,23 +294,15 @@ class AgentSession {
     if (existing == null || existing.sessionId != sessionId) {
       _initPendingToolCallsReplicator(sessionId: sessionId);
     }
-    unawaited(_pendingToolCallsReplicator!.optimisticUpdate(pendingCalls));
 
     final completer = Completer<PendingToolCallList?>();
     _approvalCompleter = completer;
-    _broadcastCustomMessage({
-      'type': 'request_approval',
-      'tools': pendingCalls.items
-          .map((call) => call.toApprovalRequestJson())
-          .toList(),
-      'sessionId': sessionId,
-    });
+    unawaited(_pendingToolCallsReplicator!.optimisticUpdate(pendingCalls));
 
     return completer.future;
   }
 
-  bool _resendPendingApprovalRequest(
-    MultiplexedWebSocketChannel channel, {
+  bool _resendPendingApprovalRequest({
     required String sessionId,
   }) {
     if (!_isAwaitingApproval) {
@@ -387,12 +317,11 @@ class AgentSession {
       return false;
     }
 
-    _log.info('Re-sending pending approval request to reconnected channel');
+    _log.info('Pending approval still active for session $sessionId');
     final replicator = _pendingToolCallsReplicator;
     if (replicator != null) {
       unawaited(replicator.syncCurrent());
     }
-    _sendApprovalRequest(channel, pendingCalls, sessionId: sessionId);
     return true;
   }
 
@@ -425,11 +354,27 @@ class AgentSession {
       },
     );
     _pendingToolCallsReplicator = replicator;
-    _removePendingToolCallsListener = replicator.onChanged(
-      (next, previous) {
-        _currentPendingCalls = next;
-      },
-    );
+    _removePendingToolCallsListener = replicator.onChanged((next, previous) {
+      _currentPendingCalls = next;
+
+      final completer = _approvalCompleter;
+      if (next != null || completer == null || completer.isCompleted) {
+        return;
+      }
+
+      final envelope = replicator.currentEnvelope;
+      if (envelope?.action != StateReplicatedAction.closed) {
+        return;
+      }
+
+      final resolved = PendingToolCallList.decode(envelope?.payload);
+      _approvalCompleter = null;
+      if (resolved == null || resolved.items.isEmpty) {
+        completer.complete(null);
+      } else {
+        completer.complete(resolved);
+      }
+    });
   }
 
   Future<void> _disposePendingToolCallsReplicator() async {
@@ -476,7 +421,7 @@ class AgentSession {
     if (sessionId != null) {
       final locked = await _lockSession(sessionId);
       if (!locked) {
-        if (_resendPendingApprovalRequest(channel, sessionId: sessionId)) {
+        if (_resendPendingApprovalRequest(sessionId: sessionId)) {
           return;
         }
         _log.warning('Chat already in progress for session $sessionId');

@@ -93,6 +93,31 @@ void main() {
 
       await replicator.syncCurrent();
     });
+
+    test(
+        'optimistic closed updates preserve final payload while clearing state',
+        () async {
+      final replicator = _createReplicator(
+        initialState: const _FakeState('before-close'),
+        initialRevision: 6,
+      );
+
+      await replicator.optimisticUpdate(
+        null,
+        action: StateReplicatedAction.closed,
+        payload: const {'value': 'approved-final'},
+      );
+
+      expect(replicator.current, isNull);
+      expect(replicator.hasCurrent, isFalse);
+      expect(replicator.currentEnvelope?.action, StateReplicatedAction.closed);
+      expect(
+        replicator.currentEnvelope?.payload,
+        const {'value': 'approved-final'},
+      );
+
+      await replicator.syncCurrent();
+    });
   });
 }
 

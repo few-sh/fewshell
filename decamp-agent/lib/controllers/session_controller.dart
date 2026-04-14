@@ -239,7 +239,6 @@ class SessionController {
           'payload': msg['payload'],
         });
       } else if (msg['type'] == 'start_chat' ||
-          msg['type'] == 'approval_response' ||
           msg['type'] == 'abort_chat' ||
           msg['type'] == 'summarize' ||
           msg['type'] == 'terminal_keys') {

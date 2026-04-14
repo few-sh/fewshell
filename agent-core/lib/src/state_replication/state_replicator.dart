@@ -191,10 +191,11 @@ class StateReplicator<TState extends ReplicatedState> {
   Future<void> optimisticUpdate(
     TState? next, {
     StateReplicatedAction action = StateReplicatedAction.update,
+    JsonMap? payload,
   }) async {
     final envelope = _createNextEnvelope(
       action: action,
-      payload: next?.toJson(),
+      payload: payload ?? next?.toJson(),
     );
     _setCurrent(
       next,
@@ -203,6 +204,7 @@ class StateReplicator<TState extends ReplicatedState> {
       sessionId: envelope.sessionId,
       objectKind: envelope.objectKind,
       objectKey: envelope.objectKey,
+      payload: envelope.payload,
     );
     await _send(envelope);
   }
@@ -226,11 +228,12 @@ class StateReplicator<TState extends ReplicatedState> {
   Future<void> submit(
     TState? next, {
     StateReplicatedAction action = StateReplicatedAction.update,
+    JsonMap? payload,
   }) async {
     await _send(
       _createNextEnvelope(
         action: action,
-        payload: next?.toJson(),
+        payload: payload ?? next?.toJson(),
       ),
     );
   }
@@ -289,7 +292,7 @@ class StateReplicator<TState extends ReplicatedState> {
     MultiplexedWebSocketChannel? exceptChannel,
   }) async {
     final envelope = currentEnvelope;
-    if (envelope == null || current == null) {
+    if (envelope == null) {
       return;
     }
 
@@ -324,6 +327,7 @@ class StateReplicator<TState extends ReplicatedState> {
       sessionId: envelope.sessionId,
       objectKind: envelope.objectKind,
       objectKey: envelope.objectKey,
+      payload: envelope.payload,
     );
     isSubmitting = false;
     error = null;
@@ -337,6 +341,7 @@ class StateReplicator<TState extends ReplicatedState> {
     String? sessionId,
     String? objectKind,
     String? objectKey,
+    JsonMap? payload,
   }) {
     final previous = current;
     _currentEnvelope = StateReplicatedEnvelope(
@@ -345,7 +350,7 @@ class StateReplicator<TState extends ReplicatedState> {
       objectKey: objectKey ?? this.objectKey,
       revision: revision,
       action: action,
-      payload: next?.toJson(),
+      payload: payload ?? next?.toJson(),
     );
     _currentState = next;
     _notifyListeners(next, previous);
