@@ -21,7 +21,7 @@ await runAgentLoop(
   tools: myTools,
   conversation: messages,
   requestApproval: (toolCalls) async {
-    // Show approval UI, return approved subset or null to cancel
+    // Show approval UI, return PendingToolCallList or null to cancel
     return showApprovalDialog(toolCalls);
   },
   executeToolCall: (toolCalls) async {

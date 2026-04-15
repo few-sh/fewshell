@@ -149,6 +149,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   WebSocketSink get sink => _sink;
 
   void sendCustomMessage(Map<String, dynamic> message) {
+    _log.fine('Sending custom message: $message');
     _inner.sink.add('$_customPrefix${jsonEncode(message)}');
   }
 
@@ -156,6 +157,7 @@ class MultiplexedWebSocketChannel extends StreamChannelMixin
   bool safeSendCustomMessage(Map<String, dynamic> message) {
     // Chain sending to ensure order with other processing
     try {
+      _log.fine('Sending custom message (safe): $message');
       _inner.sink.add('$_customPrefix${jsonEncode(message)}');
       return true;
     } catch (e, stackTrace) {

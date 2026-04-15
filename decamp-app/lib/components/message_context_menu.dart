@@ -56,14 +56,13 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
     await controller.resendMessage(
       messageId: widget.message.id,
       sessionId: widget.message.sessionId,
-      requestApproval: (actions) {
+      requestApproval: (pendingCalls) {
         final overlayContext = navigatorKey.currentContext;
         if (overlayContext == null) return Future.value(null);
 
-        // Check if we're still on the same session before showing approval UI.
-        // If the user switched sessions while this approval was pending,
-        // return null to signal we're not responding (not a cancellation).
-        // Returning null prevents sending any approval_response to the server.
+        // Check if we're still on the same session before showing the local
+        // fallback approval UI. Remote approval now flows through replicated
+        // session state, but the local path still uses this callback.
         if (activeSessionId != widget.message.sessionId) {
           _log.info(
             'Approval request for wrong session: was for ${widget.message.sessionId} but active is $activeSessionId. Not responding.',
@@ -71,7 +70,7 @@ class _MessageContextMenuState extends ConsumerState<MessageContextMenu> {
           return Future.value(null);
         }
 
-        return MultiCommandApprovalOverlay.show(overlayContext, actions);
+        return MultiCommandApprovalOverlay.show(overlayContext, pendingCalls);
       },
       syncChannel: syncChannel,
     );

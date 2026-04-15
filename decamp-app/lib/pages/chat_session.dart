@@ -12,6 +12,7 @@ import 'package:decamp/components/chat_session_empty_state.dart';
 import 'package:decamp/components/search_controls.dart';
 import 'package:decamp/components/search_match_navigator.dart';
 import 'package:decamp/components/project_title_bar.dart';
+import 'package:decamp/providers/pending_tool_call_approval_provider.dart';
 import 'package:decamp/utils/search_utils.dart';
 import 'package:decamp/pages/sessions_history.dart';
 import 'package:decamp/components/no_llm_configured_overlay.dart';
@@ -246,13 +247,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
       content: content,
       userName: userName,
       sessionId: currentSessionId,
-      requestApproval: (actions) {
+      requestApproval: (pendingCalls) {
         if (!mounted) return Future.value(null);
 
-        // Check if we're still on the same session before showing approval UI.
-        // If the user switched sessions while this approval was pending,
-        // return null to signal we're not responding (not a cancellation).
-        // Returning null prevents sending any approval_response to the server.
+        // Check if we're still on the same session before showing the local
+        // fallback approval UI. Remote approval now flows through replicated
+        // session state, but the local path still uses this callback.
         if (activeSessionId != currentSessionId) {
           _log.info(
             'Approval request for wrong session: was for $currentSessionId but active is $activeSessionId. Not responding.',
@@ -260,7 +260,7 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
           return Future.value(null);
         }
 
-        return MultiCommandApprovalOverlay.show(context, actions);
+        return MultiCommandApprovalOverlay.show(context, pendingCalls);
       },
       onNoConfig: () {
         if (mounted) NoLlmConfiguredOverlay.show(context);
@@ -282,6 +282,10 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
     // Watch current state
     final currentProject = ref.watch(currentProjectProvider);
     final currentSessionId = ref.watch(currentSessionIdProvider);
+
+    // Keep approval replication alive while the chat session page is active.
+    // The approval UI is rendered directly from replicated state below.
+    final pendingApproval = ref.watch(pendingToolCallApprovalProvider);
 
     // Watch active model
     final activeModelAsync = ref.watch(activeModelIdentifierProvider);
@@ -521,6 +525,12 @@ class _ChatSessionState extends ConsumerState<ChatSession> {
                   currentCommand: chatState.executionProgress!.currentCommand,
                   totalCommands: chatState.executionProgress!.totalCommands,
                   commandName: chatState.executionProgress!.commandName,
+                ),
+
+              if (pendingApproval.items.isNotEmpty)
+                MultiCommandApprovalOverlay(
+                  pendingCalls: pendingApproval,
+                  embedded: true,
                 ),
 
               // Reveal control

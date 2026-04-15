@@ -18,54 +18,14 @@ Future<AgentLoopResult> runRemoteAgentLoop({
 
   final completer = Completer<AgentLoopResult>();
 
-  // Listen for messages on the custom channel
+  // Listen for messages on the custom channel.
+  // Approval UI now flows through replicated session state rather than a
+  // one-shot custom request/response message.
   Future<void> handleMessage(Map<String, dynamic> data) async {
     try {
       final type = data['type'] as String;
 
-      if (type == 'request_approval') {
-        final toolsJson = (data['tools'] as List).cast<Map<String, dynamic>>();
-        final msgSessionId = data['sessionId'] as String;
-
-        // Validate that this approval request is for the session this loop is
-        // handling. This is important because even if the app's active session
-        // changes while an approval is pending, we only process requests that
-        // belong to our session. This is enforced on the client side via
-        // session validation in the requestApproval callback, which returns null
-        // if the user has switched sessions (no response sent to server).
-        if (msgSessionId != sessionId) {
-          _log.warning(
-              'Received approval request for session $msgSessionId but this loop is for session $sessionId. Ignoring.');
-          return;
-        }
-
-        final pendingCalls =
-            toolsJson.map(PendingToolCall.fromApprovalRequestJson).toList();
-
-        final approved = await requestApproval(pendingCalls);
-
-        if (approved == null) {
-          // null = don't send a response (e.g., app was on wrong session)
-          _log.info(
-            'Approval request handled without response (approved was null)',
-          );
-        } else if (approved.isEmpty) {
-          // empty list = user cancelled/rejected all tools
-          channel.sendCustomMessage({
-            'type': 'approval_response',
-            'approvedCalls': [], // empty list signals user cancellation
-            'sessionId': sessionId,
-          });
-        } else {
-          // non-empty list = tools were approved
-          channel.sendCustomMessage({
-            'type': 'approval_response',
-            'approvedCalls':
-                approved.map((c) => c.toApprovalResponseJson()).toList(),
-            'sessionId': sessionId,
-          });
-        }
-      } else if (type == 'complete') {
+      if (type == 'complete') {
         if (!completer.isCompleted) {
           completer.complete(const AgentLoopCompleted());
         }
