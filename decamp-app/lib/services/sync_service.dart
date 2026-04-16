@@ -1208,7 +1208,9 @@ class SyncService {
 
     // Ensure the fewshell server is installed and running (global only).
     if (ensureServer) {
-      final installer = RemoteInstaller(client);
+      final versionStr = _clientVersion?.split('+').first ?? '0.0.0';
+      final appVersion = SemanticVersion.parse(versionStr);
+      final installer = RemoteInstaller(client, appVersion: appVersion);
       try {
         await installer.ensureServerRunning();
       } finally {

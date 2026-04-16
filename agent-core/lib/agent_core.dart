@@ -31,6 +31,7 @@ export 'src/utils/terminal_buffer.dart';
 export 'src/utils/node_id_migration.dart';
 export 'src/utils/server_node_id.dart';
 export 'src/utils/toml_node_id_migration.dart';
+export 'src/utils/semver.dart';
 
 // Secrets Storage
 export 'src/secrets_storage/secure_storage.dart';

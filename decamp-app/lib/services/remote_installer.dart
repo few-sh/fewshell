@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:agent_core/agent_core.dart' show SemanticVersion;
 import 'package:dartssh2/dartssh2.dart';
 import 'package:logging/logging.dart';
 
@@ -25,6 +26,10 @@ const _socketTimeout = Duration(seconds: 60);
 /// Polling interval when waiting for the domain socket.
 const _socketPollInterval = Duration(seconds: 1);
 
+/// Regex to extract the version from `fewshell-server --version` output.
+/// Matches lines like "Fewshell Server v0.1.28".
+final _versionRegex = RegExp(r'v(\d+\.\d+\.\d+)');
+
 /// Ensures the fewshell server is installed and running on a remote system
 /// via an authenticated SSH connection.
 ///
@@ -34,13 +39,14 @@ const _socketPollInterval = Duration(seconds: 1);
 /// Subscribe to [output] to receive streaming text from the install process.
 class RemoteInstaller {
   final SSHClient client;
+  final SemanticVersion appVersion;
 
   final _outputController = StreamController<String>.broadcast();
 
   /// Streaming output from the install / start lifecycle.
   Stream<String> get output => _outputController.stream;
 
-  RemoteInstaller(this.client);
+  RemoteInstaller(this.client, {required this.appVersion});
 
   /// Ensures the fewshell server is installed and running.
   ///
@@ -68,16 +74,35 @@ class RemoteInstaller {
     }
   }
 
-  /// `true` when the server binary exists and is executable.
+  /// `true` when the server binary exists with a matching major version.
   Future<bool> _isInstalled() async {
     _log.fine('Checking if fewshell-server is installed…');
-    // Use stdout instead of exit codes — dartssh2 doesn't reliably
-    // deliver exitCode before session.done completes.
-    final result = await _execStdout(
-      'test -x \$HOME/$_serverBinaryPath && echo YES || echo NO',
-    );
-    _log.fine('_isInstalled: result = $result');
-    return result == 'YES';
+    final output = await _execStdout('\$HOME/$_serverBinaryPath --version');
+    _log.fine('_isInstalled: output = $output');
+
+    final match = _versionRegex.firstMatch(output);
+    if (match == null) {
+      _log.fine('Could not parse server version from output.');
+      return false;
+    }
+
+    final serverVersion = SemanticVersion.tryParse(match.group(1)!);
+    if (serverVersion == null) {
+      _log.fine('Invalid semver in server output: ${match.group(1)}');
+      return false;
+    }
+
+    _log.fine('Server version: $serverVersion, app version: $appVersion');
+    if (appVersion.major > serverVersion.major ||
+        (appVersion.major == serverVersion.major &&
+            appVersion.minor > serverVersion.minor)) {
+      _log.info(
+        'Server version ${serverVersion.major}.${serverVersion.minor} is older than '
+        'app version ${appVersion.major}.${appVersion.minor}, needs update.',
+      );
+      return false;
+    }
+    return true;
   }
 
   /// `true` when the fewshell-server process is running.
