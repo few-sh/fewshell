@@ -1,12 +1,13 @@
 +++
-title = "Fewshell: Human-Gated AI SSH"
+title = "Fewshell — SSH Copilot for On-Calls"
+description = "Fewshell is a self-hosted AI SSH client for iOS, Android, macOS and Linux. Run DevOps and on-call tasks from any device with secret redaction and human approval on every command."
 
 template = "homepage.html"
 [extra]
 stylesheets = ["css/custom.css"]
 +++
 
-Fearlessly use AI for your infrastructure.
+**Fewshell** is an SSH copilot for on-call engineers, sysadmins, DevOps and MLOps teams. Fearlessly use AI to troubleshoot and run commands on your infrastructure from any phone or desktop — every command approved by you, every secret redacted from the model.
 
 <div class="get-app-section">
 <div class="get-app-badges">
@@ -27,36 +28,56 @@ Fearlessly use AI for your infrastructure.
 
 </div>
 <div class="get-app-screenshots">
-<img src="/landing-screenshot-ios.png" alt="Fewshell on iOS" class="screenshot-ios">
-<img src="/landing-screenshot-desktop.png" alt="Fewshell on desktop" class="screenshot-desktop">
+<img src="/fewshell-ai-ssh-client-ios.png" alt="Fewshell AI SSH client on iPhone approving a shell command" class="screenshot-ios">
+<img src="/fewshell-ai-ssh-client-desktop.png" alt="Fewshell AI SSH copilot on macOS desktop with terminal and chat" class="screenshot-desktop">
 </div>
 </div>
 
 ## Features
 
-##### Security
-Secrets stored in your device's keychain, automatically redacted from AI. Never stored on disk.
+### Security
+Secrets stored in your device's keychain, automatically redacted from AI. Never stored on disk. [Learn how secrets work →](/docs/guides/secrets/)
 
-##### Privacy
+### Privacy
 No cloud services, no sign-ups. Works with your existing infrastructure. Use self-hosted models or frontier providers.
 
-##### Ergonomics
+### Ergonomics
 Turn "clean up old Docker images" into `docker images --format '{{.Repository}}:{{.Tag}} {{.CreatedSince}} {{.Size}}' | grep -E 'months|years' | awk '{print $1}' | xargs -r docker rmi` — reviewed and approved before anything runs.
 
-##### Safety
+### Safety
 Every command requires your explicit approval. There is no way to turn this off. No accidents or surprises. Designed for critical infrastructure.
 
-##### Transparency
+### Transparency
 Every interaction recorded on your device and your server. Know exactly what changed and when.
 
-##### Control
-Organize projects, prompts, context, and snippets. Keep your workflows at your fingertips. Set up on your desktop and seamlessly sync to your phone.
+### Control
+Organize projects, prompts, context, and snippets. Keep your workflows at your fingertips. Set up on your desktop and seamlessly sync to your phone. [Configure Fewshell →](/docs/guides/configuration/)
 
-##### Collaboration
+### Collaboration
 Connect multiple devices and share real-time sessions. Share with your team or seamlessly switch between desktop and mobile - securely over your SSH tunnel.
 
-##### Simplicity
-Easy to set up. Minimalist interface. Designed to do one thing and do it well.
+### Simplicity
+Easy to set up. Minimalist interface. Designed to do one thing and do it well. [Quick start guide →](/docs/getting-started/quick-start/)
+
+## Frequently asked questions
+
+### Can the AI run shell commands without my approval?
+No. Every command the model proposes is staged for your review in the terminal UI and only executes after you explicitly approve it. This behavior cannot be disabled.
+
+### Which LLM providers does Fewshell support?
+Fewshell is BYOM — bring your own model. It works with OpenAI, Anthropic (Claude), Google Gemini, DeepSeek, xAI, Groq, OpenRouter, and any OpenAI-compatible endpoint including self-hosted Ollama.
+
+### Is Fewshell self-hosted?
+Yes. The Fewshell agent runs on a server you control (any Linux or macOS host with SSH). Clients connect over your SSH tunnel — there is no Fewshell cloud service in the data path.
+
+### Does Fewshell send my secrets to the LLM?
+No. Secrets are stored in your device keychain and held only in server memory. Their values — in both plaintext and base64 — are redacted from the context sent to the LLM.
+
+### What devices does Fewshell run on?
+Fewshell has native clients for iOS, Android, macOS, and Linux (x86_64 and ARM64). Windows support is planned.
+
+### Is Fewshell open source?
+Yes. Fewshell is licensed under AGPL-3.0. [Source on GitHub](https://github.com/few-sh/fewshell).
 
 
 <script src="/js/custom.js"></script>

@@ -1,5 +1,7 @@
 +++
 title = "Privacy Policy"
+description = "How Fewshell and Fewshot Corp collect, store, and process your information."
+date = 2025-12-01
 template = "legal.html"
 [extra]
 stylesheets = ["css/custom.css"]

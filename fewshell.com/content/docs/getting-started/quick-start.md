@@ -32,7 +32,7 @@ You will need:
 
 1. Click Connect via SSH -> Automated Pairing -> Begin Pairing.
 
-<img src="/ssh-dialog.png" alt="SSH Pairing Dialog" style="max-width: 700px;">
+<img src="/fewshell-ssh-key-pairing-dialog.png" alt="Fewshell SSH key pairing dialog prompting to add a public key to the server" style="max-width: 700px;">
 
 2. On your server, run:
 ```
@@ -60,7 +60,7 @@ If you prefer not using our relay, you can manually generate the key pair and pa
 1. Tap on the upper-left menu icon. Go to Settings -> Add Model
 2. Configure the settings, test until works, save.
 
-<img src="/add-ai-model-dialog.png" alt="Add AI Model Dialog" style="max-width: 400px;">
+<img src="/fewshell-add-ai-model-dialog.png" alt="Fewshell dialog for adding an AI model provider such as Claude, OpenAI, or Ollama" style="max-width: 400px;">
 
 ## Example Workflow
 
