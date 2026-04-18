@@ -77,9 +77,9 @@ fn is_valid_ed25519_pubkey(key: &str) -> bool {
 
 /// Generate a unique 6-digit ID that doesn't collide with existing entries.
 fn generate_id(map: &HashMap<String, PubkeyEntry>) -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     loop {
-        let candidate = rng.gen_range(100_000u32..1_000_000);
+        let candidate = rng.random_range(100_000u32..1_000_000);
         let candidate_str = candidate.to_string();
         if !map.contains_key(&candidate_str) {
             return candidate_str;

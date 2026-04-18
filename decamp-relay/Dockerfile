@@ -21,6 +21,7 @@ RUN touch src/main.rs && cargo build --release
 # Runtime stage - using scratch for minimal size
 FROM scratch
 
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=builder /app/target/release/decamp-relay /decamp-relay
 
 # Keys directory should be mounted at runtime
