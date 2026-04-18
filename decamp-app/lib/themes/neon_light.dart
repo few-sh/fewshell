@@ -37,6 +37,7 @@ final neonLightTheme = ThemeData(
     tertiary: Color(0xFFFF4DFF),
     surface: Colors.white,
   ),
+  fontFamily: 'Roboto',
   textTheme: const TextTheme(
     bodyLarge: TextStyle(color: Color(0xFF0B0C2A)),
     bodyMedium: TextStyle(color: Color(0xFF64748B)),
