@@ -1210,9 +1210,9 @@ class SyncService {
     if (ensureServer) {
       final versionStr = _clientVersion?.split('+').first ?? '0.0.0';
       final appVersion = SemanticVersion.parse(versionStr);
-      final installer = RemoteInstaller(client, appVersion: appVersion);
+      final installer = RemoteInstaller(client, clientVersion: appVersion);
       try {
-        await installer.ensureServerRunning();
+        await installer.ensure();
       } finally {
         installer.dispose();
       }
