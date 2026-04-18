@@ -47,6 +47,32 @@ class RemoteInstaller {
 
   RemoteInstaller(this.client, {required this.clientVersion});
 
+  /// Returns `true` when [clientVersion] is older (in major or minor) than
+  /// [serverVersion]. Either argument may include a `+build` suffix; build
+  /// metadata is ignored per the semver spec.
+  ///
+  /// Returns `false` (i.e. "no update required") if either version string
+  /// cannot be parsed as semver.
+  static bool isClientOutdated({
+    required String serverVersion,
+    required String clientVersion,
+  }) => _isMajorMinorNewer(newer: serverVersion, than: clientVersion);
+
+  /// `true` when [newer] has a strictly higher major or minor than [than].
+  /// Build metadata is ignored. Returns `false` if either is unparseable.
+  static bool _isMajorMinorNewer({
+    required String newer,
+    required String than,
+  }) {
+    final n = SemanticVersion.tryParse(newer.split('+').first);
+    final t = SemanticVersion.tryParse(than.split('+').first);
+    if (n == null || t == null) {
+      _log.warning('Could not parse versions: newer="$newer", than="$than"');
+      return false;
+    }
+    return n.major > t.major || (n.major == t.major && n.minor > t.minor);
+  }
+
   /// Ensures the fewshell server is installed at a compatible version and
   /// running with its socket ready.
   ///
@@ -93,25 +119,18 @@ class RemoteInstaller {
       return false;
     }
 
-    final serverVersion = SemanticVersion.tryParse(match.group(1)!);
-    if (serverVersion == null) {
-      _log.fine('Invalid semver in server output: ${match.group(1)}');
-      return false;
-    }
+    final serverVersionStr = match.group(1)!;
+    final serverIsOlder = _isMajorMinorNewer(
+      newer: clientVersion.toString(),
+      than: serverVersionStr,
+    );
+    if (!serverIsOlder) return true;
 
-    _log.fine('Server version: $serverVersion, app version: $clientVersion');
-    final serverIsOlder =
-        clientVersion.major > serverVersion.major ||
-        (clientVersion.major == serverVersion.major &&
-            clientVersion.minor > serverVersion.minor);
-    if (serverIsOlder) {
-      _log.info(
-        'Server ${serverVersion.major}.${serverVersion.minor} is older than '
-        'app ${clientVersion.major}.${clientVersion.minor}, needs update.',
-      );
-      return false;
-    }
-    return true;
+    _log.info(
+      'Server $serverVersionStr is older than client $clientVersion, '
+      'needs update.',
+    );
+    return false;
   }
 
   /// Runs the installer script, streaming its output to [output].

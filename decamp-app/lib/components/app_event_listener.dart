@@ -5,6 +5,7 @@ import 'package:logging/logging.dart';
 import 'package:decamp/models/app_event.dart';
 import 'package:decamp/providers/providers.dart';
 import 'package:decamp/services/app_event_bus.dart';
+import 'package:decamp/components/app_update_dialog.dart';
 import 'package:decamp/components/create_project_dialog.dart';
 
 final _log = Logger('AppEventListener');
@@ -27,6 +28,7 @@ class AppEventListener extends ConsumerStatefulWidget {
 class _AppEventListenerState extends ConsumerState<AppEventListener> {
   StreamSubscription<AppEvent>? _subscription;
   bool _dialogShowing = false;
+  bool _updateDialogShown = false;
 
   @override
   void initState() {
@@ -45,11 +47,31 @@ class _AppEventListenerState extends ConsumerState<AppEventListener> {
     switch (event) {
       case NoProjectsForServer(:final serverNodeId, :final connectionInfo):
         _handleNoProjects(serverNodeId, connectionInfo);
+      case AppUpdateRequired(:final serverVersion, :final clientVersion):
+        _handleUpdateRequired(serverVersion, clientVersion);
       case GlobalSyncConnected():
       case GlobalSyncIdle():
       case GlobalSyncDisconnected():
         break; // Future: handle as needed
     }
+  }
+
+  Future<void> _handleUpdateRequired(
+    String serverVersion,
+    String clientVersion,
+  ) async {
+    // Only prompt once per app launch — don't nag on every reconnect.
+    if (_updateDialogShown || !mounted) return;
+    _updateDialogShown = true;
+
+    await Future.delayed(Duration.zero);
+    if (!mounted) return;
+
+    await AppUpdateDialog.show(
+      context,
+      serverVersion: serverVersion,
+      clientVersion: clientVersion,
+    );
   }
 
   Future<void> _handleNoProjects(
