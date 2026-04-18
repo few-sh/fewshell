@@ -3,7 +3,7 @@ base_url = "https://fewshell.com"
 
 # The site title and description; used in feeds by default.
 title = "Fewshell"
-description = "A mobile AI-assistant for DevOps practitioners and on-calls."
+description = "Fewshell is a self-hosted AI SSH client for iOS, Android, macOS and Linux. Your SSH copilot for on-call — with secret redaction and human approval on every command."
 
 # The theme to use
 theme = "terminus"
@@ -12,7 +12,12 @@ theme = "terminus"
 compile_sass = true
 
 # When set to "true", a feed is automatically generated.
-generate_feeds = false
+generate_feeds = true
+feed_filenames = ["atom.xml"]
+
+taxonomies = [
+    { name = "tags", feed = true },
+]
 
 # The default author for pages
 author = "Fewshot Corp"
@@ -39,10 +44,104 @@ copy_button = true
 favicon_emoji = "🐚"
 layout = "center"
 show_default_author = false
+default_social_media_image = "static/fewshell-ai-ssh-client-desktop.png"
+
+json_ld_software_application = '''
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Fewshell",
+  "alternateName": "Fewshell — SSH Copilot for On-Calls",
+  "operatingSystem": "iOS, Android, macOS, Linux",
+  "applicationCategory": "DeveloperApplication",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+  "description": "Self-hosted AI SSH client with human-approved command execution and automatic secret redaction. Runs on iOS, Android, macOS and Linux.",
+  "url": "https://fewshell.com/",
+  "downloadUrl": "https://apps.apple.com/us/app/fewshell/id6755896752",
+  "image": "https://fewshell.com/fewshell-ai-ssh-client-desktop.png",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Fewshot Corp",
+    "url": "https://fewshell.com/"
+  }
+}
+'''
+
+json_ld_organization = '''
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Fewshell",
+  "legalName": "Fewshot Corp",
+  "url": "https://fewshell.com/",
+  "logo": "https://fewshell.com/fewshell-ai-ssh-client-desktop.png",
+  "sameAs": [
+    "https://github.com/few-sh/fewshell"
+  ]
+}
+'''
+
+json_ld_faq = '''
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can the AI run shell commands without my approval?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Every command the model proposes is staged for your review in the terminal UI and only executes after you explicitly approve it. This behavior cannot be disabled."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which LLM providers does Fewshell support?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Fewshell is BYOM \u2014 bring your own model. It works with OpenAI, Anthropic (Claude), Google Gemini, DeepSeek, xAI, Groq, OpenRouter, and any OpenAI-compatible endpoint including self-hosted Ollama."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Fewshell self-hosted?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The Fewshell agent runs on a server you control (any Linux or macOS host with SSH). Clients connect over your SSH tunnel \u2014 there is no Fewshell cloud service in the data path."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does Fewshell send my secrets to the LLM?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. Secrets are stored in your device keychain and held only in server memory. Their values \u2014 in both plaintext and base64 \u2014 are redacted from the context sent to the LLM."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What devices does Fewshell run on?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Fewshell has native clients for iOS, Android, macOS, and Linux (x86_64 and ARM64). Windows support is planned."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is Fewshell open source?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Fewshell is licensed under AGPL-3.0. Source is available at https://github.com/few-sh/fewshell."
+      }
+    }
+  ]
+}
+'''
 
 main_menu = [
     { name = "Home", url = "", trailing_slash = true },
 #    { name = "Docs", url = "docs", trailing_slash = true },
+#    { name = "Blog", url = "blog", trailing_slash = true },
     { name = "Contact", url = "contact", trailing_slash = true },
 ]
 

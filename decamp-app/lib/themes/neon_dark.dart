@@ -37,6 +37,7 @@ final neonDarkTheme = ThemeData(
     tertiary: Color(0xFFFF4DFF),
     surface: Color(0xFF14143A),
   ),
+  fontFamily: 'Roboto',
   textTheme: const TextTheme(
     bodyLarge: TextStyle(color: Color(0xFFEAEAEA)),
     bodyMedium: TextStyle(color: Color(0xFFA1A3C1)),

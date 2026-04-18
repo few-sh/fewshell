@@ -16,11 +16,15 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
   /// Hint/placeholder text color
   final Color hintColor;
 
+  /// Font family for monospace/code text
+  final String monospaceFontFamily;
+
   const TerminalTheme({
     required this.backgroundColor,
     required this.textColor,
     required this.borderColor,
     required this.hintColor,
+    this.monospaceFontFamily = 'RobotoMono',
   });
 
   /// Dark terminal theme (similar to VS Code dark terminal)
@@ -45,12 +49,14 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
     Color? textColor,
     Color? borderColor,
     Color? hintColor,
+    String? monospaceFontFamily,
   }) {
     return TerminalTheme(
       backgroundColor: backgroundColor ?? this.backgroundColor,
       textColor: textColor ?? this.textColor,
       borderColor: borderColor ?? this.borderColor,
       hintColor: hintColor ?? this.hintColor,
+      monospaceFontFamily: monospaceFontFamily ?? this.monospaceFontFamily,
     );
   }
 
@@ -64,6 +70,9 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
       textColor: Color.lerp(textColor, other.textColor, t)!,
       borderColor: Color.lerp(borderColor, other.borderColor, t)!,
       hintColor: Color.lerp(hintColor, other.hintColor, t)!,
+      monospaceFontFamily: t < 0.5
+          ? monospaceFontFamily
+          : other.monospaceFontFamily,
     );
   }
 }

@@ -1,5 +1,7 @@
 +++
 title = "Terms of Service"
+description = "Legal terms that govern your use of Fewshell and related services."
+date = 2025-12-01
 template = "legal.html"
 [extra]
 stylesheets = ["css/custom.css"]
