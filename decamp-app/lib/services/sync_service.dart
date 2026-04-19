@@ -94,6 +94,12 @@ class SyncService {
   /// [connectViaTunnel] is running its own polling + emission logic.
   bool _tunnelConnectInProgress = false;
 
+  /// When true, all automatic reconnect attempts (global and project) are
+  /// suppressed. Set by [_stopReconnecting] when continued retries would be
+  /// wasted (e.g. server requires a newer client). Cleared automatically on
+  /// the next project switch.
+  bool _reconnectingPaused = false;
+
   late final AppEventBus _appEventBus;
 
   /// The client version string (e.g. '1.0.1+27'), resolved from PackageInfo.
@@ -160,6 +166,11 @@ class SyncService {
           'serverNodeId: ${previous?.serverNodeId} -> ${next?.serverNodeId}), '
           'reconnecting global sync.',
         );
+        // A project switch is the user's signal to try connecting again, so
+        // re-enable automatic reconnects that may have been paused.
+        if (previous?.id != next?.id) {
+          _reconnectingPaused = false;
+        }
         _connectGlobal(ref.read(globalDatabaseProvider), next?.serverUrl);
       } else {
         _log.fine(
@@ -407,6 +418,12 @@ class SyncService {
       _currentServerNodeId = headerNodeId;
       _globalReconnectAttempts = 0;
       _log.info('Discovered server node ID: $headerNodeId');
+
+      // Verify version compatibility before doing anything else with the
+      // channel. Throws (after closing the channel) if the server is newer
+      // than this client supports.
+      await _checkServerVersion(responseHeaders, channel);
+
       _appEventBus.emit(GlobalSyncConnected(headerNodeId));
 
       _globalChannel = MultiplexedWebSocketChannel(
@@ -942,7 +959,22 @@ class SyncService {
     }
   }
 
+  /// Stops all automatic reconnect attempts (global and project) until the
+  /// next project switch. Cancels any pending reconnect timers.
+  void _stopReconnecting(String reason) {
+    _log.info('Stopping all reconnect attempts: $reason');
+    _reconnectingPaused = true;
+    _globalReconnectTimer?.cancel();
+    _globalReconnectTimer = null;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
   void _scheduleGlobalReconnect() {
+    if (_reconnectingPaused) {
+      _log.fine('_scheduleGlobalReconnect: reconnects paused, skipping.');
+      return;
+    }
     if (_globalReconnectTimer?.isActive ?? false) {
       _log.fine('_scheduleGlobalReconnect: timer already active, skipping.');
       return;
@@ -962,6 +994,10 @@ class SyncService {
   }
 
   void _scheduleReconnect() {
+    if (_reconnectingPaused) {
+      _log.fine('_scheduleReconnect: reconnects paused, skipping.');
+      return;
+    }
     if (_reconnectTimer?.isActive ?? false) {
       _log.fine('_scheduleReconnect: timer already active, skipping.');
       return;
@@ -1210,9 +1246,9 @@ class SyncService {
     if (ensureServer) {
       final versionStr = _clientVersion?.split('+').first ?? '0.0.0';
       final appVersion = SemanticVersion.parse(versionStr);
-      final installer = RemoteInstaller(client, appVersion: appVersion);
+      final installer = RemoteInstaller(client, clientVersion: appVersion);
       try {
-        await installer.ensureServerRunning();
+        await installer.ensure();
       } finally {
         installer.dispose();
       }
@@ -1357,6 +1393,43 @@ class SyncService {
       _log.severe('Error during certificate pinning check', e);
       return false;
     }
+  }
+
+  /// If the server (per upgrade response headers) is newer than this client,
+  /// emits an [AppUpdateRequired] event, stops further reconnect attempts,
+  /// closes [channel], and throws so the caller aborts the connection.
+  Future<void> _checkServerVersion(
+    Map<String, String> responseHeaders,
+    WebSocketChannel channel,
+  ) async {
+    final serverVersion = responseHeaders[kServerVersionHeader.toLowerCase()];
+    final clientVersion = _clientVersion;
+    if (serverVersion == null || clientVersion == null) return;
+
+    final outdated = RemoteInstaller.isClientOutdated(
+      serverVersion: serverVersion,
+      clientVersion: clientVersion,
+    );
+    if (!outdated) return;
+
+    _log.warning(
+      'Server $serverVersion is newer than client $clientVersion, '
+      'aborting connection and prompting for update.',
+    );
+    _stopReconnecting(
+      'server requires client >= $serverVersion (have $clientVersion)',
+    );
+    _appEventBus.emit(
+      AppUpdateRequired(
+        serverVersion: serverVersion,
+        clientVersion: clientVersion,
+      ),
+    );
+    await channel.sink.close();
+    throw Exception(
+      'Server version $serverVersion requires a newer client '
+      '(currently $clientVersion). Please update the app.',
+    );
   }
 
   /// Connects a WebSocket with a manual HTTP upgrade, returning both the

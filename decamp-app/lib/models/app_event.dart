@@ -36,3 +36,20 @@ class NoProjectsForServer extends AppEvent {
 
   const NoProjectsForServer(this.serverNodeId, {this.connectionInfo});
 }
+
+// --- Update events ---
+
+/// Emitted when the server reports a version newer than the running client
+/// (minor or major bump). The UI should prompt the user to update the app.
+class AppUpdateRequired extends AppEvent {
+  /// Server version string as reported by the server (e.g. `1.2.0+45`).
+  final String serverVersion;
+
+  /// Currently installed client version string (e.g. `1.1.0+30`).
+  final String clientVersion;
+
+  const AppUpdateRequired({
+    required this.serverVersion,
+    required this.clientVersion,
+  });
+}
