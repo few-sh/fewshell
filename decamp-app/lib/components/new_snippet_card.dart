@@ -366,7 +366,7 @@ class _NewSnippetCardState extends ConsumerState<NewSnippetCard> {
               _isVisibleToLlm = value;
             });
           },
-          label: const Text('Visible to AI'),
+          label: const Text('Enabled'),
           sublabel: const Text('Include this snippet in the AI context'),
         ),
         if (widget.isGlobal == null) ...[

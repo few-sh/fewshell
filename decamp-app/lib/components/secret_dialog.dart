@@ -154,8 +154,10 @@ class _SecretDialogFormState extends State<_SecretDialogForm> {
                     _isVisibleToLlm = value;
                   });
                 },
-                label: const Text('Visible to AI'),
-                sublabel: const Text('Include this secret in the AI context'),
+                label: const Text('Enabled'),
+                sublabel: const Text(
+                  'List name of this secret in the prompt context',
+                ),
               ),
             ],
           ),
