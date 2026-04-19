@@ -405,7 +405,7 @@ packages:
       path: "../decamp-agent"
       relative: true
     source: path
-    version: "0.1.29"
+    version: "1.0.3"
   ffi:
     dependency: transitive
     description:
