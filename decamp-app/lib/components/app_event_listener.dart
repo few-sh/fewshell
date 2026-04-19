@@ -28,7 +28,6 @@ class AppEventListener extends ConsumerStatefulWidget {
 class _AppEventListenerState extends ConsumerState<AppEventListener> {
   StreamSubscription<AppEvent>? _subscription;
   bool _dialogShowing = false;
-  bool _updateDialogShown = false;
 
   @override
   void initState() {
@@ -60,10 +59,6 @@ class _AppEventListenerState extends ConsumerState<AppEventListener> {
     String serverVersion,
     String clientVersion,
   ) async {
-    // Only prompt once per app launch — don't nag on every reconnect.
-    if (_updateDialogShown || !mounted) return;
-    _updateDialogShown = true;
-
     await Future.delayed(Duration.zero);
     if (!mounted) return;
 
