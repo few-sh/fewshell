@@ -16,7 +16,8 @@ RESET='\033[0m'
 
 INSTALL_DIR="$HOME/.fewshell"
 LIB_DIR="$HOME/lib"
-BASE_URL="https://release.few.sh/releases/latest"
+RELEASES_URL="https://release.fewshell.com/releases"
+CLIENT_VERSION="latest"
 RELAY_URL="https://relay.fewshell.com"
 SSH_DIR="$HOME/.ssh"
 AUTH_KEYS="$SSH_DIR/authorized_keys"
@@ -64,7 +65,7 @@ main() {
     arch="$(detect_arch)"
 
     local tgz_name="fewshell-agent-${os}-${arch}.tar.gz"
-    local url="${BASE_URL}/${tgz_name}"
+    local url="${RELEASES_URL}/${CLIENT_VERSION}/${tgz_name}"
 
     info "OS: ${os}  Architecture: ${arch}"
 
@@ -186,6 +187,7 @@ SKIP_PAIRING=false
 for arg in "$@"; do
     case "$arg" in
         --skip-pairing) SKIP_PAIRING=true ;;
+        --client-version=*) CLIENT_VERSION="${arg#--client-version=}" ;;
     esac
 done
 
