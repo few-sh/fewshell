@@ -299,7 +299,7 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
+                      child: SelectableText(
                         key,
                         style: theme.textTheme.h4.copyWith(
                           fontSize: 16,
@@ -341,14 +341,13 @@ class _SecretsPageState extends ConsumerState<SecretsPage>
                         duration: const Duration(milliseconds: 200),
                         alignment: Alignment.topLeft,
                         curve: Curves.easeInOut,
-                        child: Text(
+                        child: SelectableText(
                           isObscured ? '••••••••••••••••' : secret.value,
                           style: theme.textTheme.p.copyWith(
                             fontFamily: 'monospace',
                             color: theme.colorScheme.mutedForeground,
                           ),
                           maxLines: isObscured ? 1 : null,
-                          overflow: isObscured ? TextOverflow.ellipsis : null,
                         ),
                       ),
                     ),
