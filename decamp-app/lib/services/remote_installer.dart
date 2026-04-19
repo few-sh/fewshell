@@ -58,7 +58,7 @@ class RemoteInstaller {
     required String clientVersion,
   }) => _isMajorMinorNewer(newer: serverVersion, than: clientVersion);
 
-  /// `true` when [newer] has a strictly higher major or minor than [than].
+  /// `true` when [newer] is strictly greater than [than] (semver precedence).
   /// Build metadata is ignored. Returns `false` if either is unparseable.
   static bool _isMajorMinorNewer({
     required String newer,
@@ -70,7 +70,7 @@ class RemoteInstaller {
       _log.warning('Could not parse versions: newer="$newer", than="$than"');
       return false;
     }
-    return n.major > t.major || (n.major == t.major && n.minor > t.minor);
+    return n > t;
   }
 
   /// Ensures the fewshell server is installed at a compatible version and
