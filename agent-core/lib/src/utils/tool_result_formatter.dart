@@ -204,6 +204,9 @@ class ToolResultFormatter {
       // Try to detect if output looks like it should have syntax highlighting
       final language = _detectLanguage(stdout);
       buffer.writeln('```$language');
+      if (originalCommand != null && originalCommand.isNotEmpty) {
+        buffer.writeln('\$ $originalCommand');
+      }
       buffer.writeln(stdout);
       buffer.writeln('```');
     }

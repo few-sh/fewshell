@@ -339,6 +339,24 @@ class _RichMessageContentState extends ConsumerState<RichMessageContent> {
         highlightComponent,
         ...MarkdownComponent.inlineComponents,
       ],
+      highlightBuilder: (context, text, style) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+          decoration: BoxDecoration(
+            color: terminalTheme.backgroundColor,
+            // border: Border.all(color: terminalTheme.borderColor),
+            // borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            text,
+            style: style.copyWith(
+              fontFamily: terminalTheme.monospaceFontFamily,
+              color: terminalTheme.textColor,
+              fontSize: (style.fontSize ?? 14) * 0.9,
+            ),
+          ),
+        );
+      },
       codeBuilder: (context, language, code, closed) {
         final index = codeBlockIndex++;
         final heroTag = 'code_block_${widget.message.id}_$index';
