@@ -87,9 +87,10 @@ TextSpan buildAnsiTextSpan({
   final state = _SgrState();
   final spans = <TextSpan>[];
 
-  // Sort highlights by offset for efficient lookup.
+  // Sort highlights by offset for a single forward pass.
   final sortedHighlights = highlights.toList()
     ..sort((a, b) => a.offset.compareTo(b.offset));
+  var hlCursor = 0; // Index of the next highlight that may still match.
 
   // Buffer the run of visible characters that share the same style.
   final runBuffer = StringBuffer();
@@ -98,23 +99,32 @@ TextSpan buildAnsiTextSpan({
 
   void flushRun() {
     if (runBuffer.isEmpty) return;
-    spans.add(
-      TextSpan(
-        text: runBuffer.toString(),
-        style: runStyle?.copyWith(backgroundColor: runHighlightColor),
-      ),
-    );
+    // When there is a highlight, override the ANSI background with the
+    // highlight color. Otherwise preserve whatever ANSI background the
+    // style already carries — `copyWith(backgroundColor: null)` keeps the
+    // existing value, which is exactly what we want here.
+    final style = runHighlightColor == null
+        ? runStyle
+        : runStyle?.copyWith(backgroundColor: runHighlightColor);
+    spans.add(TextSpan(text: runBuffer.toString(), style: style));
     runBuffer.clear();
   }
 
+  // Returns the highlight color at [rawIndex], advancing [hlCursor]
+  // past any highlights that ended before this position. The raw index
+  // is monotonically non-decreasing across the loop, giving an O(N + M)
+  // total cost.
   Color? highlightColorAt(int rawIndex) {
-    for (final h in sortedHighlights) {
-      if (rawIndex < h.offset) return null;
-      if (rawIndex < h.offset + h.length) {
-        return h.isActive ? activeHighlightColor : inactiveHighlightColor;
-      }
+    while (hlCursor < sortedHighlights.length &&
+        rawIndex >=
+            sortedHighlights[hlCursor].offset +
+                sortedHighlights[hlCursor].length) {
+      hlCursor++;
     }
-    return null;
+    if (hlCursor >= sortedHighlights.length) return null;
+    final h = sortedHighlights[hlCursor];
+    if (rawIndex < h.offset) return null;
+    return h.isActive ? activeHighlightColor : inactiveHighlightColor;
   }
 
   var i = 0;

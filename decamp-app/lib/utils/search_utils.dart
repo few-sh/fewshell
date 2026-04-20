@@ -85,7 +85,13 @@ class SearchUtils {
     return matches;
   }
 
-  /// Find matches in a specific text using regex
+  /// Find matches in a specific text using regex.
+  ///
+  /// The regex is run against an ANSI-stripped copy of [text] so search
+  /// terms don't accidentally match characters inside escape sequences
+  /// (e.g. searching "FG" matching the `m` in `\x1B[38;5;202m`). Match
+  /// offsets are then mapped back to positions in the original [text]
+  /// so downstream highlight injection stays aligned.
   static void _findMatchesInText({
     required String text,
     required RegExp regex,
@@ -93,12 +99,21 @@ class SearchUtils {
     required MatchType matchType,
     required List<SearchMatch> matches,
   }) {
-    final allMatches = regex.allMatches(text);
+    final stripped = stripAnsiWithMap(text);
+    final allMatches = regex.allMatches(stripped.visible);
 
     for (final match in allMatches) {
-      final matchOffset = match.start;
-      final matchLength = match.end - match.start;
-      final matchContext = _extractContext(text, matchOffset, matchLength);
+      final rawStart = stripped.visibleToRaw[match.start];
+      final rawEnd = stripped.visibleToRaw[match.end];
+      final matchOffset = rawStart;
+      final matchLength = rawEnd - rawStart;
+      // Build context from the visible (stripped) text so ANSI escapes
+      // don't pollute the snippet shown in the search results UI.
+      final matchContext = _extractContext(
+        stripped.visible,
+        match.start,
+        match.end - match.start,
+      );
 
       matches.add(
         SearchMatch(

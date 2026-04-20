@@ -24,3 +24,39 @@ final RegExp _ansiPattern = RegExp(
 
 /// Returns [text] with all ANSI escape sequences removed.
 String stripAnsi(String text) => text.replaceAll(_ansiPattern, '');
+
+/// Result of [stripAnsiWithMap]: the visible text plus a mapping from
+/// each visible code-unit index to the corresponding code-unit index in
+/// the original text. The map has length `visible.length + 1`; the final
+/// entry maps the end-of-text position so substring ranges round-trip
+/// correctly.
+class StrippedAnsi {
+  final String visible;
+  final List<int> visibleToRaw;
+  const StrippedAnsi(this.visible, this.visibleToRaw);
+}
+
+/// Strips ANSI escapes from [text] and returns both the visible text and
+/// a map from visible code-unit indices back to raw indices in [text].
+/// Useful when running a regex against visible content but needing to
+/// report match positions in the original (escape-containing) text.
+StrippedAnsi stripAnsiWithMap(String text) {
+  final buffer = StringBuffer();
+  final map = <int>[];
+  var raw = 0;
+  for (final m in _ansiPattern.allMatches(text)) {
+    while (raw < m.start) {
+      map.add(raw);
+      buffer.writeCharCode(text.codeUnitAt(raw));
+      raw++;
+    }
+    raw = m.end;
+  }
+  while (raw < text.length) {
+    map.add(raw);
+    buffer.writeCharCode(text.codeUnitAt(raw));
+    raw++;
+  }
+  map.add(text.length);
+  return StrippedAnsi(buffer.toString(), map);
+}

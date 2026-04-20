@@ -116,10 +116,23 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
     final totalLines = lines.length;
     final needsTruncation = totalLines > kTerminalMaxLines;
 
-    // Build displayed content (truncated or full)
-    final displayedContent = needsTruncation
-        ? _buildTruncatedContent(lines, totalLines)
-        : widget.code;
+    // Build displayed content (truncated or full) and remap highlight
+    // offsets so they line up with what's actually rendered.
+    final String displayedContent;
+    final List<CodeHighlight> displayedHighlights;
+    if (needsTruncation) {
+      final truncated = _buildTruncatedContent(lines, totalLines);
+      displayedContent = truncated.text;
+      displayedHighlights = _remapHighlights(
+        widget.highlights,
+        firstHalfEnd: truncated.firstHalfEnd,
+        lastHalfStart: truncated.lastHalfStart,
+        truncatedLastHalfStart: truncated.truncatedLastHalfStart,
+      );
+    } else {
+      displayedContent = widget.code;
+      displayedHighlights = widget.highlights;
+    }
 
     return SelectionArea(
       contextMenuBuilder: (context, selectableRegionState) {
@@ -159,13 +172,19 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(12),
-                          child: _buildHighlightedCode(displayedContent),
+                          child: _buildHighlightedCode(
+                            displayedContent,
+                            displayedHighlights,
+                          ),
                         ),
                       )
                     : SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.all(12),
-                        child: _buildHighlightedCode(displayedContent),
+                        child: _buildHighlightedCode(
+                          displayedContent,
+                          displayedHighlights,
+                        ),
                       ),
               ),
               // Expand button
@@ -200,19 +219,68 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
     );
   }
 
-  /// Build truncated content showing first and last lines with ellipsis
-  String _buildTruncatedContent(List<String> lines, int totalLines) {
+  /// Build truncated content showing first and last lines with ellipsis.
+  /// Returns the rendered text plus the offsets needed to remap highlights
+  /// from the full [widget.code] into the truncated string.
+  _TruncatedContent _buildTruncatedContent(List<String> lines, int totalLines) {
     final firstLines = lines.take(kTerminalEllipsisHalfLines).toList();
     final lastLines = lines
         .skip(totalLines - kTerminalEllipsisHalfLines)
         .toList();
     final hiddenCount = totalLines - (2 * kTerminalEllipsisHalfLines);
+    final ellipsisLine = '... ($hiddenCount more lines) ...';
 
-    return [
-      ...firstLines,
-      '... ($hiddenCount more lines) ...',
-      ...lastLines,
-    ].join('\n');
+    final firstHalf = firstLines.join('\n');
+    final lastHalf = lastLines.join('\n');
+
+    // In the original code, the trailing newline of the first half sits at
+    // position firstHalf.length; the last half begins at
+    // (totalLength - lastHalf.length).
+    final firstHalfEnd = firstHalf.length;
+    final lastHalfStart = widget.code.length - lastHalf.length;
+    // In the truncated string, the last half begins after
+    //   firstHalf + '\n' + ellipsisLine + '\n'.
+    final truncatedLastHalfStart = firstHalfEnd + 1 + ellipsisLine.length + 1;
+
+    return _TruncatedContent(
+      text: '$firstHalf\n$ellipsisLine\n$lastHalf',
+      firstHalfEnd: firstHalfEnd,
+      lastHalfStart: lastHalfStart,
+      truncatedLastHalfStart: truncatedLastHalfStart,
+    );
+  }
+
+  /// Remap highlight offsets from the original [widget.code] into the
+  /// truncated string. Highlights fully inside the first half keep their
+  /// offset; ones fully inside the last half are shifted; ones that fall
+  /// in the hidden region (or straddle a boundary) are dropped so they
+  /// don't paint random characters.
+  List<CodeHighlight> _remapHighlights(
+    List<CodeHighlight> highlights, {
+    required int firstHalfEnd,
+    required int lastHalfStart,
+    required int truncatedLastHalfStart,
+  }) {
+    if (highlights.isEmpty) return highlights;
+    final shift = truncatedLastHalfStart - lastHalfStart;
+    final remapped = <CodeHighlight>[];
+    for (final h in highlights) {
+      final end = h.offset + h.length;
+      if (end <= firstHalfEnd) {
+        remapped.add(h);
+      } else if (h.offset >= lastHalfStart) {
+        remapped.add(
+          CodeHighlight(
+            offset: h.offset + shift,
+            length: h.length,
+            isActive: h.isActive,
+            matchIndex: h.matchIndex,
+          ),
+        );
+      }
+      // Highlights overlapping the hidden region are intentionally dropped.
+    }
+    return remapped;
   }
 
   /// Build context menu with a Copy button that expands truncated content
@@ -247,7 +315,7 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
   }
 
   /// Build code text with ANSI color parsing and search highlights.
-  Widget _buildHighlightedCode(String text) {
+  Widget _buildHighlightedCode(String text, List<CodeHighlight> highlights) {
     final baseStyle = TextStyle(
       fontFamily: 'monospace',
       fontSize: 14,
@@ -260,7 +328,7 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
       baseStyle: baseStyle,
       palette: widget.terminalTheme.ansiPalette,
       defaultForeground: widget.terminalTheme.textColor,
-      highlights: widget.highlights,
+      highlights: highlights,
       activeHighlightColor: widget.activeColor,
       inactiveHighlightColor: widget.inactiveColor,
     );
@@ -290,4 +358,19 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
       ),
     );
   }
+}
+
+/// Output of truncating a code block: the rendered text plus the offsets
+/// needed to remap highlight positions from the original string.
+class _TruncatedContent {
+  final String text;
+  final int firstHalfEnd;
+  final int lastHalfStart;
+  final int truncatedLastHalfStart;
+  const _TruncatedContent({
+    required this.text,
+    required this.firstHalfEnd,
+    required this.lastHalfStart,
+    required this.truncatedLastHalfStart,
+  });
 }
