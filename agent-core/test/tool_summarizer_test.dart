@@ -233,6 +233,102 @@ void main() {
         'original output',
       );
     });
+
+    test('strips ANSI escapes from shell tool stdout/stderr', () {
+      final raw = jsonEncode({
+        'stdout': '\x1B[31mERR\x1B[0m\nplain',
+        'stderr': '\x1B[1mwarn\x1B[22m',
+        'exitCode': 1,
+      });
+      final message = _buildToolResultMessage(
+        toolCalls: [
+          _toolCall(
+            id: 'call_1',
+            name: 'execute_shell_command',
+            arguments: '{"command":"ls --color"}',
+          ),
+        ],
+        toolResults: [
+          _toolCall(
+            id: 'call_1',
+            name: 'execute_shell_command',
+            arguments: raw,
+          ),
+        ],
+      );
+
+      final chatMessages = message.toChatMessage();
+      final toolResultMessage =
+          chatMessages.last.messageType as ToolResultMessage;
+      final cleaned = jsonDecode(
+        toolResultMessage.results.single.function.arguments,
+      ) as Map<String, dynamic>;
+
+      expect(cleaned['stdout'], 'ERR\nplain');
+      expect(cleaned['stderr'], 'warn');
+      expect(cleaned['exitCode'], 1);
+    });
+
+    test('summary takes precedence over ANSI stripping', () {
+      final raw = jsonEncode({
+        'stdout': '\x1B[31mraw\x1B[0m',
+        'stderr': '',
+        'exitCode': 0,
+      });
+      final message = _buildToolResultMessage(
+        toolCalls: [
+          _toolCall(
+            id: 'call_1',
+            name: 'execute_shell_command',
+            arguments: '{"command":"ls"}',
+          ),
+        ],
+        toolResults: [
+          _toolCall(
+            id: 'call_1',
+            name: 'execute_shell_command',
+            arguments: raw,
+          ),
+        ],
+        summary: jsonEncode({'call_1': 'summarized'}),
+      );
+
+      final chatMessages = message.toChatMessage();
+      final toolResultMessage =
+          chatMessages.last.messageType as ToolResultMessage;
+      expect(
+        toolResultMessage.results.single.function.arguments,
+        'summarized',
+      );
+    });
+
+    test('does not strip ANSI from non-shell tools', () {
+      final raw = '{"data":"\\u001B[31mraw\\u001B[0m"}';
+      final message = _buildToolResultMessage(
+        toolCalls: [
+          _toolCall(
+            id: 'call_1',
+            name: 'fetch',
+            arguments: '{"url":"https://example.com"}',
+          ),
+        ],
+        toolResults: [
+          _toolCall(
+            id: 'call_1',
+            name: 'fetch',
+            arguments: raw,
+          ),
+        ],
+      );
+
+      final chatMessages = message.toChatMessage();
+      final toolResultMessage =
+          chatMessages.last.messageType as ToolResultMessage;
+      expect(
+        toolResultMessage.results.single.function.arguments,
+        raw,
+      );
+    });
   });
 }
 

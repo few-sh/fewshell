@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:decamp/themes/ansi_palette.dart';
+
+export 'package:decamp/themes/ansi_palette.dart';
 
 /// Terminal color scheme for code/command display areas.
 /// Inspired by common terminal themes like VS Code's integrated terminal.
@@ -19,12 +22,16 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
   /// Font family for monospace/code text
   final String monospaceFontFamily;
 
+  /// 16-color ANSI palette used to render SGR-colored shell output.
+  final AnsiPalette ansiPalette;
+
   const TerminalTheme({
     required this.backgroundColor,
     required this.textColor,
     required this.borderColor,
     required this.hintColor,
     this.monospaceFontFamily = 'RobotoMono',
+    this.ansiPalette = AnsiPalette.xtermDark,
   });
 
   /// Dark terminal theme (similar to VS Code dark terminal)
@@ -33,6 +40,7 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
     textColor: Color(0xFF4ADE80), // Green accent (similar to terminal success)
     borderColor: Color(0xFF3E3E3E), // Medium grey border
     hintColor: Color(0xFF6E6E6E), // Muted grey for hints
+    ansiPalette: AnsiPalette.xtermDark,
   );
 
   /// Light terminal theme (inverted colors for light mode)
@@ -41,6 +49,7 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
     textColor: Color(0xFF22C55E), // Darker green for contrast
     borderColor: Color(0xFF1A1A1A), // Darker border
     hintColor: Color(0xFF808080), // Medium grey for hints
+    ansiPalette: AnsiPalette.xtermLight,
   );
 
   @override
@@ -50,6 +59,7 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
     Color? borderColor,
     Color? hintColor,
     String? monospaceFontFamily,
+    AnsiPalette? ansiPalette,
   }) {
     return TerminalTheme(
       backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -57,6 +67,7 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
       borderColor: borderColor ?? this.borderColor,
       hintColor: hintColor ?? this.hintColor,
       monospaceFontFamily: monospaceFontFamily ?? this.monospaceFontFamily,
+      ansiPalette: ansiPalette ?? this.ansiPalette,
     );
   }
 
@@ -73,6 +84,7 @@ class TerminalTheme extends ThemeExtension<TerminalTheme> {
       monospaceFontFamily: t < 0.5
           ? monospaceFontFamily
           : other.monospaceFontFamily,
+      ansiPalette: AnsiPalette.lerp(ansiPalette, other.ansiPalette, t),
     );
   }
 }

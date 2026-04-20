@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:decamp/themes/terminal_theme.dart';
 import 'package:agent_core/agent_core.dart';
 import 'package:decamp/components/full_screen_code_view.dart';
+import 'package:decamp/utils/ansi_renderer.dart';
 import 'package:decamp/utils/highlight_injector.dart';
 
 /// Expandable code block with truncation and hero animation
@@ -92,10 +93,15 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
     final ellipsisIndex = textLines.indexOf(expectedEllipsis);
     if (ellipsisIndex == -1) return text;
 
-    final hiddenLines = codeLines.sublist(
-      kTerminalEllipsisHalfLines,
-      totalLines - kTerminalEllipsisHalfLines,
-    );
+    // Strip ANSI escapes from hidden lines so the clipboard content is
+    // consistent with the visible (already escape-free) selection.
+    final hiddenLines = codeLines
+        .sublist(
+          kTerminalEllipsisHalfLines,
+          totalLines - kTerminalEllipsisHalfLines,
+        )
+        .map(stripAnsi)
+        .toList();
 
     return [
       ...textLines.sublist(0, ellipsisIndex),
@@ -240,7 +246,7 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
     );
   }
 
-  /// Build code text with highlights using RichText
+  /// Build code text with ANSI color parsing and search highlights.
   Widget _buildHighlightedCode(String text) {
     final baseStyle = TextStyle(
       fontFamily: 'monospace',
@@ -249,51 +255,17 @@ class _ExpandableCodeBlockState extends State<ExpandableCodeBlock> {
       height: 1.5,
     );
 
-    if (widget.highlights.isEmpty) {
-      return Text(text, style: baseStyle);
-    }
+    final span = buildAnsiTextSpan(
+      text: text,
+      baseStyle: baseStyle,
+      palette: widget.terminalTheme.ansiPalette,
+      defaultForeground: widget.terminalTheme.textColor,
+      highlights: widget.highlights,
+      activeHighlightColor: widget.activeColor,
+      inactiveHighlightColor: widget.inactiveColor,
+    );
 
-    // Build TextSpans with highlights
-    final spans = <TextSpan>[];
-    var lastIndex = 0;
-
-    // Sort highlights by offset
-    final sortedHighlights = widget.highlights.toList()
-      ..sort((a, b) => a.offset.compareTo(b.offset));
-
-    for (final highlight in sortedHighlights) {
-      final start = highlight.offset;
-      final end = start + highlight.length;
-
-      // Validate bounds
-      if (start < 0 || end > text.length || start < lastIndex) continue;
-
-      // Add text before highlight
-      if (start > lastIndex) {
-        spans.add(TextSpan(text: text.substring(lastIndex, start)));
-      }
-
-      // Add highlighted text
-      spans.add(
-        TextSpan(
-          text: text.substring(start, end),
-          style: baseStyle.copyWith(
-            backgroundColor: highlight.isActive
-                ? widget.activeColor
-                : widget.inactiveColor,
-          ),
-        ),
-      );
-
-      lastIndex = end;
-    }
-
-    // Add remaining text
-    if (lastIndex < text.length) {
-      spans.add(TextSpan(text: text.substring(lastIndex)));
-    }
-
-    return Text.rich(TextSpan(children: spans, style: baseStyle));
+    return Text.rich(span);
   }
 
   /// Open full-screen code view with hero animation
