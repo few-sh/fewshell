@@ -108,17 +108,37 @@ fi
 echo "✅ Build successful: $APP_PATH"
 
 # -----------------------------------------------------------------------------
-# Code Sign (deep, with hardened runtime for notarization)
+# Code Sign (with hardened runtime + explicit entitlements for notarization)
 # -----------------------------------------------------------------------------
 echo "🔏 Code signing with: $SIGNING_IDENTITY"
 
-codesign --deep --force --options runtime \
+ENTITLEMENTS_PATH="macos/Runner/Release.entitlements"
+if [ ! -f "$ENTITLEMENTS_PATH" ]; then
+    echo "❌ Entitlements file not found: $ENTITLEMENTS_PATH"
+    exit 1
+fi
+
+# Re-sign nested frameworks first (without entitlements – they don't take any),
+# then sign the outer .app with explicit entitlements. We avoid `--deep` because
+# it would apply the app's entitlements to every nested binary, and would also
+# silently preserve whatever entitlements were already there on re-sign.
+for fw in "$APP_PATH"/Contents/Frameworks/*.framework "$APP_PATH"/Contents/Frameworks/*.dylib; do
+    [ -e "$fw" ] || continue
+    codesign --force --options runtime --timestamp --sign "$SIGNING_IDENTITY" "$fw"
+done
+
+codesign --force --options runtime \
+    --entitlements "$ENTITLEMENTS_PATH" \
     --sign "$SIGNING_IDENTITY" \
     --timestamp \
     "$APP_PATH"
 
 echo "   Verifying signature..."
 codesign --verify --deep --strict "$APP_PATH"
+# if codesign -d --entitlements :- "$APP_PATH" 2>/dev/null | grep -q keychain-access-groups; then
+#     echo "❌ keychain-access-groups still present in entitlements – aborting."
+#     exit 1
+# fi
 echo "✅ Code signing verified."
 
 # -----------------------------------------------------------------------------
@@ -128,22 +148,46 @@ echo "💿 Creating DMG..."
 rm -rf "$DMG_DIR"
 mkdir -p "$DMG_DIR"
 
-# Create a temporary folder for DMG contents
-DMG_STAGING="$DMG_DIR/staging"
-mkdir -p "$DMG_STAGING"
-cp -R "$APP_PATH" "$DMG_STAGING/"
-
-# Create a symlink to /Applications for drag-and-drop install
-ln -s /Applications "$DMG_STAGING/Applications"
+# Two-step DMG creation to avoid hdiutil following the /Applications symlink
+# (which can fail with "Operation not permitted" if /Applications contains
+# protected apps – e.g. a previously-installed copy of Fewshell.app).
+#
+# Step 1: create an empty writable image sized to fit the app + headroom.
+# Step 2: mount it, copy contents in (without following symlinks),
+#         create the /Applications symlink, unmount.
+# Step 3: convert to compressed read-only UDZO.
+APP_SIZE_KB=$(du -sk "$APP_PATH" | awk '{print $1}')
+IMAGE_SIZE_KB=$((APP_SIZE_KB + 50000))   # +50 MB headroom
+TMP_DMG="$DMG_DIR/tmp.dmg"
+VOL_NAME="$APP_NAME"
 
 hdiutil create \
-    -volname "$APP_NAME" \
-    -srcfolder "$DMG_STAGING" \
+    -size "${IMAGE_SIZE_KB}k" \
+    -fs HFS+ \
+    -volname "$VOL_NAME" \
     -ov \
-    -format UDZO \
-    "$DMG_PATH"
+    "$TMP_DMG"
 
-rm -rf "$DMG_STAGING"
+MOUNT_INFO=$(hdiutil attach "$TMP_DMG" -nobrowse -noautoopen -mountrandom /tmp)
+MOUNT_POINT=$(echo "$MOUNT_INFO" | grep -E '^/dev/' | tail -n1 | awk '{for(i=3;i<=NF;i++) printf "%s ",$i; print ""}' | sed 's/ *$//')
+
+if [ -z "$MOUNT_POINT" ] || [ ! -d "$MOUNT_POINT" ]; then
+    echo "❌ Failed to mount temporary DMG."
+    exit 1
+fi
+
+# Ensure unmount happens even on error
+trap 'hdiutil detach "$MOUNT_POINT" -quiet || true' EXIT
+
+# Copy the .app preserving symlinks/attrs but NOT following them.
+cp -R "$APP_PATH" "$MOUNT_POINT/"
+ln -s /Applications "$MOUNT_POINT/Applications"
+
+hdiutil detach "$MOUNT_POINT" -quiet
+trap - EXIT
+
+hdiutil convert "$TMP_DMG" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG_PATH"
+rm -f "$TMP_DMG"
 
 if [ ! -f "$DMG_PATH" ]; then
     echo "❌ DMG creation failed."
