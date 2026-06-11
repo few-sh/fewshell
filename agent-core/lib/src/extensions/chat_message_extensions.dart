@@ -5,6 +5,8 @@ import 'package:llm_dart/llm_dart.dart';
 
 import '../database/database.dart';
 import '../database/tables/messages_table.dart';
+import '../services/shell_tools_provider.dart' show kExecuteShellCommand;
+import '../utils/ansi.dart';
 import '../utils/id_generator.dart';
 
 /// Extensions for ChatMessage to support conversion to database entities
@@ -215,17 +217,27 @@ extension MessageEntityToChat on MessageEntity {
     // Parse the summary map if present: {toolCallId: summarizedContent}.
     final summaryMap = _parseSummaryMap();
 
-    // Replace oversized tool results with their summarized content.
+    // Replace oversized tool results with their summarized content,
+    // and strip ANSI escape sequences from shell command stdout/stderr
+    // (raw bytes are kept in the DB for terminal-style UI rendering, but
+    // would just waste tokens / confuse the LLM).
     final effectiveResults = results.map((toolResult) {
       final summarized = summaryMap?[toolResult.id];
-      if (summarized == null) return toolResult;
-      // Swap in the summarized content, preserving the tool call metadata.
+      final effectiveArgs = summarized ??
+          _stripAnsiFromToolResult(
+            toolResult.function.name,
+            toolResult.function.arguments,
+          );
+      if (identical(effectiveArgs, toolResult.function.arguments)) {
+        return toolResult;
+      }
+      // Swap in the cleaned content, preserving the tool call metadata.
       return ToolCall(
         id: toolResult.id,
         callType: toolResult.callType,
         function: FunctionCall(
           name: toolResult.function.name,
-          arguments: summarized,
+          arguments: effectiveArgs,
         ),
       );
     }).toList();
@@ -251,6 +263,33 @@ extension MessageEntityToChat on MessageEntity {
       return Map<String, String>.from(decoded);
     } catch (_) {
       return null;
+    }
+  }
+
+  /// For shell tool results, strip ANSI escape sequences from
+  /// `stdout`/`stderr` in the JSON payload. Returns the original string
+  /// unchanged if the tool isn't a shell command, the payload isn't valid
+  /// JSON, or there are no escape sequences to strip.
+  String _stripAnsiFromToolResult(String toolName, String argumentsJson) {
+    if (toolName != kExecuteShellCommand) return argumentsJson;
+    try {
+      final decoded = jsonDecode(argumentsJson);
+      if (decoded is! Map<String, dynamic>) return argumentsJson;
+      var changed = false;
+      final cleaned = Map<String, dynamic>.from(decoded);
+      for (final field in const ['stdout', 'stderr']) {
+        final value = cleaned[field];
+        if (value is String) {
+          final stripped = stripAnsi(value);
+          if (!identical(stripped, value) && stripped != value) {
+            cleaned[field] = stripped;
+            changed = true;
+          }
+        }
+      }
+      return changed ? jsonEncode(cleaned) : argumentsJson;
+    } catch (_) {
+      return argumentsJson;
     }
   }
 

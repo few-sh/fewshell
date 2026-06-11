@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:decamp/themes/terminal_theme.dart';
+import 'package:decamp/utils/ansi_renderer.dart';
 
 /// Full-screen code viewer with hero animation and streaming support
 ///
@@ -104,13 +105,17 @@ class _FullScreenCodeViewState extends State<FullScreenCodeView> {
                       child: SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.all(12),
-                        child: Text(
-                          _displayedCode,
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: 14,
-                            color: widget.terminalTheme.textColor,
-                            height: 1.5,
+                        child: Text.rich(
+                          buildAnsiTextSpan(
+                            text: _displayedCode,
+                            baseStyle: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 14,
+                              color: widget.terminalTheme.textColor,
+                              height: 1.5,
+                            ),
+                            palette: widget.terminalTheme.ansiPalette,
+                            defaultForeground: widget.terminalTheme.textColor,
                           ),
                         ),
                       ),
