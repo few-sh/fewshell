@@ -11,5 +11,6 @@
         "3123": {
             "localPort": 4000
         }
-    }
+    },
+    "cmake.sourceDirectory": "${workspaceFolder}/decamp-app/linux"
 }
