@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,6 +46,27 @@ void main() async {
   // Ensure Flutter bindings are initialized before async operations
   WidgetsFlutterBinding.ensureInitialized();
   _log.info('WidgetsFlutterBinding initialized');
+
+  // Workaround for https://github.com/flutter/flutter/issues/83219
+  // The OS can deliver an unbalanced KeyDownEvent (e.g. after focus changes
+  // or IME interaction), which trips an assertion in HardwareKeyboard and
+  // then breaks all subsequent key input. Swallow that specific assertion
+  // and reset keyboard state so typing keeps working.
+  final previousOnError = FlutterError.onError;
+  FlutterError.onError = (details) {
+    final ex = details.exception;
+    if (ex is AssertionError &&
+        ex.toString().contains('_pressedKeys.containsKey')) {
+      // ignore: invalid_use_of_visible_for_testing_member
+      HardwareKeyboard.instance.clearState();
+      return;
+    }
+    if (previousOnError != null) {
+      previousOnError(details);
+    } else {
+      FlutterError.presentError(details);
+    }
+  };
 
   final appDocDir = await getApplicationDocumentsDirectory();
 
